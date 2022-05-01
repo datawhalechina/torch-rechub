@@ -6,7 +6,7 @@ Reference: "DeepFM: A Factorization-Machine based Neural Network for CTR Predict
 
 import torch
 
-from ..layers import FactorizationMachine, FeaturesEmbedding, FeaturesLinear, MultiLayerPerceptron
+from ..basic.layers import FactorizationMachine, EmbeddingLayer, MultiLayerPerceptron
 
 
 class DeepFM(torch.nn.Module):
@@ -14,22 +14,24 @@ class DeepFM(torch.nn.Module):
         Deep Factorization Machine Model
     """
 
-    def __init__(self, dense_field_nums, sparse_field_dims, embed_dim, mlp_dims, dropout):
-        super().__init__()
-        self.linear = FeaturesLinear(dense_field_nums)
+    def __init__(self, deep_features, fm_features, mlp_params):
+        super(DeepFM, self).__init__()
+        self.deep_features = deep_features
+        self.fm_features = fm_features
+        self.deep_dims = sum([fea.embed_dim for fea in deep_features])
+        self.fm_dims = sum([fea.embed_dim for fea in fm_features])
         self.fm = FactorizationMachine(reduce_sum=True)
-        self.embedding = FeaturesEmbedding(sparse_field_dims, embed_dim)
-        self.mlp = MultiLayerPerceptron(len(sparse_field_dims) * embed_dim, mlp_dims, dropout)
+        self.embedding = EmbeddingLayer(deep_features + fm_features)
+        self.mlp = MultiLayerPerceptron(self.deep_dims, **mlp_params)
 
     def forward(self, x):
         """
-        :param x_dense: Long tensor of size ``(batch_size, num_dense_fields)``
-        :param x_sparse: Long tensor of size ``(batch_size, num_sparse_fields)``
         """
-        x_dense, x_sparse = x["x_dense"], x["x_sparse"]
-        y_linear = self.linear(x_dense) #dense特征不参与交叉，建议提前离散化
-        embed_x = self.embedding(x_sparse)
-        y_fm = self.fm(embed_x)
-        y_deep = self.mlp(embed_x.flatten(start_dim=1))
-        y = y_linear + y_fm + y_deep
+
+        input_deep = self.embedding(x, self.deep_features, squeeze_dim=True)  #[batch_size, deep_dims]
+        input_fm = self.embedding(x, self.fm_features, squeeze_dim=False)  #[batch_size, num_fields, embed_dim]
+
+        y_deep = self.mlp(input_deep)  #[batch_size, 1]
+        y_fm = self.fm(input_fm)
+        y = y_fm + y_deep
         return torch.sigmoid(y.squeeze(1))

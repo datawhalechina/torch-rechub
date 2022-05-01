@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 
+
 class Dice(nn.Module):
+
     def __init__(self, epsilon=1e-3):
         super(Dice, self).__init__()
         self.epsilon = epsilon
@@ -19,13 +21,6 @@ class Dice(nn.Module):
         ps = nn.Sigmoid()(ps)  # N * 1
         return ps * x + (1 - ps) * self.alpha * x
 
-class Identity(nn.Module):
-
-    def __init__(self, **kwargs):
-        super(Identity, self).__init__()
-
-    def forward(self, inputs):
-        return inputs
 
 def activation_layer(act_name):
     """Construct activation layers
@@ -40,12 +35,10 @@ def activation_layer(act_name):
     if isinstance(act_name, str):
         if act_name.lower() == 'sigmoid':
             act_layer = nn.Sigmoid()
-        elif act_name.lower() == 'linear':
-            act_layer = Identity()
         elif act_name.lower() == 'relu':
             act_layer = nn.ReLU(inplace=True)
         elif act_name.lower() == 'dice':
-            act_layer = Dice() #hidden_size, dice_dim
+            act_layer = Dice()  #hidden_size, dice_dim
         elif act_name.lower() == 'prelu':
             act_layer = nn.PReLU()
     elif issubclass(act_name, nn.Module):

@@ -1,7 +1,10 @@
+import copy
+
+
 class EarlyStopper(object):
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self, patience, save_path):
+    def __init__(self, patience):
         """
         Args:
             patience (int): How long to wait after last time validation auc improved.
@@ -10,15 +13,16 @@ class EarlyStopper(object):
         self.patience = patience
         self.trial_counter = 0
         self.best_auc = 0
-        self.save_path = save_path
+        self.best_weights = None
 
-    def is_continuable(self, val_auc):
+    def stop_training(self, val_auc, weights):
         if val_auc > self.best_auc:
             self.best_auc = val_auc
             self.trial_counter = 0
-            return True
+            self.best_weights = copy.deepcopy(weights)
+            return False
         elif self.trial_counter + 1 < self.patience:
             self.trial_counter += 1
-            return True
-        else:
             return False
+        else:
+            return True

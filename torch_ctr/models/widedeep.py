@@ -6,25 +6,30 @@ Reference: "Wide & Deep Learning for Recommender Systems", DLRS, 2016
 
 import torch
 
-from ..layers import FeaturesLinear, MultiLayerPerceptron, FeaturesEmbedding
+from ..basic.layers import FeaturesLinear, MultiLayerPerceptron, EmbeddingLayer
 
-class WideAndDeep(torch.nn.Module):
 
-    def __init__(self, dense_field_nums, sparse_field_dims, embed_dim, mlp_dims, dropout):
-        super().__init__()
-        self.linear = FeaturesLinear(dense_field_nums)
-        self.embedding = FeaturesEmbedding(sparse_field_dims, embed_dim)
-        self.mlp = MultiLayerPerceptron(len(sparse_field_dims) * embed_dim, mlp_dims, dropout)
+class WideDeep(torch.nn.Module):
+
+    def __init__(self, wide_features, deep_features, mlp_params):
+        super(WideDeep, self).__init__()
+        self.wide_features = wide_features
+        self.deep_features = deep_features
+        self.wide_dims = sum([fea.embed_dim for fea in wide_features])
+        self.deep_dims = sum([fea.embed_dim for fea in deep_features])
+        self.linear = FeaturesLinear(self.wide_dims)
+        self.embedding = EmbeddingLayer(wide_features + deep_features)
+        self.mlp = MultiLayerPerceptron(self.deep_dims, **mlp_params)
 
     def forward(self, x):
         """
-        :param x_dense: Long tensor of size ``(batch_size, num_dense_fields)``
-        :param x_sparse: Long tensor of size ``(batch_size, num_sparse_fields)``
+        :param x: Long tensor of size ``(batch_size, num_dense_fields)``
         """
-        x_dense, x_sparse = x["x_dense"], x["x_sparse"]
-        y_wide = self.linear(x_dense)
-        embed_x = self.embedding(x_sparse)
-        y_deep = self.mlp(embed_x.flatten(start_dim=1))
+        input_wide = self.embedding(x, self.wide_features, squeeze_dim=True)  #[batch_size, wide_dims]
+        input_deep = self.embedding(x, self.deep_features, squeeze_dim=True)  #[batch_size, deep_dims]
+
+        y_wide = self.linear(input_wide)  #[batch_size, 1]
+        y_deep = self.mlp(input_deep)  #[batch_size, 1]
         y = y_wide + y_deep
         y = torch.sigmoid(y.squeeze(1))
         return y
