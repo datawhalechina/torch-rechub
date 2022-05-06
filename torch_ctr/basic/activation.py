@@ -41,6 +41,8 @@ def activation_layer(act_name):
             act_layer = Dice()  #hidden_size, dice_dim
         elif act_name.lower() == 'prelu':
             act_layer = nn.PReLU()
+        elif act_name.lower() == "softmax":
+            act_layer = nn.Softmax(dim=1)
     elif issubclass(act_name, nn.Module):
         act_layer = act_name()
     else:

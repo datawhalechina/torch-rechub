@@ -5,6 +5,24 @@ from .activation import activation_layer
 from .features import DenseFeature, SparseFeature, SequenceFeature
 
 
+class PredictionLayer(nn.Module):
+    """
+      Arguments
+         - **task**: str, ``"classification"`` for  binary logloss or  ``"regression"`` for regression loss
+    """
+
+    def __init__(self, task_type='classification'):
+        super(PredictionLayer, self).__init__()
+        if task_type not in ["classification", "regression"]:
+            raise ValueError("task_type must be classification or regression")
+        self.task_type = task_type
+
+    def forward(self, x):
+        if self.task_type == "classification":
+            x = torch.sigmoid(x)
+        return x
+
+
 class EmbeddingLayer(nn.Module):
     """General Embedding Layer
     Args:
@@ -67,8 +85,7 @@ class EmbeddingLayer(nn.Module):
                 if fea.shared_with == None:
                     sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long())).unsqueeze(1))
                 else:
-                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](
-                        x[fea.name].long())).unsqueeze(1))  #shared specific sparse feature embedding
+                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long())).unsqueeze(1))  #shared specific sparse feature embedding
             else:
                 dense_values.append(x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
 
@@ -93,11 +110,10 @@ class EmbeddingLayer(nn.Module):
             if sparse_exists:
                 return sparse_emb  #[batch_size, num_features, embed_dim]
             else:
-                raise ValueError("If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" %
-                                 ("SparseFeatures", features))
+                raise ValueError("If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" % ("SparseFeatures", features))
 
 
-class FeaturesLinear(nn.Module):
+class LR(nn.Module):
     """
         Logistic Regression
     """
@@ -244,7 +260,12 @@ class SequenceFeaturesEmbedding(nn.Module):
             return sequence_emb
 
 
-class MultiLayerPerceptron(nn.Module):
+class MLP(nn.Module):
+    """Multi Layer Perceptron
+
+    Args:
+        nn (_type_): _description_
+    """
 
     def __init__(self, input_dim, dims, dropout=0, activation="relu", output_layer=True):
         super().__init__()

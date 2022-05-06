@@ -4,11 +4,10 @@ sys.path.append("../")
 
 import numpy as np
 import pandas as pd
-import pickle
 import torch
 from torch_ctr.models import WideDeep, DeepFM, DIN
-from torch_ctr.basic.trainer import CTRTrainer
-from torch_ctr.basic.features import DenseFeature, SparseFeature, SequenceFeature
+from torch_ctr.trainers import CTRTrainer
+from torch_ctr.basic.features import DenseFeature, SparseFeature
 from torch_ctr.basic.utils import DataGenerator
 from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder

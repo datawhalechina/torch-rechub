@@ -6,7 +6,7 @@ Reference: "Wide & Deep Learning for Recommender Systems", DLRS, 2016
 
 import torch
 
-from ..basic.layers import FeaturesLinear, MultiLayerPerceptron, EmbeddingLayer
+from ..basic.layers import LR, MLP, EmbeddingLayer
 
 
 class WideDeep(torch.nn.Module):
@@ -17,9 +17,9 @@ class WideDeep(torch.nn.Module):
         self.deep_features = deep_features
         self.wide_dims = sum([fea.embed_dim for fea in wide_features])
         self.deep_dims = sum([fea.embed_dim for fea in deep_features])
-        self.linear = FeaturesLinear(self.wide_dims)
+        self.linear = LR(self.wide_dims)
         self.embedding = EmbeddingLayer(wide_features + deep_features)
-        self.mlp = MultiLayerPerceptron(self.deep_dims, **mlp_params)
+        self.mlp = MLP(self.deep_dims, **mlp_params)
 
     def forward(self, x):
         """

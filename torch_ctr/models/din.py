@@ -7,7 +7,7 @@ Reference: "Deep Interest Network for Click-Through Rate Prediction", KDD, 2018
 import torch
 import torch.nn as nn
 
-from ..basic.layers import EmbeddingLayer, MultiLayerPerceptron
+from ..basic.layers import EmbeddingLayer, MLP
 
 
 class DIN(nn.Module):
@@ -36,7 +36,7 @@ class DIN(nn.Module):
 
         self.all_dims = sum([fea.embed_dim for fea in features + history_features + target_features])
         self.embedding = EmbeddingLayer(features + history_features + target_features)
-        self.mlp = MultiLayerPerceptron(self.all_dims, **mlp_params)
+        self.mlp = MLP(self.all_dims, **mlp_params)
 
         self.attention_layers = nn.ModuleList([ActivationUnit(fea.embed_dim, **attention_mlp_params) for fea in self.history_features])
 
@@ -55,15 +55,12 @@ class DIN(nn.Module):
         embed_x_history = self.embedding(x, self.history_features)  #(batch_size, num_history_features, seq_length, emb_dim)
         embed_x_target = self.embedding(x, self.target_features)  #(batch_size, num_target_features, emb_dim)
         attention_pooling = []
-        for i in range(self.num_history_features):  #为每一个序列特征都训练一个独立的激活单元 eg.历史序列item id，历史序列item id品牌
+        for i in range(self.num_history_features):
             attention_seq = self.attention_layers[i](embed_x_history[:, i, :, :], embed_x_target[:, i, :])
             attention_pooling.append(attention_seq.unsqueeze(1))  #(batch_size, 1, emb_dim)
         attention_pooling = torch.cat(attention_pooling, dim=1)  #(batch_size, num_history_features, emb_dim)
 
-        mlp_in = torch.cat([attention_pooling.flatten(start_dim=1),
-                            embed_x_target.flatten(start_dim=1),
-                            embed_x_features.flatten(start_dim=1)],
-                           dim=1)  #(batch_size, N)
+        mlp_in = torch.cat([attention_pooling.flatten(start_dim=1), embed_x_target.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  #(batch_size, N)
 
         y = self.mlp(mlp_in)
         return torch.sigmoid(y.squeeze(1))
@@ -78,16 +75,16 @@ class ActivationUnit(torch.nn.Module):
         super(ActivationUnit, self).__init__()
         self.emb_dim = emb_dim
         self.use_softmax = use_softmax
-        self.attention = MultiLayerPerceptron(4 * self.emb_dim, dims, activation=activation)
+        self.attention = MLP(4 * self.emb_dim, dims, activation=activation)
 
-    def forward(self, history, candidate):
+    def forward(self, history, target):
         """
         :param history: Long tensor of size ``(batch_size, seq_length, emb_dim) ``
-        :param candidate: Long tensor of size ``(batch_size, emb_dim)``
+        :param target: Long tensor of size ``(batch_size, emb_dim)``
         """
         seq_length = history.size(1)
-        candidate = candidate.unsqueeze(1).expand(-1, seq_length, -1)  #batch_size,seq_length,emb_dim
-        att_input = torch.cat([candidate, history, candidate - history, candidate * history], dim=-1)  # batch_size,seq_length,4*emb_dim
+        target = target.unsqueeze(1).expand(-1, seq_length, -1)  #batch_size,seq_length,emb_dim
+        att_input = torch.cat([target, history, target - history, target * history], dim=-1)  # batch_size,seq_length,4*emb_dim
         att_weight = self.attention(att_input.view(-1, 4 * self.emb_dim))  #  #(batch_size*seq_length,4*emb_dim)
         att_weight = att_weight.view(-1, seq_length)  #(batch_size*seq_length, 1) -> (batch_size,seq_length)
         if self.use_softmax:
