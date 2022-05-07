@@ -1,8 +1,11 @@
 """
-Created on 4 May, 2022
-Reference: Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts (KDD'2018)
-@author: Mincai Lai, laimincai@shanghaitech.edu.cn
+Date: create on 04/05/2022
+References: 
+    paper: (KDD'2018) Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts
+    url: https://dl.acm.org/doi/pdf/10.1145/3219819.3220007
+Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
+
 import torch
 import torch.nn as nn
 
@@ -10,9 +13,18 @@ from ...basic.layers import MLP, EmbeddingLayer, PredictionLayer
 
 
 class MMOE(nn.Module):
+    """Multi-gate Mixture-of-Experts model.
+
+    Args:
+        features (list): the list of `Feature Class`, training by the expert and tower module.
+        task_types (list): types of tasks, only support `["classfication", "regression"]`.
+        n_expert (int): the number of expert net.
+        expert_params (dict): the params of all the expert module, keys include:`{"dims":list, "activation":str, "dropout":float}, keep `{"output_layer":False}`.
+        tower_params_list (list): the list of tower params dict, the keys same as expert_params.
+    """
 
     def __init__(self, features, task_types, n_expert, expert_params, tower_params_list):
-        super(MMOE, self).__init__()
+        super().__init__()
         self.features = features
         self.task_types = task_types
         self.n_task = len(task_types)
@@ -20,11 +32,7 @@ class MMOE(nn.Module):
         self.embedding = EmbeddingLayer(features)
         self.input_dims = sum([fea.embed_dim for fea in features])
         self.experts = nn.ModuleList(MLP(self.input_dims, **{**expert_params, **{"output_layer": False}}) for i in range(self.n_expert))
-        self.gates = nn.ModuleList(MLP(self.input_dims, **{
-            "dims": [self.n_expert],
-            "activation": "softmax",
-            "output_layer": False
-        }) for i in range(self.n_task))  #n_gate = n_task
+        self.gates = nn.ModuleList(MLP(self.input_dims, **{"dims": [self.n_expert], "activation": "softmax", "output_layer": False}) for i in range(self.n_task))  #n_gate = n_task
         self.towers = nn.ModuleList(MLP(expert_params["dims"][-1], **tower_params_list[i]) for i in range(self.n_task))
         self.predict_layers = nn.ModuleList(PredictionLayer(task_type) for task_type in task_types)
 

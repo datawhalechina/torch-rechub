@@ -1,14 +1,31 @@
-import imp
 import os
-import torch
 import tqdm
 import numpy as np
+import torch
+import torch.nn as nn
 from ..basic.callback import EarlyStopper
 from ..basic.utils import get_loss_func, get_metric_func
 from ..models.multi_task import ESMM
 
 
 class MTLTrainer(object):
+    """A trainer for multi task learning.
+
+    Args:
+        model (nn.Module): any multi task learning model.
+        task_types (list): types of tasks, only support ["classfication", "regression"].
+        optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
+        optimizer_params (dict): parameters of optimizer_fn.
+        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_params (dict): parameters of optimizer scheduler_fn.
+        adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`. 
+        n_epoch (int): epoch number of training.
+        earlystop_taskid (int): task id of earlystop metrics relies between multi task (default = 0).
+        earlystop_patience (int): how long to wait after last time validation auc improved (default = 10).
+        device (str): `"cpu"` or `"cuda:0"`
+        gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
+        model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+    """
 
     def __init__(
         self,
@@ -21,6 +38,7 @@ class MTLTrainer(object):
         },
         scheduler_fn=None,
         scheduler_params=None,
+        adaptive_params=None,
         n_epoch=10,
         earlystop_taskid=0,
         earlystop_patience=10,
@@ -28,11 +46,16 @@ class MTLTrainer(object):
         gpus=[],
         model_path="./",
     ):
-        super(MTLTrainer, self).__init__()
-
         self.model = model
         self.task_types = task_types
         self.n_task = len(task_types)
+        self.loss_weight = None
+        self.adaptive_method = None
+        if adaptive_params is not None:
+            if adaptive_params["method"] == "uwl":
+                self.adaptive_method = "uwl"
+                self.loss_weight = nn.ParameterList(nn.Parameter(torch.zeros(1)) for _ in range(self.n_task))
+                self.model.add_module("loss weight", self.loss_weight)
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default Adam optimizer
         self.scheduler = None
         if scheduler_fn is not None:
@@ -43,6 +66,7 @@ class MTLTrainer(object):
         self.earlystop_taskid = earlystop_taskid
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.device = torch.device(device)
+
         self.gpus = gpus
         if len(gpus) > 1:
             print('parallel running on these gpus:', gpus)
@@ -61,15 +85,24 @@ class MTLTrainer(object):
             if isinstance(self.model, ESMM):
                 loss = sum(loss_list[1:])  #ESSM only compute loss for ctr and ctcvr task
             else:
-                loss = sum(loss_list)
+                if self.adaptive_method != None:
+                    if self.adaptive_method == "uwl":
+                        loss = 0
+                        for loss_i, w_i in zip(loss_list, self.loss_weight):
+                            w_i = torch.clamp(w_i, min=0)
+                            loss += 2 * loss_i * torch.exp(-w_i) + w_i
+                else:
+                    loss = sum(loss_list) / self.n_task
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
             total_loss += np.array([l.item() for l in loss_list])
         log_dict = {"task_%d:" % (i): total_loss[i] / (iter_i + 1) for i in range(self.n_task)}
         print("train loss: ", log_dict)
+        if self.loss_weight:
+            print("loss weight: ", [w.item() for w in self.loss_weight])
 
-    def train(self, train_dataloader, val_dataloader):
+    def fit(self, train_dataloader, val_dataloader):
         self.model.to(self.device)
         for epoch_i in range(self.n_epoch):
             self.train_one_epoch(train_dataloader)

@@ -62,4 +62,3 @@ auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
 > - 一个预处理脚本，将原始数据进行预处理，转化成csv。
 > - 数据格式参考文件（100条）。
 > - 全量数据，统一的csv文件，提供高速网盘下载链接和原始数据链接。
-

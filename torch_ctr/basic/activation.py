@@ -3,6 +3,9 @@ import torch.nn as nn
 
 
 class Dice(nn.Module):
+    """The Dice activation function mentioned in the `DIN paper
+    https://arxiv.org/abs/1706.06978`
+    """
 
     def __init__(self, epsilon=1e-3):
         super(Dice, self).__init__()
@@ -27,9 +30,8 @@ def activation_layer(act_name):
 
     Args:
         act_name: str or nn.Module, name of activation function
-        #hidden_size: int, used for Dice activation
-        #dice_dim: int, used for Dice activation
-    Return:
+    
+    Returns:
         act_layer: activation layer
     """
     if isinstance(act_name, str):
@@ -38,7 +40,7 @@ def activation_layer(act_name):
         elif act_name.lower() == 'relu':
             act_layer = nn.ReLU(inplace=True)
         elif act_name.lower() == 'dice':
-            act_layer = Dice()  #hidden_size, dice_dim
+            act_layer = Dice()
         elif act_name.lower() == 'prelu':
             act_layer = nn.PReLU()
         elif act_name.lower() == "softmax":

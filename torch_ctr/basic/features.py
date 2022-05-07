@@ -1,16 +1,21 @@
 from .utils import get_auto_embedding_dim
 
 
-class SequenceFeature():
-    """
+class SequenceFeature(object):
+    """The Feature Class for Sequence feature or multi-hot feature.
+    In recommendation, there are many user behaviour features which we want to take the sequence model
+    and tag featurs (multi hot) which we want to pooling. Note that if you use this feature, you must padding
+    the feature value before training.
+
+    Args:
+        name (str): feature's name.
+        vocab_size (int): vocabulary size of embedding table.
+        embed_dim (int): embedding vector's length
+        pooling (str): pooling method, support `["mean", "sum", "concat"]` (default=`"mean"`)
+        shared_with (str): the another feature name which this feature will shared with embedding.
     """
 
-    def __init__(self, name, vocab_size, embed_dim, pooling="mean", shared_with=None):
-        """
-        :param name: String, means sparse feature's name
-        :param vocab_size: Integer, means vocabulary size
-        :param embed_dim: Integer, means embedding vector's length
-        """
+    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:
@@ -21,16 +26,16 @@ class SequenceFeature():
         self.shared_with = shared_with
 
 
-class SparseFeature():
-    """
+class SparseFeature(object):
+    """The Feature Class for Sparse feature.
+
+    Args:
+        name (str): feature's name.
+        vocab_size (int): vocabulary size of embedding table.
+        embed_dim (int): embedding vector's length
     """
 
     def __init__(self, name, vocab_size, embed_dim=None):
-        """
-        :param name: String, means sparse feature's name
-        :param vocab_size: Integer, means vocabulary size
-        :param embed_dim: Integer, means embedding vector's length
-        """
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:
@@ -39,13 +44,14 @@ class SparseFeature():
             self.embed_dim = embed_dim
 
 
-class DenseFeature():
-    """
+class DenseFeature(object):
+    """The Feature Class for Dense feature.
+
+    Args:
+        name (str): feature's name.
+        embed_dim (int): embedding vector's length, the value fixed `1`.
     """
 
     def __init__(self, name):
-        """
-        :param name: String, means dense feature's name
-        """
         self.name = name
         self.embed_dim = 1

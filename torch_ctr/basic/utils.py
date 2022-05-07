@@ -1,9 +1,7 @@
 import random
-
 import torch
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader, random_split
 from sklearn.metrics import roc_auc_score, mean_squared_error
 
@@ -64,9 +62,12 @@ def get_auto_embedding_dim(num_classes):
     """ Calculate the dim of embedding vector according to number of classes in the category
     emb_dim = [6 * (num_classes)^(1/4)]
     reference: Deep & Cross Network for Ad Click Predictions.(ADKDD'17)
-
-    :param num_classes: number of classes in the category
-    :return: the dim of embedding vector
+    
+    Args:
+        num_classes: number of classes in the category
+    
+    Returns:
+        the dim of embedding vector
     """
     return np.floor(6 * np.pow(num_classes, 0.26))
 
@@ -90,37 +91,37 @@ def get_metric_func(task_type="classification"):
 
 
 def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
-    """
-    Build builds a sequence of user actions in chronological order
+    """Build a sequence of user's history by time.
+    
     Args:
-        data: your DataFrame, and must have key: user_id, item_id, cate_id, time
-        max_len: the max length of a user history sequence
-        drop_short: remove some inactive user whos sequence < drop_short
-        shuffle: shuffle data if true
-    Returns: 3 DataFrame, train, val and test. In test, target item is final one item of an user,
-    in val, target item is penultimate item of an user.
+        data (pd.DataFrame): must contain keys: `user_id, item_id, cate_id, time`.
+        max_len (int): the max length of a user history sequence.
+        drop_short (int): remove some inactive user who's sequence length < drop_short.
+        shuffle (bool): shuffle data if true.
+    
+    Returns: 
+        train (pd.DataFrame): target item will be each item before last two items.
+        val (pd.DataFrame): target item is the second to last item of user's history sequence.
+        test (pd.DataFrame): target item is the last item of user's history sequence.
     """
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     # 0 to be used as the symbol for padding
     data = data.astype('int32')
-    data['item_id'] = data['item_id'].apply(lambda x: x+1)
-    data['cate_id'] = data['cate_id'].apply(lambda x: x+1)
+    data['item_id'] = data['item_id'].apply(lambda x: x + 1)
+    data['cate_id'] = data['cate_id'].apply(lambda x: x + 1)
 
     item_cate_map = data[['item_id', 'cate_id']]
     item2cate_dict = item_cate_map.set_index(['item_id'])['cate_id'].to_dict()
 
-    data = data.sort_values(['user_id', 'time']).groupby('user_id').agg(
-        click_hist_list=('item_id', list),
-        cate_hist_hist=('cate_id', list)
-    ).reset_index()
+    data = data.sort_values(['user_id', 'time']).groupby('user_id').agg(click_hist_list=('item_id', list), cate_hist_hist=('cate_id', list)).reset_index()
 
     # Sliding window to construct negative samples
     train_data, val_data, test_data = [], [], []
     for item in data.itertuples():
         if len(item[2]) < drop_short:
             continue
-        click_hist_list = item[2][: max_len]
-        cate_hist_list = item[3][: max_len]
+        click_hist_list = item[2][:max_len]
+        cate_hist_list = item[3][:max_len]
 
         def neg_sample():
             neg = click_hist_list[0]
@@ -159,10 +160,9 @@ def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
 
     return train, val, test
 
+
 def df_to_input_dict(data):
     data_dict = data.to_dict('list')
     for key in data.keys():
         data_dict[key] = np.array(data_dict[key])
     return data_dict
-
-

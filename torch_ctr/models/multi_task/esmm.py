@@ -1,18 +1,29 @@
 """
-Created on 4 May, 2022
-Reference: Entire Space Multi-Task Model: An Effective Approach for Estimating Post-Click Conversion Rate (SIGIR'2018)
-@author: Mincai Lai, laimincai@shanghaitech.edu.cn
+Date: create on 04/05/2022
+References: 
+    paper: (SIGIR'2018) Entire Space Multi-Task Model: An Effective Approach for Estimating Post-Click Conversion Rate 
+    url: https://arxiv.org/abs/1804.07931
+Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
+
 import torch
 import torch.nn as nn
 
-from ...basic.layers import MLP, EmbeddingLayer, PredictionLayer
+from ...basic.layers import MLP, EmbeddingLayer
 
 
 class ESMM(nn.Module):
+    """Entire Space Multi-Task Model
+
+    Args:
+        user_features (list): the list of `Feature Class`, training by shared bottom and tower module. It means the user features.
+        item_features (list): the list of `Feature Class`, training by shared bottom and tower module. It means the item features.
+        cvr_params (dict): the params of the CVR Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
+        ctr_params (dict): the params of the CTR Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
+    """
 
     def __init__(self, user_features, item_features, cvr_params, ctr_params):
-        super(ESMM, self).__init__()
+        super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.embedding = EmbeddingLayer(user_features + item_features)

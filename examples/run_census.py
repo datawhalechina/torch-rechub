@@ -1,8 +1,8 @@
 import sys
 
 sys.path.append("../")
+
 import pandas as pd
-import numpy as np
 import torch
 from torch_ctr.models.multi_task import SharedBottom, ESMM, MMOE, PLE
 from torch_ctr.trainers import MTLTrainer
@@ -10,10 +10,10 @@ from torch_ctr.basic.features import DenseFeature, SparseFeature
 from torch_ctr.basic.utils import DataGenerator
 
 
-def get_census_data_dict(model_name):
-    df_train = pd.read_csv('./census-income/census_income_train.csv')
-    df_val = pd.read_csv('./census-income/census_income_val.csv')
-    df_test = pd.read_csv('./census-income/census_income_test.csv')
+def get_census_data_dict(model_name, data_path='./data/census-income'):
+    df_train = pd.read_csv(data_path + '/census_income_train.csv')
+    df_val = pd.read_csv(data_path + '/census_income_val.csv')
+    df_test = pd.read_csv(data_path + '/census_income_test.csv')
     print("train : val : test = %d %d %d" % (len(df_train), len(df_val), len(df_test)))
     train_idx, val_idx = df_train.shape[0], df_train.shape[0] + df_val.shape[0]
     data = pd.concat([df_train, df_val, df_test], axis=0)
@@ -49,7 +49,7 @@ def get_census_data_dict(model_name):
         return features, x_train, y_train, x_val, y_val, x_test, y_test
 
 
-def main(dataset_name, dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
     torch.manual_seed(seed)
     #for fair compare in paper, input_dim = 34*4+7=142 #34 sparse(embed_dim=4), 7 dense
     # MMOE 8 expert:143 * 16 * 8 + 16 * 8 * 2 = 18560,
@@ -69,13 +69,16 @@ def main(dataset_name, dataset_path, model_name, epoch, learning_rate, batch_siz
     elif model_name == "PLE":
         features, x_train, y_train, x_val, y_val, x_test, y_test = get_census_data_dict(model_name)
         task_types = ["classification", "classification"]
-        model = PLE(features, task_types, n_level=2, n_expert_specific=2, n_expert_shared=1, expert_params={"dims": [16], "output_layer": False}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
+        model = PLE(features, task_types, n_level=1, n_expert_specific=2, n_expert_shared=1, expert_params={"dims": [16], "output_layer": False}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
 
     dg = DataGenerator(x_train, y_train)
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=batch_size)
 
+    #adaptive weight loss:
+    #mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, adaptive_params={"method": "uwl"}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
+
     mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=30, device=device, model_path=save_dir)
-    mtl_trainer.train(train_dataloader, val_dataloader)
+    mtl_trainer.fit(train_dataloader, val_dataloader)
     auc = mtl_trainer.evaluate(mtl_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
 
@@ -83,22 +86,20 @@ def main(dataset_name, dataset_path, model_name, epoch, learning_rate, batch_siz
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_name', default='amazon')
-    parser.add_argument('--dataset_path', default="./amazon/data/amazon_dict.pkl")
     parser.add_argument('--model_name', default='SharedBottom')
     parser.add_argument('--epoch', type=int, default=100)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=1024)
+    parser.add_argument('--batch_size', type=int, default=16)  #1024
     parser.add_argument('--weight_decay', type=float, default=1e-4)
-    parser.add_argument('--device', default='cuda:0')
-    parser.add_argument('--save_dir', default='./adult/saved_model')
+    parser.add_argument('--device', default='cpu')  #cuda:0
+    parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
 
     args = parser.parse_args()
-    main(args.dataset_name, args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
 """
-run script:
-python run_census.py
+python run_census.py --model_name SharedBottom
 python run_census.py --model_name ESMM
 python run_census.py --model_name MMOE
+python run_census.py --model_name PLE
 """

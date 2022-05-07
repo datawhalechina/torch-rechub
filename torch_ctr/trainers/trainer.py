@@ -6,6 +6,20 @@ from ..basic.callback import EarlyStopper
 
 
 class CTRTrainer(object):
+    """A general trainer for single task learning.
+
+    Args:
+        model (nn.Module): any multi task learning model.
+        optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
+        optimizer_params (dict): parameters of optimizer_fn.
+        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_params (dict): parameters of optimizer scheduler_fn.
+        n_epoch (int): epoch number of training.
+        earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
+        device (str): `"cpu"` or `"cuda:0"`
+        gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
+        model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+    """
 
     def __init__(
         self,
@@ -56,7 +70,7 @@ class CTRTrainer(object):
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
-    def train(self, train_dataloader, val_dataloader):
+    def fit(self, train_dataloader, val_dataloader):
         self.model.to(self.device)
         for epoch_i in range(self.n_epoch):
             self.train_one_epoch(train_dataloader)
