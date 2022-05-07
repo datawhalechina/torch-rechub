@@ -70,7 +70,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/criteo/criteo_sample.csv")
     parser.add_argument('--model_name', default='widedeep')
-    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--epoch', type=int, default=2)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=16)  #4096
     parser.add_argument('--weight_decay', type=float, default=1e-3)

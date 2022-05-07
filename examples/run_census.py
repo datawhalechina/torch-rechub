@@ -11,9 +11,9 @@ from torch_ctr.basic.utils import DataGenerator
 
 
 def get_census_data_dict(model_name, data_path='./data/census-income'):
-    df_train = pd.read_csv(data_path + '/census_income_train.csv')
-    df_val = pd.read_csv(data_path + '/census_income_val.csv')
-    df_test = pd.read_csv(data_path + '/census_income_test.csv')
+    df_train = pd.read_csv(data_path + '/census_income_train_sample.csv')
+    df_val = pd.read_csv(data_path + '/census_income_val_sample.csv')
+    df_test = pd.read_csv(data_path + '/census_income_test_sample.csv')
     print("train : val : test = %d %d %d" % (len(df_train), len(df_val), len(df_test)))
     train_idx, val_idx = df_train.shape[0], df_train.shape[0] + df_val.shape[0]
     data = pd.concat([df_train, df_val, df_test], axis=0)
@@ -32,8 +32,8 @@ def get_census_data_dict(model_name, data_path='./data/census-income'):
         #ESMM only for sparse features in origin paper
         user_cols = ['industry code', 'occupation code', 'race', 'education', 'sex']  #assumption features split for user and item
         item_cols = [col for col in sparse_cols if col not in user_cols]
-        user_features = [SparseFeature(col, data[col].nunique(), embed_dim=16) for col in user_cols]
-        item_features = [SparseFeature(col, data[col].nunique(), embed_dim=16) for col in item_cols]
+        user_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in user_cols]
+        item_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in item_cols]
         x_train, y_train = {name: data[name].values[:train_idx] for name in sparse_cols}, data[label_cols].values[:train_idx]
         x_val, y_val = {name: data[name].values[train_idx:val_idx] for name in sparse_cols}, data[label_cols].values[train_idx:val_idx]
         x_test, y_test = {name: data[name].values[val_idx:] for name in sparse_cols}, data[label_cols].values[val_idx:]
@@ -41,7 +41,7 @@ def get_census_data_dict(model_name, data_path='./data/census-income'):
     else:
         label_cols = ['cvr_label', 'ctr_label']  #the order of labels can be any
         used_cols = sparse_cols + dense_cols
-        features = [SparseFeature(col, data[col].nunique(), embed_dim=4)for col in sparse_cols] \
+        features = [SparseFeature(col, data[col].max()+1, embed_dim=4)for col in sparse_cols] \
                    + [DenseFeature(col) for col in dense_cols]
         x_train, y_train = {name: data[name].values[:train_idx] for name in used_cols}, data[label_cols].values[:train_idx]
         x_val, y_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}, data[label_cols].values[train_idx:val_idx]
@@ -87,9 +87,9 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', default='SharedBottom')
-    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--epoch', type=int, default=2)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=16)  #1024
+    parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--device', default='cpu')  #cuda:0
     parser.add_argument('--save_dir', default='./')

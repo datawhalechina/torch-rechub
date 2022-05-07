@@ -60,9 +60,9 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/amazon/amazon_sample.csv")
-    parser.add_argument('--epoch', type=int, default=2)
+    parser.add_argument('--epoch', type=int, default=2)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=16)  #4096
+    parser.add_argument('--batch_size', type=int, default=4096)
     parser.add_argument('--weight_decay', type=float, default=1e-3)
     parser.add_argument('--device', default='cpu')  #cuda:0
     parser.add_argument('--save_dir', default='./')
