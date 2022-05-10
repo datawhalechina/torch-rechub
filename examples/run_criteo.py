@@ -5,10 +5,10 @@ sys.path.append("../")
 import numpy as np
 import pandas as pd
 import torch
-from torch_ctr.models.ranking import WideDeep, DeepFM
-from torch_ctr.trainers import CTRTrainer
-from torch_ctr.basic.features import DenseFeature, SparseFeature
-from torch_ctr.basic.utils import DataGenerator
+from torch_rechub.models.ranking import WideDeep, DeepFM
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.basic.utils import DataGenerator
 from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 

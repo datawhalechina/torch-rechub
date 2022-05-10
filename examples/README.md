@@ -8,6 +8,8 @@
 
   使用其中带label的`train.txt`。
 
+- csv格式高速网盘下载链接：https://cowtransfer.com/s/3f5e873a254b43
+
 - 使用方法
 
   ```Python

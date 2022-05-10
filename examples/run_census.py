@@ -4,10 +4,10 @@ sys.path.append("../")
 
 import pandas as pd
 import torch
-from torch_ctr.models.multi_task import SharedBottom, ESMM, MMOE, PLE
-from torch_ctr.trainers import MTLTrainer
-from torch_ctr.basic.features import DenseFeature, SparseFeature
-from torch_ctr.basic.utils import DataGenerator
+from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE
+from torch_rechub.trainers import MTLTrainer
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.basic.utils import DataGenerator
 
 
 def get_census_data_dict(model_name, data_path='./data/census-income'):

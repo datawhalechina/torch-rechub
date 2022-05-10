@@ -1,19 +1,22 @@
-# torch-ctr
+# Torch-RecHub
 
-一个轻量级的基于Pytorch开发的推荐系统框架，易用易拓展。
+A Lighting Pytorch Framework for Recommendation Models, Easy-to-use and Easy-to-extend.
+
+## 安装
+
+```python
+pip install torch-rechub
+```
 
 ## 主要特性
 
 - scikit-learn风格易用的API（fit、predict），即插即用
 - 训练过程与模型定义解耦，易拓展，可针对不同类型的模型设置不同的训练机制
 - 使用Pytorch原生Dataset、DataLoader，易修改，自定义数据
-- 高度模块化，支持常见Layer，容易调用组装成新模型
-  - 浅层模块：LR、MLP
-  - 交互模块：FM、FFM
-  - Attention机制：target-attention、self-attention等
+- 高度模块化，支持常见Layer（MLP、FM、FFM、target-attention、self-attention、transformer等），容易调用组装成新模型
 - 支持常见排序模型（WideDeep、DeepFM、DIN、DCN、xDeepFM等）
 
-- [ ] 支持常见召回模型（DSSM、YoutubeDNN、Swing、SARSRec等）
+- [ ] 支持常见召回模型（DSSM、YoutubeDNN、MIND、SARSRec等）
 - 丰富的多任务学习支持
   - SharedBottom、ESMM、MMOE、PLE、AITM等模型
   - GradNorm、UWL等动态loss加权机制
@@ -30,9 +33,9 @@
 ## 快速使用
 
 ```python
-from torch_ctr.models import WideDeep, DeepFM, DIN
-from torch_ctr.trainers import CTRTrainer
-from torch_ctr.basic.utils import DataGenerator
+from torch_rechub.models import WideDeep, DeepFM, DIN
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.basic.utils import DataGenerator
 
 dg = DataGenerator(x, y)
 train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader()
@@ -62,3 +65,8 @@ auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
 > - 一个预处理脚本，将原始数据进行预处理，转化成csv。
 > - 数据格式参考文件（100条）。
 > - 全量数据，统一的csv文件，提供高速网盘下载链接和原始数据链接。
+
+
+
+[初步规划TODO清单](https://user-images.githubusercontent.com/11856746/167436396-f9c5de5b-d341-4697-8b91-884d4ae552be.png)
+

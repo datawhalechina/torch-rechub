@@ -5,10 +5,10 @@ sys.path.append("../")
 import pandas as pd
 import torch
 from sklearn.preprocessing import LabelEncoder
-from torch_ctr.models.ranking import DIN
-from torch_ctr.trainers import CTRTrainer
-from torch_ctr.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_ctr.basic.utils import DataGenerator, create_seq_features, df_to_input_dict
+from torch_rechub.models.ranking import DIN
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
+from torch_rechub.basic.utils import DataGenerator, create_seq_features, df_to_input_dict
 
 
 def get_amazon_data_dict(dataset_path):
