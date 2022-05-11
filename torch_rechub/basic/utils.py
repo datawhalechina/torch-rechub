@@ -2,8 +2,9 @@ import random
 import torch
 import numpy as np
 import pandas as pd
-from torch.utils.data import Dataset, DataLoader, random_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import roc_auc_score, mean_squared_error
+from torch.utils.data import Dataset, DataLoader, random_split
 
 
 class TorchDataset(Dataset):
@@ -90,25 +91,28 @@ def get_metric_func(task_type="classification"):
         raise ValueError("task_type must be classification or regression")
 
 
-def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
+def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50, drop_short=3, shuffle=True):
     """Build a sequence of user's history by time.
-    
+
     Args:
         data (pd.DataFrame): must contain keys: `user_id, item_id, cate_id, time`.
+        seq_feature_col (list): specify the column name that needs to generate sequence features, and its sequence features will be generated according to userid.
         max_len (int): the max length of a user history sequence.
         drop_short (int): remove some inactive user who's sequence length < drop_short.
         shuffle (bool): shuffle data if true.
-    
-    Returns: 
+
+    Returns:
         train (pd.DataFrame): target item will be each item before last two items.
         val (pd.DataFrame): target item is the second to last item of user's history sequence.
         test (pd.DataFrame): target item is the last item of user's history sequence.
     """
-    n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
-    # 0 to be used as the symbol for padding
+    for feat in data:
+        le = LabelEncoder()
+        data[feat] = le.fit_transform(data[feat])
+        data[feat] = data[feat].apply(lambda x: x + 1) # 0 to be used as the symbol for padding
     data = data.astype('int32')
-    data['item_id'] = data['item_id'].apply(lambda x: x + 1)
-    data['cate_id'] = data['cate_id'].apply(lambda x: x + 1)
+
+    n_items = data["item_id"].max()
 
     item_cate_map = data[['item_id', 'cate_id']]
     item2cate_dict = item_cate_map.set_index(['item_id'])['cate_id'].to_dict()
@@ -120,16 +124,11 @@ def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
     for item in data.itertuples():
         if len(item[2]) < drop_short:
             continue
+        user_id = item[1]
         click_hist_list = item[2][:max_len]
         cate_hist_list = item[3][:max_len]
 
-        def neg_sample():
-            neg = click_hist_list[0]
-            while neg in click_hist_list:
-                neg = random.randint(1, n_items)
-            return neg
-
-        neg_list = [neg_sample() for _ in range(len(click_hist_list))]
+        neg_list = [neg_sample(click_hist_list, n_items) for _ in range(len(click_hist_list))]
         hist_list = []
         cate_list = []
         for i in range(1, len(click_hist_list)):
@@ -138,14 +137,14 @@ def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
             hist_list_pad = hist_list + [0] * (max_len - len(hist_list))
             cate_list_pad = cate_list + [0] * (max_len - len(cate_list))
             if i == len(click_hist_list) - 1:
-                test_data.append([hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
-                test_data.append([hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+                test_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                test_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
             if i == len(click_hist_list) - 2:
-                val_data.append([hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
-                val_data.append([hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+                val_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                val_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
             else:
-                train_data.append([hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
-                train_data.append([hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+                train_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                train_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
 
     # shuffle
     if shuffle:
@@ -153,7 +152,7 @@ def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
         random.shuffle(val_data)
         random.shuffle(test_data)
 
-    col_name = ['history_item', 'history_cate', 'target_item', 'target_cate', 'label']
+    col_name = ['user_id', 'history_item', 'history_cate', 'target_item', 'target_cate', 'label']
     train = pd.DataFrame(train_data, columns=col_name)
     val = pd.DataFrame(val_data, columns=col_name)
     test = pd.DataFrame(test_data, columns=col_name)
@@ -162,7 +161,21 @@ def create_seq_features(data, max_len=50, drop_short=3, shuffle=True):
 
 
 def df_to_input_dict(data):
+    """
+    Convert the DataFrame to a dict type input that the network can accept
+    Args:
+        data(pd.DataFrame): datasets of type DataFrame
+    Returns:
+        The converted dict, which can be used directly into the input network
+    """
     data_dict = data.to_dict('list')
     for key in data.keys():
         data_dict[key] = np.array(data_dict[key])
     return data_dict
+
+
+def neg_sample(click_hist, item_size):
+    neg = random.randint(1, item_size)
+    while neg in click_hist:
+        neg = random.randint(1, item_size)
+    return neg
