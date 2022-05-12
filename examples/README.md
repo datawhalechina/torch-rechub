@@ -36,7 +36,7 @@
 - 使用方法
 
   ```python
-  python run_amazon_electronics.py #run DIN model on sample data
+  python run_amazon_electronics.py # run DIN model on sample data
   ```
 
 
@@ -50,7 +50,18 @@
 - 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Beauty中ratings数据集；
 - 预处理后的全量数据下载地址：https://cowtransfer.com/s/0765971f36e44d
 
-使用
+
+
+## Amazon-Books
+
+该数据集是 2014 年亚马逊发布的评论数据集（有2014和2018两个版本，注意区分）。该数据集包括评论（评分、文本）、产品元数据（描述、类别信息、价格、品牌和图像特征） 和链接（甚至有封面图）。 
+
+该数据集对不同种类商品进行了分类，Beauty数据集该类目包含800W个用户、200W条商品的信息，共计2000W条数据。
+
+- 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Books中ratings数据集；
+- 预处理后的全量数据下载地址：https://cowtransfer.com/s/2c73f60d514049
+
+
 
 ## Census-Income
 
