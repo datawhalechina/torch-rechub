@@ -19,11 +19,11 @@
 
   
 
-## Amazon
+## Amazon-Electronics
 
-该数据集是 2014 年亚马逊发布的评论数据集（有2014和2018两个版本，注意区分）。该数据集包括评论（评分、文本、帮助投票）、产品元数据（描述、类别信息、价格、品牌和图像特征） 和链接（查看/还购买了图表）。 
+该数据集是 2014 年亚马逊发布的评论数据集（有2014和2018两个版本，注意区分）。该数据集包括评论（评分、文本、帮助投票）、产品元数据（描述、类别信息、价格、品牌和图像特征） 和链接（查看）。 
 
-该数据集对不同种类商品进行了分类，我们所使用的是Electronics数据集，该类目包含19W用户、6W商品的信息。
+该数据集对不同种类商品进行了分类，Electronics数据集该类目包含19W用户、6W商品的信息。
 
 - 注意事项
   - 原始数据是json格式，包含两个文件reviews和meta，reviews包含用户交互日志，meta是商品侧特征，因为原始数据含有较多评论信息，数据较大，我们提供了预处理之后的数据，以csv格式保存，并提供下载链接。同时我们选取了前100条数据放在data/sample中。
@@ -36,8 +36,21 @@
 - 使用方法
 
   ```python
-  python run_amazon.py #run DIN model on sample data
+  python run_amazon_electronics.py #run DIN model on sample data
   ```
+
+
+
+## Amazon-Beauty
+
+该数据集是 2014 年亚马逊发布的评论数据集（有2014和2018两个版本，注意区分）。该数据集包括评论（评分、文本）、产品元数据（描述、类别信息、价格、品牌和图像特征） 和链接（甚至有封面图）。 
+
+该数据集对不同种类商品进行了分类，Beauty数据集该类目包含120W个用户、24W条商品的信息，共计200W条数据。
+
+- 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Beauty中ratings数据集；
+- 预处理后的全量数据下载地址：https://cowtransfer.com/s/0765971f36e44d
+
+使用
 
 ## Census-Income
 
@@ -72,19 +85,19 @@ TBD
 
 常见排序模型测试结果：
 
-| Model/Dataset | Criteo | Avazu | Amazon |
-| ------------- | ------ | ----- | ------ |
-| WideDeep      | 0.8083 |       |        |
-| DeepFM        | 0.8104 |       |        |
-| DIN           |        |       | 0.8672 |
+| Model/Dataset | Criteo | Avazu | Amazon-Electronics |
+| ------------- | ------ | ----- | ------------------ |
+| WideDeep      | 0.8083 |       |                    |
+| DeepFM        | 0.8104 |       |                    |
+| DIN           |        |       | 0.8672             |
 
 序列模型测试结果：
 
-| Model/Dataset | Amazon | Taobao(CTR) |
-| ------------- | ------ | ----------- |
-| DIN           | 0.8672 |             |
-|               |        |             |
-|               |        |             |
+| Model/Dataset | Amazon-Electronics | Taobao(CTR) |
+| ------------- | ------------------ | ----------- |
+| DIN           | 0.8672             |             |
+|               |                    |             |
+|               |                    |             |
 
 多任务学习模型测试结果：
 

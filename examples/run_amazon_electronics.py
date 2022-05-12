@@ -64,7 +64,7 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_path', default="./data/amazon/amazon_sample.csv")
+    parser.add_argument('--dataset_path', default="./data/amazon-electronics/amazon_electronics_sample.csv")
     parser.add_argument('--epoch', type=int, default=2)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=4096)
@@ -76,5 +76,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
 """
-python run_amazon.py
+python run_amazon_electronics.py
 """
