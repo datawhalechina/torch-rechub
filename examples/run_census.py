@@ -4,7 +4,7 @@ sys.path.append("../")
 
 import pandas as pd
 import torch
-from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE
+from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
 from torch_rechub.trainers import MTLTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.basic.utils import DataGenerator
@@ -57,7 +57,7 @@ def main(model_name, epoch, learning_rate, batch_size, weight_decay, device, sav
     if model_name == "SharedBottom":
         features, x_train, y_train, x_val, y_val, x_test, y_test = get_census_data_dict(model_name)
         task_types = ["classification", "classification"]
-        model = SharedBottom(features, task_types, bottom_params={"dims": [142]}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
+        model = SharedBottom(features, task_types, bottom_params={"dims": [117]}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
     elif model_name == "ESMM":
         user_features, item_features, x_train, y_train, x_val, y_val, x_test, y_test = get_census_data_dict(model_name)
         task_types = ["classification", "classification", "classification"]  #cvr,ctr,ctcvr
@@ -70,6 +70,10 @@ def main(model_name, epoch, learning_rate, batch_size, weight_decay, device, sav
         features, x_train, y_train, x_val, y_val, x_test, y_test = get_census_data_dict(model_name)
         task_types = ["classification", "classification"]
         model = PLE(features, task_types, n_level=1, n_expert_specific=2, n_expert_shared=1, expert_params={"dims": [16], "output_layer": False}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
+    elif model_name == "AITM":
+        task_types = ["classification", "classification"]
+        features, x_train, y_train, x_val, y_val, x_test, y_test = get_census_data_dict(model_name)
+        model = AITM(features, 2, bottom_params={"dims":[32,16]}, tower_params_list=[{"dims": [8]}, {"dims": [8]}])
 
     dg = DataGenerator(x_train, y_train)
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=batch_size)
@@ -87,11 +91,11 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', default='SharedBottom')
-    parser.add_argument('--epoch', type=int, default=2)  #100
+    parser.add_argument('--epoch', type=int, default=100)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
-    parser.add_argument('--device', default='cpu')  #cuda:0
+    parser.add_argument('--device', default='cuda:0')  #cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
 
@@ -102,4 +106,5 @@ python run_census.py --model_name SharedBottom
 python run_census.py --model_name ESMM
 python run_census.py --model_name MMOE
 python run_census.py --model_name PLE
+python run_census.py --model_name AITM
 """

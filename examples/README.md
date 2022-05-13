@@ -80,6 +80,7 @@ python run_census.py --model_name SharedBottom
 python run_census.py --model_name ESMM
 python run_census.py --model_name MMOE
 python run_census.py --model_name PLE
+python run_census.py --model_name AITM
 ```
 
 ## Taobao
@@ -119,6 +120,7 @@ TBD
 | MMOE             | 0.9579             | 0.9950             |             |             |
 | PLE(num_level=1) | 0.9583             | 0.9951             |             |             |
 | PLE(num_level=2) | 0.9593             | 0.9950             |             |             |
+| AITM             | 0.9595             | 0.9951             |             |             |
 
 > Note: ESMM中CVR较低正常，因为我们构造了一个虚拟的任务依赖关系，以产生CTCVR label
 
