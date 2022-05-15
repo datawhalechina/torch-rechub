@@ -83,6 +83,20 @@ python run_census.py --model_name PLE
 python run_census.py --model_name AITM
 ```
 
+## AliExpress
+
+阿里速卖通数据，一共有16个sparse特征，63个dense特征，包含“曝光”、“点击”、“转化”三个标签，原始数据已对dense特征进行归一化预处理。原始数据一共有5个csv，这里只使用US地区数据进行测试。
+
+- 原始数据地址:https://tianchi.aliyun.com/dataset/dataDetail?dataId=74690&lang=en-us
+
+- 预处理后数据：https://cowtransfer.com/s/7080e52e5f4f4a
+
+
+
+## WeChat
+
+TBD
+
 ## Taobao
 
 TBD
@@ -113,14 +127,14 @@ TBD
 
 多任务学习模型测试结果：
 
-| Model/Dataset    | Census-Income(CVR) | Census-Income(CTR) | Taobao(CVR) | Taobao(CTR) |
-| ---------------- | ------------------ | ------------------ | ----------- | ----------- |
-| Shared-Bottom    | 0.9560             | 0.9948             |             |             |
-| ESMM             | 0.7223             | 0.9906             |             |             |
-| MMOE             | 0.9579             | 0.9950             |             |             |
-| PLE(num_level=1) | 0.9583             | 0.9951             |             |             |
-| PLE(num_level=2) | 0.9593             | 0.9950             |             |             |
-| AITM             | 0.9595             | 0.9951             |             |             |
+| Model\Dataset    | Census-Income(CVR) | Census-Income(CTR) | Taobao(CVR) | Taobao(CTR) | AliExpress-US(CVR) | AliExpress-US(CTR) |
+| :--------------- | ------------------ | ------------------ | ----------- | ----------- | ------------------ | ------------------ |
+| Shared-Bottom    | 0.9560             | 0.9948             |             |             | 0.8667             | 0.6967             |
+| ESMM             | 0.7223             | 0.9906             |             |             |                    |                    |
+| MMOE             | 0.9579             | 0.9950             |             |             |                    |                    |
+| PLE(num_level=1) | 0.9583             | 0.9951             |             |             |                    |                    |
+| PLE(num_level=2) | 0.9593             | 0.9950             |             |             |                    |                    |
+| AITM             | 0.9595             | 0.9951             |             |             | 0.8613             | 0.6991             |
 
 > Note: ESMM中CVR较低正常，因为我们构造了一个虚拟的任务依赖关系，以产生CTCVR label
 
