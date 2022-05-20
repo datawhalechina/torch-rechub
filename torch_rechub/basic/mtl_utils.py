@@ -1,3 +1,9 @@
+"""The mtl_utils module, it is used to provide a funciton 
+to get shared layers and task layers in multi-task model.
+Available function:
+- shared_task_layers: get shared layers and task layers in multi-task model
+Authors: Qida Dong, dongjidan@126.com
+"""
 import torch
 from ..models.multi_task import ESMM, MMOE, SharedBottom, PLE, AITM
 
@@ -22,11 +28,3 @@ def shared_task_layers(model):
 		raise ValueError(f'this model {model} is not suitable for MetaBalance Optimizer')
 	return shared_layers, task_layers
 
-# share ali meta:test auc: [0.6122230867729563, 0.6102749439999999]
-# share ali adam:test auc: [0.6042237572680785, 0.59811668]
-# mmoe ali meta:test auc: [0.5516007157418209, 0.5518165456]
-# mmoe ali adam:test auc: [0.5398094929187571, 0.5879860592]
-# ple ali meta:test auc: [0.7634381816288129, 0.5400777488]
-# ple ali adam:test auc: [0.6046847571408265, 0.5892243184]
-# aitm ali meta:test auc: [0.5394383038128273, 0.5424584976]
-# aitm ali adam:test auc: [0.5424497743198506, 0.5270031264000001]
