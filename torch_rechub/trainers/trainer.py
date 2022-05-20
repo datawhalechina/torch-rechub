@@ -70,21 +70,23 @@ class CTRTrainer(object):
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
-    def fit(self, train_dataloader, val_dataloader):
+    def fit(self, train_dataloader, val_dataloader=None):
         self.model.to(self.device)
         for epoch_i in range(self.n_epoch):
+            print('epoch:', epoch_i)
             self.train_one_epoch(train_dataloader)
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  #update lr in epoch level by scheduler
-            auc = self.evaluate(self.model, val_dataloader)
-            print('epoch:', epoch_i, 'validation: auc:', auc)
-            if self.early_stopper.stop_training(auc, self.model.state_dict()):
-                print(f'validation: best auc: {self.early_stopper.best_auc}')
-                self.model.load_state_dict(self.early_stopper.best_weights)
-                torch.save(self.early_stopper.best_weights, os.path.join(self.model_path, "model.pth"))  #save best auc model
-                break
+            if val_dataloader:
+                auc = self.evaluate(self.model, val_dataloader)
+                print('epoch:', epoch_i, 'validation: auc:', auc)
+                if self.early_stopper.stop_training(auc, self.model.state_dict()):
+                    print(f'validation: best auc: {self.early_stopper.best_auc}')
+                    self.model.load_state_dict(self.early_stopper.best_weights)
+                    torch.save(self.early_stopper.best_weights, os.path.join(self.model_path, "model.pth"))  #save best auc model
+                    break
 
     def evaluate(self, model, data_loader):
         model.eval()
@@ -104,8 +106,9 @@ class CTRTrainer(object):
         predicts = list()
         with torch.no_grad():
             tk0 = tqdm.tqdm(data_loader, desc="predict", smoothing=0, mininterval=1.0)
-            for i, x_dict in enumerate(tk0):
+            for i, (x_dict, y) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}
+                y = y.to(self.device)
                 y_pred = model(x_dict)
                 predicts.extend(y_pred.tolist())
         return predicts
