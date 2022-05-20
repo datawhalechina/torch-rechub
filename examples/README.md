@@ -138,6 +138,14 @@ TBD
 
 > Note: ESMM中CVR较低正常，因为我们构造了一个虚拟的任务依赖关系，以产生CTCVR label
 
+多任务学习模型在采样后的AliExpress-US上进行MetaBalance和Adam的对比
+
+| Model\Dataset    | CVR(Adam) | CTR(Adam) | CVR(MetaBalance) | CTR(MetaBalance) |
+| :--------------- | --------- | --------- | ---------------- | ---------------- |
+| Shared-Bottom    | 0.6247    | 0.4868    | 0.7794           | 0.6027           |
+| MMOE             | 0.6601    | 0.5856    | 0.6660           | 0.6289           |
+| PLE(num_level=1) | 0.7284    | 0.6351    | 0.7511           | 0.6373           |
+| AITM             | 0.5970    | 0.4839    | 0.7379           | 0.6093           |
 
 
 # 召回
