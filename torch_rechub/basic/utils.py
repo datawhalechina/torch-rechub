@@ -20,6 +20,17 @@ class TorchDataset(Dataset):
     def __len__(self):
         return len(self.y)
 
+class PredictDataset(Dataset):
+    
+    def __init__(self, x):
+        super().__init__()
+        self.x = x
+
+    def __getitem__(self, index):
+        return {k: v[index] for k, v in self.x.items()}
+
+    def __len__(self):
+        return len(self.x[list(self.x.keys())[0]])
 
 class DataGenerator(object):
 
@@ -44,20 +55,6 @@ class DataGenerator(object):
         val_dataloader = DataLoader(val_dataset, batch_size=batch_size, num_workers=num_workers)
         test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=num_workers)
         return train_dataloader, val_dataloader, test_dataloader
-
-
-class PredictDataset(Dataset):
-
-    def __init__(self, x):
-        super(TorchDataset, self).__init__()
-        self.x = x
-
-    def __getitem__(self, index):
-        return {k: v[index] for k, v in self.x.items()}
-
-    def __len__(self):
-        return len(self.x[list(self.x.keys())[0]])
-
 
 def get_auto_embedding_dim(num_classes):
     """ Calculate the dim of embedding vector according to number of classes in the category

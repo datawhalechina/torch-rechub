@@ -77,6 +77,7 @@ def gen_model_input(train_set,user_profile,seq_max_len):
 
 def get_movielens_data(data_path, load_cache=False):
     data = pd.read_csv(data_path)
+    print(data.shape)
     data["cate_id"] = data["genres"].apply(lambda x:x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip',"cate_id"]
     user_col, item_col, label_col = "user_id", "movie_id", "label"
@@ -99,7 +100,7 @@ def get_movielens_data(data_path, load_cache=False):
     if load_cache:
         x_train, y_train, x_test, y_test = np.load("./data/ml-1m/saved/data_preprocess.npy",allow_pickle=True)
     else:
-        train_set, test_set = preprocess_data(data, neg_ratio=5, min_item=5)
+        train_set, test_set = preprocess_data(data, neg_ratio=5, min_item=0)
         x_train, y_train = gen_model_input(train_set, user_profile, seq_max_len=50)
         x_test, y_test = gen_model_input(test_set, user_profile, seq_max_len=50)
         np.save("./data/ml-1m/saved/data_preprocess.npy", (x_train, y_train, x_test, y_test)) 
@@ -128,7 +129,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         model = DSSM(user_features, item_features, sim_func="cosine", temperature=0.01, user_params={"dims":[128,64,32],"output_layer":False}, item_params={"dims":[128,64,32],"output_layer":False})
 
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, 
-                             earlystop_patience=5, device=device, model_path=save_dir, gpus=[0,1],
+                             earlystop_patience=5, device=device, model_path=save_dir,
                              scheduler_fn=torch.optim.lr_scheduler.StepLR,
                              scheduler_params={"step_size": 2,"gamma": 0.8})
 
@@ -152,7 +153,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     print("matching for topk")
     user_map, item_map = np.load("./data/ml-1m/saved/raw_id_maps.npy", allow_pickle=True)
     match_res = collections.defaultdict(dict)
-    topk = 100
+    topk = 10
     for user_id, user_emb in zip(test_user_model_input["user_id"], user_embedding):
         items_idx, items_scores = annoy.query(v=user_emb, n=topk) #the index of topk match items
         match_res[user_map[user_id]] = all_item_model_input["movie_id"][items_idx]
