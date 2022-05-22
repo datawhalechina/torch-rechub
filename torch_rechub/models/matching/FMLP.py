@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 
 class FMLPRecModel(nn.Module):
+
     def __init__(self, args):
         super(FMLPRecModel, self).__init__()
         self.args = args
@@ -39,25 +40,26 @@ class FMLPRecModel(nn.Module):
 
     def forward(self, input_ids):
         attention_mask = (input_ids > 0).long()
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2) # torch.int64
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
         max_len = attention_mask.size(-1)
         attn_shape = (1, max_len, max_len)
-        subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1) # torch.uint8
+        subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)  # torch.uint8
         subsequent_mask = (subsequent_mask == 0).unsqueeze(1)
         subsequent_mask = subsequent_mask.long()
 
         if self.args.cuda_condition:
             subsequent_mask = subsequent_mask.cuda()
         extended_attention_mask = extended_attention_mask * subsequent_mask
-        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype) # fp16 compatibility
+        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         sequence_emb = self.add_position_embedding(input_ids)
 
-        item_encoded_layers = self.item_encoder(sequence_emb,
-                                                extended_attention_mask,
-                                                output_all_encoded_layers=True,
-                                                )
+        item_encoded_layers = self.item_encoder(
+            sequence_emb,
+            extended_attention_mask,
+            output_all_encoded_layers=True,
+        )
         sequence_output = item_encoded_layers[-1]
 
         return sequence_output
@@ -87,6 +89,7 @@ ACT2FN = {"gelu": gelu, "relu": F.relu, "swish": swish}
 
 
 class LayerNorm(nn.Module):
+
     def __init__(self, hidden_size, eps=1e-12):
         super(LayerNorm, self).__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
@@ -101,12 +104,12 @@ class LayerNorm(nn.Module):
 
 
 class SelfAttention(nn.Module):
+
     def __init__(self, args):
         super(SelfAttention, self).__init__()
         if args.hidden_size % args.num_attention_heads != 0:
-            raise ValueError(
-                "The hidden size (%d) is not a multiple of the number of attention "
-                "heads (%d)" % (args.hidden_size, args.num_attention_heads))
+            raise ValueError("The hidden size (%d) is not a multiple of the number of attention "
+                             "heads (%d)" % (args.hidden_size, args.num_attention_heads))
         self.num_attention_heads = args.num_attention_heads
         self.attention_head_size = int(args.hidden_size / args.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
@@ -155,9 +158,10 @@ class SelfAttention(nn.Module):
 
 
 class FilterLayer(nn.Module):
+
     def __init__(self, args):
         super(FilterLayer, self).__init__()
-        self.complex_weight = nn.Parameter(torch.randn(1, args.max_seq_length//2 + 1, args.hidden_size, 2, dtype=torch.float32) * 0.02)
+        self.complex_weight = nn.Parameter(torch.randn(1, args.max_seq_length // 2 + 1, args.hidden_size, 2, dtype=torch.float32) * 0.02)
         self.out_dropout = nn.Dropout(args.hidden_dropout_prob)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
 
@@ -175,6 +179,7 @@ class FilterLayer(nn.Module):
 
 
 class Intermediate(nn.Module):
+
     def __init__(self, args):
         super(Intermediate, self).__init__()
         self.dense_1 = nn.Linear(args.hidden_size, args.hidden_size * 4)
@@ -199,6 +204,7 @@ class Intermediate(nn.Module):
 
 
 class Layer(nn.Module):
+
     def __init__(self, args):
         super(Layer, self).__init__()
         self.no_filters = args.no_filters
@@ -219,11 +225,11 @@ class Layer(nn.Module):
 
 
 class Encoder(nn.Module):
+
     def __init__(self, args):
         super(Encoder, self).__init__()
         layer = Layer(args)
-        self.layer = nn.ModuleList([copy.deepcopy(layer)
-                                    for _ in range(args.num_hidden_layers)])
+        self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_hidden_layers)])
 
     def forward(self, hidden_states, attention_mask, output_all_encoded_layers=True):
         all_encoder_layers = []
