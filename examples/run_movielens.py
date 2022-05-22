@@ -1,83 +1,37 @@
 import sys
 
 sys.path.append("../")
+
+import os
 import random
 import numpy as np
 import pandas as pd
 import collections
 import torch
+from torch.utils.data import DataLoader
 
-from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
+from torch_rechub.models.ranking import DeepFM
 from torch_rechub.models.matching import DSSM
-from torch_rechub.trainers import CTRTrainer
+from torch_rechub.trainers import MatchTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch.utils.data import DataLoader
-from torch_rechub.basic.match_utils import full_predict, Annoy
-from torch_rechub.basic.utils import pad_sequences, TorchDataset, df_to_input_dict
+from torch_rechub.basic.match_utils import Annoy, generate_seq_feature_match
+from torch_rechub.basic.utils import PredictDataset, pad_sequences, TorchDataset, df_to_input_dict
 from torch_rechub.basic.metric import  topk_metrics
-
-def preprocess_data(data, neg_ratio=0, min_item=3):
-    print("preprocess data")
-    data.sort_values("timestamp", inplace=True)
-    item_ids = data['movie_id'].unique()
     
-    movie_cate_map = dict(zip(data["movie_id"], data["cate_id"]))
-
-    train_set = []
-    test_set = []
-    n_cold_user = 0
-    for reviewerID, hist in tqdm(data.groupby('user_id')):
-        pos_list = hist['movie_id'].tolist()
-        rating_list = hist['rating'].tolist()
-        if len(pos_list)<min_item: #drop this user when his pos items < min_item
-            n_cold_user += 1
-            continue
-
-        if neg_ratio > 0:
-            candidate_set = list(set(item_ids) - set(pos_list))
-            neg_list = np.random.choice(candidate_set,size=len(pos_list)*neg_ratio,replace=True)
-        for i in range(1, len(pos_list)):
-            hist = pos_list[:i]
-            if i != len(pos_list) - 1:
-                train_set.append((reviewerID, hist[::-1], pos_list[i], 1, movie_cate_map[pos_list[i]],len(hist[::-1]), rating_list[i]))
-                for negi in range(neg_ratio):
-                    neg_item = neg_list[i*neg_ratio+negi]
-                    train_set.append((reviewerID, hist[::-1], neg_item, 0, movie_cate_map[neg_item],len(hist[::-1])))
-            else:
-                test_set.append((reviewerID, hist[::-1], pos_list[i],1, movie_cate_map[pos_list[i]], len(hist[::-1]), rating_list[i]))
-
-    random.shuffle(train_set)
-    random.shuffle(test_set)
-
-    print("n_train: %d, n_test: %d" %(len(train_set),len(test_set)))
-    print("%d cold start user droped "%(n_cold_user))
-    return train_set,test_set
-
-def gen_model_input(train_set,user_profile,seq_max_len):
-    
-    train_uid = np.array([line[0] for line in train_set])
-    train_seq = [line[1] for line in train_set]
-    train_iid = np.array([line[2] for line in train_set])
-    train_label = np.array([line[3] for line in train_set])
-    train_cid = np.array([line[4] for line in train_set])
-    train_hist_len = np.array([line[5] for line in train_set])
-    
-
-    train_seq_pad = pad_sequences(train_seq, maxlen=seq_max_len, padding='post', truncating='post', value=0)
-    train_model_input = {"user_id": train_uid, "movie_id": train_iid, "hist_movie_id": train_seq_pad,
-                         "hist_len": train_hist_len, "cate_id":train_cid}
-
-    for key in ["gender", "age", "occupation", "zip"]:
-        train_model_input[key] = user_profile.loc[train_model_input['user_id']][key].values
-
-    return train_model_input, train_label
+def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len):
+    df = pd.merge(df, user_profile, on=user_col)
+    df = pd.merge(df, item_profile, on=item_col)
+    for col in df.columns.to_list():
+        if col.startswith("hist_"):
+            df[col] = pad_sequences(df[col], maxlen=seq_max_len, value=0).tolist()
+    input_dict = df_to_input_dict(df)
+    return input_dict
 
 
 def get_movielens_data(data_path, load_cache=False):
-    data = pd.read_csv(data_path)
-    print(data.shape)
+    data = pd.read_csv(data_path)[:100000]
     data["cate_id"] = data["genres"].apply(lambda x:x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip',"cate_id"]
     user_col, item_col, label_col = "user_id", "movie_id", "label"
@@ -92,17 +46,19 @@ def get_movielens_data(data_path, load_cache=False):
         if feature == item_col:
             item_map = {encode_id+1: raw_id for encode_id, raw_id in enumerate(lbe.classes_)} #encode item id: raw item id
     np.save("./data/ml-1m/saved/raw_id_maps.npy", (user_map, item_map))
-    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates('user_id')
-    user_profile.set_index("user_id", inplace=True)
     
+    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates('user_id')
     item_profile = data[["movie_id", "cate_id"]].drop_duplicates('movie_id')
-    #user_item_list = data.groupby("user_id")['movie_id'].apply(list)
-    if load_cache:
+    
+    
+    if load_cache: #if you have run this script before and saved the preprocessed data
         x_train, y_train, x_test, y_test = np.load("./data/ml-1m/saved/data_preprocess.npy",allow_pickle=True)
     else:
-        train_set, test_set = preprocess_data(data, neg_ratio=5, min_item=0)
-        x_train, y_train = gen_model_input(train_set, user_profile, seq_max_len=50)
-        x_test, y_test = gen_model_input(test_set, user_profile, seq_max_len=50)
+        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=0, mode=0, neg_ratio=3, min_item=0)
+        x_train =  gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
+        y_train = df_train["label"].values
+        x_test =  gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
+        y_test = df_test["label"].values
         np.save("./data/ml-1m/saved/data_preprocess.npy", (x_train, y_train, x_test, y_test)) 
     
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
@@ -120,28 +76,30 @@ def get_movielens_data(data_path, load_cache=False):
 
 
 def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     torch.manual_seed(seed)
     user_features, item_features, x_train, y_train, all_item_model_input, test_user_model_input = get_movielens_data(dataset_path)
     dataset = TorchDataset(x_train, y_train)
     train_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
     
     if model_name == "dssm":
-        model = DSSM(user_features, item_features, sim_func="cosine", temperature=0.01, user_params={"dims":[128,64,32],"output_layer":False}, item_params={"dims":[128,64,32],"output_layer":False})
+        model = DSSM(user_features, item_features, sim_func="cosine", temperature=0.01, user_params={"dims":[256, 128,64,16],"output_layer":False}, item_params={"dims":[256, 128,64,16],"output_layer":False})
 
-    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, 
+    trainer = MatchTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, 
                              earlystop_patience=5, device=device, model_path=save_dir,
                              scheduler_fn=torch.optim.lr_scheduler.StepLR,
                              scheduler_params={"step_size": 2,"gamma": 0.8})
 
-    ctr_trainer.fit(train_dataloader)
+    trainer.fit(train_dataloader)
     
     print("inference embedding")
-    model.mode = "user_tower"
-    user_embedding = full_predict(ctr_trainer.model, test_user_model_input,  device)
+    test_dl = DataLoader(PredictDataset(test_user_model_input), batch_size=batch_size, shuffle=True, num_workers=8)
+    user_embedding = trainer.inference_embedding(model=model, mode="user_tower", data_loader=test_dl, model_path=save_dir)
     
-    model.mode = "item_tower"
-    item_embedding = full_predict(ctr_trainer.model, all_item_model_input,  device)
-    
+    all_item_dl = DataLoader(PredictDataset(all_item_model_input), batch_size=batch_size, shuffle=True, num_workers=8)
+    item_embedding = trainer.inference_embedding(model=model, mode="item_tower", data_loader=all_item_dl, model_path=save_dir)
+
     torch.save(user_embedding.data.cpu(), save_dir + "user_embedding.pth")
     torch.save(item_embedding.data.cpu(), save_dir + "item_embedding.pth")
     
@@ -153,7 +111,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     print("matching for topk")
     user_map, item_map = np.load("./data/ml-1m/saved/raw_id_maps.npy", allow_pickle=True)
     match_res = collections.defaultdict(dict)
-    topk = 10
+    topk = 100
     for user_id, user_emb in zip(test_user_model_input["user_id"], user_embedding):
         items_idx, items_scores = annoy.query(v=user_emb, n=topk) #the index of topk match items
         match_res[user_map[user_id]] = all_item_model_input["movie_id"][items_idx]
