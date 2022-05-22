@@ -111,7 +111,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     print("matching for topk")
     user_map, item_map = np.load("./data/ml-1m/saved/raw_id_maps.npy", allow_pickle=True)
     match_res = collections.defaultdict(dict)
-    topk = 100
+    topk = 10
     for user_id, user_emb in zip(test_user_model_input["user_id"], user_embedding):
         items_idx, items_scores = annoy.query(v=user_emb, n=topk) #the index of topk match items
         match_res[user_map[user_id]] = all_item_model_input["movie_id"][items_idx]
