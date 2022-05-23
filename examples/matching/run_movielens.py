@@ -138,7 +138,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     user_col = "user_id"
     item_col = "movie_id"
 
-    data = pd.DataFrame({"user_id": all_item["user_id"], "movie_id": all_item["movie_id"]})
+    data = pd.DataFrame({"user_id": test_user["user_id"], "movie_id": test_user["movie_id"]})
     data[user_col] = data[user_col].map(user_map)
     data[item_col] = data[item_col].map(item_map)
     user_pos_item = data.groupby(user_col).agg(list).reset_index()
