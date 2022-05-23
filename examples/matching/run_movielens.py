@@ -3,32 +3,18 @@ import sys
 sys.path.append("../..")
 
 import os
-import random
 import numpy as np
 import pandas as pd
 import collections
 import torch
-from torch.utils.data import DataLoader
 
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-
-from torch_rechub.models.ranking import DeepFM
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.utils.match import Annoy, generate_seq_feature_match
-from torch_rechub.utils.data import PredictDataset, pad_sequences, TorchDataset, df_to_dict
+from torch_rechub.utils.match import Annoy, generate_seq_feature_match, gen_model_input
+from torch_rechub.utils.data import df_to_dict, MatchDataGenerator
 from torch_rechub.basic.metric import topk_metrics
-
-
-def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len):
-    df = pd.merge(df, user_profile, on=user_col)
-    df = pd.merge(df, item_profile, on=item_col)
-    for col in df.columns.to_list():
-        if col.startswith("hist_"):
-            df[col] = pad_sequences(df[col], maxlen=seq_max_len, value=0).tolist()
-    input_dict = df_to_dict(df)
-    return input_dict
 
 
 def get_movielens_data(data_path, load_cache=False):
@@ -91,19 +77,17 @@ def get_movielens_data(data_path, load_cache=False):
         for feature_name in item_cols
     ]
 
-    all_item_model_input = df_to_dict(item_profile)
-    test_user_model_input = x_test
-    return user_features, item_features, x_train, y_train, all_item_model_input, test_user_model_input
+    all_item = df_to_dict(item_profile)
+    test_user = x_test
+    return user_features, item_features, x_train, y_train, all_item, test_user
 
 
 def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.manual_seed(seed)
-    user_features, item_features, x_train, y_train, all_item_model_input, test_user_model_input = get_movielens_data(
-        dataset_path)
-    dataset = TorchDataset(x_train, y_train)
-    train_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    user_features, item_features, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path)
+    dg = MatchDataGenerator(x=x_train, y=y_train)
 
     if model_name == "dssm":
         model = DSSM(user_features,
@@ -127,21 +111,12 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
                            model_path=save_dir,
                            gpus=[0, 1])
 
-    trainer.fit(train_dataloader)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
+    trainer.fit(train_dl)
 
     print("inference embedding")
-    test_dl = DataLoader(PredictDataset(test_user_model_input), batch_size=batch_size, shuffle=True, num_workers=8)
-    user_embedding = trainer.inference_embedding(model=model,
-                                                 mode="user_tower",
-                                                 data_loader=test_dl,
-                                                 model_path=save_dir)
-
-    all_item_dl = DataLoader(PredictDataset(all_item_model_input), batch_size=batch_size, shuffle=True, num_workers=8)
-    item_embedding = trainer.inference_embedding(model=model,
-                                                 mode="item_tower",
-                                                 data_loader=all_item_dl,
-                                                 model_path=save_dir)
-
+    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
+    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
     torch.save(user_embedding.data.cpu(), save_dir + "user_embedding.pth")
     torch.save(item_embedding.data.cpu(), save_dir + "item_embedding.pth")
 
@@ -154,16 +129,16 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     user_map, item_map = np.load("./data/ml-1m/saved/raw_id_maps.npy", allow_pickle=True)
     match_res = collections.defaultdict(dict)
     topk = 100
-    for user_id, user_emb in zip(test_user_model_input["user_id"], user_embedding):
+    for user_id, user_emb in zip(test_user["user_id"], user_embedding):
         items_idx, items_scores = annoy.query(v=user_emb, n=topk)  #the index of topk match items
-        match_res[user_map[user_id]] = all_item_model_input["movie_id"][items_idx]
+        match_res[user_map[user_id]] = all_item["movie_id"][items_idx]
 
     #get ground truth
     print("generate ground truth")
     user_col = "user_id"
     item_col = "movie_id"
 
-    data = pd.DataFrame({"user_id": test_user_model_input["user_id"], "movie_id": test_user_model_input["movie_id"]})
+    data = pd.DataFrame({"user_id": all_item["user_id"], "movie_id": all_item["movie_id"]})
     data[user_col] = data[user_col].map(user_map)
     data[item_col] = data[item_col].map(item_map)
     user_pos_item = data.groupby(user_col).agg(list).reset_index()
