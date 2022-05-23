@@ -72,8 +72,7 @@ class DataGenerator(object):
             val_length = int(self.length * split_ratio[1])
             test_length = self.length - train_length - val_length
             print("the samples of train : val : test are  %d : %d : %d" % (train_length, val_length, test_length))
-            train_dataset, val_dataset, test_dataset = random_split(self.dataset,
-                                                                    (train_length, val_length, test_length))
+            train_dataset, val_dataset, test_dataset = random_split(self.dataset, (train_length, val_length, test_length))
         else:
             train_dataset = self.dataset
             val_dataset = TorchDataset(x_val, y_val)
