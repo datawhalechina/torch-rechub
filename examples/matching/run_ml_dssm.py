@@ -1,14 +1,8 @@
 import sys
-
-from paddle import topk
-
-sys.path.append("../..")
-
 import os
 import numpy as np
 import pandas as pd
 import torch
-
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
@@ -16,6 +10,8 @@ from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFea
 from torch_rechub.utils.match import generate_seq_feature_match, gen_model_input
 from torch_rechub.utils.data import df_to_dict, MatchDataGenerator
 from movielens_utils import match_evaluation
+
+sys.path.append("../..")
 
 
 def get_movielens_data(data_path, load_cache=False):
@@ -51,9 +47,9 @@ def get_movielens_data(data_path, load_cache=False):
                                                        neg_ratio=3,
                                                        min_item=0)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-        y_train = df_train["label"].values
+        y_train = x_train["label"]
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-        y_test = df_test["label"].values
+        y_test = x_test["label"]
         np.save("./data/ml-1m/saved/data_preprocess.npy", (x_train, y_train, x_test, y_test))
 
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
@@ -106,8 +102,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
                            },
                            n_epoch=epoch,
                            device=device,
-                           model_path=save_dir,
-                           gpus=[0, 1])
+                           model_path=save_dir)
 
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
     trainer.fit(train_dl)

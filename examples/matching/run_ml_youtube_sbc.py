@@ -102,8 +102,7 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
                            },
                            n_epoch=epoch,
                            device=device,
-                           model_path=save_dir,
-                           gpus=[0, 1])
+                           model_path=save_dir)
 
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
     trainer.fit(train_dl)
