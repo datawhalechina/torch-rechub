@@ -10,8 +10,8 @@ from .data import pad_sequences, df_to_dict
 
 def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len):
     #merge user_profile and item_profile, pad history seuence feature
-    df = pd.merge(df, user_profile, on=user_col)
-    df = pd.merge(df, item_profile, on=item_col)
+    df = pd.merge(df, user_profile, on=user_col, how='left')  # how=left to keep samples order same as the input
+    df = pd.merge(df, item_profile, on=item_col, how='left')
     for col in df.columns.to_list():
         if col.startswith("hist_"):
             df[col] = pad_sequences(df[col], maxlen=seq_max_len, value=0).tolist()
@@ -93,6 +93,10 @@ def generate_seq_feature_match(data,
     Returns:
         pd.DataFrame: split train and test data with sequence features.
     """
+    if mode == 2:  # list wise learning
+        assert neg_ratio > 0, 'neg_ratio must be greater than 0 when list-wise learning'
+    elif mode == 1:  # pair wise learning
+        neg_ratio = 1
     print("preprocess data")
     data.sort_values(time_col, inplace=True)  #sort by time from old to new
     train_set, test_set = [], []
@@ -100,14 +104,13 @@ def generate_seq_feature_match(data,
 
     items_cnt = Counter(data[item_col].tolist())
     items_cnt_order = OrderedDict(sorted((items_cnt.items()), key=lambda x: x[1], reverse=True))  #item_id:item count
-    for uid, hist in tqdm.tqdm(data.groupby(user_col)):
+    neg_list = negative_sample(items_cnt_order, ratio=data.shape[0] * neg_ratio, method_id=sample_method)
+    neg_idx = 0
+    for uid, hist in tqdm.tqdm(data.groupby(user_col), desc='generate sequence features'):
         pos_list = hist[item_col].tolist()
         if len(pos_list) < min_item:  #drop this user when his pos items < min_item
             n_cold_user += 1
             continue
-
-        if neg_ratio > 0:
-            neg_list = negative_sample(items_cnt_order, ratio=len(pos_list) * neg_ratio, method_id=sample_method)
 
         for i in range(1, len(pos_list)):
             hist_item = pos_list[:i]
@@ -120,17 +123,20 @@ def generate_seq_feature_match(data,
                     last_col = "label"
                     train_set.append(sample + [1])
                     for negi in range(neg_ratio):
-                        sample[1] = neg_list[i * neg_ratio + negi]
+                        sample[1] = neg_list[neg_idx]
+                        neg_idx += 1
                         train_set.append(sample + [0])
                 elif mode == 1:  #pair-wise, the last col is neg_col, include one negative item
                     last_col = "neg_items"
                     for negi in range(neg_ratio):
                         sample_copy = copy.deepcopy(sample)
-                        sample_copy.append(neg_list[i * neg_ratio + negi])
+                        sample_copy.append(neg_list[neg_idx])
+                        neg_idx += 1
                         train_set.append(sample_copy)
                 elif mode == 2:  #list-wise, the last col is neg_col, include neg_ratio negative items
                     last_col = "neg_items"
-                    sample.append(neg_list[i * neg_ratio:(i + 1) * neg_ratio])
+                    sample.append(neg_list[neg_idx * neg_ratio: (neg_idx + 1) * neg_ratio])
+                    neg_idx += neg_ratio
                     train_set.append(sample)
                 else:
                     raise ValueError("mode should in (0,1,2)")
