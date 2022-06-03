@@ -22,7 +22,7 @@ def match_evaluation(user_embedding, item_embedding, test_user, all_item, user_c
     match_res = collections.defaultdict(dict)  # user id -> predicted item ids
     for user_id, user_emb in zip(test_user[user_col], user_embedding):
         items_idx, items_scores = annoy.query(v=user_emb, n=topk)  #the index of topk match items
-        match_res[user_map[user_id]] = np.fromiter(map(item_map.get, all_item[item_col][items_idx]), int)
+        match_res[user_map[user_id]] = np.vectorize(item_map.get)(all_item[item_col][items_idx])
 
     #get ground truth
     print("generate ground truth")
