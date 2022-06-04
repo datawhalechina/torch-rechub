@@ -7,7 +7,7 @@
   <img src='https://img.shields.io/badge/pandas-1.0.5+-brightgreen'>
   <img src='https://img.shields.io/badge/annoy-1.17.0-brightgreen'>
   <img src="https://img.shields.io/pypi/l/torch-rechub">
-  <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fmorningsky%2FTorch-RecHub%2F&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com">
+ <a href="https://github.com/datawhalechina/torch-rechub"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fdatawhalechina%2Ftorch-rechub&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false"/></a>
 
 ## 中文Wiki站
 
