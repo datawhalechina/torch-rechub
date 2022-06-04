@@ -206,7 +206,7 @@ def neg_sample(click_hist, item_size):
     return neg
 
 
-def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncating='pre', value=0.):
+def pad_sequences(sequences, maxlen=None, dtype='int32', padding='post', truncating='post', value=0.):
     """ Pads sequences (list of list) to the ndarray of same length.
         This is an equivalent implementation of tf.keras.preprocessing.sequence.pad_sequences
         reference: https://github.com/huawei-noah/benchmark/tree/main/FuxiCTR/fuxictr
