@@ -13,8 +13,8 @@ from torch import nn
 
 
 class GRU4Rec(torch.nn.Module):
-    """The match model mentioned in `SESSION-BASED RECOMMENDATIONS WITH RECURRENT NEURAL NETWORKS` paper.
-    It's a Gru4Rec match model trained by global softmax loss on list-wise samples.
+    """The match model mentioned in `Deep Neural Networks for YouTube Recommendations` paper.
+    It's a DSSM match model trained by global softmax loss on list-wise samples.
     Note in origin paper, it's without item dnn tower and train item embedding directly.
 
     Args:

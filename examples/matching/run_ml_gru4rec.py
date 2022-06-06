@@ -100,7 +100,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
                            model_path=save_dir,
                            gpus=[0])
 
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size,num_workers=0)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size, num_workers=0)
     trainer.fit(train_dl)
 
     print("inference embedding")
@@ -129,5 +129,5 @@ if __name__ == '__main__':
     main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device,
          args.save_dir, args.seed)
 """
-python run_ml_gru4rec.py
+python run_ml_youtube_dnn.py
 """
