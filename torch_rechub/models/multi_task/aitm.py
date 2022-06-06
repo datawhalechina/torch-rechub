@@ -45,7 +45,7 @@ class AITM(nn.Module):
         input_towers = [self.bottoms[i](embed_x) for i in range(self.n_task)]  #[i]:[batch_size, bottom_dims[-1]]
         for i in range(1, self.n_task):  #for task 1:n-1
             info = self.info_gates[i - 1](input_towers[i - 1]).unsqueeze(1)  #[batch_size,1,bottom_dims[-1]]
-            ait_input = torch.cat([input_towers[i - 1].unsqueeze(1), info], dim=1)  #[batch_size, 2, bottom_dims[-1]]
+            ait_input = torch.cat([input_towers[i].unsqueeze(1), info], dim=1)  #[batch_size, 2, bottom_dims[-1]]
             input_towers[i] = self.aits[i - 1](ait_input)
 
         ys = []
