@@ -46,10 +46,9 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
     dg = DataGenerator(train_x, train_y)
 
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=val_x, y_val=val_y, x_test=test_x, y_test=test_y, batch_size=batch_size)
-    model = DIN(features=features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]})
+    model = DIN(features=features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]}, attention_mlp_params={"dims": [256, 128]})
 
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=4, device=device, model_path=save_dir)
-    # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
