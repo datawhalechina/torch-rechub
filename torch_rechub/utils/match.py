@@ -39,8 +39,6 @@ def negative_sample(items_cnt_order, ratio, method_id=0):
         list: sampled negative item list
     """
     items_set = [item for item, count in items_cnt_order.items()]
-    if not isinstance(ratio, int) or ratio < 1:
-        raise ValueError("ratio means neg/pos, it should be greater than or equal to 1")
     if method_id == 0:
         neg_items = np.random.choice(items_set, size=ratio, replace=True)
     elif method_id == 1:
@@ -122,13 +120,13 @@ def generate_seq_feature_match(data,
                 if mode == 0:  #point-wise, the last col is label_col, include label 0 and 1
                     last_col = "label"
                     train_set.append(sample + [1])
-                    for negi in range(neg_ratio):
+                    for _ in range(neg_ratio):
                         sample[1] = neg_list[neg_idx]
                         neg_idx += 1
                         train_set.append(sample + [0])
                 elif mode == 1:  #pair-wise, the last col is neg_col, include one negative item
                     last_col = "neg_items"
-                    for negi in range(neg_ratio):
+                    for _ in range(neg_ratio):
                         sample_copy = copy.deepcopy(sample)
                         sample_copy.append(neg_list[neg_idx])
                         neg_idx += 1

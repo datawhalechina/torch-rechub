@@ -46,9 +46,11 @@ class MatchDataGenerator(object):
     def generate_dataloader(self, x_test_user, x_all_item, batch_size, num_workers=8):
         train_dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
         test_dataset = PredictDataset(x_test_user)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+
+        # shuffle = False to keep same order as ground truth
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         item_dataset = PredictDataset(x_all_item)
-        item_dataloader = DataLoader(item_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        item_dataloader = DataLoader(item_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return train_dataloader, test_dataloader, item_dataloader
 
 

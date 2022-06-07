@@ -11,10 +11,10 @@
 - 处理完整数据csv下载地址：https://cowtransfer.com/s/5a3ab69ebd314e
 
 | Model\Metrics | Hit@100 | Recall@100 | Precision@100 |
-| ------------- | ------- | ---------- | ------------- |
-| DSSM          | 6.78%   | 6.78%      | 0.06%         |
-| YoutubeDNN    |         |            |               |
-| YoutubeSBC    |         |            |               |
+|---------------|---------|------------|---------------|
+| DSSM          | 14.74%% | 14.74%     | 0.15%         |
+| YoutubeDNN    | 6.27%   | 6.27%      | 0.06%         |
+| YoutubeSBC    | 6.99%   | 6.99%      | 0.07%         |
 | FacebookDSSM  |         |            |               |
 
 
