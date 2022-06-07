@@ -1,4 +1,5 @@
 from ..utils.data import get_auto_embedding_dim
+from .initializers import XavierNormal
 
 
 class SequenceFeature(object):
@@ -13,9 +14,10 @@ class SequenceFeature(object):
         embed_dim (int): embedding vector's length
         pooling (str): pooling method, support `["mean", "sum", "concat"]` (default=`"mean"`)
         shared_with (str): the another feature name which this feature will shared with embedding.
+        initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None):
+    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None, initializer=XavierNormal()):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:
@@ -24,6 +26,7 @@ class SequenceFeature(object):
             self.embed_dim = embed_dim
         self.pooling = pooling
         self.shared_with = shared_with
+        self.initializer = initializer
 
 
 class SparseFeature(object):
@@ -34,9 +37,10 @@ class SparseFeature(object):
         vocab_size (int): vocabulary size of embedding table.
         embed_dim (int): embedding vector's length
         shared_with (str): the another feature name which this feature will shared with embedding.
+        initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self, name, vocab_size, embed_dim=None, shared_with=None):
+    def __init__(self, name, vocab_size, embed_dim=None, shared_with=None, initializer=XavierNormal()):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:
@@ -44,6 +48,7 @@ class SparseFeature(object):
         else:
             self.embed_dim = embed_dim
         self.shared_with = shared_with
+        self.initializer = initializer
 
 
 class DenseFeature(object):
