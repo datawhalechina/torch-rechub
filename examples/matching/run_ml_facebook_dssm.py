@@ -90,7 +90,6 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     model = FaceBookDSSM(user_features,
                          item_features,
                          neg_item_features,
-                         sim_func="cosine",
                          temperature=0.02,
                          user_params={
                              "dims": [256, 128, 64, 32],

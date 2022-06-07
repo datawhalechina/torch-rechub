@@ -82,17 +82,17 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     user_features, item_features, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path)
     dg = MatchDataGenerator(x=x_train, y=y_train)
 
-    if model_name == "dssm":
-        model = DSSM(user_features,
-                     item_features,
-                     sim_func="cosine",
-                     temperature=0.02,
-                     user_params={
-                         "dims": [256, 128, 64, 32],
-                     },
-                     item_params={
-                         "dims": [256, 128, 64, 32],
-                     })
+    model = DSSM(user_features,
+                 item_features,
+                 temperature=0.02,
+                 user_params={
+                     "dims": [256, 128, 64],
+                     "activation": 'prelu',
+                 },
+                 item_params={
+                     "dims": [256, 128, 64],
+                     "activation": 'prelu',
+                 })
 
     trainer = MatchTrainer(model,
                            mode=0,

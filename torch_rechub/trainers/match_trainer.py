@@ -81,6 +81,20 @@ class MatchTrainer(object):
             else:
                 y_pred = self.model(x_dict)
                 loss = self.criterion(y_pred, y)
+            # used for debug
+            # if i == 0:
+            #     print()
+            #     if self.mode == 0:
+            #         print('pred: ', [f'{float(each):5.2g}' for each in y_pred.detach().cpu().tolist()])
+            #         print('truth:', [f'{float(each):5.2g}' for each in y.detach().cpu().tolist()])
+            #     elif self.mode == 2:
+            #         pred = y_pred.detach().cpu().mean(0)
+            #         pred = torch.softmax(pred, dim=0).tolist()
+            #         print('pred: ', [f'{float(each):4.2g}' for each in pred])
+            #     elif self.mode == 1:
+            #         print('pos:', [f'{float(each):5.2g}' for each in pos_score.detach().cpu().tolist()])
+            #         print('neg: ', [f'{float(each):5.2g}' for each in neg_score.detach().cpu().tolist()])
+
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()

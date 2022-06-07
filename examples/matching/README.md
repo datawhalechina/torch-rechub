@@ -15,7 +15,7 @@
 | DSSM          | 14.74%% | 14.74%     | 0.15%         |
 | YoutubeDNN    | 6.27%   | 6.27%      | 0.06%         |
 | YoutubeSBC    | 6.99%   | 6.99%      | 0.07%         |
-| FacebookDSSM  |         |            |               |
+| FacebookDSSM  | 17.83%  | 17.83%     | 0.18%         |
 
 
 

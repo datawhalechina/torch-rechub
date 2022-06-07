@@ -7,8 +7,9 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
 
 import torch
-
+import torch.nn.functional as F
 from ...basic.layers import MLP, EmbeddingLayer
+import numpy as np
 
 
 class YoutubeSBC(torch.nn.Module):
@@ -33,51 +34,57 @@ class YoutubeSBC(torch.nn.Module):
                  sample_weight_feature,
                  user_params,
                  item_params,
+                 batch_size,
                  n_neg=3,
-                 sim_func="cosine",
                  temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.sample_weight_feature = sample_weight_feature
         self.n_neg = n_neg
-        self.sim_func = sim_func
         self.temperature = temperature
         self.user_dims = sum([fea.embed_dim for fea in user_features])
         self.item_dims = sum([fea.embed_dim for fea in item_features])
-
+        self.batch_size = batch_size
         self.embedding = EmbeddingLayer(user_features + item_features + sample_weight_feature)
         self.user_mlp = MLP(self.user_dims, output_layer=False, **user_params)
         self.item_mlp = MLP(self.item_dims, output_layer=False, **item_params)
         self.mode = None
 
+        # in-batch sample index
+        self.index0 = np.repeat(np.arange(batch_size), n_neg + 1)
+        self.index1 = np.concatenate([np.arange(i, i + n_neg + 1) for i in range(batch_size)])
+        self.index1[np.where(self.index1 >= batch_size)] -= batch_size
+
     def forward(self, x):
-        user_embedding = self.user_tower(x)
-        item_embedding = self.item_tower(x)
+        user_embedding = self.user_tower(x)  # (batch_size, embedding_dim)
+        item_embedding = self.item_tower(x)  # (batch_size, embedding_dim)
         if self.mode == "user":
             return user_embedding
         if self.mode == "item":
             return item_embedding
-        if self.sim_func == "cosine":
-            y = torch.cosine_similarity(user_embedding, item_embedding, dim=1)
-        elif self.sim_func == "dot":
-            y = torch.mul(user_embedding, item_embedding).sum(dim=1)
+
+        # pred[i, j] means predicted score that user_i give to item_j
+
+        pred = torch.cosine_similarity(user_embedding.unsqueeze(1), item_embedding, dim=2)  # (batch_size, batch_size)
+
+        # get sample weight of items in this batch
+        sample_weight = self.embedding(x, self.sample_weight_feature, squeeze_dim=True).squeeze(1)  # (batch_size)
+
+        scores = pred - torch.log(sample_weight)  #Sampling Bias Corrected, using broadcast
+        if user_embedding.shape[0] * (self.n_neg + 1) != self.index0.shape[0]:  # last batch
+            batch_size = user_embedding.shape[0]
+            index0 = self.index0[:batch_size * (self.n_neg + 1)]
+            index1 = self.index1[:batch_size * (self.n_neg + 1)]
+            index0[np.where(index0 >= batch_size)] -= batch_size
+            index1[np.where(index1 >= batch_size)] -= batch_size
+
+            scores = scores[index0, index1]
         else:
-            raise ValueError("similarity function only support %s, but got %s" % (["cosine", "dot"], self.sim_func))
+            scores = scores[self.index0, self.index1]
 
-        sample_weight = self.embedding(x, self.sample_weight_feature, squeeze_dim=True).squeeze(1)
-
-        y = y - torch.log(sample_weight)  #Sampling Bias Corrected
-
-        #in-batch negative sample
-        #!! TODO: use mask matrix. It's slow now.
-        batch_size = y.size(0)
-        scores = torch.ones(batch_size, 1 + self.n_neg, device=y.device)  #positive sample in the first position.
-        y_expand = torch.cat((y, y))
-        for i in range(batch_size):
-            scores[i, :] = torch.cat((y_expand[i].view(-1), y_expand[i + 1:i + 1 + self.n_neg]))
         scores = scores / self.temperature
-        return scores  #(batch_size, 4)
+        return scores.view(-1, self.n_neg + 1)  #(batch_size, 1 + self.n_neg)
 
     def user_tower(self, x):
         if self.mode == "item":
