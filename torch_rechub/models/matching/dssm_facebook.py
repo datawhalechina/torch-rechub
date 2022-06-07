@@ -7,7 +7,7 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
 
 import torch
-
+import torch.nn.functional as F
 from ...basic.layers import MLP, EmbeddingLayer
 
 
@@ -19,7 +19,6 @@ class FaceBookDSSM(torch.nn.Module):
         user_features (list[Feature Class]): training by the user tower module.
         pos_item_features (list[Feature Class]): negative sample features, training by the item tower module.
         neg_item_features (list[Feature Class]): positive sample features, training by the item tower module.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
         temperature (float): temperature factor for similarity score, default to 1.0.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
@@ -31,13 +30,11 @@ class FaceBookDSSM(torch.nn.Module):
                  neg_item_features,
                  user_params,
                  item_params,
-                 sim_func="cosine",
                  temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.pos_item_features = pos_item_features
         self.neg_item_features = neg_item_features
-        self.sim_func = sim_func
         self.temperature = temperature
         self.user_dims = sum([fea.embed_dim for fea in user_features])
         self.item_dims = sum([fea.embed_dim for fea in pos_item_features])
@@ -54,14 +51,10 @@ class FaceBookDSSM(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return pos_item_embedding
-        if self.sim_func == "cosine":
-            pos_score = torch.cosine_similarity(user_embedding, pos_item_embedding, dim=1)
-            neg_score = torch.cosine_similarity(user_embedding, neg_item_embedding, dim=1)
-        elif self.sim_func == "dot":
-            pos_score = torch.mul(user_embedding, pos_item_embedding).sum(dim=1)
-            neg_score = torch.mul(user_embedding, neg_item_embedding).sum(dim=1)
-        else:
-            raise ValueError("similarity function only support %s, but got %s" % (["cosine", "dot"], self.sim_func))
+
+        # calculate cosine score
+        pos_score = torch.mul(user_embedding, pos_item_embedding).sum(dim=1)
+        neg_score = torch.mul(user_embedding, neg_item_embedding).sum(dim=1)
 
         return pos_score, neg_score
 
@@ -70,6 +63,7 @@ class FaceBookDSSM(torch.nn.Module):
             return None
         input_user = self.embedding(x, self.user_features, squeeze_dim=True)  #[batch_size, num_features*deep_dims]
         user_embedding = self.user_mlp(input_user)  #[batch_size, user_params["dims"][-1]]
+        user_embedding = F.normalize(user_embedding, p=2, dim=1)
         return user_embedding
 
     def item_tower(self, x):
@@ -79,4 +73,7 @@ class FaceBookDSSM(torch.nn.Module):
         if self.mode == "item":  #inference embedding mode, the zeros is just for placefolder
             return self.item_mlp(input_item_pos), None
         input_item_neg = self.embedding(x, self.neg_item_features, squeeze_dim=True)
-        return self.item_mlp(input_item_pos), self.item_mlp(input_item_neg)
+        pos_embedding, neg_embedding = self.item_mlp(input_item_pos), self.item_mlp(input_item_neg)
+        pos_embedding = F.normalize(pos_embedding, p=2, dim=1)
+        neg_embedding = F.normalize(neg_embedding, p=2, dim=1)
+        return pos_embedding, neg_embedding

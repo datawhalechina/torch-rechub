@@ -12,7 +12,7 @@
 
 - 使用方法
 
-  ```Python
+  ```shell
   python run_criteo.py --model_name widedeep
   python run_criteo.py --model_name deepfm
   ```
@@ -35,7 +35,7 @@
 
 - 使用方法
 
-  ```python
+  ```shell
   python run_amazon_electronics.py # run DIN model on sample data
   ```
 

@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-
+import math
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from torch_rechub.models.matching import YoutubeSBC
 from torch_rechub.trainers import MatchTrainer
@@ -16,7 +16,7 @@ from torch_rechub.utils.data import df_to_dict, MatchDataGenerator
 from movielens_utils import match_evaluation, get_item_sample_weight
 
 
-def get_movielens_data(data_path, load_cache=False):
+def get_movielens_data(data_path, batch_size, load_cache=False):
     data = pd.read_csv(data_path)
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', "cate_id"]
@@ -83,7 +83,7 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.manual_seed(seed)
-    user_features, item_features, sample_weight_feature, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path)
+    user_features, item_features, sample_weight_feature, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path, batch_size=batch_size, load_cache=False)
     dg = MatchDataGenerator(x=x_train, y=y_train)
 
     model = YoutubeSBC(user_features,
@@ -91,6 +91,7 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
                        sample_weight_feature,
                        user_params={"dims": [128, 64, 16]},
                        item_params={"dims": [128, 64, 16]},
+                       batch_size=batch_size,
                        n_neg=3,
                        temperature=0.02)
     #mode=2 means use list-wise loss: softmax
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_path', default="./data/ml-1m/ml-1m_sample.csv")
     parser.add_argument('--epoch', type=int, default=1)  #8
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=2048)  #4096
+    parser.add_argument('--batch_size', type=int, default=512)  #4096
     parser.add_argument('--weight_decay', type=float, default=1e-6)
     parser.add_argument('--device', default='cpu')  #cuda:0
     parser.add_argument('--save_dir', default='./data/ml-1m/saved/')
