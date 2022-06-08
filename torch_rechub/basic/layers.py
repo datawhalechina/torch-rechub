@@ -324,7 +324,7 @@ class MultiInterestSA(nn.Module):
     Shape:
         - Input: seq_emb : (batch,seq,emb)
                  mask : (batch,seq,1)
-        - Output: `(batch_size, K, embedding_dim)`
+        - Output: `(batch_size, interest_num, embedding_dim)`
 
     """
     def __init__(self, embedding_dim, interest_num, hidden_dim=None):
@@ -338,11 +338,6 @@ class MultiInterestSA(nn.Module):
         self.W3 = torch.nn.Parameter(torch.rand(self.embedding_dim, self.embedding_dim), requires_grad=True)
 
     def forward(self, seq_emb, mask = None):
-        """
-        :param seq_emb : batch,seq,emb
-        :param mask : batch,seq,1
-        """
-
         H = torch.einsum('bse, ed -> bsd', seq_emb, self.W1).tanh()
         if mask != None:
             A = torch.einsum('bsd, dk -> bsk', H, self.W2) + -1.e9 * (1 - mask.float())
@@ -366,7 +361,7 @@ class CapsuleNetwork(nn.Module):
     Shape:
         - Input: seq_emb : (batch,seq,emb)
                  mask : (batch,seq,1)
-        - Output: `(batch_size, K, embedding_dim)`
+        - Output: `(batch_size, interest_num, embedding_dim)`
 
     """
     def __init__(self, embedding_dim, seq_len, bilinear_type=2, interest_num=4, routing_times=3, relu_layer=False):
@@ -390,7 +385,7 @@ class CapsuleNetwork(nn.Module):
         else:
             self.w = nn.Parameter(torch.Tensor(1, self.seq_len, self.interest_num * self.embedding_dim, self.embedding_dim))
 
-    def forward(self, item_eb, mask, device):
+    def forward(self, item_eb, mask):
         if self.bilinear_type == 0:
             item_eb_hat = self.linear(item_eb)
             item_eb_hat = item_eb_hat.repeat(1, 1, self.interest_num)
@@ -411,10 +406,10 @@ class CapsuleNetwork(nn.Module):
             item_eb_hat_iter = item_eb_hat
 
         if self.bilinear_type > 0:
-            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=device,
+            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device,
                                          requires_grad=False)
         else:
-            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=device,
+            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device,
                                          requires_grad=False)
 
         for i in range(self.routing_times):  # 动态路由传播3次
