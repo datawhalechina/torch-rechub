@@ -21,16 +21,14 @@ class YoutubeDNN(torch.nn.Module):
         item_features (list[Feature Class]): training by the embedding table, it's the item id feature.
         neg_item_feature (list[Feature Class]): training by the embedding table, it's the negative items id feature.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
         temperature (float): temperature factor for similarity score, default to 1.0.
     """
 
-    def __init__(self, user_features, item_features, neg_item_feature, user_params, sim_func="cosine", temperature=1.0):
+    def __init__(self, user_features, item_features, neg_item_feature, user_params, temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.neg_item_feature = neg_item_feature
-        self.sim_func = sim_func
         self.temperature = temperature
         self.user_dims = sum([fea.embed_dim for fea in user_features])
         self.embedding = EmbeddingLayer(user_features + item_features)

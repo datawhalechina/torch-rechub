@@ -116,8 +116,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/ml-1m/ml-1m_sample.csv")
     parser.add_argument('--model_name', default='dssm')
-    parser.add_argument('--epoch', type=int, default=1)  #10
-    parser.add_argument('--learning_rate', type=float, default=1e-3)
+    parser.add_argument('--epoch', type=int, default=10)  #10
+    parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--batch_size', type=int, default=2048)  #4096
     parser.add_argument('--weight_decay', type=float, default=1e-6)
     parser.add_argument('--device', default='cpu')  #cuda:0
