@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from torch_rechub.models.matching import ComirecSA, ComirecDR
+from torch_rechub.models.matching import MIND
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
 from torch_rechub.utils.match import generate_seq_feature_match, gen_model_input
@@ -86,10 +86,8 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     user_features, history_features, item_features, neg_item_feature, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path, seq_max_len=seq_max_len)
     dg = MatchDataGenerator(x=x_train, y=y_train)
 
-    if model_name.lower() == 'comirec_dr':
-        model = ComirecDR(user_features, history_features, item_features, neg_item_feature, max_length=seq_max_len, temperature=0.02)
-    else:
-        model = ComirecSA(user_features, history_features, item_features, neg_item_feature, temperature=0.02,)
+
+    model = MIND(user_features, history_features, item_features, neg_item_feature, max_length=seq_max_len, temperature=0.02)
 
     #mode=1 means pair-wise learning
     trainer = MatchTrainer(model,
