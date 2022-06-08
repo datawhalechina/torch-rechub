@@ -24,18 +24,16 @@ class ComirecSA(torch.nn.Module):
         history_features (list[Feature Class]): training history
         item_features (list[Feature Class]): training by the embedding table, it's the item id feature.
         neg_item_feature (list[Feature Class]): training by the embedding table, it's the negative items id feature.
-        user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
         temperature (float): temperature factor for similarity score, default to 1.0.
+        interest_num （int): interest num
     """
 
-    def __init__(self, user_features, history_features, item_features, neg_item_feature, sim_func="cosine", temperature=1.0, interest_num=4):
+    def __init__(self, user_features, history_features, item_features, neg_item_feature, temperature=1.0, interest_num=4):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.history_features = history_features
         self.neg_item_feature = neg_item_feature
-        self.sim_func = sim_func
         self.temperature = temperature
         self.interest_num = interest_num
         self.user_dims = sum([fea.embed_dim for fea in user_features+history_features])
@@ -112,18 +110,17 @@ class ComirecDR(torch.nn.Module):
         history_features (list[Feature Class]): training history
         item_features (list[Feature Class]): training by the embedding table, it's the item id feature.
         neg_item_feature (list[Feature Class]): training by the embedding table, it's the negative items id feature.
-        user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
+        max_length (int): max sequence length of input item sequence
         temperature (float): temperature factor for similarity score, default to 1.0.
+        interest_num （int): interest num
     """
 
-    def __init__(self, user_features, history_features, item_features, neg_item_feature, max_length, sim_func="cosine", temperature=1.0, interest_num=4):
+    def __init__(self, user_features, history_features, item_features, neg_item_feature, max_length, temperature=1.0, interest_num=4):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.history_features = history_features
         self.neg_item_feature = neg_item_feature
-        self.sim_func = sim_func
         self.temperature = temperature
         self.interest_num = interest_num
         self.max_length = max_length

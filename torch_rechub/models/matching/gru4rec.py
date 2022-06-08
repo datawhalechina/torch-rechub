@@ -10,6 +10,7 @@ import torch
 
 from ...basic.layers import MLP, EmbeddingLayer
 from torch import nn
+import torch.nn.functional as F
 
 
 class GRU4Rec(torch.nn.Module):
@@ -23,17 +24,15 @@ class GRU4Rec(torch.nn.Module):
         item_features (list[Feature Class]): training by the embedding table, it's the item id feature.
         neg_item_feature (list[Feature Class]): training by the embedding table, it's the negative items id feature.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
         temperature (float): temperature factor for similarity score, default to 1.0.
     """
 
-    def __init__(self, user_features, history_features, item_features, neg_item_feature, user_params, sim_func="cosine", temperature=1.0):
+    def __init__(self, user_features, history_features, item_features, neg_item_feature, user_params, temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
         self.history_features = history_features
         self.neg_item_feature = neg_item_feature
-        self.sim_func = sim_func
         self.temperature = temperature
         self.user_dims = sum([fea.embed_dim for fea in user_features+history_features])
 
@@ -53,13 +52,9 @@ class GRU4Rec(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
-        if self.sim_func == "cosine":
-            y = torch.cosine_similarity(user_embedding, item_embedding, dim=-1)  #[batch_size, 1+n_neg_items, embed_dim]
-        elif self.sim_func == "dot":
-            y = torch.mul(user_embedding, item_embedding).sum(dim=1)
-        else:
-            raise ValueError("similarity function only support %s, but got %s" % (["cosine", "dot"], self.sim_func))
-        y = y / self.temperature
+
+        y = torch.mul(user_embedding, item_embedding).sum(dim=1)
+
         return y
 
     def user_tower(self, x):
@@ -74,6 +69,7 @@ class GRU4Rec(torch.nn.Module):
         input_user = torch.cat([input_user,history_emb],dim=-1)
 
         user_embedding = self.user_mlp(input_user).unsqueeze(1)  #[batch_size, 1, embed_dim]
+        user_embedding = F.normalize(user_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "user":
             return user_embedding.squeeze(1)  #inference embedding mode -> [batch_size, embed_dim]
         return user_embedding
@@ -82,8 +78,10 @@ class GRU4Rec(torch.nn.Module):
         if self.mode == "user":
             return None
         pos_embedding = self.embedding(x, self.item_features, squeeze_dim=False)  #[batch_size, 1, embed_dim]
+        pos_embedding = F.normalize(pos_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "item":  #inference embedding mode
             return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
         neg_embeddings = self.embedding(x, self.neg_item_feature,
                                         squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
+        neg_embeddings = F.normalize(neg_embeddings, p=2, dim=-1)  # L2 normalize
         return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]
