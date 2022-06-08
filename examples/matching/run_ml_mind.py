@@ -117,8 +117,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/ml-1m/ml-1m_sample.csv")
-    parser.add_argument('--model_name', default='comirec_dr')
-    parser.add_argument('--epoch', type=int, default=100)  #10
+    parser.add_argument('--model_name', default='mind')
+    parser.add_argument('--epoch', type=int, default=10)  #10
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=256)  #4096
     parser.add_argument('--weight_decay', type=float, default=1e-6)

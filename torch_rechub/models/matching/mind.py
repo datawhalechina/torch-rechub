@@ -11,6 +11,7 @@ import torch
 
 from ...basic.layers import MLP, EmbeddingLayer, MultiInterestSA, CapsuleNetwork
 from torch import nn
+import torch.nn.functional as F
 
 
 class MIND(torch.nn.Module):
@@ -61,13 +62,7 @@ class MIND(torch.nn.Module):
             best_interest_emb[k, :] = user_embedding[k, k_index[k], :]
         best_interest_emb = best_interest_emb.unsqueeze(1)
 
-        if self.sim_func == "cosine":
-            y = torch.cosine_similarity(best_interest_emb, item_embedding, dim=-1)  #[batch_size, 1+n_neg_items, embed_dim]
-        elif self.sim_func == "dot":
-            y = torch.mul(best_interest_emb, item_embedding).sum(dim=1)
-        else:
-            raise ValueError("similarity function only support %s, but got %s" % (["cosine", "dot"], self.sim_func))
-        y = y / self.temperature
+        y = torch.mul(best_interest_emb, item_embedding).sum(dim=1)
         return y
 
     def user_tower(self, x):
@@ -84,6 +79,7 @@ class MIND(torch.nn.Module):
 
         # user_embedding = self.user_mlp(input_user).unsqueeze(1)  #[batch_size, interest_num, embed_dim]
         user_embedding = torch.matmul(input_user,self.convert_user_weight)
+        user_embedding = F.normalize(user_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "user":
             return user_embedding  #inference embedding mode -> [batch_size, interest_num, embed_dim]
         return user_embedding
@@ -92,10 +88,12 @@ class MIND(torch.nn.Module):
         if self.mode == "user":
             return None
         pos_embedding = self.embedding(x, self.item_features, squeeze_dim=False)  #[batch_size, 1, embed_dim]
+        pos_embedding = F.normalize(pos_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "item":  #inference embedding mode
             return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
         neg_embeddings = self.embedding(x, self.neg_item_feature,
                                         squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
+        neg_embeddings = F.normalize(neg_embeddings, p=2, dim=-1)  # L2 normalize
         return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]
 
     def gen_mask(self, x):
