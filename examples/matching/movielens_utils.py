@@ -21,8 +21,25 @@ def match_evaluation(user_embedding, item_embedding, test_user, all_item, user_c
     user_map, item_map = np.load(raw_id_maps, allow_pickle=True)
     match_res = collections.defaultdict(dict)  # user id -> predicted item ids
     for user_id, user_emb in zip(test_user[user_col], user_embedding):
-        items_idx, items_scores = annoy.query(v=user_emb, n=topk)  #the index of topk match items
-        match_res[user_map[user_id]] = np.vectorize(item_map.get)(all_item[item_col][items_idx])
+        if len(user_emb.shape)==2:
+            #多兴趣召回
+            items_idx = []
+            items_scores = []
+            for i in range(user_emb.shape[0]):
+                temp_items_idx, temp_items_scores = annoy.query(v=user_emb[i], n=topk)  # the index of topk match items
+                items_idx += temp_items_idx
+                items_scores += temp_items_scores
+            temp_df = pd.DataFrame()
+            temp_df['item'] = items_idx
+            temp_df['score'] = items_scores
+            temp_df = temp_df.sort_values(by='score', ascending=True)
+            temp_df = temp_df.drop_duplicates(subset=['item'], keep='first', inplace=False)
+            recall_item_list = temp_df['item'][:topk].values
+            match_res[user_map[user_id]] = np.vectorize(item_map.get)(all_item[item_col][recall_item_list])
+        else:
+            #普通召回
+            items_idx, items_scores = annoy.query(v=user_emb, n=topk)  #the index of topk match items
+            match_res[user_map[user_id]] = np.vectorize(item_map.get)(all_item[item_col][items_idx])
 
     #get ground truth
     print("generate ground truth")

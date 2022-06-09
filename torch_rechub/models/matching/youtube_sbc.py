@@ -22,10 +22,9 @@ class YoutubeSBC(torch.nn.Module):
         sample_weight_feature (list[Feature Class]): used for sampleing bias corrected in training.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
+        batch_size (int): same as batch size of DataLoader, used in in-batch sampling
         n_neg (int): the number of negative sample for every positive sample, default to 3. Note it's must smaller than batch_size.
-        sim_func (str): similarity function, includes `["cosine", "dot"]`, default to "cosine".
         temperature (float): temperature factor for similarity score, default to 1.0.
-
     """
 
     def __init__(self,
@@ -51,7 +50,7 @@ class YoutubeSBC(torch.nn.Module):
         self.item_mlp = MLP(self.item_dims, output_layer=False, **item_params)
         self.mode = None
 
-        # in-batch sample index
+        # in-batch sampling index
         self.index0 = np.repeat(np.arange(batch_size), n_neg + 1)
         self.index1 = np.concatenate([np.arange(i, i + n_neg + 1) for i in range(batch_size)])
         self.index1[np.where(self.index1 >= batch_size)] -= batch_size
@@ -65,21 +64,19 @@ class YoutubeSBC(torch.nn.Module):
             return item_embedding
 
         # pred[i, j] means predicted score that user_i give to item_j
-
         pred = torch.cosine_similarity(user_embedding.unsqueeze(1), item_embedding, dim=2)  # (batch_size, batch_size)
 
         # get sample weight of items in this batch
         sample_weight = self.embedding(x, self.sample_weight_feature, squeeze_dim=True).squeeze(1)  # (batch_size)
+        scores = pred - torch.log(sample_weight)  #Sampling Bias Corrected, using broadcast. (batch_size, batch_size)
 
-        scores = pred - torch.log(sample_weight)  #Sampling Bias Corrected, using broadcast
         if user_embedding.shape[0] * (self.n_neg + 1) != self.index0.shape[0]:  # last batch
             batch_size = user_embedding.shape[0]
             index0 = self.index0[:batch_size * (self.n_neg + 1)]
             index1 = self.index1[:batch_size * (self.n_neg + 1)]
             index0[np.where(index0 >= batch_size)] -= batch_size
             index1[np.where(index1 >= batch_size)] -= batch_size
-
-            scores = scores[index0, index1]
+            scores = scores[index0, index1]  # (batch_size, 1 + self.n_neg)
         else:
             scores = scores[self.index0, self.index1]
 
