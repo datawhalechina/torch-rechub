@@ -1,5 +1,5 @@
 from ..utils.data import get_auto_embedding_dim
-from .initializers import XavierNormal
+from .initializers import RandomNormal
 
 
 class SequenceFeature(object):
@@ -17,7 +17,7 @@ class SequenceFeature(object):
         initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None, initializer=XavierNormal()):
+    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None, initializer=RandomNormal(0, 0.0001)):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:
@@ -40,7 +40,7 @@ class SparseFeature(object):
         initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self, name, vocab_size, embed_dim=None, shared_with=None, initializer=XavierNormal()):
+    def __init__(self, name, vocab_size, embed_dim=None, shared_with=None, initializer=RandomNormal(0, 0.0001)):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim == None:

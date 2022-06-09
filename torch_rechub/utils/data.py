@@ -61,14 +61,7 @@ class DataGenerator(object):
         self.dataset = TorchDataset(x, y)
         self.length = len(self.dataset)
 
-    def generate_dataloader(self,
-                            x_val=None,
-                            y_val=None,
-                            x_test=None,
-                            y_test=None,
-                            split_ratio=None,
-                            batch_size=16,
-                            num_workers=8):
+    def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16, num_workers=8):
         if split_ratio != None:
             train_length = int(self.length * split_ratio[0])
             val_length = int(self.length * split_ratio[1])
@@ -80,9 +73,9 @@ class DataGenerator(object):
             val_dataset = TorchDataset(x_val, y_val)
             test_dataset = TorchDataset(x_test, y_test)
 
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers)
-        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, num_workers=num_workers)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=num_workers)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return train_dataloader, val_dataloader, test_dataloader
 
 
@@ -143,8 +136,7 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
     item_cate_map = data[['item_id', 'cate_id']]
     item2cate_dict = item_cate_map.set_index(['item_id'])['cate_id'].to_dict()
 
-    data = data.sort_values(['user_id', 'time']).groupby('user_id').agg(click_hist_list=('item_id', list),
-                                                                        cate_hist_hist=('cate_id', list)).reset_index()
+    data = data.sort_values(['user_id', 'time']).groupby('user_id').agg(click_hist_list=('item_id', list), cate_hist_hist=('cate_id', list)).reset_index()
 
     # Sliding window to construct negative samples
     train_data, val_data, test_data = [], [], []

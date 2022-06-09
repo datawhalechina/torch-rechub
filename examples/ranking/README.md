@@ -63,17 +63,25 @@
 
 
 
-
-
-
-
 ## WeChat
 
 TBD
 
-## Taobao
 
-TBD
+
+## Ali-CCP
+
+该数据集采集自手机淘宝移动客户端的推荐系统日志，一共有23个sparse特征，8个dense特征，包含“点击”、“购买”两个标签。
+
+数据集该类目包含25W个用户、50W条商品的信息，共计8000W条数据。
+
+- 注意事项
+  - 原始数据已划分训练集和测试集，预处理过程将原始数据的测试集随机划分一半作为验证集，预处理后的训练集、验证集、测试集比例为2:1:1。
+  - 预处理完的数据集的sparse特征已经Lable Encode，dense特征采用归一化处理。数据预处理方式参考[AITM模型预处理脚本](https://github.com/xidongbo/AITM/blob/main/process_public_dataset.py)，我们也提供了处理原始数据的脚本`preprocess_ali_ccp.py`。
+- 原始数据地址：https://tianchi.aliyun.com/dataset/dataDetail?dataId=408
+- 预处理后的全量数据下载地址：https://cowtransfer.com/s/1903cab699fa49
+
+
 
 ## Avazu
 
@@ -84,37 +92,37 @@ train:按时间顺序排列的10天点击数据，约四千万样本。
 test:用于测试模型预测的1天广告数据，约四百六十万。
 由于Kaggle中的test缺少label，因此推荐使用avazu的划分方法，即把原始的训练集按照7:1:2进行划分。
 数据字段极其解释:
-|字段名|解释|
-|-----|-----|
-|id|广告点击id，每个点击事件都有一个唯一的id，可以用来做广告点击跟踪|
-|click|广告是否被点击，1表示点击，0表示未点击|
-|hour|广告点击时间，格式为YYMMDDHH|
-|C1|广告类别1，用于区分广告类别|
-|banner_pos|广告位置|
-|site_id|广告所属站点id|
-|site_domain|广告所属站点域名|
-|site_category|站点分类|
-|app_id|广告所属app id| 
-|app_domain|广告所属app域名|
-|app_category|广告所属app分类|
-|device_id|广告所属设备id|
-|device_ip|广告所属设备ip|
-|device_model|广告所属设备型号|
-|device_type|广告所属设备类型|
-|device_conn_type|广告所属设备连接类型|
-|C14-C21|匿名化的分类变量|
+| 字段名           | 解释                                                             |
+| ---------------- | ---------------------------------------------------------------- |
+| id               | 广告点击id，每个点击事件都有一个唯一的id，可以用来做广告点击跟踪 |
+| click            | 广告是否被点击，1表示点击，0表示未点击                           |
+| hour             | 广告点击时间，格式为YYMMDDHH                                     |
+| C1               | 广告类别1，用于区分广告类别                                      |
+| banner_pos       | 广告位置                                                         |
+| site_id          | 广告所属站点id                                                   |
+| site_domain      | 广告所属站点域名                                                 |
+| site_category    | 站点分类                                                         |
+| app_id           | 广告所属app id                                                   |
+| app_domain       | 广告所属app域名                                                  |
+| app_category     | 广告所属app分类                                                  |
+| device_id        | 广告所属设备id                                                   |
+| device_ip        | 广告所属设备ip                                                   |
+| device_model     | 广告所属设备型号                                                 |
+| device_type      | 广告所属设备类型                                                 |
+| device_conn_type | 广告所属设备连接类型                                             |
+| C14-C21          | 匿名化的分类变量                                                 |
 ## 测试结果
 
 > 表格中score值，分类任务均为AUC(越大越好)，回归任务均为MSE(越小越好)
 
 常见排序模型测试结果：
 
-| Model/Dataset | Criteo | Avazu | Taobao(CTR) |
-| ------------- | ------ | ----- | ----------- |
-| WideDeep      | 0.8083 |0.7533 |             |
-| DeepFM        | 0.8104 |0.7579 |             |
-| DCN           |        |0.7533 |             |
-| xDeepFM       |        |       |             |
+| Model/Dataset | Criteo | Avazu  | Taobao(CTR) |
+| ------------- | ------ | ------ | ----------- |
+| WideDeep      | 0.8083 | 0.7533 |             |
+| DeepFM        | 0.8104 | 0.7579 |             |
+| DCN           |        | 0.7533 |             |
+| xDeepFM       |        |        |             |
 
 序列模型测试结果：
 
