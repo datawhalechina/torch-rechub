@@ -13,15 +13,17 @@
 
 查看最新研发进度，认领感兴趣的研发任务，学习rechub模型复现心得，加入rechub共建者团队等
 
-[点击链接](https://www.wolai.com/mincai/2qjdg3DPy1179e1vpcHZQC)
+[点击链接](https://www.wolai.com/rechub/2qjdg3DPy1179e1vpcHZQC)
 
 ## 安装
 
 ```python
 #最新版(目前推荐安装方式)
-git clone https://github.com/morningsky/Torch-RecHub.git
+1. git clone https://github.com/datawhalechina/torch-rechub.git
+2. cd torch-rechub
+3. pip install -e . --verbose
 
-#稳定版
+#稳定版 (暂未更新)
 #pip install torch-rechub
 
 ```
@@ -81,7 +83,7 @@ git clone https://github.com/morningsky/Torch-RecHub.git
 ### 单任务排序
 
 ```python
-from torch_rechub.rmodels.ranking import WideDeep, DeepFM, DIN
+from torch_rechub.models.ranking import WideDeep, DeepFM, DIN
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.utils import DataGenerator
 
