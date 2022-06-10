@@ -28,6 +28,9 @@ class SequenceFeature(object):
         self.shared_with = shared_with
         self.initializer = initializer
 
+    def get_embedding_layer(self):
+        return self.initializer(self.vocab_size, self.embed_dim)
+
 
 class SparseFeature(object):
     """The Feature Class for Sparse feature.
@@ -49,6 +52,9 @@ class SparseFeature(object):
             self.embed_dim = embed_dim
         self.shared_with = shared_with
         self.initializer = initializer
+
+    def get_embedding_layer(self):
+        return self.initializer(self.vocab_size, self.embed_dim)
 
 
 class DenseFeature(object):

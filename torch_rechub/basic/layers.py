@@ -55,9 +55,9 @@ class EmbeddingLayer(nn.Module):
             if fea.name in self.embed_dict:  #exist
                 continue
             if isinstance(fea, SparseFeature) and fea.shared_with == None:
-                self.embed_dict[fea.name] = fea.initializer()
+                self.embed_dict[fea.name] = fea.get_embedding_layer()
             elif isinstance(fea, SequenceFeature) and fea.shared_with == None:
-                self.embed_dict[fea.name] = fea.initializer()
+                self.embed_dict[fea.name] = fea.get_embedding_layer()
             elif isinstance(fea, DenseFeature):
                 self.n_dense += 1
 
