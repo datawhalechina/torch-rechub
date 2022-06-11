@@ -18,14 +18,13 @@
 ## 安装
 
 ```python
-#最新版(目前推荐安装方式)
+#稳定版 
+pip install torch-rechub
+
+#最新版
 1. git clone https://github.com/datawhalechina/torch-rechub.git
 2. cd torch-rechub
-3. pip install -e . --verbose
-
-#稳定版 (暂未更新)
-#pip install torch-rechub
-
+3. python setup.py install
 ```
 
 ## 核心定位

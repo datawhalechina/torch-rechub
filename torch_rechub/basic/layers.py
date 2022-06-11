@@ -26,11 +26,12 @@ class PredictionLayer(nn.Module):
 
 
 class EmbeddingLayer(nn.Module):
-    """General Embedding Layer. We init each embedding layer by `xavier_normal_`.
+    """General Embedding Layer.
+    We save all the feature embeddings in embed_dict: `{feature_name : embedding table}`.
+
     
     Args:
         features (list): the list of `Feature Class`. It is means all the features which we want to create a embedding table.
-        embed_dict (dict): the embedding dict, `{feature_name : embedding table}`.
 
     Shape:
         - Input: 
@@ -78,11 +79,13 @@ class EmbeddingLayer(nn.Module):
                 elif fea.pooling == "concat":
                     pooling_layer = ConcatPooling()
                 else:
-                    raise ValueError("Sequence pooling method supports only pooling in %s, got %s." % (["sum", "mean"], fea.pooling))
+                    raise ValueError("Sequence pooling method supports only pooling in %s, got %s." %
+                                     (["sum", "mean"], fea.pooling))
                 if fea.shared_with == None:
                     sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long())).unsqueeze(1))
                 else:
-                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long())).unsqueeze(1))  #shared specific sparse feature embedding
+                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](
+                        x[fea.name].long())).unsqueeze(1))  #shared specific sparse feature embedding
             else:
                 dense_values.append(x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
 
@@ -99,14 +102,17 @@ class EmbeddingLayer(nn.Module):
             elif not dense_exists and sparse_exists:
                 return sparse_emb.flatten(start_dim=1)  #squeeze dim to : [batch_size, num_features*embed_dim]
             elif dense_exists and sparse_exists:
-                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values), dim=1)  #concat dense value with sparse embedding
+                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values),
+                                 dim=1)  #concat dense value with sparse embedding
             else:
                 raise ValueError("The input features can note be empty")
         else:
             if sparse_exists:
                 return sparse_emb  #[batch_size, num_features, embed_dim]
             else:
-                raise ValueError("If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" % ("SparseFeatures", features))
+                raise ValueError(
+                    "If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" %
+                    ("SparseFeatures", features))
 
 
 class LR(nn.Module):
@@ -406,9 +412,17 @@ class CapsuleNetwork(nn.Module):
             item_eb_hat_iter = item_eb_hat
 
         if self.bilinear_type > 0:
-            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
+            capsule_weight = torch.zeros(item_eb_hat.shape[0],
+                                         self.interest_num,
+                                         self.seq_len,
+                                         device=item_eb.device,
+                                         requires_grad=False)
         else:
-            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
+            capsule_weight = torch.randn(item_eb_hat.shape[0],
+                                         self.interest_num,
+                                         self.seq_len,
+                                         device=item_eb.device,
+                                         requires_grad=False)
 
         for i in range(self.routing_times):  # 动态路由传播3次
             atten_mask = torch.unsqueeze(mask, 1).repeat(1, self.interest_num, 1)
