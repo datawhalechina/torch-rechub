@@ -55,9 +55,9 @@ class EmbeddingLayer(nn.Module):
             if fea.name in self.embed_dict:  #exist
                 continue
             if isinstance(fea, SparseFeature) and fea.shared_with == None:
-                self.embed_dict[fea.name] = fea.initializer(fea)
+                self.embed_dict[fea.name] = fea.get_embedding_layer()
             elif isinstance(fea, SequenceFeature) and fea.shared_with == None:
-                self.embed_dict[fea.name] = fea.initializer(fea)
+                self.embed_dict[fea.name] = fea.get_embedding_layer()
             elif isinstance(fea, DenseFeature):
                 self.n_dense += 1
 
@@ -313,6 +313,7 @@ class CrossNetwork(nn.Module):
             x = x0 * xw + self.b[i] + x
         return x
 
+
 class MultiInterestSA(nn.Module):
     """MultiInterest Attention mentioned in the Comirec paper.
 
@@ -327,17 +328,18 @@ class MultiInterestSA(nn.Module):
         - Output: `(batch_size, interest_num, embedding_dim)`
 
     """
+
     def __init__(self, embedding_dim, interest_num, hidden_dim=None):
         super(MultiInterestSA, self).__init__()
         self.embedding_dim = embedding_dim
         self.interest_num = interest_num
         if hidden_dim == None:
-            self.hidden_dim= self.embedding_dim*4
+            self.hidden_dim = self.embedding_dim * 4
         self.W1 = torch.nn.Parameter(torch.rand(self.embedding_dim, self.hidden_dim), requires_grad=True)
         self.W2 = torch.nn.Parameter(torch.rand(self.hidden_dim, self.interest_num), requires_grad=True)
         self.W3 = torch.nn.Parameter(torch.rand(self.embedding_dim, self.embedding_dim), requires_grad=True)
 
-    def forward(self, seq_emb, mask = None):
+    def forward(self, seq_emb, mask=None):
         H = torch.einsum('bse, ed -> bsd', seq_emb, self.W1).tanh()
         if mask != None:
             A = torch.einsum('bsd, dk -> bsk', H, self.W2) + -1.e9 * (1 - mask.float())
@@ -347,6 +349,7 @@ class MultiInterestSA(nn.Module):
         A = A.permute(0, 2, 1)
         multi_interest_emb = torch.matmul(A, seq_emb)
         return multi_interest_emb
+
 
 class CapsuleNetwork(nn.Module):
     """CapsuleNetwork mentioned in the Comirec and MIND paper.
@@ -364,6 +367,7 @@ class CapsuleNetwork(nn.Module):
         - Output: `(batch_size, interest_num, embedding_dim)`
 
     """
+
     def __init__(self, embedding_dim, seq_len, bilinear_type=2, interest_num=4, routing_times=3, relu_layer=False):
         super(CapsuleNetwork, self).__init__()
         self.embedding_dim = embedding_dim  # h
@@ -374,10 +378,7 @@ class CapsuleNetwork(nn.Module):
 
         self.relu_layer = relu_layer
         self.stop_grad = True
-        self.relu = nn.Sequential(
-            nn.Linear(self.embedding_dim, self.embedding_dim, bias=False),
-            nn.ReLU()
-        )
+        self.relu = nn.Sequential(nn.Linear(self.embedding_dim, self.embedding_dim, bias=False), nn.ReLU())
         if self.bilinear_type == 0:  # MIND
             self.linear = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
         elif self.bilinear_type == 1:
@@ -393,8 +394,7 @@ class CapsuleNetwork(nn.Module):
             item_eb_hat = self.linear(item_eb)
         else:
             u = torch.unsqueeze(item_eb, dim=2)
-            item_eb_hat = torch.sum(self.w[:, :self.seq_len, :, :] * u,
-                                    dim=3)
+            item_eb_hat = torch.sum(self.w[:, :self.seq_len, :, :] * u, dim=3)
 
         item_eb_hat = torch.reshape(item_eb_hat, (-1, self.seq_len, self.interest_num, self.embedding_dim))
         item_eb_hat = torch.transpose(item_eb_hat, 1, 2).contiguous()
@@ -406,11 +406,9 @@ class CapsuleNetwork(nn.Module):
             item_eb_hat_iter = item_eb_hat
 
         if self.bilinear_type > 0:
-            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device,
-                                         requires_grad=False)
+            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
         else:
-            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device,
-                                         requires_grad=False)
+            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
 
         for i in range(self.routing_times):  # 动态路由传播3次
             atten_mask = torch.unsqueeze(mask, 1).repeat(1, self.interest_num, 1)
@@ -421,17 +419,13 @@ class CapsuleNetwork(nn.Module):
             capsule_softmax_weight = torch.unsqueeze(capsule_softmax_weight, 2)
 
             if i < 2:
-                interest_capsule = torch.matmul(capsule_softmax_weight,
-                                                item_eb_hat_iter)
+                interest_capsule = torch.matmul(capsule_softmax_weight, item_eb_hat_iter)
                 cap_norm = torch.sum(torch.square(interest_capsule), -1, True)
                 scalar_factor = cap_norm / (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
                 interest_capsule = scalar_factor * interest_capsule
 
-                delta_weight = torch.matmul(item_eb_hat_iter,
-                                            torch.transpose(interest_capsule, 2, 3).contiguous()
-                                            )
-                delta_weight = torch.reshape(delta_weight, (
-                -1, self.interest_num, self.seq_len))
+                delta_weight = torch.matmul(item_eb_hat_iter, torch.transpose(interest_capsule, 2, 3).contiguous())
+                delta_weight = torch.reshape(delta_weight, (-1, self.interest_num, self.seq_len))
                 capsule_weight = capsule_weight + delta_weight
             else:
                 interest_capsule = torch.matmul(capsule_softmax_weight, item_eb_hat)
@@ -445,4 +439,3 @@ class CapsuleNetwork(nn.Module):
             interest_capsule = self.relu(interest_capsule)
 
         return interest_capsule
-
