@@ -2,13 +2,13 @@
 
 ## Criteo
 
-该数据集是Criteo Labs发布的在线广告数据集。 它包含数百万个展示广告的点击反馈记录，该数据可作为点击率(CTR)预测的基准。 数据集具有40个特征，第一列是标签，其中值1表示已单击广告，而值0表示未单击广告。 其他特征包含13个dense列和26个sparse特征。
+该数据集是Criteo Labs发布的在线广告数据集。 它包含数百万个展示广告的点击反馈记录，该数据可作为点击率(CTR)预测的基准。 数据集具有40个特征，第一列是标签，其中值1表示已点击广告，而值0表示未点击广告。 其他特征包含13个dense特征和26个sparse特征。
 
 - 原始数据地址：https://www.kaggle.com/datasets/mrkmakr/criteo-dataset?resource=download
 
   使用其中带label的`train.txt`。
 
-- csv格式高速网盘下载链接：https://cowtransfer.com/s/3f5e873a254b43
+- 全量csv数据下载：https://cowtransfer.com/s/3f5e873a254b43
 
 - 使用方法
 
