@@ -117,7 +117,7 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
         data (pd.DataFrame): must contain keys: `user_id, item_id, cate_id, time`.
         seq_feature_col (list): specify the column name that needs to generate sequence features, and its sequence features will be generated according to userid.
         max_len (int): the max length of a user history sequence.
-        drop_short (int): remove some inactive user who's sequence length < drop_short.
+        drop_short (int): remove some inactive user whose sequence length < drop_short.
         shuffle (bool): shuffle data if true.
 
     Returns:

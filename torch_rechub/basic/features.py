@@ -28,6 +28,9 @@ class SequenceFeature(object):
         self.shared_with = shared_with
         self.initializer = initializer
 
+    def __repr__(self):
+        return f'<SequenceFeature {self.name} with Embedding shape ({self.vocab_size}, {self.embed_dim})>'
+
     def get_embedding_layer(self):
         return self.initializer(self.vocab_size, self.embed_dim)
 
@@ -53,8 +56,12 @@ class SparseFeature(object):
         self.shared_with = shared_with
         self.initializer = initializer
 
+    def __repr__(self):
+        return f'<SparseFeature {self.name} with Embedding shape ({self.vocab_size}, {self.embed_dim})>'
+
     def get_embedding_layer(self):
         return self.initializer(self.vocab_size, self.embed_dim)
+
 
 
 class DenseFeature(object):
@@ -68,3 +75,6 @@ class DenseFeature(object):
     def __init__(self, name):
         self.name = name
         self.embed_dim = 1
+
+    def __repr__(self):
+        return f'<DenseFeature {self.name}>'
