@@ -106,13 +106,6 @@ class SASRec(torch.nn.Module):
 
         return pos_logits, neg_logits
 
-    def predict(self, log_seqs, item_indices):
-        log_feats = self.log2feats(log_seqs)
-        final_feat = log_feats[:, -1, :]
-        item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))
-        logits = item_embs.matmul(final_feat.unsqueeze(-1)).squeeze(-1)
-        return logits
-
 
 class PointWiseFeedForward(torch.nn.Module):
     def __init__(self, hidden_units, dropout_rate):
