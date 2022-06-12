@@ -9,8 +9,9 @@
 - 将每个用户最后一条观看记录设置为测试集
 - 原始数据下载地址：https://grouplens.org/datasets/movielens/1m/
 - 处理完整数据csv下载地址：https://cowtransfer.com/s/5a3ab69ebd314e
-- 
+
 以下指标使用example中的相同参数在ml-1m上测试得到
+
 | Model\Metrics | Hit@100 | Recall@100 | Precision@100 |
 |---------------|---------|------------|---------------|
 | DSSM          | 14.74%  | 14.74%     | 0.15%         |

@@ -19,7 +19,7 @@ class YoutubeSBC(torch.nn.Module):
     Args:
         user_features (list[Feature Class]): training by the user tower module.
         item_features (list[Feature Class]): training by the item tower module.
-        sample_weight_feature (list[Feature Class]): used for sampleing bias corrected in training.
+        sample_weight_feature (list[Feature Class]): used for sampling bias corrected in training.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         batch_size (int): same as batch size of DataLoader, used in in-batch sampling
@@ -78,7 +78,7 @@ class YoutubeSBC(torch.nn.Module):
             index1[np.where(index1 >= batch_size)] -= batch_size
             scores = scores[index0, index1]  # (batch_size, 1 + self.n_neg)
         else:
-            scores = scores[self.index0, self.index1]
+            scores = scores[self.index0, self.index1]  # (batch_size, 1 + self.n_neg)
 
         scores = scores / self.temperature
         return scores.view(-1, self.n_neg + 1)  #(batch_size, 1 + self.n_neg)
