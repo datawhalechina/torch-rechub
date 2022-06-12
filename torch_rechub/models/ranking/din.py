@@ -73,7 +73,7 @@ class ActivationUnit(nn.Module):
         super(ActivationUnit, self).__init__()
         self.emb_dim = emb_dim
         self.use_softmax = use_softmax
-        self.attention = MLP(4 * self.emb_dim, dims, activation=activation)
+        self.attention = MLP(4 * self.emb_dim, dims=dims, activation=activation)
 
     def forward(self, history, target):
         seq_length = history.size(1)
