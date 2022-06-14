@@ -31,7 +31,7 @@ def get_movielens_data(data_path, load_cache=False):
             user_map = {encode_id + 1: raw_id for encode_id, raw_id in enumerate(lbe.classes_)}  #encode user id: raw user id
         if feature == item_col:
             item_map = {encode_id + 1: raw_id for encode_id, raw_id in enumerate(lbe.classes_)}  #encode item id: raw item id
-    np.save("./data/ml-1m/saved/raw_id_maps.npy", (user_map, item_map))
+    np.save("./data/ml-1m/saved/raw_id_maps.npy", np.array((user_map, item_map), dtype=object))
 
     user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates('user_id')
     item_profile = data[["movie_id", "cate_id"]].drop_duplicates('movie_id')
@@ -52,7 +52,7 @@ def get_movielens_data(data_path, load_cache=False):
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50, padding='post', truncating='post')
         y_train = np.array([0] * df_train.shape[0])  #label=0 means the first pred value is positiva sample
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50, padding='post', truncating='post')
-        np.save("./data/ml-1m/saved/data_cache.npy", (x_train, y_train, x_test))
+        np.save("./data/ml-1m/saved/data_cache.npy", np.array((x_train, y_train, x_test), dtype=object))
 
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
 
