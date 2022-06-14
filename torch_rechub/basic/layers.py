@@ -81,11 +81,11 @@ class EmbeddingLayer(nn.Module):
                 else:
                     raise ValueError("Sequence pooling method supports only pooling in %s, got %s." %
                                      (["sum", "mean"], fea.pooling))
+                fea_mask = InputMask()(x, fea)
                 if fea.shared_with == None:
-                    sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long())).unsqueeze(1))
+                    sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long()), fea_mask).unsqueeze(1))
                 else:
-                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](
-                        x[fea.name].long())).unsqueeze(1))  #shared specific sparse feature embedding
+                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long()), fea_mask).unsqueeze(1))  #shared specific sparse feature embedding
             else:
                 dense_values.append(x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
 
@@ -113,6 +113,38 @@ class EmbeddingLayer(nn.Module):
                 raise ValueError(
                     "If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" %
                     ("SparseFeatures", features))
+
+
+class InputMask(nn.Module):
+    """Return inputs mask from given features
+
+    Shape:
+        - Input: 
+            x (dict): {feature_name: feature_value}, sequence feature value is a 2D tensor with shape:`(batch_size, seq_len)`,\
+                      sparse/dense feature value is a 1D tensor with shape `(batch_size)`.
+            features (list or SparseFeature or SequenceFeature): Note that the elements in features are either all instances of SparseFeature or all instances of SequenceFeature.
+        - Output: 
+            - if input Sparse: `(batch_size, num_features)`
+            - if input Sequence: `(batch_size, num_features_seq, seq_length)`
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, features):
+        mask = []
+        if not isinstance(features, list):
+            features = [features]
+        for fea in features:
+            if isinstance(fea, SparseFeature) or isinstance(fea, SequenceFeature):
+                if fea.padding_idx != None:
+                    fea_mask = x[fea.name].long() != fea.padding_idx
+                else:
+                    fea_mask = x[fea.name].long() != -1
+                mask.append(fea_mask.unsqueeze(1).float())
+            else:
+                raise ValueError("Only SparseFeature or SequenceFeature support to get mask.")
+        return torch.cat(mask, dim=1)
 
 
 class LR(nn.Module):
@@ -151,7 +183,7 @@ class ConcatPooling(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         return x
 
 
@@ -159,33 +191,42 @@ class AveragePooling(nn.Module):
     """Pooling the sequence embedding matrix by `mean`.
     
     Shape:
-        - Input: `(batch_size, seq_length, embed_dim)`
+        - Input
+            x: `(batch_size, seq_length, embed_dim)`
+            mask: `(batch_size, 1, seq_length)`
         - Output: `(batch_size, embed_dim)`
     """
 
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
-        sum_pooling_matrix = torch.sum(x, dim=1)
-        non_padding_length = (x != 0).sum(dim=1)
-        x = sum_pooling_matrix / (non_padding_length.float() + 1e-16)
-        return x
+    def forward(self, x, mask=None):
+        if mask == None:
+            return torch.mean(x, dim=1)
+        else:
+            sum_pooling_matrix = torch.bmm(mask, x).squeeze(1)
+            non_padding_length = mask.sum(dim=-1)
+            return sum_pooling_matrix / (non_padding_length.float() + 1e-16)
 
 
 class SumPooling(nn.Module):
     """Pooling the sequence embedding matrix by `sum`.
 
     Shape:
-        - Input: `(batch_size, seq_length, embed_dim)`
+        - Input
+            x: `(batch_size, seq_length, embed_dim)`
+            mask: `(batch_size, 1, seq_length)`
         - Output: `(batch_size, embed_dim)`
     """
 
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
-        return torch.sum(x, dim=1)
+    def forward(self, x, mask=None):
+        if mask == None:
+            return torch.sum(x, dim=1)
+        else:
+            return torch.bmm(mask, x).squeeze(1)
 
 
 class MLP(nn.Module):
