@@ -28,18 +28,22 @@ class MatchTrainer(object):
         model,
         mode=0,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params={
-            "lr": 1e-3,
-            "weight_decay": 1e-5
-        },
+            optimizer_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         n_epoch=10,
         earlystop_patience=10,
         device="cpu",
-        gpus=[],
+            gpus=None,
         model_path="./",
     ):
+        if optimizer_params is None:
+            optimizer_params = {
+                "lr": 1e-3,
+                "weight_decay": 1e-5
+            }
+        if gpus is None:
+            gpus = []
         self.model = model  #for uniform weights save method in one gpu or multi gpu
         self.mode = mode
         if mode == 0:  #point-wise loss, binary cross_entropy

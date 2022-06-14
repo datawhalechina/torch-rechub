@@ -36,8 +36,10 @@ class PredictDataset(Dataset):
 
 class MatchDataGenerator(object):
 
-    def __init__(self, x, y=[]):
+    def __init__(self, x, y=None):
         super().__init__()
+        if y is None:
+            y = []
         if len(y) != 0:
             self.dataset = TorchDataset(x, y)
         else:  #For pair-wise model, trained without given label
@@ -110,7 +112,7 @@ def get_metric_func(task_type="classification"):
         raise ValueError("task_type must be classification or regression")
 
 
-def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50, drop_short=3, shuffle=True):
+def create_seq_features(data, seq_feature_col=None, max_len=50, drop_short=3, shuffle=True):
     """Build a sequence of user's history by time.
 
     Args:
@@ -125,6 +127,8 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
         val (pd.DataFrame): target item is the second to last item of user's history sequence.
         test (pd.DataFrame): target item is the last item of user's history sequence.
     """
+    if seq_feature_col is None:
+        seq_feature_col = ['item_id', 'cate_id']
     for feat in data:
         le = LabelEncoder()
         data[feat] = le.fit_transform(data[feat])
