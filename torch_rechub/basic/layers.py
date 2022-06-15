@@ -246,8 +246,10 @@ class MLP(nn.Module):
         - Output: `(batch_size, 1)` or `(batch_size, dims[-1])`
     """
 
-    def __init__(self, input_dim, output_layer=True, dims=[], dropout=0, activation="relu"):
+    def __init__(self, input_dim, output_layer=True, dims=None, dropout=0, activation="relu"):
         super().__init__()
+        if dims is None:
+            dims = []
         layers = list()
         for i_dim in dims:
             layers.append(nn.Linear(input_dim, i_dim))

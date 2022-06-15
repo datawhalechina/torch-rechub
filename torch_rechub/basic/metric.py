@@ -69,34 +69,43 @@ def gauc_score(y_true, y_pred, users, weights=None):
 
 
 
-def ndcg_score(y_true, y_pred, topKs=[5]):
-
+def ndcg_score(y_true, y_pred, topKs=None):
+	if topKs is None:
+		topKs = [5]
 	result = topk_metrics(y_true, y_pred, topKs)
 	return result['NDCG']
 	
 
 
-def hit_score(y_true, y_pred, topKs=[5]):
+def hit_score(y_true, y_pred, topKs=None):
+	if topKs is None:
+		topKs = [5]
 	result = topk_metrics(y_true, y_pred, topKs)
 	return result['Hit']
 
 
-def mrr_score(y_true, y_pred, topKs=[5]):
+def mrr_score(y_true, y_pred, topKs=None):
+	if topKs is None:
+		topKs = [5]
 	result = topk_metrics(y_true, y_pred, topKs)
 	return result['MRR']
 
 
-def recall_score(y_true, y_pred, topKs=[5]):
+def recall_score(y_true, y_pred, topKs=None):
+	if topKs is None:
+		topKs = [5]
 	result = topk_metrics(y_true, y_pred, topKs)
 	return result['Recall']
 
 
-def precision_score(y_true, y_pred, topKs=[5]):
+def precision_score(y_true, y_pred, topKs=None):
+	if topKs is None:
+		topKs = [5]
 	result = topk_metrics(y_true, y_pred, topKs)
 	return result['Precision']
 
 
-def topk_metrics(y_true, y_pred, topKs=[5]):
+def topk_metrics(y_true, y_pred, topKs=None):
 	"""choice topk metrics and compute it
 	the metrics contains 'ndcg', 'mrr', 'recall', 'precision' and 'hit'
 
@@ -109,6 +118,8 @@ def topk_metrics(y_true, y_pred, topKs=[5]):
 		results (dict): {metric_name: metric_values}, it contains five metrics, 'ndcg', 'recall', 'mrr', 'hit', 'precision'
 
 	"""
+	if topKs is None:
+		topKs = [5]
 	assert len(y_true) == len(y_pred)
 
 	if not isinstance(topKs, (tuple, list)):
@@ -178,15 +189,11 @@ def topk_metrics(y_true, y_pred, topKs=[5]):
 		results['Precision'].append(output)
 	return results
 
-
-
-
 def log_loss(y_true, y_pred):
 	score = y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)
 	return -score.sum() / len(y_true)
 
-
-def Coverage(y_pred, all_items, topKs=[5]):
+def Coverage(y_pred, all_items, topKs=None):
 	"""compute the coverage
 	This method measures the diversity of the recommended items 
 	and the ability to explore the long-tailed items
@@ -196,6 +203,8 @@ def Coverage(y_pred, all_items, topKs=[5]):
 	Return:
 		result (list[float]): the list of coverage scores
 	"""
+	if topKs is None:
+		topKs = [5]
 	result = []
 	for k in topKs:
 		rec_items = set([])

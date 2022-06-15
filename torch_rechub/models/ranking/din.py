@@ -69,8 +69,10 @@ class ActivationUnit(nn.Module):
         - Output: `(batch_size, emb_dim)`
     """
 
-    def __init__(self, emb_dim, dims=[36], activation="dice", use_softmax=False):
+    def __init__(self, emb_dim, dims=None, activation="dice", use_softmax=False):
         super(ActivationUnit, self).__init__()
+        if dims is None:
+            dims = [36]
         self.emb_dim = emb_dim
         self.use_softmax = use_softmax
         self.attention = MLP(4 * self.emb_dim, dims=dims, activation=activation)

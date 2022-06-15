@@ -33,10 +33,7 @@ class MTLTrainer(object):
         model,
         task_types,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params={
-            "lr": 1e-3,
-            "weight_decay": 1e-5
-        },
+            optimizer_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         adaptive_params=None,
@@ -44,9 +41,16 @@ class MTLTrainer(object):
         earlystop_taskid=0,
         earlystop_patience=10,
         device="cpu",
-        gpus=[],
+            gpus=None,
         model_path="./",
     ):
+        if optimizer_params is None:
+            optimizer_params = {
+                "lr": 1e-3,
+                "weight_decay": 1e-5
+            }
+        if gpus is None:
+            gpus = []
         self.model = model
         self.task_types = task_types
         self.n_task = len(task_types)
