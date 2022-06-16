@@ -18,10 +18,17 @@ class SequenceFeature(object):
         initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None, padding_idx=None, initializer=RandomNormal(0, 0.0001)):
+    def __init__(self,
+                 name,
+                 vocab_size,
+                 embed_dim=None,
+                 pooling="mean",
+                 shared_with=None,
+                 padding_idx=None,
+                 initializer=RandomNormal(0, 0.0001)):
         self.name = name
         self.vocab_size = vocab_size
-        if embed_dim == None:
+        if embed_dim is None:
             self.embed_dim = get_auto_embedding_dim(vocab_size)
         else:
             self.embed_dim = embed_dim
@@ -54,7 +61,7 @@ class SparseFeature(object):
     def __init__(self, name, vocab_size, embed_dim=None, shared_with=None, padding_idx=None, initializer=RandomNormal(0, 0.0001)):
         self.name = name
         self.vocab_size = vocab_size
-        if embed_dim == None:
+        if embed_dim is None:
             self.embed_dim = get_auto_embedding_dim(vocab_size)
         else:
             self.embed_dim = embed_dim
