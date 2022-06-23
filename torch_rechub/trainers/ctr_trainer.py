@@ -25,18 +25,22 @@ class CTRTrainer(object):
         self,
         model,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params={
-            "lr": 1e-3,
-            "weight_decay": 1e-5
-        },
+        optimizer_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         n_epoch=10,
         earlystop_patience=10,
         device="cpu",
-        gpus=[],
+        gpus=None,
         model_path="./",
     ):
+        if gpus is None:
+            gpus = []
+        if optimizer_params is None:
+            optimizer_params = {
+                "lr": 1e-3,
+                "weight_decay": 1e-5
+            }
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default optimizer
         self.scheduler = None

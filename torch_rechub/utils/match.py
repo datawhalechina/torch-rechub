@@ -65,7 +65,7 @@ def generate_seq_feature_match(data,
                                user_col,
                                item_col,
                                time_col,
-                               item_attribute_cols=[],
+                               item_attribute_cols=None,
                                sample_method=0,
                                mode=0,
                                neg_ratio=0,
@@ -91,6 +91,8 @@ def generate_seq_feature_match(data,
     Returns:
         pd.DataFrame: split train and test data with sequence features.
     """
+    if item_attribute_cols is None:
+        item_attribute_cols = []
     if mode == 2:  # list wise learning
         assert neg_ratio > 0, 'neg_ratio must be greater than 0 when list-wise learning'
     elif mode == 1:  # pair wise learning
