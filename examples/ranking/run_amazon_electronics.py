@@ -3,33 +3,33 @@ import sys
 sys.path.append("../..")
 
 import pandas as pd
+import numpy as np
 import torch
 from torch_rechub.models.ranking import DIN
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.utils.data import DataGenerator, create_seq_features, df_to_dict
+from torch_rechub.utils.data import DataGenerator, generate_seq_feature, df_to_dict, pad_sequences
 
 
 def get_amazon_data_dict(dataset_path):
     data = pd.read_csv(dataset_path)
     print('========== Start Amazon ==========')
+    train, val, test = generate_seq_feature(data=data, user_col="user_id", item_col="item_id", time_col='time', item_attribute_cols=["cate_id"])
+    print('INFO: Now, the dataframe named: ', train.columns)
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
+    print(train)
 
-    features = [SparseFeature("target_item", vocab_size=n_items + 2, embed_dim=8), SparseFeature("target_cate", vocab_size=n_cates + 2, embed_dim=8), SparseFeature("user_id", vocab_size=n_users + 2, embed_dim=8)]
+    features = [SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates+1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users+1, embed_dim=8)]
     target_features = features
     history_features = [
-        SequenceFeature("history_item", vocab_size=n_items + 2, embed_dim=8, pooling="concat", shared_with="target_item"),
-        SequenceFeature("history_cate", vocab_size=n_cates + 2, embed_dim=8, pooling="concat", shared_with="target_cate")
+        SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
+        SequenceFeature("hist_cate_id", vocab_size=n_cates+1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
     ]
-
-    print('========== Create sequence features ==========')
-    train, val, test = create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], drop_short=3)
 
     print('========== Generate input dict ==========')
     train = df_to_dict(train)
     val = df_to_dict(val)
     test = df_to_dict(test)
-
     train_y, val_y, test_y = train["label"], val["label"], test["label"]
 
     del train["label"]
