@@ -37,14 +37,20 @@ class MatchTrainer(object):
             gpus=None,
         model_path="./",
     ):
+        self.model = model  # for uniform weights save method in one gpu or multi gpu
+        if gpus is None:
+            gpus = []
+        self.gpus = gpus
+        if len(gpus) > 1:
+            print('parallel running on these gpus:', gpus)
+            self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
+        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         if optimizer_params is None:
             optimizer_params = {
                 "lr": 1e-3,
                 "weight_decay": 1e-5
             }
-        if gpus is None:
-            gpus = []
-        self.model = model  #for uniform weights save method in one gpu or multi gpu
         self.mode = mode
         if mode == 0:  #point-wise loss, binary cross_entropy
             self.criterion = torch.nn.BCELoss()  #default loss binary cross_entropy
@@ -61,11 +67,6 @@ class MatchTrainer(object):
         self.evaluate_fn = roc_auc_score  #default evaluate function
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
-        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.gpus = gpus
-        if len(gpus) > 1:
-            print('parallel running on these gpus:', gpus)
-            self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
         self.model_path = model_path
 
     def train_one_epoch(self, data_loader, log_interval=10):
@@ -108,7 +109,6 @@ class MatchTrainer(object):
                 total_loss = 0
 
     def fit(self, train_dataloader, val_dataloader=None):
-        self.model.to(self.device)
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
             self.train_one_epoch(train_dataloader)
