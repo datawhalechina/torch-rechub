@@ -91,7 +91,7 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
                        sample_weight_feature,
                        user_params={"dims": [128, 64, 16]},
                        item_params={"dims": [128, 64, 16]},
-                       batch_size=batch_size,
+                       batch_size=batch_size,  # !! should be same as batch size of dataloader
                        n_neg=3,
                        temperature=0.02)
     #mode=2 means use list-wise loss: softmax
