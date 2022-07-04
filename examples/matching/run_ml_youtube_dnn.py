@@ -50,7 +50,7 @@ def get_movielens_data(data_path, load_cache=False):
                                                        neg_ratio=3,
                                                        min_item=0)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-        y_train = np.array([0] * df_train.shape[0])  #label=0 means the first pred value is positiva sample
+        y_train = np.array([0] * df_train.shape[0])  #label=0 means the first pred value is positive sample
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         np.save("./data/ml-1m/saved/data_cache.npy", np.array((x_train, y_train, x_test), dtype=object))
 

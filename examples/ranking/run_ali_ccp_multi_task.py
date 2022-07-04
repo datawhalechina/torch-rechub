@@ -24,7 +24,7 @@ def get_ali_ccp_data_dict(model_name, data_path='./data/ali-ccp'):
 
     col_names = data.columns.values.tolist()
     dense_cols = ['D109_14', 'D110_14', 'D127_14', 'D150_14', 'D508', 'D509', 'D702', 'D853']
-    sparse_cols = [col for col in col_names if col not in dense_cols and col not in ['cvr_label', 'ctr_label']]
+    sparse_cols = [col for col in col_names if col not in dense_cols and col not in ['cvr_label', 'ctr_label', 'ctcvr_label']]
     print("sparse cols:%d dense cols:%d" % (len(sparse_cols), len(dense_cols)))
     #define dense and sparse features
     if model_name == "ESMM":

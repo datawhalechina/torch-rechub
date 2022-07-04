@@ -154,7 +154,7 @@ test:用于测试模型预测的1天广告数据，约四百六十万。
 - 预处理之后的数据下载地址：https://cowtransfer.com/s/e8b67418ce044c
 - 使用方法
 
-```python
+```shell
 python run_census.py --model_name SharedBottom
 python run_census.py --model_name ESMM
 python run_census.py --model_name MMOE

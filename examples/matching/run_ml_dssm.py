@@ -18,7 +18,7 @@ def get_movielens_data(data_path, load_cache=False):
     data = pd.read_csv(data_path)
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', "cate_id"]
-    user_col, item_col, label_col = "user_id", "movie_id", "label"
+    user_col, item_col = "user_id", "movie_id"
 
     feature_max_idx = {}
     for feature in sparse_features:
