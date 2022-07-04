@@ -30,8 +30,8 @@ def get_criteo_data_dict(data_path):
     dense_features = [f for f in data.columns.tolist() if f[0] == "I"]
     sparse_features = [f for f in data.columns.tolist() if f[0] == "C"]
 
-    data[sparse_features] = data[sparse_features].fillna('-996',)
-    data[dense_features] = data[dense_features].fillna(0,)
+    data[sparse_features] = data[sparse_features].fillna('0')
+    data[dense_features] = data[dense_features].fillna(0)
 
     for feat in tqdm(dense_features):  #discretize dense feature and as new sparse feature
         sparse_features.append(feat + "_cat")
