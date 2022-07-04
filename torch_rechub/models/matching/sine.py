@@ -46,16 +46,16 @@ class SINE(torch.nn.Module):
         torch.nn.init.normal_(self.position_embedding.weight, 0, std)
     
 
-        self.W_1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)        
-        self.W_2 = torch.nn.Parameter(torch.rand(hidden_dim, num_heads), requires_grad=True)
+        self.w_1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)        
+        self.w_2 = torch.nn.Parameter(torch.rand(hidden_dim, num_heads), requires_grad=True)
 
-        self.W_3 = torch.nn.Parameter(torch.rand(embedding_dim, embedding_dim), requires_grad=True)
+        self.w_3 = torch.nn.Parameter(torch.rand(embedding_dim, embedding_dim), requires_grad=True)
 
-        self.W_k1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)
-        self.W_k2 = torch.nn.Parameter(torch.rand(hidden_dim, num_intention), requires_grad=True)
+        self.w_k1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)
+        self.w_k2 = torch.nn.Parameter(torch.rand(hidden_dim, num_intention), requires_grad=True)
 
-        self.W_4 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)
-        self.W_5 = torch.nn.Parameter(torch.rand(hidden_dim, num_heads), requires_grad=True)
+        self.w_4 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)
+        self.w_5 = torch.nn.Parameter(torch.rand(hidden_dim, num_heads), requires_grad=True)
 
         self.mode = None
 
@@ -82,50 +82,50 @@ class SINE(torch.nn.Module):
         # sparse interests extraction
         ## user specific historical item embedding X^u
         hist_item = x[self.history_features[0]]
-        X_u = self.item_embedding(hist_item) + self.position_embedding.weight.unsqueeze(0)
-        X_u_mask = (x[self.history_features[0]] > 0).long()
+        x_u = self.item_embedding(hist_item) + self.position_embedding.weight.unsqueeze(0)
+        x_u_mask = (x[self.history_features[0]] > 0).long()
 
         ## user specific conceptual prototypes C^u
         ### attention a
-        H_1 = einsum('bse, ed -> bsd', X_u, self.W_1).tanh()
-        a_hist = F.softmax(einsum('bsd, dh -> bsh', H_1, self.W_2) + -1.e9 * (1 - X_u_mask.unsqueeze(-1).float()), dim=1) 
+        h_1 = einsum('bse, ed -> bsd', x_u, self.w_1).tanh()
+        a_hist = F.softmax(einsum('bsd, dh -> bsh', h_1, self.w_2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1) 
 
         ### virtual concept vector z_u
-        z_u = einsum("bse, bsh -> be", X_u, a_hist)
+        z_u = einsum("bse, bsh -> be", x_u, a_hist)
 
         ### similarity between user's concept vector and entire conceptual prototypes s^u
         s_u = einsum("be, te -> bt", z_u, self.concept_embedding.weight)
         s_u_top_k = torch.topk(s_u, self.num_intention)
 
         ### final C^u
-        C_u =  einsum("bk, bke -> bke", torch.sigmoid(s_u_top_k.values), self.concept_embedding(s_u_top_k.indices))
+        c_u =  einsum("bk, bke -> bke", torch.sigmoid(s_u_top_k.values), self.concept_embedding(s_u_top_k.indices))
 
         ## user intention assignment P_{k|t}        
-        P_u = F.softmax(einsum("bse, bke -> bks", F.normalize(X_u @ self.W_3, dim=-1),  F.normalize(C_u, p=2, dim=-1)), dim=1)
+        p_u = F.softmax(einsum("bse, bke -> bks", F.normalize(x_u @ self.w_3, dim=-1),  F.normalize(c_u, p=2, dim=-1)), dim=1)
 
         ## attention weighing P_{t|k}
-        H_2 = einsum('bse, ed -> bsd', X_u, self.W_k1).tanh()
-        a_concept_k = F.softmax(einsum('bsd, dk -> bsk', H_2, self.W_k2) + -1.e9 * (1 - X_u_mask.unsqueeze(-1).float()), dim=1) 
+        h_2 = einsum('bse, ed -> bsd', x_u, self.w_k1).tanh()
+        a_concept_k = F.softmax(einsum('bsd, dk -> bsk', h_2, self.w_k2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1) 
 
         ## multiple interests encoding \phi_\theta^k(x^u)
-        phi_u = einsum("bks, bse -> bke", P_u * a_concept_k.permute(0, 2, 1), X_u)
+        phi_u = einsum("bks, bse -> bke", p_u * a_concept_k.permute(0, 2, 1), x_u)
 
 
         # adaptive interest aggregation
         ## intention aware input behavior \hat{X^u}
-        X_u_hat = einsum('bks, bke -> bse', P_u, C_u)
+        x_u_hat = einsum('bks, bke -> bse', p_u, c_u)
 
         ## user's next intention C^u_{apt}
-        H_3 = einsum('bse, ed -> bsd', X_u_hat, self.W_4).tanh()
-        C_u_apt = F.normalize(
+        h_3 = einsum('bse, ed -> bsd', x_u_hat, self.w_4).tanh()
+        c_u_apt = F.normalize(
                     einsum(
                         "bs, bse -> be",
-                        F.softmax(einsum('bsd, dh -> bsh', H_3, self.W_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - X_u_mask.float()), dim=1),
-                        X_u_hat
+                        F.softmax(einsum('bsd, dh -> bsh', h_3, self.w_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - x_u_mask.float()), dim=1),
+                        x_u_hat
                     ), -1)
 
         ## aggregation weights e_k^u
-        e_u = F.softmax(einsum('be, bke -> bk', C_u_apt, phi_u) / self.temperature, dim=1)         
+        e_u = F.softmax(einsum('be, bke -> bk', c_u_apt, phi_u) / self.temperature, dim=1)         
 
 
         # final user representation v^u
