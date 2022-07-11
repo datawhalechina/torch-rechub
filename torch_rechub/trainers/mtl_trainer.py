@@ -6,7 +6,7 @@ import torch.nn as nn
 from ..basic.callback import EarlyStopper
 from ..utils.data import get_loss_func, get_metric_func
 from ..models.multi_task import ESMM
-from ..utils.mtl import shared_task_layers, MetaBalance
+from ..utils.mtl import shared_task_layers, gradnorm, MetaBalance
 
 
 class MTLTrainer(object):
@@ -33,7 +33,7 @@ class MTLTrainer(object):
         model,
         task_types,
         optimizer_fn=torch.optim.Adam,
-            optimizer_params=None,
+        optimizer_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         adaptive_params=None,
@@ -41,18 +41,12 @@ class MTLTrainer(object):
         earlystop_taskid=0,
         earlystop_patience=10,
         device="cpu",
-            gpus=None,
+        gpus=None,
         model_path="./",
     ):
-        self.model = model  # for uniform weights save method in one gpu or multi gpu
+        self.model = model
         if gpus is None:
             gpus = []
-        self.gpus = gpus
-        if len(gpus) > 1:
-            print('parallel running on these gpus:', gpus)
-            self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
-        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
         if optimizer_params is None:
             optimizer_params = {
                 "lr": 1e-3,
@@ -73,6 +67,18 @@ class MTLTrainer(object):
                 self.meta_optimizer = MetaBalance(share_layers)
                 self.share_optimizer = optimizer_fn(share_layers, **optimizer_params)
                 self.task_optimizer = optimizer_fn(task_layers, **optimizer_params)
+            elif adaptive_params["method"] == "gradnorm":
+                self.adaptive_method = "gradnorm"
+                self.alpha = adaptive_params.get("alpha", 0.16)
+                share_layers = shared_task_layers(self.model)[0]
+                #gradnorm calculate the gradients of each loss on the last fully connected shared layer weight(dimension is 2)
+                for i in range(len(share_layers)):
+                    if share_layers[-i].ndim == 2:
+                        self.last_share_layer = share_layers[-i]
+                        break
+                self.initial_task_loss = None
+                self.loss_weight = nn.ParameterList(nn.Parameter(torch.ones(1)) for _ in range(self.n_task))
+                self.model.add_module("loss weight", self.loss_weight)
         if self.adaptive_method != "metabalance":
             self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default Adam optimizer
         self.scheduler = None
@@ -83,6 +89,13 @@ class MTLTrainer(object):
         self.n_epoch = n_epoch
         self.earlystop_taskid = earlystop_taskid
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
+
+        self.gpus = gpus
+        if len(gpus) > 1:
+            print('parallel running on these gpus:', gpus)
+            self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
+        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         self.model_path = model_path
 
     def train_one_epoch(self, data_loader):
@@ -111,6 +124,17 @@ class MTLTrainer(object):
                 self.meta_optimizer.step(loss_list)
                 self.share_optimizer.step()
                 self.task_optimizer.step()
+            elif self.adaptive_method == "gradnorm":
+                self.optimizer.zero_grad()
+                if self.initial_task_loss is None:
+                    self.initial_task_loss = [l.item() for l in loss_list]
+                gradnorm(loss_list, self.loss_weight, self.last_share_layer, self.initial_task_loss, self.alpha)
+                self.optimizer.step()
+                # renormalize
+                loss_weight_sum = sum([w.item() for w in self.loss_weight])
+                normalize_coeff = len(self.loss_weight) / loss_weight_sum
+                for w in self.loss_weight:
+                    w.data = w.data * normalize_coeff
             else:
                 self.model.zero_grad()
                 loss.backward()

@@ -92,3 +92,35 @@ class MetaBalance(Optimizer):
                         gp.grad.zero_()
                     if idx == len(losses) - 1:
                         gp.grad = state['sum_gradient']
+
+
+def gradnorm(loss_list, loss_weight, share_layer, initial_task_loss, alpha):
+    loss = 0
+    for loss_i, w_i in zip(loss_list, loss_weight):
+        loss += loss_i * w_i
+    loss.backward(retain_graph=True)
+    # set the gradients of w_i(t) to zero because these gradients have to be updated using the GradNorm loss
+    for w_i in loss_weight:
+        w_i.grad.data = w_i.grad.data * 0.0
+    # get the gradient norms for each of the tasks
+    # G^{(i)}_w(t)
+    norms, loss_ratio = [], []
+    for i in range(len(loss_list)):
+        # get the gradient of this task loss with respect to the shared parameters
+        gygw = torch.autograd.grad(loss_list[i], share_layer, retain_graph=True)
+        # compute the norm
+        norms.append(torch.norm(torch.mul(loss_weight[i], gygw[0])))
+        # compute the inverse training rate r_i(t)
+        loss_ratio.append(loss_list[i].item() / initial_task_loss[i])
+    norms = torch.stack(norms)
+    mean_norm = torch.mean(norms.detach())
+    mean_loss_ratio = sum(loss_ratio) / len(loss_ratio)
+    # compute the GradNorm loss
+    # this term has to remain constant
+    constant_term = mean_norm * (mean_loss_ratio**alpha)
+    grad_norm_loss = torch.sum(torch.abs(norms - constant_term))
+    #print('GradNorm loss {}'.format(grad_norm_loss))
+
+    # compute the gradient for the weights
+    for w_i in loss_weight:
+        w_i.grad = torch.autograd.grad(grad_norm_loss, w_i, retain_graph=True)[0]
