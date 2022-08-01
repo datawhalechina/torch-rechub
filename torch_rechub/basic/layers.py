@@ -496,3 +496,74 @@ class CapsuleNetwork(nn.Module):
             interest_capsule = self.relu(interest_capsule)
 
         return interest_capsule
+
+
+class FFM(nn.Module):
+    """The Field-aware Factorization Machine module, mentioned in the `FFM paper
+    <https://dl.acm.org/doi/abs/10.1145/2959100.2959134>`. It explicitly models 
+    multi-channel second-order feature interactions, with each feature filed 
+    corresponding to one channel.
+
+    Args:
+        num_fields (int): number of feature fields.
+        reduce_sum (bool): whether to sum in embed_dim (default = `True`).
+
+    Shape:
+        - Input: `(batch_size, num_fields, num_fields, embed_dim)`
+        - Output: `(batch_size, num_fields*(num_fields-1)/2, 1)` or `(batch_size, num_fields*(num_fields-1)/2, embed_dim)`
+    """
+
+    def __init__(self, num_fields, reduce_sum=True):
+        super().__init__()        
+        self.num_fields = num_fields
+        self.reduce_sum = reduce_sum
+
+    def forward(self, x):
+        # compute (non-redundant) second order field-aware feature crossings
+        crossed_embeddings = []
+        for i in range(self.num_fields-1):
+            for j in range(i+1, self.num_fields):
+                crossed_embeddings.append(x[:, i, j, :] *  x[:, j, i, :])        
+        crossed_embeddings = torch.stack(crossed_embeddings, dim=1)
+        
+        # if reduce_sum is true, the crossing operation is effectively inner product, other wise Hadamard-product
+        if self.reduce_sum:
+            crossed_embeddings = torch.sum(crossed_embeddings, dim=-1, keepdim=True)
+        return crossed_embeddings
+
+
+class CEN(nn.Module):
+    """The Compose-Excitation Network module, mentioned in the `FAT-DeepFFM paper
+    <https://arxiv.org/abs/1905.06336>`, a modified version of 
+    `Squeeze-and-Excitation Network” (SENet) (Hu et al., 2017)`. It is used to 
+    highlight the importance of second-order feature crosses.
+
+    Args:
+        embed_dim (int): the dimensionality of categorical value embedding.
+        num_field_cross (int): the number of second order crosses between feature fields.
+        reduction_ratio (int): the between the dimensions of input layer and hidden layer of the MLP module.
+
+    Shape:
+        - Input: `(batch_size, num_fields, num_fields, embed_dim)`
+        - Output: `(batch_size, num_fields*(num_fields-1)/2 * embed_dim)`
+    """
+    def __init__(self, embed_dim, num_field_cross, reduction_ratio):
+        super().__init__()        
+        
+        # convolution weight (Eq.7 FAT-DeepFFM)
+        self.u = torch.nn.Parameter(torch.rand(num_field_cross, embed_dim), requires_grad=True)
+
+        # two FC layers that computes the field attention
+        self.mlp_att = MLP(num_field_cross, dims=[num_field_cross//reduction_ratio, num_field_cross], output_layer=False, activation="relu")
+        
+
+    def forward(self, em):  
+        # compute descriptor vector (Eq.7 FAT-DeepFFM), output shape [batch_size, num_feature_crosses]
+        d = (self.u.squeeze(0) * em).sum(-1)        
+        
+        # compute field attention (Eq.9), output shape [batch_size, num_feature_crosses]    
+        s = self.mlp_att(d)                             
+
+        # rescale original embedding with field attention (Eq.10), output shape [batch_size, num_feature_crosses, embed_dim]
+        aem = s.unsqueeze(-1) * em                 
+        return aem.flatten(start_dim=1)        
