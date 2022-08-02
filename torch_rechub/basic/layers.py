@@ -540,30 +540,30 @@ class CEN(nn.Module):
 
     Args:
         embed_dim (int): the dimensionality of categorical value embedding.
-        num_field_cross (int): the number of second order crosses between feature fields.
+        num_field_crosses (int): the number of second order crosses between feature fields.
         reduction_ratio (int): the between the dimensions of input layer and hidden layer of the MLP module.
 
     Shape:
         - Input: `(batch_size, num_fields, num_fields, embed_dim)`
         - Output: `(batch_size, num_fields*(num_fields-1)/2 * embed_dim)`
     """
-    def __init__(self, embed_dim, num_field_cross, reduction_ratio):
+    def __init__(self, embed_dim, num_field_crosses, reduction_ratio):
         super().__init__()        
         
         # convolution weight (Eq.7 FAT-DeepFFM)
-        self.u = torch.nn.Parameter(torch.rand(num_field_cross, embed_dim), requires_grad=True)
+        self.u = torch.nn.Parameter(torch.rand(num_field_crosses, embed_dim), requires_grad=True)
 
         # two FC layers that computes the field attention
-        self.mlp_att = MLP(num_field_cross, dims=[num_field_cross//reduction_ratio, num_field_cross], output_layer=False, activation="relu")
+        self.mlp_att = MLP(num_field_crosses, dims=[num_field_crosses//reduction_ratio, num_field_crosses], output_layer=False, activation="relu")
         
 
     def forward(self, em):  
-        # compute descriptor vector (Eq.7 FAT-DeepFFM), output shape [batch_size, num_feature_crosses]
-        d = (self.u.squeeze(0) * em).sum(-1)        
+        # compute descriptor vector (Eq.7 FAT-DeepFFM), output shape [batch_size, num_field_crosses]
+        d = F.relu((self.u.squeeze(0) * em).sum(-1))
         
-        # compute field attention (Eq.9), output shape [batch_size, num_feature_crosses]    
+        # compute field attention (Eq.9), output shape [batch_size, num_field_crosses]    
         s = self.mlp_att(d)                             
 
-        # rescale original embedding with field attention (Eq.10), output shape [batch_size, num_feature_crosses, embed_dim]
+        # rescale original embedding with field attention (Eq.10), output shape [batch_size, num_field_crosses, embed_dim]
         aem = s.unsqueeze(-1) * em                 
         return aem.flatten(start_dim=1)        
