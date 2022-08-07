@@ -5,7 +5,7 @@ sys.path.append("../..")
 import numpy as np
 import pandas as pd
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
+from torch_rechub.models.ranking import WideDeep, DeepFM, DCN, DeepFFM, FatDeepFFM
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
@@ -52,13 +52,27 @@ def get_avazu_data_dict(data_path):
         )
         for feature_name in features
     ]
+    ffm_linear_feas = [
+        SparseFeature(
+            feature.name, vocab_size=feature.vocab_size, embed_dim=1
+        ) 
+        for feature in sparse_feas
+    ]
+    ffm_cross_feas = [
+        SparseFeature(
+            feature.name, vocab_size=feature.vocab_size*len(sparse_feas), 
+            embed_dim=10
+        ) 
+        for feature in sparse_feas
+    ]
     y = data["label"]
     del data["label"]
     x = data
     x_train, y_train = x[:train_idx], y[:train_idx]
     x_val, y_val = x[train_idx:val_idx], y[train_idx:val_idx]
     x_test, y_test = x[val_idx:], y[val_idx:]
-    return dense_feas, sparse_feas, x_train, y_train, x_val, y_val, x_test, y_test
+    return (dense_feas, sparse_feas, ffm_linear_feas, ffm_cross_feas, x_train, 
+            y_train, x_val, y_val, x_test, y_test)
 
 
 def main(
@@ -76,6 +90,8 @@ def main(
     (
         dense_feas,
         sparse_feas,
+        ffm_linear_feas,
+        ffm_cross_feas,
         x_train,
         y_train,
         x_val,
@@ -105,6 +121,21 @@ def main(
             features=dense_feas + sparse_feas,
             n_cross_layers=3,
             mlp_params={"dims": [256, 128]},
+        )
+    elif model_name == "deepffm":
+        model = DeepFFM(
+            linear_features=ffm_linear_feas, 
+            cross_features=ffm_cross_feas,
+            embed_dim=10,            
+            mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"},
+        )
+    elif model_name == "fat_deepffm":
+        model = FatDeepFFM(
+            linear_features=ffm_linear_feas, 
+            cross_features=ffm_cross_feas,
+            embed_dim=10,
+            reduction_ratio=1,
+            mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"},
         )
     ctr_trainer = CTRTrainer(
         model,
@@ -147,7 +178,9 @@ if __name__ == "__main__":
         args.seed,
     )
 """
-python run_criteo.py --model_name widedeep
-python run_criteo.py --model_name deepfm
-python run_criteo.py --model_name dcn
+python run_avazu.py --model_name widedeep
+python run_avazu.py --model_name deepfm
+python run_avazu.py --model_name dcn
+python run_avazu.py --model_name deepffm
+python run_avazu.py --model_name fat_deepffm
 """
