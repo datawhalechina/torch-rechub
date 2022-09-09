@@ -5,7 +5,7 @@ sys.path.append("../..")
 import numpy as np
 import pandas as pd
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
+from torch_rechub.models.ranking import WideDeep, DeepFM, DCN, DCNv2
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
@@ -63,6 +63,8 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         model = DeepFM(deep_features=dense_feas, fm_features=sparse_feas, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "dcn":
         model = DCN(features=dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims": [256, 128]})
+    elif model_name == "dcn_v2":
+        model = DCNv2(features= dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims":[256,128], "dropout": 0.2, "activation": "relu"})
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
     #scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
@@ -74,7 +76,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/criteo/criteo_sample.csv")
-    parser.add_argument('--model_name', default='widedeep')
+    parser.add_argument('--model_name', default='dcn_v2')
     parser.add_argument('--epoch', type=int, default=2)  #100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=2048)  #4096
@@ -89,4 +91,5 @@ if __name__ == '__main__':
 python run_criteo.py --model_name widedeep
 python run_criteo.py --model_name deepfm
 python run_criteo.py --model_name dcn
+python run_criteo.py --model_name dcn_v2
 """
