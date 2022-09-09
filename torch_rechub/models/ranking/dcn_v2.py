@@ -14,7 +14,7 @@ class DCNv2(torch.nn.Module):
                  n_cross_layers,
                  mlp_params,
                  model_structure="parallel",
-                 use_low_rank_mixture=False,
+                 use_low_rank_mixture=True,
                  low_rank=32,
                  num_experts=4,
                  **kwargs):
