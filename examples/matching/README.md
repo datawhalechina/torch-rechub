@@ -56,3 +56,20 @@
 [比赛链接](https://tech.yidianzixun.com/competition/#/)
 
 [第一参赛者笔记](https://www.logicjake.xyz/2021/09/20/%E4%B8%80%E7%82%B9%E8%B5%84%E8%AE%AF%E6%8A%80%E6%9C%AF%E7%BC%96%E7%A8%8B%E5%A4%A7%E8%B5%9BCTR%E8%B5%9B%E9%81%93-%E8%B5%9B%E5%90%8E%E6%80%BB%E7%BB%93/)
+
+
+
+## Session based recommendation datasets
+#### 序列推荐的基准数据集目前包括:
+* YOOCHOOSE: [ACM RecSys Challenge 2015](https://recsys.acm.org/recsys15/challenge/) 所使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `train-item-views.csv` 文件。该文件包含四个原始特征：`"session_id", "item_id", "time","category"`。该数据目前可以在 [Kaggle](https://www.kaggle.com/datasets/chadgostopp/recsys-challenge-2015) 网站下载。
+* DIGINETICA: [CIKM Cup 2016](https://competitions.codalab.org/competitions/11161) 使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `yoochoose-clicks.dat` 文件。该文件包含五个原始特征：`"sessionId", “userId”, "itemId", "time", "timeframe", "eventdate"`。该数据目前可以在 [google drive](https://drive.google.com/drive/folders/0B7XZSACQf0KdXzZFS21DblRxQ3c?resourcekey=0-3k4O5YlwnZf0cNeTZ5Y_Uw) 下载。
+
+#### 测试结果
+* __Neural Attentive Session-based Recommendation__ ( [Li et al., CIKM'17](https://dl.acm.org/doi/10.1145/3132847.3132926) )
+    |               | Recall@20 | MRR@20 |
+    |---------------|-----------|--------|
+    | YOOCHOOSE1/64 | 0.6746    | 0.2827 |
+    | YOOCHOOSE1/4  | 0.7028    | 0.2909 |
+    | DIGINETICA    | 0.5829    | 0.2603 |
+
+* 注：以上指标可使用examples/matching/run_sbr.py中的相同训练参数测试得到。排序指标 `top_k` 则需要调整成 `20`。
