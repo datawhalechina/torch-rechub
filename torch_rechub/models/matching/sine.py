@@ -67,7 +67,7 @@ class SINE(torch.nn.Module):
         if self.mode == "item":
             return item_embedding
         
-        y = torch.mul(user_embedding, item_embedding).sum(dim=1)
+        y = torch.mul(user_embedding, item_embedding).sum(dim=-1)
 
         # # compute covariance regularizer
         # M = torch.cov(self.concept_embedding.weight, correction=0)
