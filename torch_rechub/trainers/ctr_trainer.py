@@ -44,10 +44,7 @@ class CTRTrainer(object):
         self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         if optimizer_params is None:
-            optimizer_params = {
-                "lr": 1e-3,
-                "weight_decay": 1e-5
-            }
+            optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default optimizer
         self.scheduler = None
         if scheduler_fn is not None:
@@ -89,9 +86,8 @@ class CTRTrainer(object):
                 if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
-                    torch.save(self.early_stopper.best_weights, os.path.join(self.model_path,
-                                                                             "model.pth"))  #save best auc model
                     break
+        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  #save best auc model
 
     def evaluate(self, model, data_loader):
         model.eval()
