@@ -65,11 +65,12 @@
 * DIGINETICA: [CIKM Cup 2016](https://competitions.codalab.org/competitions/11161) 使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `yoochoose-clicks.dat` 文件。该文件包含五个原始特征：`"sessionId", “userId”, "itemId", "time", "timeframe", "eventdate"`。该数据目前可以在 [google drive](https://drive.google.com/drive/folders/0B7XZSACQf0KdXzZFS21DblRxQ3c?resourcekey=0-3k4O5YlwnZf0cNeTZ5Y_Uw) 下载。
 
 #### 测试结果
-* __Neural Attentive Session-based Recommendation__ ( [Li et al., CIKM'17](https://dl.acm.org/doi/10.1145/3132847.3132926) )
-    |               | Recall@20 | MRR@20 |
-    |---------------|-----------|--------|
-    | YOOCHOOSE1/64 | 0.6746    | 0.2827 |
-    | YOOCHOOSE1/4  | 0.7028    | 0.2909 |
-    | DIGINETICA    | 0.5829    | 0.2603 |
 
-* 注：以上指标可使用examples/matching/run_sbr.py中的相同训练参数测试得到。排序指标 `top_k` 则需要调整成 `20`。
+|       | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | DIGI.<br> Recall@20 | DIGI.<br> Recall@20 |
+|:-----:|:-----------------------:|:-----------------------:|:-----------------------:|:-----------------------:|:-------------------:|:-------------------:|
+|  NARM |          0.6746         |          0.2827         |          0.7028         |          0.2909         |        0.5829       |        0.2603       |
+| STAMP |          0.6675         |          0.2859         |          0.7079         |          0.3074         |        0.5578       |        0.2303       |
+
+* __Neural Attentive Session-based Recommendation__ ([Li et al., CIKM'17](https://dl.acm.
+* __STAMP: Short-Term Attention/Memory Priority Model for Session-based Recommendation__  ([Liu et al., KDD'18](https://dl.acm.org/doi/10.1145/3219819.3219950))
+* 注：以上指标可使用论文中实验章节提到的训练参数测试得到。排序指标 `top_k` 则需要调整成 `20`。
