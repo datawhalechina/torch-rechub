@@ -158,9 +158,9 @@ class MTLTrainer(object):
                 print('validation best auc of main task %d: %.6f' %
                       (self.earlystop_taskid, self.early_stopper.best_auc))
                 self.model.load_state_dict(self.early_stopper.best_weights)
-                torch.save(self.early_stopper.best_weights, os.path.join(self.model_path,
-                                                                         "model.pth"))  #save best auc model
                 break
+        torch.save(self.model.state_dict(), os.path.join(self.model_path,
+                                                            "model.pth"))  #save best auc model
 
     def evaluate(self, model, data_loader):
         model.eval()

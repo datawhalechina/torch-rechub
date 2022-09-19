@@ -78,7 +78,7 @@ def preprocess_data(mode='train'):
                             if v in vocabulary[k]:
                                 vocabulary[k][v] += 1
                             else:
-                                vocabulary[k][v] = 0
+                                vocabulary[k][v] = 1
 
     if mode == "train":
         print('before filter low freq:')
@@ -87,7 +87,7 @@ def preprocess_data(mode='train'):
         new_vocabulary = dict(zip(sparse_columns, [[] for _ in range(len(sparse_columns))]))
         for k, v in vocabulary.items():
             for k1, v1 in v.items():
-                if v1 > 10:
+                if v1 >= 10:
                     new_vocabulary[k].append(k1)
         vocabulary = new_vocabulary
         print('after filter low freq:')
