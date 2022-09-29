@@ -333,6 +333,21 @@ class CIN(nn.Module):
             xs.append(x)
         return self.fc(torch.sum(torch.cat(xs, dim=1), 2))
 
+class CrossLayer(nn.Module):
+    """
+        Cross layer.
+    Args:
+        input_dim (int): input dim of input tensor
+    """
+    def __init__(self, input_dim):
+        super(CrossLayer, self).__init__()
+        self.w = torch.nn.Linear(input_dim, 1, bias=False)
+        self.b = torch.nn.Parameter(torch.zeros(input_dim))
+
+    def forward(self, x_0, x_i):
+        x = self.w(x_i) * x_0 + self.b
+        return x
+
 
 class CrossNetwork(nn.Module):
     """CrossNetwork  mentioned in the DCN paper.

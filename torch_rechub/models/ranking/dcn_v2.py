@@ -9,6 +9,16 @@ import torch
 from ...basic.layers import LR, MLP,CrossNetV2, CrossNetMix, EmbeddingLayer
 
 class DCNv2(torch.nn.Module):
+    """Deep & Cross Network with a mixture of low-rank architecture
+
+    Args:
+        features (list[Feature Class]): training by the whole module.
+        n_cross_layers (int) : the number of layers of feature intersection layers
+        mlp_params (dict): the params of the last MLP module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
+        use_low_rank_mixture (bool): True, whether to use a mixture of low-rank architecture
+        low_rank (int): the rank size of low-rank matrices
+        num_experts (int): the number of expert networks
+    """
     def __init__(self,
                  features,
                  n_cross_layers,
@@ -18,7 +28,7 @@ class DCNv2(torch.nn.Module):
                  low_rank=32,
                  num_experts=4,
                  **kwargs):
-        super().__init__()
+        super(DCNv2, self).__init__()
         self.features = features
         self.dims = sum([fea.embed_dim for fea in features])
         self.embedding = EmbeddingLayer(features)
@@ -41,7 +51,7 @@ class DCNv2(torch.nn.Module):
             final_dim = mlp_params["dims"][-1] + self.dims
         if self.model_structure == "crossnet_only": # only CrossNet
             final_dim = self.dims
-        self.linear = LR(self.dims + mlp_params["dims"][-1])
+        self.linear = LR(final_dim)
 
 
     def forward(self, x):
