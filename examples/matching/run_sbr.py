@@ -13,7 +13,7 @@ sys.path.append("../..")
 from data.session_based.preprocess_session_based import INTERNAL_ITEM_ID_FIELD, TRAIN_DATA_PREFIX, TEST_DATA_PREFIX
 from torch_rechub.basic.features import SequenceFeature
 from torch_rechub.basic.metric import topk_metrics
-from torch_rechub.models.matching import NARM
+from torch_rechub.models.matching import NARM, STAMP
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import TorchDataset
 
@@ -72,6 +72,8 @@ def main(config):
     
     if config.model_name == "narm":
         model = NARM(item_history_feature, config.hidden_dim, config.emb_dropout, config.session_rep_dropout)
+    elif config.model_name == "stamp":
+        model = STAMP(item_history_feature, config.weight_std, config.emb_std)
     else:
         raise NotImplementedError(f"Unknown model {config.model_name}")    
 
@@ -100,6 +102,8 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_dim", default=50, type=int)
     parser.add_argument("--emb_dropout", default=0.25, type=float)
     parser.add_argument("--session_rep_dropout", default=0.5, type=float)
+    parser.add_argument("--weight_std", default=0.05, type=float)
+    parser.add_argument("--emb_std", default=0.002, type=float)
     parser.add_argument("--epoch", type=int, default=30)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--batch_size", type=int, default=512)
@@ -114,4 +118,7 @@ if __name__ == "__main__":
 """
 python run_sbr.py --model_name narm --data_path ./data/session_based/diginetica --top_k 3
 python run_sbr.py --model_name narm --data_path ./data/session_based/yoochoose --top_k 3
+
+python run_sbr.py --model_name stamp --data_path ./data/session_based/diginetica --top_k 3
+python run_sbr.py --model_name stamp --data_path ./data/session_based/yoochoose --top_k 3
 """
