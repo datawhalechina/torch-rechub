@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from itertools import combinations
 from .activation import activation_layer
 from .features import DenseFeature, SparseFeature, SequenceFeature
 
@@ -453,6 +454,64 @@ class CrossNetMix(nn.Module):
 
         x_l = x_l.squeeze()  # (bs, in_features)
         return x_l
+
+class SENETLayer(nn.Module):
+    """
+    A weighted feature gating system in the SENet paper
+    Args:
+        num_fields (int): number of feature fields
+
+    Shape:
+        - num_fields: `(batch_size, *)`
+        - Output: `(batch_size, *)`
+    """
+    def __init__(self, num_fields, reduction_ratio=3):
+        super(SENETLayer, self).__init__()
+        reduced_size = max(1, int(num_fields/ reduction_ratio))
+        self.mlp = nn.Sequential(nn.Linear(num_fields, reduced_size, bias=False),
+                                 nn.ReLU(),
+                                 nn.Linear(reduced_size, num_fields, bias=False),
+                                 nn.ReLU())
+    def forward(self, x):
+        z = torch.mean(x, dim=-1, out=None)
+        a = self.mlp(z)
+        v = x*a.unsqueeze(-1)
+        return v
+
+class BiLinearInteractionLayer(nn.Module):
+    """
+    Bilinear feature interaction module, which is an improved model of the FFM model
+     Args:
+        num_fields (int): number of feature fields
+        bilinear_type(str): the type bilinear interaction function
+    Shape:
+        - num_fields: `(batch_size, *)`
+        - Output: `(batch_size, *)`
+    """
+    def __init__(self, input_dim, num_fields, bilinear_type = "field_interaction"):
+        super(BiLinearInteractionLayer, self).__init__()
+        self.bilinear_type = bilinear_type
+        if self.bilinear_type == "field_all":
+            self.bilinear_layer = nn.Linear(input_dim, input_dim, bias=False)
+        elif self.bilinear_type == "field_each":
+            self.bilinear_layer = nn.ModuleList([nn.Linear(input_dim, input_dim, bias=False) for i in range(num_fields)])
+        elif self.bilinear_type == "field_interaction":
+            self.bilinear_layer = nn.ModuleList([nn.Linear(input_dim, input_dim, bias=False) for i,j in combinations(range(num_fields), 2)])
+        else:
+            raise NotImplementedError()
+
+    def forward(self, x):
+        feature_emb = torch.split(x, 1, dim=1)
+        if self.bilinear_type == "field_all":
+            bilinear_list = [self.bilinear_layer(v_i)*v_j for v_i, v_j in combinations(feature_emb, 2)]
+        elif self.bilinear_type == "field_each":
+            bilinear_list = [self.bilinear_layer[i](feature_emb[i])*feature_emb[j] for i,j in combinations(range(len(feature_emb)), 2)]
+        elif self.bilinear_type == "field_interaction":
+            bilinear_list = [self.bilinear_layer[i](v[0])*v[1] for i,v in enumerate(combinations(feature_emb, 2))]
+        return torch.cat(bilinear_list, dim=1)
+
+
+
 
 class MultiInterestSA(nn.Module):
     """MultiInterest Attention mentioned in the Comirec paper.
