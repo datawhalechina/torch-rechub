@@ -261,7 +261,7 @@ class Milvus(object):
     def __init__(self, dim=64, host="localhost", port="19530"):
         print("Start connecting to Milvus")
         connections.connect("default", host=host, port=port)
-
+        self.dim = dim
         has = utility.has_collection("rechub")
         print(f"Does collection rechub exist? {has}")
         if has:
@@ -307,7 +307,7 @@ class Milvus(object):
 
     def query(self, v, n):
         if torch.is_tensor(v):
-            v = v.cpu().numpy().reshape(1, -1)
+            v = v.cpu().numpy().reshape(-1, self.dim)
         self.milvus.load()
         search_params = {"metric_type": "L2", "params": {"nprobe": 16}}
         results = self.milvus.search(v, "embeddings", search_params, n)
