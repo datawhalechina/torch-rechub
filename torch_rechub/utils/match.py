@@ -306,6 +306,8 @@ class Milvus(object):
         return idx_list, score_list
 
     def query(self, v, n):
+        if torch.is_tensor(v):
+            v = v.cpu().numpy().reshape(1, -1)
         self.milvus.load()
         search_params = {"metric_type": "L2", "params": {"nprobe": 16}}
         results = self.milvus.search(v, "embeddings", search_params, n)
