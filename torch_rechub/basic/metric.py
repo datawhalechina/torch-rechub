@@ -141,6 +141,7 @@ def topk_metrics(y_true, y_pred, topKs=None):
 		hits = 0
 		precisions = 0
 		recalls = 0
+		gts = 0
 		for i in range(len(true_array)):
 			if len(true_array[i]) != 0:
 				mrr_tmp = 0
@@ -148,23 +149,23 @@ def topk_metrics(y_true, y_pred, topKs=None):
 				hit_tmp = 0
 				dcg_tmp = 0
 				idcg_tmp = 0
-				hit = 0
 				for j in range(topKs[idx]):
 					if pred_array[i][j] in true_array[i]:
-						hit += 1.
+						hit_tmp += 1.
 						if mrr_flag:
 							mrr_flag = False
 							mrr_tmp = 1. / (1 + j)
-							hit_tmp = 1.
 						dcg_tmp += 1. / (np.log2(j + 2))
-					idcg_tmp += 1. / (np.log2(j + 2))
+					if j < len(true_array[i]):
+						idcg_tmp += 1. / (np.log2(j + 2))
+				gts += len(true_array[i])
 				hits += hit_tmp
 				mrrs += mrr_tmp
-				recalls += hit / len(true_array[i])
-				precisions += hit / topKs[idx]
+				recalls += hit_tmp / len(true_array[i])
+				precisions += hit_tmp / topKs[idx]
 				if idcg_tmp != 0:
 					ndcgs += dcg_tmp / idcg_tmp
-		hit_result.append(round(hits / len(pred_array), 4))
+		hit_result.append(round(hits / gts, 4))
 		mrr_result.append(round(mrrs / len(pred_array), 4))
 		recall_result.append(round(recalls / len(pred_array), 4))
 		precision_result.append(round(precisions / len(pred_array), 4))
@@ -241,3 +242,9 @@ def Coverage(y_pred, all_items, topKs=None):
 # print(len(ground_truth),len(match_res))
 # out = topk_metrics(y_true=ground_truth, y_pred=match_res, topKs=[50])
 # print(out)
+
+if __name__ == "__main__":
+	y_pred = {'0': [0, 1], '1': [0, 1], '2': [2, 3]}
+	y_true = {'0': [1, 2], '1': [0, 1, 2], '2': [2, 3]}
+	out = topk_metrics(y_true, y_pred, topKs=(1,2))
+	print(out)
