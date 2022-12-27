@@ -6,7 +6,7 @@ import random
 from collections import OrderedDict, Counter
 from annoy import AnnoyIndex
 from .data import pad_sequences, df_to_dict
-
+from pymilvus import Collection,CollectionSchema,DataType,FieldSchema,connections,utility
 
 def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len, padding='pre', truncating='pre'):
     #merge user_profile and item_profile, pad history seuence feature
@@ -187,6 +187,70 @@ class Annoy(object):
     def __str__(self):
         return 'Annoy(n_trees=%d, search_k=%d)' % (self._n_trees, self._search_k)
 
+    
+class Milvus(object):
+    """Vector matching by Milvus.
+
+    Args:
+        dim (int): embedding dim
+        host (str): host address of Milvus
+        port (str): port of Milvus
+    """
+
+    def __init__(self, dim=64, host="localhost", port="19530"):
+        print("Start connecting to Milvus")
+        connections.connect("default", host=host, port=port)
+        self.dim = dim
+        has = utility.has_collection("rechub")
+        #print(f"Does collection rechub exist? {has}")
+        if has:
+            utility.drop_collection("rechub")
+        # Create collection
+        fields = [
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=dim),
+        ]
+        schema = CollectionSchema(fields=fields)
+        self.milvus = Collection("rechub", schema=schema)
+
+    def fit(self, X):
+        if torch.is_tensor(X):
+            X = X.cpu().numpy()
+        self.milvus.release()
+        entities = [[i for i in range(len(X))], X]
+        self.milvus.insert(entities)
+        print(
+            f"Number of entities in Milvus: {self.milvus.num_entities}"
+        )  # check the num_entites
+
+        index = {
+            "index_type": "IVF_FLAT",
+            "metric_type": "L2",
+            "params": {"nlist": 128},
+        }
+        self.milvus.create_index("embeddings", index)
+
+    @staticmethod
+    def process_result(results):
+        idx_list = []
+        score_list = []
+        for r in results:
+            temp_idx_list = []
+            temp_score_list = []
+            for i in range(len(r)):
+                temp_idx_list.append(r[i].id)
+                temp_score_list.append(r[i].distance)
+            idx_list.append(temp_idx_list)
+            score_list.append(temp_score_list)
+        return idx_list, score_list
+
+    def query(self, v, n):
+        if torch.is_tensor(v):
+            v = v.cpu().numpy().reshape(-1, self.dim)
+        self.milvus.load()
+        search_params = {"metric_type": "L2", "params": {"nprobe": 16}}
+        results = self.milvus.search(v, "embeddings", search_params, n)
+        return self.process_result(results)
 
 #annoy = Annoy(n_trees=10)
 #annoy.fit(item_embs)
