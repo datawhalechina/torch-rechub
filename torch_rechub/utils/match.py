@@ -53,7 +53,7 @@ def negative_sample(items_cnt_order, ratio, method_id=0):
         p_value = np.array(list(p_sel.values())) / sum(p_sel.values())
         neg_items = np.random.choice(items_set, size=ratio, replace=True, p=p_value)
     elif method_id == 3:
-        p_sel = {item: (np.log(k + 2) - np.log(k + 1) / np.log(len(items_cnt_order) + 1)) for item, k in items_cnt_order.items()}
+        p_sel = {item: (np.log(k + 2) - np.log(k + 1)) / np.log(len(items_cnt_order) + 1) for item, k in items_cnt_order.items()}
         p_value = np.array(list(p_sel.values())) / sum(p_sel.values())
         neg_items = np.random.choice(items_set, size=ratio, replace=False, p=p_value)
     else:
