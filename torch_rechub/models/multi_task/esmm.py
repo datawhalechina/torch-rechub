@@ -42,7 +42,7 @@ class ESMM(nn.Module):
         ctr_logit = self.tower_ctr(input_tower)
         cvr_pred = torch.sigmoid(cvr_logit)
         ctr_pred = torch.sigmoid(ctr_logit)
-        ctcvr_pred = torch.mul(cvr_pred, cvr_pred)
+        ctcvr_pred = torch.mul(ctr_pred, cvr_pred)
 
         ys = [cvr_pred, ctr_pred, ctcvr_pred]
         return torch.cat(ys, dim=1)
