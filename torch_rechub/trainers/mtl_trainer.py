@@ -98,6 +98,7 @@ class MTLTrainer(object):
         self.model.to(self.device)
         self.model_path = model_path
 
+
     def train_one_epoch(self, data_loader):
         self.model.train()
         total_loss = np.zeros(self.n_task)
@@ -141,26 +142,42 @@ class MTLTrainer(object):
                 self.optimizer.step()
             total_loss += np.array([l.item() for l in loss_list])
         log_dict = {"task_%d:" % (i): total_loss[i] / (iter_i + 1) for i in range(self.n_task)}
+        loss_list = [total_loss[i] / (iter_i + 1) for i in range(self.n_task)]
         print("train loss: ", log_dict)
         if self.loss_weight:
             print("loss weight: ", [w.item() for w in self.loss_weight])
 
-    def fit(self, train_dataloader, val_dataloader):
+        return loss_list
+
+
+    def fit(self, train_dataloader, val_dataloader, mode = 'base', seed = 0):
+        total_log = []
+
         for epoch_i in range(self.n_epoch):
-            self.train_one_epoch(train_dataloader)
+            _log_per_epoch = self.train_one_epoch(train_dataloader)
+
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  #update lr in epoch level by scheduler
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
+
+            for score in scores:
+                _log_per_epoch.append(score)
+
+            total_log.append(_log_per_epoch)
+
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
                 print('validation best auc of main task %d: %.6f' %
                       (self.earlystop_taskid, self.early_stopper.best_auc))
                 self.model.load_state_dict(self.early_stopper.best_weights)
                 break
-        torch.save(self.model.state_dict(), os.path.join(self.model_path,
-                                                            "model.pth"))  #save best auc model
+
+        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  #save best auc model
+
+        return total_log
+
 
     def evaluate(self, model, data_loader):
         model.eval()
@@ -176,6 +193,7 @@ class MTLTrainer(object):
         targets, predicts = np.array(targets), np.array(predicts)
         scores = [self.evaluate_fns[i](targets[:, i], predicts[:, i]) for i in range(self.n_task)]
         return scores
+
 
     def predict(self, model, data_loader):
         model.eval()
