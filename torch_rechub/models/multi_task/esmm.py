@@ -27,16 +27,23 @@ class ESMM(nn.Module):
         self.user_features = user_features
         self.item_features = item_features
         self.embedding = EmbeddingLayer(user_features + item_features)
-        self.tower_dims = user_features[0].embed_dim + item_features[0].embed_dim
+        self.tower_dims = len(user_features) * user_features[0].embed_dim + len(item_features) * item_features[0].embed_dim
         self.tower_cvr = MLP(self.tower_dims, **cvr_params)
         self.tower_ctr = MLP(self.tower_dims, **ctr_params)
 
     def forward(self, x):
-        #Field-wise Pooling Layer for user and item
-        embed_user_features = self.embedding(x, self.user_features,
-                                             squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
-        embed_item_features = self.embedding(x, self.item_features,
-                                             squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
+        # # Field-wise Pooling Layer for user and item
+        # embed_user_features = self.embedding(x, self.user_features, squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
+        # embed_item_features = self.embedding(x, self.item_features, squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
+
+        # Here we concat all the features instead of field-wise pooling them
+        # [batch_size, num_features, embed_dim] --> [batch_size, num_features * embed_dim]
+        _batch_size = self.embedding(x, self.user_features, squeeze_dim=False).shape[0]
+        embed_user_features = self.embedding(x, self.user_features, squeeze_dim=False).reshape(_batch_size, -1)
+        embed_item_features = self.embedding(x, self.item_features, squeeze_dim=False).reshape(_batch_size, -1)
+
+        # print('embed_user_features', embed_user_features.shape)
+
         input_tower = torch.cat((embed_user_features, embed_item_features), dim=1)
         cvr_logit = self.tower_cvr(input_tower)
         ctr_logit = self.tower_ctr(input_tower)
