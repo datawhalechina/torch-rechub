@@ -63,7 +63,7 @@ class DataGenerator(object):
         self.length = len(self.dataset)
 
     def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16,
-                            num_workers=8):
+                            num_workers=0):
         if split_ratio != None:
             train_length = int(self.length * split_ratio[0])
             val_length = int(self.length * split_ratio[1])
