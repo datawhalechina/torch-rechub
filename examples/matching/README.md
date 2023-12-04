@@ -57,6 +57,27 @@
 
 [第一参赛者笔记](https://www.logicjake.xyz/2021/09/20/%E4%B8%80%E7%82%B9%E8%B5%84%E8%AE%AF%E6%8A%80%E6%9C%AF%E7%BC%96%E7%A8%8B%E5%A4%A7%E8%B5%9BCTR%E8%B5%9B%E9%81%93-%E8%B5%9B%E5%90%8E%E6%80%BB%E7%BB%93/)
 
+## Million Song Dataset
+百万歌曲音乐数据集（事实上这个数据集很很多种，同时也有不同社区对它进行处理，我们只选取它数据量比较少且文件结构简单的一个）
+
+### 数据集说明
+1.这个项目由The Echonest和LABRosa一起完成
+
+2.数据集主要是多年间外国音乐的量化特征，包含了百万用户对几十万首歌曲的播放记录（train_triplets.txt，2.9G）和这些歌曲的详细信息（triplets_metadata.db，700M）。
+
+### 数据格式
+1.用户的播放记录数据集train_triplets.txt:`用户,歌曲,播放次数`，其中用户和歌曲都匿名
+
+2.歌曲的详细信息数据集triplets_metadata.db:`歌曲的发布时间,作者,作者热度,...`等
+
+由于数据集很大，测试训练时可以从.txt文件中选取200万条数据作为我们的数据集。
+
+
+[数据集下载](http://millionsongdataset.com/sites/default/files/challenge/train_triplets.txt.zip)
+
+[数据集说明](http://millionsongdataset.com/tasteprofile/)
+
+
 
 
 ## Session based recommendation datasets
