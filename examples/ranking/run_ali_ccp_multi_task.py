@@ -4,10 +4,32 @@ sys.path.append("../..")
 
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
 from torch_rechub.trainers import MTLTrainer
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
+from sklearn.metrics import roc_auc_score
+
+def calculate_cvr_auc(target, preds):
+    click_indices = target[:, 1] == 1
+    preds_click = preds[click_indices, 0]
+    target_click = target[click_indices, 0]
+    auc = roc_auc_score(target_click, preds_click)
+    return auc
+
+
+class CustomCVRloss(nn.Module):
+    def __init__(self):
+        super(CustomCVRloss, self).__init__()
+        self.bce_loss = nn.BCELoss(reduction='none')
+
+    def forward(self, preds, target):
+        pred_purchase = preds[:, 0]  
+        target_purchase = target[:, 0]  
+        target_click = target[:, 1]
+        purchase_loss = self.bce_loss(pred_purchase, target_purchase) * target_click
+        return purchase_loss[target_click == 1].mean()
 
 
 def get_ali_ccp_data_dict(model_name, data_path='./data/ali-ccp'):
@@ -78,7 +100,15 @@ def main(model_name, epoch, learning_rate, batch_size, weight_decay, device, sav
     #adaptive weight loss:
     #mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, adaptive_params={"method": "uwl"}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
 
-    mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=30, device=device, model_path=save_dir)
+    mtl_trainer = MTLTrainer(model, 
+                            task_types=task_types, 
+                            optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, 
+                            n_epoch=epoch, 
+                            earlystop_patience=30, 
+                            device=device, 
+                            model_path=save_dir,
+                            custom_loss_funcs=[CustomCVRloss()],
+                            custom_evaluate_funcs=[calculate_cvr_auc])
     mtl_trainer.fit(train_dataloader, val_dataloader)
     auc = mtl_trainer.evaluate(mtl_trainer.model, test_dataloader)
     print(f'test auc: {auc}')

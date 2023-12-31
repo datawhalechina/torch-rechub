@@ -3,6 +3,7 @@ import tqdm
 import numpy as np
 import torch
 import torch.nn as nn
+from typing import List, Callable, Optional
 from ..basic.callback import EarlyStopper
 from ..utils.data import get_loss_func, get_metric_func
 from ..models.multi_task import ESMM
@@ -43,6 +44,8 @@ class MTLTrainer(object):
         device="cpu",
         gpus=None,
         model_path="./",
+        custom_loss_funcs: Optional[List[Callable]] = None,
+        custom_evaluate_funcs: Optional[List[Callable]] = None
     ):
         self.model = model
         if gpus is None:
@@ -54,6 +57,8 @@ class MTLTrainer(object):
             }
         self.task_types = task_types
         self.n_task = len(task_types)
+        self.custom_loss_funcs = custom_loss_funcs or []
+        self.custom_evaluate_funcs = custom_evaluate_funcs or []
         self.loss_weight = None
         self.adaptive_method = None
         if adaptive_params is not None:
@@ -84,8 +89,8 @@ class MTLTrainer(object):
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
-        self.loss_fns = [get_loss_func(task_type) for task_type in task_types]
-        self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
+        self.loss_fns = self.initialize_loss_functions()
+        self.evaluate_fns = self.initialize_evaluate_functions()
         self.n_epoch = n_epoch
         self.earlystop_taskid = earlystop_taskid
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
@@ -98,6 +103,24 @@ class MTLTrainer(object):
         self.model.to(self.device)
         self.model_path = model_path
 
+    def initialize_loss_functions(self):
+        loss_fns = []
+        for i, task_type in enumerate(self.task_types):
+            if i < len(self.custom_loss_funcs) and self.custom_loss_funcs[i] is not None:
+                loss_fns.append((self.custom_loss_funcs[i], 'custom'))
+            else:
+                loss_fns.append((get_loss_func(task_type), 'default'))
+        return loss_fns
+    
+    def initialize_evaluate_functions(self):
+        evaluate_fns = []
+        for i, task_type in enumerate(self.task_types):
+            if i < len(self.custom_evaluate_funcs) and self.custom_evaluate_funcs[i] is not None:
+                evaluate_fns.append((self.custom_evaluate_funcs[i], 'custom'))
+            else:
+                evaluate_fns.append((get_metric_func(task_type), 'default'))
+        return evaluate_fns
+
     def train_one_epoch(self, data_loader):
         self.model.train()
         total_loss = np.zeros(self.n_task)
@@ -106,7 +129,13 @@ class MTLTrainer(object):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
             ys = ys.to(self.device)
             y_preds = self.model(x_dict)
-            loss_list = [self.loss_fns[i](y_preds[:, i], ys[:, i].float()) for i in range(self.n_task)]
+            loss_list = []
+            for i, (loss_fn, type) in enumerate(self.loss_fns):
+                if type == 'custom':
+                    loss = loss_fn(y_preds, ys.float())
+                else:
+                    loss = loss_fn(y_preds[:, i], ys[:, i].float())
+                loss_list.append(loss)
             if isinstance(self.model, ESMM):
                 loss = sum(loss_list[1:])  #ESSM only compute loss for ctr and ctcvr task
             else:
@@ -174,7 +203,13 @@ class MTLTrainer(object):
                 targets.extend(ys.tolist())
                 predicts.extend(y_preds.tolist())
         targets, predicts = np.array(targets), np.array(predicts)
-        scores = [self.evaluate_fns[i](targets[:, i], predicts[:, i]) for i in range(self.n_task)]
+        scores = []
+        for i, (evaluate_fn, type) in enumerate(self.evaluate_fns):
+            if type == 'custom':
+                score = evaluate_fn(targets, predicts)
+            else:
+                score = evaluate_fn(targets[:, i], predicts[:, i])
+            scores.append(score)
         return scores
 
     def predict(self, model, data_loader):
