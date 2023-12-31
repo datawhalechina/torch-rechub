@@ -2,6 +2,7 @@ import os
 import torch
 import tqdm
 from sklearn.metrics import roc_auc_score
+from typing import Callable, Optional
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import BPRLoss
 
@@ -36,6 +37,8 @@ class MatchTrainer(object):
         device="cpu",
             gpus=None,
         model_path="./",
+        custom_loss_func: Optional[Callable] = None,
+        custom_evaluate_func: Optional[Callable] = None
     ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
@@ -52,7 +55,9 @@ class MatchTrainer(object):
                 "weight_decay": 1e-5
             }
         self.mode = mode
-        if mode == 0:  #point-wise loss, binary cross_entropy
+        if custom_loss_func:
+            self.criterion = custom_loss_func
+        elif mode == 0:  #point-wise loss, binary cross_entropy
             self.criterion = torch.nn.BCELoss()  #default loss binary cross_entropy
         elif mode == 1:  #pair-wise loss
             self.criterion = BPRLoss()
@@ -64,7 +69,10 @@ class MatchTrainer(object):
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
-        self.evaluate_fn = roc_auc_score  #default evaluate function
+        if custom_evaluate_func:
+            self.evaluate_fn = custom_evaluate_func
+        else:
+            self.evaluate_fn = roc_auc_score  #default evaluate function
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.model_path = model_path
