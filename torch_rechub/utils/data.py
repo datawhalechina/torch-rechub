@@ -274,3 +274,74 @@ def array_replace_with_dict(array, dic):
     # Get argsort indices
     idx = k.argsort()
     return v[idx[np.searchsorted(k, array, sorter=idx)]]
+
+
+# Temporarily reserved for testing purposes(1985312383@qq.com)
+def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50, drop_short=3, shuffle=True):
+    """Build a sequence of user's history by time.
+
+    Args:
+        data (pd.DataFrame): must contain keys: `user_id, item_id, cate_id, time`.
+        seq_feature_col (list): specify the column name that needs to generate sequence features, and its sequence features will be generated according to userid.
+        max_len (int): the max length of a user history sequence.
+        drop_short (int): remove some inactive user who's sequence length < drop_short.
+        shuffle (bool): shuffle data if true.
+
+    Returns:
+        train (pd.DataFrame): target item will be each item before last two items.
+        val (pd.DataFrame): target item is the second to last item of user's history sequence.
+        test (pd.DataFrame): target item is the last item of user's history sequence.
+    """
+    for feat in data:
+        le = LabelEncoder()
+        data[feat] = le.fit_transform(data[feat])
+        data[feat] = data[feat].apply(lambda x: x + 1)  # 0 to be used as the symbol for padding
+    data = data.astype('int32')
+
+    n_items = data["item_id"].max()
+
+    item_cate_map = data[['item_id', 'cate_id']]
+    item2cate_dict = item_cate_map.set_index(['item_id'])['cate_id'].to_dict()
+
+    data = data.sort_values(['user_id', 'time']).groupby('user_id').agg(click_hist_list=('item_id', list), cate_hist_hist=('cate_id', list)).reset_index()
+
+    # Sliding window to construct negative samples
+    train_data, val_data, test_data = [], [], []
+    for item in data.itertuples():
+        if len(item[2]) < drop_short:
+            continue
+        user_id = item[1]
+        click_hist_list = item[2][:max_len]
+        cate_hist_list = item[3][:max_len]
+
+        neg_list = [neg_sample(click_hist_list, n_items) for _ in range(len(click_hist_list))]
+        hist_list = []
+        cate_list = []
+        for i in range(1, len(click_hist_list)):
+            hist_list.append(click_hist_list[i - 1])
+            cate_list.append(cate_hist_list[i - 1])
+            hist_list_pad = hist_list + [0] * (max_len - len(hist_list))
+            cate_list_pad = cate_list + [0] * (max_len - len(cate_list))
+            if i == len(click_hist_list) - 1:
+                test_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                test_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+            if i == len(click_hist_list) - 2:
+                val_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                val_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+            else:
+                train_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
+                train_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
+
+    # shuffle
+    if shuffle:
+        random.shuffle(train_data)
+        random.shuffle(val_data)
+        random.shuffle(test_data)
+
+    col_name = ['user_id', 'history_item', 'history_cate', 'target_item', 'target_cate', 'label']
+    train = pd.DataFrame(train_data, columns=col_name)
+    val = pd.DataFrame(val_data, columns=col_name)
+    test = pd.DataFrame(test_data, columns=col_name)
+
+    return train, val, test
+
