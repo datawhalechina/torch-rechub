@@ -235,7 +235,20 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncati
     """ Pads sequences (list of list) to the ndarray of same length.
         This is an equivalent implementation of tf.keras.preprocessing.sequence.pad_sequences
         reference: https://github.com/huawei-noah/benchmark/tree/main/FuxiCTR/fuxictr
+    
+    Args:
+        sequences (pd.DataFrame): data that needs to pad or truncate
+        maxlen (int): maximum sequence length. Defaults to None.
+        dtype (str, optional): Defaults to 'int32'.
+        padding (str, optional): if len(sequences) less than maxlen, padding style, {'pre', 'post'}. Defaults to 'pre'.
+        truncating (str, optional): if len(sequences) more than maxlen, truncate style, {'pre', 'post'}. Defaults to 'pre'.
+        value (_type_, optional): Defaults to 0..
+
+    Returns:
+        _type_: _description_
     """
+    
+
     assert padding in ["pre", "post"], "Invalid padding={}.".format(padding)
     assert truncating in ["pre", "post"], "Invalid truncating={}.".format(truncating)
 

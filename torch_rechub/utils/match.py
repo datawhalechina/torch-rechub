@@ -9,7 +9,21 @@ from .data import pad_sequences, df_to_dict
 from pymilvus import Collection,CollectionSchema,DataType,FieldSchema,connections,utility
 
 def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len, padding='pre', truncating='pre'):
-    #merge user_profile and item_profile, pad history seuence feature
+    """Merge user_profile and item_profile to df, pad and truncate history seuence feature
+
+    Args:
+        df (pd.DataFrame): data with history seuence feature
+        user_profile (pd.DataFrame): user data
+        user_col (str): user column name
+        item_profile (pd.DataFrame): item data
+        item_col (str): item column name
+        seq_max_len (int): sequence length of every data
+        padding (str, optional): padding style, {'pre', 'post'}. Defaults to 'pre'.
+        truncating (str, optional): truncate style, {'pre', 'post'}. Defaults to 'pre'.
+
+    Returns:
+        dict: The converted dict, which can be used directly into the input network
+    """
     df = pd.merge(df, user_profile, on=user_col, how='left')  # how=left to keep samples order same as the input
     df = pd.merge(df, item_profile, on=item_col, how='left')
     for col in df.columns.to_list():
