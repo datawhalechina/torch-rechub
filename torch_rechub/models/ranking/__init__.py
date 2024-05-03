@@ -8,3 +8,4 @@ from .deepffm import DeepFFM, FatDeepFFM
 from .fibinet import FiBiNet
 from .bst import BST
 from .afm import AFM
+from .dien import DIEN

@@ -9,9 +9,10 @@ Authors: Tao Fan, thisisevy@foxmail.com
 import torch
 from ...basic.layers import FM, MLP, LR, EmbeddingLayer
 from torch import nn
-from torch.nn import Parameter,init
+from torch.nn import Parameter, init
 
-class AFM(torch.nn.Module):
+
+class AFM(nn.Module):
     """Attentional Factorization Machine Model
 
     Args:
@@ -20,7 +21,7 @@ class AFM(torch.nn.Module):
         t (int): the size of the hidden layer in the attention network.
     """
 
-    def __init__(self, fm_features, embed_dim, t = 64):
+    def __init__(self, fm_features, embed_dim, t=64):
         super(AFM, self).__init__()
         self.fm_features = fm_features
         self.embed_dim = embed_dim
@@ -38,18 +39,18 @@ class AFM(torch.nn.Module):
 
     def attention(self, y_fm):
         # embs: [ batch_size, k ]
-        #[ batch_size, t ]
+        # [ batch_size, t ]
         y_fm = self.attention_liner(y_fm)
-        #[ batch_size, t ]
+        # [ batch_size, t ]
         y_fm = torch.relu(y_fm)
-        #[ batch_size, 1 ]
+        # [ batch_size, 1 ]
         y_fm = torch.matmul(y_fm, self.h)
-        #[ batch_size, 1 ]
+        # [ batch_size, 1 ]
         atts = torch.softmax(y_fm, dim=1)
         return atts
 
     def forward(self, x):
-        input_fm = self.embedding(x, self.fm_features, squeeze_dim=False)  #[batch_size, num_fields, embed_dim]
+        input_fm = self.embedding(x, self.fm_features, squeeze_dim=False)  # [batch_size, num_fields, embed_dim]
 
         y_linear = self.linear(input_fm.flatten(start_dim=1))
         y_fm = self.fm(input_fm)
