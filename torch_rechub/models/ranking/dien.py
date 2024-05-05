@@ -111,7 +111,7 @@ class DIEN(nn.Module):
         target_features (list): the list of `Feature Class`, training by ActivationUnit. It means the target feature which will execute target-attention with history feature.
         mlp_params (dict): the params of the last MLP module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
         history_labels (list): the list of history_features whether it is clicked history or not. It should be 0 or 1.
-        attention_mlp_params (dict): the params of the ActivationUnit module, keys include:`{"dims":list, "activation":str, "dropout":float, "use_softmax":bool`}
+        alpha (float): the weighting of auxiliary loss.
     """
 
     def __init__(self, features, history_features, target_features, mlp_params, history_labels,
