@@ -18,6 +18,7 @@ class CTRTrainer(object):
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
+        loss_mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
     """
 
@@ -32,6 +33,7 @@ class CTRTrainer(object):
         earlystop_patience=10,
         device="cpu",
         gpus=None,
+        loss_mode=True,
         model_path="./",
     ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
@@ -49,6 +51,7 @@ class CTRTrainer(object):
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+        self.loss_mode = loss_mode
         self.criterion = torch.nn.BCELoss()  #default loss cross_entropy
         self.evaluate_fn = roc_auc_score  #default evaluate function
         self.n_epoch = n_epoch
@@ -62,8 +65,12 @@ class CTRTrainer(object):
         for i, (x_dict, y) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
             y = y.to(self.device)
-            y_pred = self.model(x_dict)
-            loss = self.criterion(y_pred, y.float())
+            if self.loss_mode:
+                y_pred = self.model(x_dict)
+                loss = self.criterion(y_pred, y.float())
+            else:
+                y_pred, other_loss = self.model(x_dict)
+                loss = self.criterion(y_pred, y.float()) + other_loss
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -97,7 +104,10 @@ class CTRTrainer(object):
             for i, (x_dict, y) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}
                 y = y.to(self.device)
-                y_pred = model(x_dict)
+                if self.loss_mode:
+                    y_pred = model(x_dict)
+                else:
+                    y_pred, _ = model(x_dict)
                 targets.extend(y.tolist())
                 predicts.extend(y_pred.tolist())
         return self.evaluate_fn(targets, predicts)
@@ -110,6 +120,9 @@ class CTRTrainer(object):
             for i, (x_dict, y) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}
                 y = y.to(self.device)
-                y_pred = model(x_dict)
+                if self.loss_mode:
+                    y_pred = model(x_dict)
+                else:
+                    y_pred, _ = model(x_dict)
                 predicts.extend(y_pred.tolist())
         return predicts
