@@ -9,10 +9,10 @@ from .data import pad_sequences, df_to_dict
 from pymilvus import Collection,CollectionSchema,DataType,FieldSchema,connections,utility
 
 def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len, padding='pre', truncating='pre'):
-    """Merge user_profile and item_profile to df, pad and truncate history seuence feature
+    """Merge user_profile and item_profile to df, pad and truncate history sequence feature
 
     Args:
-        df (pd.DataFrame): data with history seuence feature
+        df (pd.DataFrame): data with history sequence feature
         user_profile (pd.DataFrame): user data
         user_col (str): user column name
         item_profile (pd.DataFrame): item data
@@ -29,6 +29,10 @@ def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_
     for col in df.columns.to_list():
         if col.startswith("hist_"):
             df[col] = pad_sequences(df[col], maxlen=seq_max_len, value=0, padding=padding, truncating=truncating).tolist()
+    for col in df.columns.to_list():
+        if col.startswith("tag_"):
+            df[col] = pad_sequences(df[col], maxlen=seq_max_len, value=0, padding=padding, truncating=truncating).tolist()
+
     input_dict = df_to_dict(df)
     return input_dict
 
@@ -161,7 +165,7 @@ def generate_seq_feature_match(data,
     random.shuffle(test_set)
 
     print("n_train: %d, n_test: %d" % (len(train_set), len(test_set)))
-    print("%d cold start user droped " % (n_cold_user))
+    print("%d cold start user dropped " % n_cold_user)
 
     attr_hist_col = ["hist_" + col for col in item_attribute_cols]
     df_train = pd.DataFrame(train_set,
