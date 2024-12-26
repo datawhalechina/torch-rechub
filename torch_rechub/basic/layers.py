@@ -95,7 +95,7 @@ class EmbeddingLayer(nn.Module):
             dense_values = torch.cat(dense_values, dim=1)
         if len(sparse_emb) > 0:
             sparse_exists = True
-            sparse_emb = torch.cat(sparse_emb, dim=1)  #[batch_size, num_features, embed_dim]
+            sparse_emb = torch.cat(sparse_emb, dim=2)  #[batch_size, num_features, embed_dim]
 
         if squeeze_dim:  #Note: if the emb_dim of sparse features is different, we must squeeze_dim
             if dense_exists and not sparse_exists:  #only input dense features
