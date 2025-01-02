@@ -92,7 +92,7 @@ def get_auto_embedding_dim(num_classes):
     Returns:
         the dim of embedding vector
     """
-    return int(np.floor(6 * np.pow(num_classes, 0.26)))
+    return int(np.floor(6 * np.pow(num_classes, 0.25)))
 
 
 def get_loss_func(task_type="classification"):
