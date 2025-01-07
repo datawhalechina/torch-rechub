@@ -77,7 +77,11 @@
 
 [数据集说明](http://millionsongdataset.com/tasteprofile/)
 
+## Book-Crossing
 
+针对美国 Book-crossing 网站关于用户对书籍的评级行为进行分析，数据包含 27.8万个匿名用户，提供 115万 个评级(显式/隐式)，涉及约 27.1万本书。增删改查合并后的数据包含约71.9万个评级。
+
+[数据集下载和说明](https://www.kaggle.com/datasets/ruchi798/bookcrossing-dataset)
 
 
 ## Session based recommendation datasets

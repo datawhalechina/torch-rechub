@@ -78,8 +78,8 @@ TBD
 - 注意事项
   - 原始数据已划分训练集和测试集，预处理过程将原始数据的测试集随机划分一半作为验证集，预处理后的训练集、验证集、测试集比例为2:1:1。
   - 预处理完的数据集的sparse特征已经Lable Encode，dense特征采用归一化处理。数据预处理方式参考[AITM模型预处理脚本](https://github.com/xidongbo/AITM/blob/main/process_public_dataset.py)，我们也提供了处理原始数据的脚本`preprocess_ali_ccp.py`。
-- 原始数据地址：https://tianchi.aliyun.com/dataset/dataDetail?dataId=408
-- 预处理后的全量数据下载地址：https://cowtransfer.com/s/1903cab699fa49
+- 原始数据地址：https://tianchi.aliyun.com/dataset/408
+- 预处理后的全量数据下载地址：https://aistudio.baidu.com/datasetdetail/281072
 
 
 
