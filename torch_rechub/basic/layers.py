@@ -103,7 +103,7 @@ class EmbeddingLayer(nn.Module):
             elif not dense_exists and sparse_exists:
                 return sparse_emb.flatten(start_dim=1)  #squeeze dim to : [batch_size, num_features*embed_dim]
             elif dense_exists and sparse_exists:
-                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values.queeze()),
+                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values.squeeze()),
                                  dim=1)  #concat dense value with sparse embedding
             else:
                 raise ValueError("The input features can note be empty")
