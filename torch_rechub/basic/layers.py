@@ -88,7 +88,7 @@ class EmbeddingLayer(nn.Module):
                 else:
                     sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long()), fea_mask).unsqueeze(1))  #shared specific sparse feature embedding
             else:
-                dense_values.append(x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
+                dense_values.append(x[fea.name].float() if x[fea.name].float().dim() > 1 else x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
 
         if len(dense_values) > 0:
             dense_exists = True
@@ -103,7 +103,7 @@ class EmbeddingLayer(nn.Module):
             elif not dense_exists and sparse_exists:
                 return sparse_emb.flatten(start_dim=1)  #squeeze dim to : [batch_size, num_features*embed_dim]
             elif dense_exists and sparse_exists:
-                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values.squeeze()),
+                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values),
                                  dim=1)  #concat dense value with sparse embedding
             else:
                 raise ValueError("The input features can note be empty")
