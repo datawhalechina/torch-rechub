@@ -83,12 +83,12 @@ class DenseFeature(object):
 
     Args:
         name (str): feature's name.
-        embed_dim (int): embedding vector's length, the value fixed `1`.
+        embed_dim (int): embedding vector's length, the value fixed `1`. If you put a vector (torch.tensor) , replace the embed_dim with your vector dimension.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, embed_dim = 1):
         self.name = name
-        self.embed_dim = 1
+        self.embed_dim = embed_dim
 
     def __repr__(self):
         return f'<DenseFeature {self.name}>'
