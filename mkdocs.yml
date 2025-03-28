@@ -1,0 +1,144 @@
+# 网站基本信息
+site_name: Torch-RecHub 文档
+site_url: https://datawhalechina.github.io/torch-rechub/
+repo_url: https://github.com/datawhalechina/torch-rechub
+site_description: Torch-RecHub 是一个基于 PyTorch 的推荐系统框架，提供易用且易扩展的解决方案。
+site_author: Datawhale
+copyright: 'Copyright &copy; 2025 Datawhale'
+
+# 主题设置
+theme:
+  name: material
+  language: en
+  features:
+    - content.code.copy  # 开启代码复制功能
+    - navigation.tabs
+    - navigation.top
+    - navigation.expand
+    - toc.integrate
+    - search.highlight
+    - search.share
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+
+# 导航结构
+nav:
+  - 首页: zh/index.md
+  - 快速开始:
+    - 安装指南: zh/installation.md
+    - 入门教程: zh/getting-started.md
+  - 教程:
+    - 排序模型: zh/tutorials/ranking.md
+    - 匹配模型: zh/tutorials/matching.md
+    - 多任务学习: zh/tutorials/multi-task.md
+  - API 参考:
+    - 模型: zh/api-reference/models.md
+    - 训练器: zh/api-reference/trainers.md
+    - 工具类: zh/api-reference/utils.md
+  - 示例: zh/examples.md
+  - 常见问题解答: zh/faq.md
+  - 贡献指南: zh/contributing.md
+  - Home: en/index.md
+  - Quick Start:
+    - Installation Guide: en/installation.md
+    - Getting Started Tutorial: en/getting-started.md
+  - Tutorials:
+    - Ranking Models: en/tutorials/ranking.md
+    - Matching Models: en/tutorials/matching.md
+    - Multi-Task Learning: en/tutorials/multi-task.md
+  - API Reference:
+    - Models: en/api-reference/models.md
+    - Trainers: en/api-reference/trainers.md
+    - Utilities: en/api-reference/utils.md
+  - Examples: en/examples.md
+  - Contribution Guide: en/contributing.md
+  - FAQ: en/faq.md
+
+# 插件设置
+plugins:
+  - search
+  - awesome-pages
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            members: true
+  - i18n:
+      default_language: en
+      languages:
+        zh:
+          name: 中文
+          build: true
+        en:
+          name: English
+          build: true
+      nav_translations:
+        en:
+          Home: 首页
+          Quick Start: 快速开始
+          Installation Guide: 安装指南
+          Getting Started Tutorial: 入门教程
+          Tutorials: 教程
+          Ranking Models: 排序模型
+          Matching Models: 匹配模型
+          Multi-Task Learning: 多任务学习
+          API Reference: API 参考
+          Models: 模型
+          Trainers: 训练器
+          Utilities: 工具类
+          Examples: 示例
+          Contribution Guide: 贡献指南
+          FAQ: 常见问题解答
+      languages_dir: docs/
+      nav_style: separate  # 分离导航
+      language_selector: true  # 确保此项为 true，显示语言切换器
+      language_selector_position: header  # 在 header 中显示
+      language_selector_name: "🌐"  # 语言切换器图标
+      nav_hide:
+        - en
+        - zh
+
+# Markdown 扩展
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+      linenums: true
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+# 额外页面设置
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/datawhalechina/torch-rechub
+  alternate:
+    - name: English
+      link: en
+      lang: en
+    - name: 中文
+      link: zh
+      lang: zh
