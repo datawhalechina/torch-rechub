@@ -64,13 +64,13 @@ class CTRTrainer(object):
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (x_dict, y) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
-            y = y.to(self.device)
+            y = y.to(self.device).float().view(-1, 1)  # 确保y是float类型且维度为[batch_size, 1]
             if self.loss_mode:
                 y_pred = self.model(x_dict)
-                loss = self.criterion(y_pred, y.float())
+                loss = self.criterion(y_pred, y)
             else:
                 y_pred, other_loss = self.model(x_dict)
-                loss = self.criterion(y_pred, y.float()) + other_loss
+                loss = self.criterion(y_pred, y) + other_loss
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -103,7 +103,7 @@ class CTRTrainer(object):
             tk0 = tqdm.tqdm(data_loader, desc="validation", smoothing=0, mininterval=1.0)
             for i, (x_dict, y) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}
-                y = y.to(self.device)
+                y = y.to(self.device).float().view(-1, 1)  # 确保y是float类型且维度为[batch_size, 1]
                 if self.loss_mode:
                     y_pred = model(x_dict)
                 else:
