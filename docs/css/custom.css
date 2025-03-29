@@ -1,0 +1,98 @@
+/* 代码块整体样式 */
+.highlight {
+    border-radius: 4px;
+    margin: 1em 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* 代码行样式 */
+.highlight table .linenos {
+    color: #999;
+    background-color: #f5f5f5;
+    padding: 0 10px;
+    border-right: 1px solid #ddd;
+    text-align: right;
+    user-select: none;
+}
+
+/* 确保代码区域不换行 */
+.highlight pre {
+    margin: 0;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* 关键字高亮 */
+.highlight .k, .highlight .kd {
+    color: #d33682; /* 粉色 */
+    font-weight: bold;
+}
+
+/* 类名高亮 */
+.highlight .nc {
+    color: #268bd2; /* 蓝色 */
+}
+
+/* 字符串高亮 */
+.highlight .s, .highlight .s1, .highlight .s2 {
+    color: #2aa198; /* 青色 */
+}
+
+/* 数字高亮 */
+.highlight .mi {
+    color: #859900; /* 绿色 */
+}
+
+/* 注释高亮 */
+.highlight .c, .highlight .c1 {
+    color: #93a1a1; /* 灰色 */
+    font-style: italic;
+}
+
+/* 函数名高亮 */
+.highlight .nf {
+    color: #268bd2; /* 蓝色 */
+}
+
+/* 操作符高亮 */
+.highlight .o {
+    color: #cb4b16; /* 橙色 */
+}
+
+/* 背景高亮 */
+.highlight .hll {
+    background-color: #f8f8f8;
+}
+
+/* 复制按钮样式 */
+.md-clipboard {
+    background: rgba(0,0,0,0.1) !important;
+    border-radius: 50% !important;
+    width: 24px !important;
+    height: 24px !important;
+    padding: 4px !important;
+}
+
+.md-clipboard:hover {
+    color: var(--md-primary-fg-color) !important;
+    transform: scale(1.2);
+}
+
+/* 代码块标题栏样式 */
+.md-typeset div.codehilite pre {
+    position: relative;
+    padding-top: 2.2em;
+}
+
+.md-typeset div.codehilite::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.2em 0.8em;
+    background-color: rgba(0,0,0,0.1);
+    color: #666;
+    font-size: 0.8em;
+    border-bottom-left-radius: 4px;
+    z-index: 1;
+}

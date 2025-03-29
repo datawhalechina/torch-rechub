@@ -1,3 +1,3 @@
-# 模型 API 参考
+# Models API Reference
 
-这里可以详细介绍 Torch-RecHub 中各个模型的 API 接口和参数说明。
+Detailed documentation of model APIs and parameters in Torch-RecHub.

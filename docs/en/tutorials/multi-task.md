@@ -1,3 +1,3 @@
-# 多任务学习教程
+# Multi-Task Learning Tutorial
 
-这里可以介绍多任务学习模型的使用方法和示例代码，如 SharedBottom、ESMM 等。
+Tutorial and example code for multi-task learning models like MMOE.

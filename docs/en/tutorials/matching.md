@@ -1,3 +1,3 @@
-# 召回模型教程
+# Matching Models Tutorial
 
-这里可以介绍匹配模型的使用方法和示例代码，如 DSSM 等。
+Tutorial and example code for matching models like DSSM.

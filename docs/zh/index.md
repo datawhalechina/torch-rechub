@@ -1,6 +1,6 @@
 # Torch-RecHub 文档
 
-![Torch-RecHub Logo](https://via.placeholder.com/150x50)
+<!-- ![Torch-RecHub Logo](https://via.placeholder.com/150x50) -->
 
 Torch-RecHub 是一个基于PyTorch的推荐系统框架，具有以下特点：
 

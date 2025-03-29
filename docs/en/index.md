@@ -1,79 +1,70 @@
-# Torch-RecHub 文档
+# Torch-RecHub Documentation
 
-![Torch-RecHub Logo](https://via.placeholder.com/150x50)
+<!-- ![Torch-RecHub Logo](https://via.placeholder.com/150x50) -->
 
-Torch-RecHub 是一个基于PyTorch的推荐系统框架，具有以下特点：
+Torch-RecHub is a PyTorch-based recommender system framework with the following features:
 
-- 易用性：提供简洁的API接口
-- 可扩展性：模块化设计，易于扩展
-- 高性能：支持多GPU训练
-- 丰富的模型库：包含多种推荐系统模型
+- Usability: Provides clean API interfaces  
+- Extensibility: Modular design for easy extension
+- High Performance: Supports multi-GPU training
+- Rich Model Zoo: Contains various recommender system models
 
-## 快速开始
+## Quick Start
 
-首先，安装Torch-RecHub：
+First, install Torch-RecHub:
 
 ```bash
 pip install torch-rechub
 ```
 
-然后，使用以下代码进行推荐系统模型的训练：
+Then use the following code to train recommender system models:
 
-### 精排（CTR预测）
-
+### Ranking (CTR Prediction)
 ```python
 from torch_rechub.models.ranking import DeepFM
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.utils.data import DataGenerator
 
 dg = DataGenerator(x, y)
-train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
+train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
 
-model = DeepFM(deep_features=deep_features, fm_features=fm_features, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
+model = DeepFM(deep_features=deep_features, fm_features=fm_features, 
+               mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
 
 ctr_trainer = CTRTrainer(model)
-ctr_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+ctr_trainer.fit(train_dl, val_dl)
+auc = ctr_trainer.evaluate(test_dl)
 ```
 
-### 多任务排序
-
+### Multi-Task Learning
 ```python
 from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
 from torch_rechub.trainers import MTLTrainer
 
-task_types = ["classification", "classification"] 
-model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_params_list=[{"dims": [32, 16]}, {"dims": [32, 16]}])
+task_types = ["classification", "classification"]
+model = MMOE(features, task_types, 8, 
+            expert_params={"dims": [32,16]}, 
+            tower_params_list=[{"dims": [32, 16]}, {"dims": [32, 16]}])
 
 mtl_trainer = MTLTrainer(model)
-mtl_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+mtl_trainer.fit(train_dl, val_dl)
 ```
 
-### 召回模型
-
+### Matching Models
 ```python
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator
 
-dg = MatchDataGenerator(x y)
+dg = MatchDataGenerator(x, y)
 train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=256)
 
 model = DSSM(user_features, item_features, temperature=0.02,
-             user_params={
-                 "dims": [256, 128, 64],
-                 "activation": 'prelu',  
-             },
-             item_params={
-                 "dims": [256, 128, 64],
-                 "activation": 'prelu', 
-             })
+             user_params={"dims": [256, 128, 64], "activation": 'prelu'},
+             item_params={"dims": [256, 128, 64], "activation": 'prelu'})
 
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
-
 ```
 
-## 模型库
-
+## Model Zoo
