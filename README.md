@@ -1,91 +1,183 @@
-# Torch-RecHub
+# [Torch-RecHub] - Lightweight Recommender System Framework based on PyTorch
 
-<p align="left">
-  <img src='https://img.shields.io/badge/python-3.8+-brightgreen'>
-  <img src='https://img.shields.io/badge/torch-1.7+-brightgreen'>
-  <img src='https://img.shields.io/badge/scikit_learn-0.23.2+-brightgreen'>
-  <img src='https://img.shields.io/badge/pandas-1.0.5+-brightgreen'>
-  <img src='https://img.shields.io/badge/annoy-1.17.0-brightgreen'>
-  <img src="https://img.shields.io/pypi/l/torch-rechub">
- <a href="https://github.com/datawhalechina/torch-rechub"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fdatawhalechina%2Ftorch-rechub&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false"/></a>
+[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE) 
+![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
+![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
+![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-orange?style=for-the-badge)](https://www.python.org/) 
+[![PyTorch Version](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/) 
+[![annoy Version](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://pytorch.org/) 
+[![pandas Version](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/) 
+[![numpy Version](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/) 
+[![scikit-learn Version](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
+[![torch-rechub Version](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
 
-## 中文Wiki站
+English | [简体中文](README_zh.md)
 
-查看最新研发进度，认领感兴趣的研发任务，学习rechub模型复现心得，加入rechub共建者团队等
+**Torch-RecHub** is a flexible and extensible recommender system framework built with PyTorch. It aims to simplify research and application of recommendation algorithms by providing common model implementations, data processing tools, and evaluation metrics.
 
-[点击链接](https://www.wolai.com/rechub/2qjdg3DPy1179e1vpcHZQC)
+## ✨ Features
 
-## 安装
+* **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
+* **PyTorch-based:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
+* **Rich Model Library:** Contains various classic and cutting-edge recommendation algorithms.
+* **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
+* **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
+* **Reproducibility:** Designed to ensure reproducible experimental results.
+* **Additional Features:** Negative sampling, multi-task learning, etc.
 
-```python
-#稳定版 
+## 📖 Table of Contents
+
+- [[Torch-RecHub] - Lightweight Recommender System Framework](#torch-rechub---lightweight-recommender-system-framework)
+  - [✨ Features](#-features)
+  - [📖 Table of Contents](#-table-of-contents)
+  - [🔧 Installation](#-installation)
+    - [Requirements](#requirements)
+    - [Installation Steps](#installation-steps)
+  - [🚀 Quick Start](#-quick-start)
+  - [📂 Project Structure](#-project-structure)
+  - [💡 Supported Models](#-supported-models)
+  - [📊 Supported Datasets](#-supported-datasets)
+  - [🧪 Examples](#-examples)
+  - [🤝 Contributing](#-contributing)
+  - [📜 License](#-license)
+  - [📚 Citation](#-citation)
+  - [📫 Contact](#-contact)
+
+## 🔧 Installation
+
+### Requirements
+
+* Python 3.8+
+* PyTorch 1.7+ (CUDA-enabled version recommended for GPU acceleration)
+* NumPy
+* Pandas
+* SciPy
+* Scikit-learn
+
+### Installation Steps
+- **Stable Version**
+```bash
 pip install torch-rechub
-
-#最新版（推荐）
-1. git clone https://github.com/datawhalechina/torch-rechub.git
-2. cd torch-rechub
-3. python setup.py install
 ```
 
-## 核心定位
+- **Latest Version (Recommended)**
+```bash
+git clone https://github.com/datawhalechina/torch-rechub.git
+cd torch-rechub
+python setup.py install
+```
 
-易用易拓展，聚焦复现业界实用的推荐模型，以及泛生态化的推荐场景
+Install dependencies:
 
-## 主要特性
+```bash
+pip install -r requirements.txt
+```
 
-*   scikit-learn风格易用的API（fit、predict），即插即用
+## 🚀 Quick Start
 
-*   模型训练与模型定义解耦，易拓展，可针对不同类型的模型设置不同的训练机制
+Here's a simple example of training a model (e.g., MF - Matrix Factorization) on the MovieLens-100k dataset:
 
-*   接受pandas的DataFrame、Dict数据输入，上手成本低
+```bash
+# 1. Prepare data (if preprocessing needed)
+# python examples/matching/data/ml-1m/preprocess_ml.py
 
-*   高度模块化，支持常见Layer，容易调用组装成新模型
+# 2. Train model
+python run_ml_dssm.py
+# Or override config with command-line arguments:
+# python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+```
 
-    *   LR、MLP、FM、FFM、CIN
+After training, model files will be saved in the `saved/dssm_ml-100k` directory (or your configured directory).
 
-    *   target-attention、self-attention、transformer
+## 📂 Project Structure
 
-*   支持常见排序模型
+```
+torch-rechub/             # Root directory
+├── README.md             # Project documentation
+├── torch_rechub/         # Core library
+│   ├── basic/            # Basic components
+│   ├── models/           # Recommendation model implementations
+│   │   ├── matching/     # Matching models (DSSM/MIND/GRU4Rec etc.)
+│   │   └── ranking/      # Ranking models (WideDeep/DeepFM/DIN etc.)
+│   │   └── multi_task/   # Multi-task models (MMoE/ESMM etc.)
+│   ├── trainers/         # Trainers
+│   ├── utils/            # Utility functions
+├── examples/             # Example scripts
+│   ├── matching/         # Matching task examples
+│   └── ranking/          # Ranking task examples
+├── docs/                 # Documentation
+├── tutorials/            # Jupyter tutorials
+├── setup.py              # Package installation script
+├── mkdocs.yml            # MkDocs config file
+└── requirements.txt      # Project dependencies
+```
 
-    *   WideDeep、DeepFM、DIN、DCN、xDeepFM等
+## 💡 Supported Models
 
-*   支持常见召回模型
+The framework currently supports the following recommendation models:
 
-    *   DSSM、YoutubeDNN、YoutubeDSSM、FacebookEBR、MIND等
+**General Recommendation:**
 
-*   丰富的多任务学习支持
+* **[DSSM](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf):** Deep Structured Semantic Model
+* **[Wide&Deep](https://arxiv.org/abs/1606.07792):** Wide & Deep Learning for Recommender Systems
+* **[FM](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf):** Factorization Machines
+* **[DeepFM](https://arxiv.org/abs/1703.04247):** Deep Factorization Machine
+* ... 
 
-    *   SharedBottom、ESMM、MMOE、PLE、AITM等模型
+**Sequential Recommendation:**
 
-    *   GradNorm、UWL、MetaBanlance等动态loss加权机制
+* **[DIN](https://arxiv.org/pdf/1706.06978.pdf):** Deep Interest Network
+* **[DIEN](https://arxiv.org/pdf/1809.03672.pdf):** Deep Interest Evolution Network
+* **[BST](https://arxiv.org/pdf/1905.06874.pdf):** Behavior Sequence Transformer
+* **[GRU4Rec](https://arxiv.org/pdf/1511.06939.pdf):** Gated Recurrent Unit for Recommendation
+* **[SASRec](https://arxiv.org/pdf/1808.09781.pdf):** Self-Attentive Sequential Recommendation
+* ... 
 
-*   聚焦更生态化的推荐场景
+**Multi-Interest Recommendation:**
 
-    - [ ] 冷启动
+* **[MIND](https://arxiv.org/pdf/1904.08030.pdf):** Multi-Interest Network with Dynamic Routing
+* **[SINER](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
+* ... 
 
-    - [ ] 延迟反馈
+**Multi-Task Recommendation:**
 
-    *   [ ] 去偏
+* **[ESMM](https://arxiv.org/pdf/1804.07931.pdf):** Entire Space Multi-Task Model
+* **[MMoE](https://dl.acm.org/doi/pdf/10.1145/3219819.3220007):** Multi-Task Multi-Interest Network for Recommendation
+* **[PLE](https://dl.acm.org/doi/pdf/10.1145/3394486.3403394):** Personalized Learning to Rank
+* **[AITM](https://arxiv.org/pdf/2005.02553.pdf):** Adaptive Interest-Task Matching
+* ... 
 
-*   支持丰富的训练机制
+## 📊 Supported Datasets
 
-    *   [ ] 对比学习
+The framework provides built-in support or preprocessing scripts for the following common datasets:
 
-    *   [ ] 蒸馏学习
+* **MovieLens**
+* **Amazon**
+* **Criteo**
+* **Avazu** 
+* **Census-Income**
+* **BookCrossing**
+* **Ali-ccp**
+* **Yidian**
+* ...
 
-*   [ ] 第三方高性能开源Trainer支持（Pytorch Lighting）
+The expected data format is typically an interaction file containing:
+- User ID
+- Item ID 
+- Rating (optional)
+- Timestamp (optional)
 
-*   [ ] 更多模型正在开发中
+For specific format requirements, please refer to the example code in the `tutorials` directory.
 
-## 快速使用
+You can easily integrate your own datasets by ensuring they conform to the framework's data format requirements or by writing custom data loaders.
 
-### 使用案例
 
-- 所有模型使用案例参考 `/examples`
+## 🧪 Examples
 
-- 202206 Datawhale-RecHub推荐课程 组队学习期间notebook教程参考 `/tutorials`
+All model usage examples can be found in `/examples`
 
-### 精排（CTR预测）
+### Ranking (CTR Prediction)
 
 ```python
 from torch_rechub.models.ranking import DeepFM
@@ -102,7 +194,7 @@ ctr_trainer.fit(train_dataloader, val_dataloader)
 auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
 ```
 
-### 多任务排序
+### Multi-Task Ranking
 
 ```python
 from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
@@ -116,7 +208,7 @@ mtl_trainer.fit(train_dataloader, val_dataloader)
 auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
 ```
 
-### 召回模型
+### Matching Model
 
 ```python
 from torch_rechub.models.matching import DSSM
@@ -138,6 +230,48 @@ model = DSSM(user_features, item_features, temperature=0.02,
 
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
-
 ```
 
+## 🤝 Contributing
+
+We welcome all types of contributions! If you'd like to contribute to this project, please follow these steps:
+
+1. **Fork the repository:** Click the "Fork" button in the upper right corner.
+2. **Make your changes:** Implement new features or fix bugs.
+3. **Commit changes:** `git commit -m "feat: add new feature"` or `fix: fix some issue"` (Following [Conventional Commits](https://www.conventionalcommits.org/) is preferred).
+4. **Push to branch:** `git push origin`
+5. **Create Pull Request:** Go back to the original repository page, click "New pull request", compare your branch with the `main` branch of the main repository, and submit PR.
+
+Please ensure your PR description clearly explains the changes and their purpose.
+
+We also welcome bug reports and feature suggestions through [Issues](https://github.com/datawhalechina/torch-rechub/issues).
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 📚 Citation
+
+If you use this framework in your research or work, please consider citing:
+
+```bibtex
+@misc{torch_rechub,
+    title = {Torch-RecHub},
+    author = {Datawhale},
+    year = {2024},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\url{https://github.com/datawhalechina/torch-rechub}},
+    note = {A PyTorch-based recommender system framework providing easy-to-use and extensible solutions}
+}
+```
+
+## 📫 Contact
+
+* **Project Lead:** [morningsky](https://github.com/morningsky) 
+* [**GitHub Issues**](https://github.com/datawhalechina/torch-rechub/issues)
+
+
+---
+
+*Last updated: [2025-03-31]*
