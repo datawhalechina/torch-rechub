@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install mkdocs mkdocs-material mkdocs-awesome-pages-plugin mkdocstrings mkdocstrings-python mkdocs-i18n
+          pip install mkdocs mkdocs-material mkdocs-awesome-pages-plugin mkdocstrings mkdocstrings-python mkdocs-static-i18n
 
       - name: Build site
         run: mkdocs build
