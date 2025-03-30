@@ -5,7 +5,7 @@ with open("README.md", "r", encoding='utf-8') as f:
      
 setup(
     name='torch-rechub',
-    version='0.0.2',
+    version='0.0.3',
     description='A Lighting Pytorch Framework for Recommendation System, Easy-to-use and Easy-to-extend.',
     long_description=long_description,
     long_description_content_type="text/markdown",
