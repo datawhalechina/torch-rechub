@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/contributing/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/contributing/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/contributing/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/examples/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/examples/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/examples/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/faq/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/faq/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/faq/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/installation/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/installation/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/installation/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/api-reference/models/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/models/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/models/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/api-reference/trainers/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/trainers/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/trainers/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/api-reference/utils/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/utils/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/tutorials/matching/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/matching/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/matching/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/tutorials/multi-task/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/multi-task/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/multi-task/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/tutorials/ranking/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/ranking/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/ranking/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/contributing/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/contributing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/contributing/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/examples/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/examples/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/examples/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/faq/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/faq/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/faq/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/installation/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/installation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/installation/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/api-reference/models/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/models/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/models/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/api-reference/trainers/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/trainers/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/trainers/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/api-reference/utils/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/utils/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/tutorials/matching/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/matching/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/matching/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/tutorials/multi-task/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/multi-task/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/multi-task/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/tutorials/ranking/</loc>
+        <lastmod>2025-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/tutorials/ranking/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/tutorials/ranking/"/>
+    </url>
+</urlset>
