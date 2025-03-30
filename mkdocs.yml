@@ -1,0 +1,134 @@
+# 网站基本信息
+site_name: Torch-RecHub
+site_url: https://datawhalechina.github.io/torch-rechub/
+repo_url: https://github.com/datawhalechina/torch-rechub
+site_description: A PyTorch-based recommender system framework providing easy-to-use and extensible solutions
+site_author: Datawhale
+copyright: 'Copyright &copy; 2025 Datawhale'
+
+# 主题设置
+theme:
+  name: material
+  language: en
+  features:
+    - content.code.copy  # 开启代码复制功能
+    - navigation.tabs
+    - navigation.top
+    - navigation.expand
+    - toc.integrate
+    - search.highlight
+    - search.share
+  palette:
+    - scheme: default
+      primary: teal
+      accent: orange
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: orange
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+
+# 导航结构
+nav:
+  - Home: en/index.md
+  - Quick Start:
+    - Installation Guide: en/installation.md
+    - Getting Started Tutorial: en/getting-started.md
+  - Tutorials:
+    - Ranking Models: en/tutorials/ranking.md
+    - Matching Models: en/tutorials/matching.md
+    - Multi-Task Learning: en/tutorials/multi-task.md
+  - API Reference:
+    - Models: en/api-reference/models.md
+    - Trainers: en/api-reference/trainers.md
+    - Utilities: en/api-reference/utils.md
+  - Examples: en/examples.md
+  - FAQ: en/faq.md
+  - Contribution Guide: en/contributing.md
+
+# 插件设置
+plugins:
+  - search
+  - awesome-pages
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            members: true
+  - i18n:
+      docs_structure: folder
+      default_language: en
+      languages:
+        - language: zh
+          name: 中文
+          locale: zh
+          build: true
+          nav_translations:
+            Home: 首页
+            Quick Start: 快速开始
+            Installation Guide: 安装指南
+            Getting Started Tutorial: 入门教程
+            Tutorials: 教程
+            Ranking Models: 排序模型
+            Matching Models: 召回模型
+            Multi-Task Learning: 多任务学习
+            API Reference: API参考
+            Models: 模型
+            Trainers: 训练器
+            Utilities: 工具类
+            Examples: 示例
+            FAQ: 常见问题
+            Contribution Guide: 贡献指南
+        - language: en
+          name: English
+          locale: en
+          build: true
+          default: true
+      languages_dir: docs/
+      nav_style: separate
+      language_selector: true
+      language_selector_position: header
+      language_selector_name: "🌐"
+      nav_translate: true  # 启用导航翻译
+
+# Markdown 扩展
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: true
+      linenums: true
+      linenums_style: table
+      use_pygments: true
+      pygments_style: monokai  # 改为更清晰的高亮样式
+      css_class: highlight     # 明确指定CSS类
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:           # 添加自定义代码块支持
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
+  - pymdownx.tabbed
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+# 额外页面设置
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/datawhalechina/torch-rechub
+
+extra_css:
+  - css/custom.css
