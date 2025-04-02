@@ -1,0 +1,21 @@
+/* 图片 */
+.md-typeset img,
+.md-typeset video {
+    display: block;
+    border-radius: 1rem;
+    margin: 0 auto;
+    box-shadow: 2px 3px 10px 2px var(--md-pic-shadow-color);
+    border: 2px solid var(--md-pic-shadow-color);
+    max-width: 90%;
+}
+
+/* svg, emoji 等符号文字对齐 */
+.md-typeset :is(.emojione, .twemoji, .gemoji) {
+    vertical-align: -0.15em;
+    border: none;
+    box-shadow: none;
+}
+
+.md-typeset img[align=left] {
+    margin: 0 1rem 0 0;
+}

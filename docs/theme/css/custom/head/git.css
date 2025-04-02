@@ -1,0 +1,14 @@
+/* 侧拉 git 背景色*/
+.md-nav__source {
+    background-color: var(--md-code-bg-color);
+    color: var(--md-code-fg-color);
+}
+
+.md-source__repository {
+    /* font-family: "JetBrains Mono"; */
+    font-size: 0.6rem;
+    font-weight: 600;
+}
+.md-source__fact:before{
+    margin-top: .1rem;
+}

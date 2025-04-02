@@ -1,0 +1,4 @@
+.md-tooltip2__inner.md-typeset {
+    border-radius: .5rem;
+    background-color: var(--md-primary-fg-color);
+}

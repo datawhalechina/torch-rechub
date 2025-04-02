@@ -1,0 +1,94 @@
+/* 图片放大start */
+
+.zoom {
+    cursor: zoom-in;
+}
+/* 遮罩样式 */
+.overlay {
+    display: none; /* 初始状态为隐藏 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--md-primary-fg-color); /* 半透明黑色遮罩 */
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    z-index: 1000; /* 遮罩层级 */
+}
+
+/* 放大图片容器样式 */
+.image-zoom-container {
+    display: none; /* 初始状态为隐藏 */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* 居中显示 */
+    z-index: 1001; /* 图片位于遮罩上方 */
+}
+
+.image-zoom-container img {
+    max-width: 90vw; /* 根据需要调整放大图片大小 */
+    max-height: 90vh;
+    box-shadow: 2px 3px 10px 2px var(--md-pic-shadow-color); /* 图片阴影 */
+    /* transition: transform 0.2s cubic-bezier(0.04, 1.06, 0.58, 1); 平滑过渡效果 */
+    cursor: grab; /* 手型光标 */
+}
+
+.image-zoom-container img:active {
+    cursor: grabbing; /* 抓取状态手型光标 */
+}
+
+.show-overlay {
+    display: block; /* 显示遮罩 */
+}
+
+/* .close-button {
+    position: absolute;
+    bottom: -10%;
+    left: 50%;
+    transform:translate(-50%,-50%);
+    background-color: rgb(180 179 179 / 59%);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: none;
+    color: #000000d1;
+    font-size: 1.5rem;
+    width: 3rem;
+    height: 3rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1002;
+    border-radius: 100px;
+} */
+
+.close-button {
+    position: fixed;
+    display: none; /* 默认隐藏关闭按钮 */
+    bottom: 1%;
+    left: 50%;
+    transform:translate(-50%,-50%);
+    background-color: var(--md-pic-shadow-color);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    transition: font 1s cubic-bezier(0.075, 0.82, 0.165, 1);
+    transition: border 1s cubic-bezier(0.075, 0.82, 0.165, 1);
+    box-shadow: 2px 3px 10px 2px rgba(0, 0, 0, 0.075);
+    /* border: none; */
+    border: 2px solid var(--md-pic-shadow-color);
+    color: #000000d1;
+    font-size: 1.2rem;
+    padding: .5rem;
+    height:fit-content;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 100px;
+    z-index: 1002;
+}
+.close-button:focus, .close-button:hover{
+    font-weight: 700;
+    border: 2px solid #9393938f;
+}
+.show-button {
+    display: block; /* 显示关闭按钮 */
+}

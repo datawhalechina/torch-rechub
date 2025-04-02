@@ -1,0 +1,9 @@
+/* 隐藏 由 Material for MkDocs 构建*/
+.md-footer-meta.md-typeset {
+    display: none;
+}
+
+.md-footer__title{
+    font-size: 1rem;
+    font-weight: 600;
+}

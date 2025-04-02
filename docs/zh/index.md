@@ -1,79 +1,44 @@
-# Torch-RecHub 文档
+---
+# template: home.html # 可选，使用 Material for MkDocs 的着陆页模板  <- 删除或注释掉此行
+hide:
+  - navigation # 隐藏左侧导航
+  - toc # 隐藏右侧目录
+title: 欢迎使用 Torch-RecHub
+---
 
-<!-- ![Torch-RecHub Logo](https://via.placeholder.com/150x50) -->
+<style>
+  .md-typeset h1, .md-content__button { display: none; } /* 隐藏默认标题和编辑按钮 */
+  /* 更新特性项样式以适应卡片 */
+  .feature-card {
+    text-align: center;
+    border: 1px solid var(--md-default-fg-color--lightest); /* 可选：添加边框 */
+    border-radius: 4px; /* 可选：添加圆角 */
+    height: 100%; /* 让卡片等高 */
+    display: flex; /* 使用 flex 布局 */
+    flex-direction: column; /* 垂直排列 */
+    justify-content: flex-start; /* 从顶部开始对齐 */
+  }
+  .feature-card .md-card__content {
+      flex-grow:
+  .feature-item { text-align: center; }
+  .feature-icon { font-size: 3em; margin-bottom: 0.5em; }
+</style>
 
-Torch-RecHub 是一个基于PyTorch的推荐系统框架，具有以下特点：
-
-- 易用性：提供简洁的API接口
-- 可扩展性：模块化设计，易于扩展
-- 高性能：支持多GPU训练
-- 丰富的模型库：包含多种推荐系统模型
-
-## 快速开始
-
-首先，安装Torch-RecHub：
-
-```bash
-pip install torch-rechub
-```
-
-然后，使用以下代码进行推荐系统模型的训练：
-
-### 精排（CTR预测）
-
-```python
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import DataGenerator
-
-dg = DataGenerator(x, y)
-train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-model = DeepFM(deep_features=deep_features, fm_features=fm_features, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
-
-ctr_trainer = CTRTrainer(model)
-ctr_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
-```
-
-### 多任务排序
-
-```python
-from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
-from torch_rechub.trainers import MTLTrainer
-
-task_types = ["classification", "classification"] 
-model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_params_list=[{"dims": [32, 16]}, {"dims": [32, 16]}])
-
-mtl_trainer = MTLTrainer(model)
-mtl_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
-```
-
-### 召回模型
-
-```python
-from torch_rechub.models.matching import DSSM
-from torch_rechub.trainers import MatchTrainer
-from torch_rechub.utils.data import MatchDataGenerator
-
-dg = MatchDataGenerator(x y)
-train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=256)
-
-model = DSSM(user_features, item_features, temperature=0.02,
-             user_params={
-                 "dims": [256, 128, 64],
-                 "activation": 'prelu',  
-             },
-             item_params={
-                 "dims": [256, 128, 64],
-                 "activation": 'prelu', 
-             })
-
-match_trainer = MatchTrainer(model)
-match_trainer.fit(train_dl)
-
-```
-
-## 模型库
-
+<!-- Hero Section -->
+<section class="mdx-container">
+  <div class="md-grid md-typeset">
+    <div class="md-grid__cell md-grid__cell--center">
+      <!-- <img src="assets/logo.png" alt="Torch-RecHub Logo" width="200"> -->
+      <h1 style="text-align: center; font-size: 3em; margin-top: 1em; margin-bottom: 0.5em;">Torch-RecHub</h1>
+      <p style="text-align: center; font-size: 1.5em; margin-bottom: 1.5em;">一个基于 PyTorch 的易用、可扩展且高性能的推荐系统框架</p>
+      <div style="text-align: center;">
+        <a href="getting-started/" class="md-button md-button--primary md-button--lg">
+          快速开始
+        </a>
+        <a href="https://github.com/datawhalechina/torch-rechub" target="_blank" rel="noopener" class="md-button md-button--lg">
+          查看 GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
