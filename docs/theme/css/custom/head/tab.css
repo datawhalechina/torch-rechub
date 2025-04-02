@@ -1,0 +1,15 @@
+/* .md-tabs{
+    background-color: rgb(255, 255, 255);
+} */
+.md-tabs__link{
+    font-size: .8rem;
+    font-weight: 600;
+}
+/* .md-tabs__item{
+    border-bottom: 5px solid #e0e0e0;
+    margin-left: .1rem;
+    margin-right: .1rem;
+} */
+.md-nav__link .md-ellipsis{
+    font-size: .8rem;
+}

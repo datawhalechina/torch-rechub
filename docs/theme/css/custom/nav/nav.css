@@ -1,0 +1,65 @@
+@media screen and (min-width: 76.25em) {
+    .md-nav--secondary .md-nav__title{
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    .md-nav--secondary .md-nav__list{
+        font-size: .5rem;
+        line-height: 1.7;
+    }
+}
+@media screen and (min-width: 60em){
+    .md-nav--secondary .md-nav__title{
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    .md-nav--secondary .md-nav__list{
+        font-size: .5rem;
+        line-height: 1.7;
+    }
+}
+.md-overlay{
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background-color: var(--md-primary-fg-color);
+}
+
+.md-nav--primary .md-nav__link:hover{
+    font-weight: 600;
+}
+.md-nav--primary .md-nav__link{
+    transition: font-weight .5s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+.md-nav--secondary .md-nav__link{
+    transition: font-weight .5s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+.md-nav--secondary .md-nav__link:hover{
+    font-weight: 600;
+}
+
+
+/* 外部table block显示 */
+/* .md-content__inner>.tabbed-set .tabbed-labels {
+    margin: 0;
+    max-width: 100%;
+    scroll-padding-inline-start: .8rem;
+} */
+
+/* [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels~.tabbed-control--next {
+    margin-right: 0;
+} */
+
+/* table 左箭头错位 */
+/* [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels~.tabbed-control--prev {
+    margin-left: 0;
+} */
+/* 侧拉目录箭头 */
+/* span.md-nav__icon.md-icon:hover {
+    background-color: var(--md-footer-bg-color);
+    border-radius: .2rem;
+} */
+
+/* .md-nav--primary .md-nav__title {
+    background-color: var(--md-footer-bg-color);
+} */
+

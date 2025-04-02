@@ -28,7 +28,7 @@ English | [简体中文](README_zh.md)
 
 ## 📖 Table of Contents
 
-- [[Torch-RecHub] - Lightweight Recommender System Framework](#torch-rechub---lightweight-recommender-system-framework)
+- [\[Torch-RecHub\] - Lightweight Recommender System Framework based on PyTorch](#torch-rechub---lightweight-recommender-system-framework-based-on-pytorch)
   - [✨ Features](#-features)
   - [📖 Table of Contents](#-table-of-contents)
   - [🔧 Installation](#-installation)
@@ -39,6 +39,9 @@ English | [简体中文](README_zh.md)
   - [💡 Supported Models](#-supported-models)
   - [📊 Supported Datasets](#-supported-datasets)
   - [🧪 Examples](#-examples)
+    - [Ranking (CTR Prediction)](#ranking-ctr-prediction)
+    - [Multi-Task Ranking](#multi-task-ranking)
+    - [Matching Model](#matching-model)
   - [🤝 Contributing](#-contributing)
   - [📜 License](#-license)
   - [📚 Citation](#-citation)
@@ -137,7 +140,7 @@ The framework currently supports the following recommendation models:
 **Multi-Interest Recommendation:**
 
 * **[MIND](https://arxiv.org/pdf/1904.08030.pdf):** Multi-Interest Network with Dynamic Routing
-* **[SINER](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
+* **[SINE](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
 * ... 
 
 **Multi-Task Recommendation:**

@@ -29,20 +29,23 @@
 ## 📖 目录
 
 - [\[Torch-RecHub\] - 基于 PyTorch 的轻量推荐系统框架](#torch-rechub---基于-pytorch-的轻量推荐系统框架)
-  - [✨ 特性](#特性)
-  - [📖 目录](#目录)
-  - [🔧 安装](#安装)
+  - [✨ 特性](#-特性)
+  - [📖 目录](#-目录)
+  - [🔧 安装](#-安装)
     - [环境要求](#环境要求)
     - [安装步骤](#安装步骤)
-  - [🚀 快速开始](#快速开始)
-  - [📂 项目结构](#项目结构)
-  - [💡 支持的模型](#支持的模型)
-  - [📊 支持的数据集](#支持的数据集)
-  - [🧪 示例](#示例)
-  - [🤝 贡献指南](#贡献指南)
-  - [📜 许可证](#许可证)
-  - [📚 引用](#引用)
-  - [📫 联系方式](#联系方式)
+  - [🚀 快速开始](#-快速开始)
+  - [📂 项目结构](#-项目结构)
+  - [💡 支持的模型](#-支持的模型)
+  - [📊 支持的数据集](#-支持的数据集)
+  - [🧪 示例](#-示例)
+    - [精排（CTR预测）](#精排ctr预测)
+    - [多任务排序](#多任务排序)
+    - [召回模型](#召回模型)
+  - [🤝 贡献指南](#-贡献指南)
+  - [📜 许可证](#-许可证)
+  - [📚 引用](#-引用)
+  - [📫 联系方式](#-联系方式)
 
 ## 🔧 安装
 
@@ -139,7 +142,7 @@ torch-rechub/             # 根目录
 **多兴趣的推荐 (Multi-Interest Recommendation):**
 
 * **[MIND](https://arxiv.org/pdf/1904.08030.pdf):** Multi-Interest Network with Dynamic Routing
-* **[SINER](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
+* **[SINE](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
 * ... 
 
 **多任务推荐 (Multi-Task Recommendation):**

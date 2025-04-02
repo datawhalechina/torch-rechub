@@ -4,32 +4,35 @@ site_url: https://datawhalechina.github.io/torch-rechub/
 repo_url: https://github.com/datawhalechina/torch-rechub
 site_description: A PyTorch-based recommender system framework providing easy-to-use and extensible solutions
 site_author: Datawhale
-copyright: 'Copyright &copy; 2025 Datawhale'
+copyright: "Copyright &copy; 2025 Datawhale"
 
 # 主题设置
 theme:
   name: material
   language: en
   features:
-    - content.code.copy  # 开启代码复制功能
+    - content.code.copy # 开启代码复制功能
     - navigation.tabs
     - navigation.top
     - navigation.expand
-    - toc.integrate
-    - search.highlight
     - search.share
+    - navigation.sections # 在左侧导航栏中自动展开当前页面所在的部分
+    - toc.integrate # 将目录集成到左侧导航
+    - navigation.top # 返回顶部按钮
+    - search.suggest # 搜索建议
+    - search.highlight # 搜索高亮
   palette:
-    - scheme: default
+    - scheme: auto
       primary: teal
       accent: orange
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
-      primary: teal
-      accent: orange
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
   font:
     text: Roboto
@@ -41,16 +44,19 @@ theme:
 nav:
   - Home: en/index.md
   - Quick Start:
-    - Installation Guide: en/installation.md
-    - Getting Started Tutorial: en/getting-started.md
+      - Installation Guide: en/installation.md
+      - Getting Started Tutorial: en/getting-started.md
   - Tutorials:
-    - Ranking Models: en/tutorials/ranking.md
-    - Matching Models: en/tutorials/matching.md
-    - Multi-Task Learning: en/tutorials/multi-task.md
+      - Ranking Models: en/tutorials/ranking.md
+      - Matching Models: en/tutorials/matching.md
+      - Multi-Task Learning: en/tutorials/multi-task.md
   - API Reference:
-    - Models: en/api-reference/models.md
-    - Trainers: en/api-reference/trainers.md
-    - Utilities: en/api-reference/utils.md
+      - Models: en/api-reference/models.md
+      - Trainers: en/api-reference/trainers.md
+      - Utilities: en/api-reference/utils.md
+  - Blog:
+      - Match Blog: en/blog/match.md
+      - Rank Blog: en/blog/rank.md
   - Examples: en/examples.md
   - FAQ: en/faq.md
   - Contribution Guide: en/contributing.md
@@ -89,6 +95,9 @@ plugins:
             Examples: 示例
             FAQ: 常见问题
             Contribution Guide: 贡献指南
+            Blog: 博客
+            Match Blog: 召回博客
+            Rank Blog: 排序博客
         - language: en
           name: English
           locale: en
@@ -99,30 +108,19 @@ plugins:
       language_selector: true
       language_selector_position: header
       language_selector_name: "🌐"
-      nav_translate: true  # 启用导航翻译
+      nav_translate: true # 启用导航翻译
 
 # Markdown 扩展
 markdown_extensions:
-  - admonition
-  - codehilite:
-      guess_lang: true
-      linenums: true
-      linenums_style: table
-      use_pygments: true
-      pygments_style: monokai  # 改为更清晰的高亮样式
-      css_class: highlight     # 明确指定CSS类
-  - toc:
-      permalink: true
-  - pymdownx.superfences:
-      custom_fences:           # 添加自定义代码块支持
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_div_format
-  - pymdownx.tabbed
-  - pymdownx.details
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - admonition # 启用警告框
+  - tables # 启用表格
+  - pymdownx.highlight # 启用代码高亮
+  - pymdownx.superfences # 启用自定义代码块
+  - pymdownx.details # 启用可折叠的详细信息
+  - pymdownx.emoji: # 启用表情符号
+  - pymdownx.inlinehilite # 启用行内代码高亮
+  - pymdownx.arithmatex:
+      generic: true # 启用数学公式
 
 # 额外页面设置
 extra:
@@ -131,4 +129,15 @@ extra:
       link: https://github.com/datawhalechina/torch-rechub
 
 extra_css:
-  - css/custom.css
+  - theme/css/import.css #主题CSS
+  - https://unpkg.com/katex@0/dist/katex.min.css # 数学公式支持
+
+extra_javascript:
+  - theme/js/zoom.js #主题JS
+  - javascripts/tablesort.js # 表格排序支持
+  - javascripts/tablesort.min.js # 表格排序支持
+
+  # katex数学公式支持
+  - javascripts/katex.js # 数学公式支持
+  - javascripts/katex.min.js # 数学公式支持
+  - javascripts/auto-render.min.js # 数学公式支持

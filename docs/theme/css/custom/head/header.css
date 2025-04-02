@@ -1,0 +1,10 @@
+.md-header,
+.md-tabs {
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.md-header__topic {
+    font-size: 1rem;
+    font-weight: 700;
+}

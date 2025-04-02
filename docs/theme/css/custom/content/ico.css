@@ -1,0 +1,9 @@
+#ico {
+    display: inline;
+    border-radius: 100%;
+    height: 2.5rem;
+    width: 2.5rem;
+    margin: .2rem;
+    border: 2px solid var(--md-pic-shadow-color);
+    vertical-align: bottom;
+}

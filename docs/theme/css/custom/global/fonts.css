@@ -1,0 +1,20 @@
+/* JetBrains Mono */
+@import url('https://fonts.loli.net/css?family=JetBrains Mono:400,500,600,700&display=swap');
+/* Noto Sans SC */
+@import url('https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@100..900&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100..900&display=swap'); */
+/* 思源宋体 */
+@import url('https://fonts.googleapis.com/css2?family=Noto Serif SC&display=swap');
+/* Roboto Slab */
+@import url('https://fonts.googleapis.com/css2?family=Roboto Slab&display=swap');
+/* Roboto*/
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+
+:root {
+    --md-text-font: 'Noto Sans SC';
+    --md-code-font: "JetBrains Mono", 'Noto Sans SC', 'Source Han Sans';
+}
+body{
+    font-size: 1rem;
+}
