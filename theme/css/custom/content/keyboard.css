@@ -1,0 +1,6 @@
+.md-typeset kbd {
+    border-radius: .35rem;
+    box-shadow: 0px 0rem 2px 0rem var(--md-typeset-kbd-border-color), inset 0px 0rem 1px 0px var(--md-typeset-kbd-border-color), 0px 0rem 0rem 2px var(--md-typeset-kbd-accent-color);
+    padding: .1em .6666666667em;
+    vertical-align: text-bottom;
+}

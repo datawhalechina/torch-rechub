@@ -1,0 +1,19 @@
+/* 头像 */
+.md-typeset .md-author img {
+    border: none;
+    max-width: 100%;
+}
+
+/* 标题 */
+a.toclink {
+    color: var(--md-default-fg-color)
+}
+
+/* 卡片 */
+article.md-post.md-post--excerpt {
+    background-color: var(--md-primary-fg-color);
+    border-radius: 1rem;
+    border: 2px solid var(--md-pic-shadow-color);
+    padding: 20px;
+    margin-bottom: 20px;
+}

@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.10">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.11">
     
     
       
@@ -54,7 +54,9 @@
     
       <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../../css/custom.css">
+      <link rel="stylesheet" href="../../theme/css/import.css">
+    
+      <link rel="stylesheet" href="https://unpkg.com/katex@0/dist/katex.min.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -73,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="orange">
+    <body dir="ltr" data-md-color-scheme="auto" data-md-color-primary="teal" data-md-color-accent="orange">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -129,20 +131,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="auto" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
@@ -180,11 +182,13 @@
 </div>
     
     
-      <label class="md-header__button md-icon" for="__search">
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-      </label>
-      <div class="md-search" data-md-component="search" role="dialog">
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
@@ -208,6 +212,8 @@
         </button>
       </nav>
       
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
@@ -221,6 +227,7 @@
     </div>
   </div>
 </div>
+      
     
     
       <div class="md-header__source">
@@ -321,6 +328,26 @@
   
   
   API参考
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../blog/match/" class="md-tabs__link">
+          
+  
+  
+  博客
 
         </a>
       </li>
@@ -468,6 +495,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -529,7 +558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../en/getting-started.md" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   
@@ -563,6 +592,8 @@
     
     
       
+      
+        
       
     
     
@@ -683,6 +714,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -796,6 +829,104 @@
   
   
   
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    博客
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            博客
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blog/match/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    召回博客
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blog/rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    排序博客
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../examples/" class="md-nav__link">
         
@@ -850,6 +981,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    贡献指南
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -861,6 +1005,61 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      如何贡献
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      寻找贡献点
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      贡献流程（代码和文档）
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pull Request 评审
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -885,8 +1084,96 @@
   
 
 
-<h1 id="_1">贡献指南<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>如何为 Torch-RecHub 项目做贡献</p>
+<h1 id="_1">贡献指南</h1>
+<p>非常感谢您对 Torch-RecHub 项目的兴趣并考虑为其做出贡献！您的帮助对项目的发展至关重要。本指南将详细介绍如何参与贡献。</p>
+<h2 id="_2">如何贡献</h2>
+<p>我们鼓励各种形式的贡献，包括但不限于：</p>
+<ul>
+<li>报告 Bug</li>
+<li>提交功能请求</li>
+<li>编写或改进文档</li>
+<li>提交代码修复或新功能（通过 Pull Request）</li>
+</ul>
+<h2 id="_3">寻找贡献点</h2>
+<p>您可以从以下几个方面入手：</p>
+<ol>
+<li><strong>查看 Issues</strong>：浏览 <a href="https://github.com/datawhalechina/torch-rechub/issues">项目 Issues 列表</a>，寻找标记为 <code>help wanted</code> 的问题。</li>
+<li><strong>改进现有功能</strong>：如果您在使用中发现可以优化的地方，欢迎提出建议或直接提交改进。</li>
+<li><strong>实现新功能</strong>：如果您有新的想法，建议先创建一个 Issue 进行讨论，以确保其符合项目方向。</li>
+</ol>
+<h2 id="_4">贡献流程（代码和文档）</h2>
+<p>我们使用标准的 GitHub Fork &amp; Pull Request 流程来接受代码和文档的贡献。(下列操作您也可以在Github网页上进行)</p>
+<ol>
+<li>
+<p><strong>Fork 仓库</strong>
+    访问 Torch-RecHub 的 <a href="https://github.com/datawhalechina/torch-rechub">GitHub 仓库页面</a> ，点击右上角的 "Fork" 按钮，将项目复制到您自己的 GitHub 账户下。</p>
+</li>
+<li>
+<p><strong>Clone 您的 Fork</strong>
+    将您 Fork 的仓库克隆到本地：
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YOUR_USERNAME/torch-rechub.git
+<span class="nb">cd</span><span class="w"> </span>torch-rechub
+</code></pre></div>
+    请将 <code>YOUR_USERNAME</code> 替换为您的 GitHub 用户名。</p>
+</li>
+<li>
+<p><strong>设置上游仓库 (Optional but Recommended)</strong>
+    添加原始项目仓库作为上游远程仓库，方便同步更新：
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/datawhalechina/torch-rechub.git
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>进行修改</strong>
+    在您的新仓库上进行代码编写、文档修改或其他改进。</p>
+</li>
+<li>
+<p><strong>确保代码质量</strong></p>
+<ul>
+<li><strong>代码风格</strong>：请遵循项目现有的代码风格。</li>
+<li><strong>文档</strong>：对于用户可见的更改（如新功能、API 变动），请更新相关文档（README、<code>docs/</code> 目录下的文件等）。</li>
+</ul>
+</li>
+<li>
+<p><strong>提交更改</strong>
+    使用清晰、有意义的 Commit Message 提交您的更改。我们推荐遵循 <a href="https://www.conventionalcommits.org/">Conventional Commits</a> 规范。
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>add<span class="w"> </span>.
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: 添加 XXX 模型支持&quot;</span>
+<span class="c1"># 或者</span>
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;fix: 修复 README 中的拼写错误&quot;</span>
+<span class="c1"># 或者</span>
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;docs: 更新贡献指南&quot;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>推送分支</strong>
+    将您的本地代码推送到您 Fork 的 GitHub 仓库：
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>main
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>创建 Pull Request (PR)</strong>
+    返回您在 GitHub 上的 Fork 仓库页面，您会看到一个提示，建议您基于新推送的分支创建一个 Pull Request。点击该提示或手动导航到 "Pull requests" 标签页，点击 "New pull request"。</p>
+<ul>
+<li><strong>选择分支</strong>：确保基础仓库 (Base repository) 是 <code>datawhale/torch-rechub</code> 的 <code>main</code> 分支，头部仓库 (Head repository) 是您 Fork 的仓库以及您刚刚推送的代码。</li>
+<li><strong>填写 PR 信息</strong>：<ul>
+<li><strong>标题</strong>：简明扼要地描述 PR 的目的，通常可以基于 Commit Message。</li>
+<li><strong>描述</strong>：详细说明您所做的更改、解决的问题（可以链接相关的 Issue，例如 <code>Closes #123</code>）、以及任何需要评审者注意的事项。如果 PR 包含 UI 更改，请附上截图或录屏。</li>
+</ul>
+</li>
+<li><strong>允许维护者修改 (可选)</strong>：勾选 "Allow edits by maintainers" 通常有助于维护者快速修复小问题。</li>
+<li><strong>提交 PR</strong>：点击 "Create pull request"。</li>
+</ul>
+</li>
+</ol>
+<h2 id="pull-request">Pull Request 评审</h2>
+<ul>
+<li>提交 PR 后，项目的 CI/CD 流程会自动运行测试和检查。</li>
+<li>项目维护者会评审您的代码和文档，并可能提出修改意见。</li>
+<li>请及时回应评审意见并进行必要的修改。维护者可能会直接在您的分支上进行小的修订（如果您允许的话），或者您需要自己更新代码并重新推送。</li>
+<li>一旦 PR 被批准并通过所有检查，维护者会将其合并到主分支中。</li>
+</ul>
+<hr />
+<p>再次感谢您对 Torch-RecHub 的贡献！</p>
 
 
 
@@ -960,10 +1247,22 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "toc.integrate", "search.highlight", "search.share"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "search.share", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
     
     
       <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="../../theme/js/zoom.js"></script>
+      
+        <script src="../../javascripts/tablesort.js"></script>
+      
+        <script src="../../javascripts/tablesort.min.js"></script>
+      
+        <script src="../../javascripts/katex.js"></script>
+      
+        <script src="../../javascripts/katex.min.js"></script>
+      
+        <script src="../../javascripts/auto-render.min.js"></script>
       
     
   </body>

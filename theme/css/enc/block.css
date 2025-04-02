@@ -1,0 +1,19 @@
+form#mkdocs-decrypt-form {
+    padding: .5rem 1rem .5rem 1rem;
+    margin-bottom: 1rem;
+    background-color: var(--md-primary-fg-color);
+    border-radius: 1rem;
+    border: 2px solid var(--md-pic-shadow-color);
+    transition: border .25s, box-shadow .25s;
+}
+
+form#mkdocs-decrypt-form:hover,
+form#mkdocs-decrypt-form:focus {
+    /* border: 1px solid var(--md-pic-shadow-color); */
+    box-shadow: var(--md-shadow-z2)
+}
+
+form#mkdocs-decrypt-form h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}

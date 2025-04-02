@@ -1,0 +1,8 @@
+.md-typeset .tabbed-labels--linked>label>a:hover,
+.md-typeset .tabbed-labels--linked>label>a:focus {
+    background: none;
+    /* text-decoration: underline;
+    text-decoration-color: var(--md-link-color);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.5em; */
+}

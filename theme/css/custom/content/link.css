@@ -1,0 +1,13 @@
+.md-typeset a, .md-typeset a {
+    background: linear-gradient(to right, var(--md-link-color),var(--md-link-color)) right bottom no-repeat;
+    background-size: 0px 2px;
+    transition: background-size 0.5s cubic-bezier(0.87, 0.29, 0.14, 0.61) 0s;
+    color: var(--md-link-color);
+}
+.md-typeset a:hover, .md-typeset a:hover {
+    background-position: left bottom;
+    background-size: 100% 2px;
+}
+#no-underline{
+    background: none;
+}

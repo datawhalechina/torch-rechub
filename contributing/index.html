@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.10">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.11">
     
     
       
@@ -56,7 +56,9 @@
     
       <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../css/custom.css">
+      <link rel="stylesheet" href="../theme/css/import.css">
+    
+      <link rel="stylesheet" href="https://unpkg.com/katex@0/dist/katex.min.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -75,7 +77,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="orange">
+    <body dir="ltr" data-md-color-scheme="auto" data-md-color-primary="teal" data-md-color-accent="orange">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -131,20 +133,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="auto" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="orange"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
@@ -182,11 +184,13 @@
 </div>
     
     
-      <label class="md-header__button md-icon" for="__search">
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-      </label>
-      <div class="md-search" data-md-component="search" role="dialog">
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
@@ -210,6 +214,8 @@
         </button>
       </nav>
       
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
@@ -223,6 +229,7 @@
     </div>
   </div>
 </div>
+      
     
     
       <div class="md-header__source">
@@ -323,6 +330,26 @@
   
   
   API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../blog/match/" class="md-tabs__link">
+          
+  
+  
+  Blog
 
         </a>
       </li>
@@ -470,6 +497,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -531,7 +560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../en/getting-started.md" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   
@@ -565,6 +594,8 @@
     
     
       
+      
+        
       
     
     
@@ -685,6 +716,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -798,6 +831,104 @@
   
   
   
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Blog
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Blog
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blog/match/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Match Blog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blog/rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Rank Blog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../examples/" class="md-nav__link">
         
@@ -852,6 +983,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Contribution Guide
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -863,6 +1007,61 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-contribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      How to Contribute
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-contribution-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      Finding Contribution Points
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contribution-process-code-and-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contribution Process (Code and Documentation)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pull-request-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pull Request Review
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -887,8 +1086,100 @@
   
 
 
-<h1 id="contribution-guide">Contribution Guide<a class="headerlink" href="#contribution-guide" title="Permanent link">&para;</a></h1>
-<p>How to contribute to Torch-RecHub project.</p>
+<h1 id="contribution-guide">Contribution Guide</h1>
+<p>Thank you very much for your interest in the Torch-RecHub project and for considering contributing! Your help is crucial for the development of the project. This guide will detail how to participate in contributions.</p>
+<h2 id="how-to-contribute">How to Contribute</h2>
+<p>You can contribute in the following ways:</p>
+<ol>
+<li><strong>Report Bugs</strong>: If you find any errors or unexpected behavior while using Torch-RecHub, please submit an Issue detailing the problem, steps to reproduce it, and your environment information.</li>
+<li><strong>Suggest Enhancements</strong>: If you have ideas for improving existing features or adding new ones, please create an Issue first to discuss.</li>
+<li><strong>Submit Code Changes</strong>: Fix bugs, implement new features, or improve code quality.</li>
+<li><strong>Improve Documentation</strong>: Enhance or correct documentation, write tutorials, or provide example use cases.</li>
+</ol>
+<h2 id="finding-contribution-points">Finding Contribution Points</h2>
+<p>You can start from the following aspects:</p>
+<ol>
+<li><strong>Check Issues</strong>: Browse the <a href="https://github.com/datawhalechina/torch-rechub/issues">project Issues list</a>, look for issues marked with <code>help wanted</code>.</li>
+<li><strong>Improve Existing Features</strong>: If you find areas for optimization during use, feel free to propose suggestions or submit improvements directly.</li>
+<li><strong>Implement New Features</strong>: If you have new ideas, it is recommended to create an Issue for discussion first to ensure it aligns with the project direction.</li>
+</ol>
+<h2 id="contribution-process-code-and-documentation">Contribution Process (Code and Documentation)</h2>
+<p>We use the standard GitHub Fork &amp; Pull Request workflow to accept code and documentation contributions. (You can also perform the following operations on the GitHub website).</p>
+<ol>
+<li>
+<p><strong>Fork the Repository</strong>
+    Visit the Torch-RecHub <a href="https://github.com/datawhalechina/torch-rechub">GitHub repository page</a>, click the "Fork" button in the top right corner to copy the project to your own GitHub account.</p>
+</li>
+<li>
+<p><strong>Clone Your Fork</strong>
+    Clone your forked repository locally:
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YOUR_USERNAME/torch-rechub.git
+<span class="nb">cd</span><span class="w"> </span>torch-rechub
+</code></pre></div>
+    Please replace <code>YOUR_USERNAME</code> with your GitHub username.</p>
+</li>
+<li>
+<p><strong>Set Upstream Remote (Optional but Recommended)</strong>
+    Add the original project repository as an upstream remote for easy synchronization of updates:
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/datawhalechina/torch-rechub.git
+<span class="c1"># Sync updates from upstream main branch if needed</span>
+<span class="c1"># git fetch upstream</span>
+<span class="c1"># git checkout main</span>
+<span class="c1"># git merge upstream/main</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Make Changes</strong>
+    Write code, modify documentation, or make other improvements directly on the <code>main</code> branch.</p>
+</li>
+<li>
+<p><strong>Ensure Code Quality</strong></p>
+<ul>
+<li><strong>Code Style</strong>: Please adhere to the project's existing code style.</li>
+<li><strong>Documentation</strong>: For user-visible changes (like new features, API changes), please update relevant documentation (README, files under <code>docs/</code>, etc.).</li>
+</ul>
+</li>
+<li>
+<p><strong>Commit Changes</strong>
+    Commit your changes with clear and meaningful commit messages. We recommend following the <a href="https://www.conventionalcommits.org/">Conventional Commits</a> specification.
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>add<span class="w"> </span>.
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: Add support for XXX model&quot;</span>
+<span class="c1"># Or</span>
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;fix: Correct typo in README&quot;</span>
+<span class="c1"># Or</span>
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;docs: Update contribution guide&quot;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Push Branch</strong>
+    Push your local <code>main</code> branch to your forked GitHub repository:
+    <div class="highlight"><pre><span></span><code>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>main
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Create a Pull Request (PR)</strong>
+    Return to your forked repository page on GitHub. You should see a prompt suggesting you create a Pull Request based on the recent pushes to <code>main</code>. Click that prompt or manually navigate to the "Pull requests" tab and click "New pull request".</p>
+<ul>
+<li><strong>Choose Branches</strong>: Ensure the Base repository is <code>datawhalechina/torch-rechub</code>'s <code>main</code> branch, and the Head repository is your fork's <code>main</code> branch.</li>
+<li><strong>Fill in PR Information</strong>:<ul>
+<li><strong>Title</strong>: Concisely describe the purpose of the PR, often based on the commit message.</li>
+<li><strong>Description</strong>: Detail the changes you've made, the problem solved (you can link related Issues, e.g., <code>Closes #123</code>), and any points reviewers should note. If the PR includes UI changes, please attach screenshots or screen recordings.</li>
+</ul>
+</li>
+<li><strong>Allow Maintainer Edits (Optional)</strong>: Checking "Allow edits by maintainers" often helps maintainers quickly fix minor issues.</li>
+<li><strong>Submit PR</strong>: Click "Create pull request".</li>
+</ul>
+</li>
+</ol>
+<h2 id="pull-request-review">Pull Request Review</h2>
+<ul>
+<li>After submitting the PR, the project's CI/CD workflow will automatically run tests and checks.</li>
+<li>Project maintainers will review your code and documentation and may suggest modifications.</li>
+<li>Please respond promptly to review comments and make necessary changes. Maintainers might make minor edits directly on your branch (if you allow it), or you might need to update the code yourself and push again.</li>
+<li>Once the PR is approved and passes all checks, maintainers will merge it into the main branch.</li>
+</ul>
+<hr />
+<p>Thank you again for your contribution to Torch-RecHub!</p>
 
 
 
@@ -962,10 +1253,22 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "toc.integrate", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "search.share", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="../theme/js/zoom.js"></script>
+      
+        <script src="../javascripts/tablesort.js"></script>
+      
+        <script src="../javascripts/tablesort.min.js"></script>
+      
+        <script src="../javascripts/katex.js"></script>
+      
+        <script src="../javascripts/katex.min.js"></script>
+      
+        <script src="../javascripts/auto-render.min.js"></script>
       
     
   </body>

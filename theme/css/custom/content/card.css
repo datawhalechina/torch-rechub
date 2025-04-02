@@ -1,0 +1,44 @@
+.md-typeset .grid.cards>ol>li,
+.md-typeset .grid.cards>ul>li,
+.md-typeset .grid>.card {
+    background-color: var(--md-primary-fg-color);
+    border-radius: 1rem;
+    border: 2px solid var(--md-pic-shadow-color);
+}
+
+.md-typeset:hover .grid.cards>ol>li:hover,
+.md-typeset:hover .grid.cards>ul>li:hover,
+.md-typeset .grid>.card:hover {
+    border: 2px solid var(--md-primary-fg-color);
+}
+
+name {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--md-default-fg-color);
+    margin-left: 10px;
+}
+
+#card-pic {
+    object-fit: cover;
+    width: 100%;
+    height: 11rem;
+    top: 1.5rem;
+    position: relative;
+    max-width: 100%;
+}
+
+.card {
+    background-color: var(--md-primary-fg-color);
+    border-radius: 1rem;
+    border: 2px solid var(--md-pic-shadow-color);
+    display: block;
+    margin: 0;
+    padding: .8rem;
+    transition: border .25s, box-shadow .25s;
+}
+
+.card:hover {
+    border: 2px solid var(--md-primary-fg-color);
+    box-shadow: var(--md-shadow-z2)
+}
