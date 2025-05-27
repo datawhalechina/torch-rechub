@@ -1,0 +1,27 @@
+#download {
+    margin-top: 0;
+    margin-right: 0;
+    background-color: var(--md-button-bg-color);
+    color: var(--md-default-fg-color);
+    border: var(--md-code-bg-color) solid 2px;
+    border-radius: .6rem;
+    transition: font-weight .25s, background-color .25s;
+    text-align: center;
+    box-shadow: 2px 3px 10px 2px var(--md-pic-shadow-color);
+}
+
+#download:hover {
+    background-color: var(--md-pic-shadow-color);
+    font-weight: 900;
+    border: var(--md-code-bg-color) solid 2px !important;
+    color: var(--md-default-fg-color);
+    background: none;
+    box-shadow: inset 0px 0px 20px 1px var(--md-pic-shadow-color);
+}
+
+@media (max-width: 600px) {
+    #download {
+        width: 100%;
+        margin-left: 0;
+    }
+}

@@ -1,0 +1,17 @@
+thead {
+    background-color: var(--md-primary-fg-color);
+}
+
+.md-typeset table:not([class]) {
+    border: 2px solid var(--md-typeset-table-color);
+    border-radius: 1rem;
+}
+
+.md-typeset__scrollwrap {
+    text-align: center;
+}
+
+.md-typeset table:not([class]) td:not([align]),
+.md-typeset table:not([class]) th:not([align]) {
+    vertical-align: middle;
+}

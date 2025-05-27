@@ -46,6 +46,7 @@ nav:
   - Quick Start:
       - Installation Guide: en/installation.md
       - Getting Started Tutorial: en/getting-started.md
+  - Introduction: en/introduction.md
   - Tutorials:
       - Ranking Models: en/tutorials/ranking.md
       - Matching Models: en/tutorials/matching.md
@@ -84,6 +85,7 @@ plugins:
             Quick Start: 快速开始
             Installation Guide: 安装指南
             Getting Started Tutorial: 入门教程
+            Introduction: 项目介绍
             Tutorials: 教程
             Ranking Models: 排序模型
             Matching Models: 召回模型

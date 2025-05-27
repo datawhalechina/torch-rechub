@@ -1,0 +1,5 @@
+@media screen and (min-width: 76.25em) {
+    [dir=ltr] .md-nav--integrated>.md-nav__list>.md-nav__item--active .md-nav--secondary {
+        border-left: 2px solid var(--md-accent-fg-color--transparent);
+    }
+}
