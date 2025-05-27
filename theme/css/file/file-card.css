@@ -1,0 +1,43 @@
+.file-block {
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    padding: 1rem !important;
+    margin: 1rem 0;
+    justify-content: space-between;
+}
+
+.file-block p {
+    margin: 0;
+}
+
+.file-title {
+    padding-left: 0rem;
+    margin-bottom: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.file-meta {
+    -ms-flex: 1 1 auto;
+    flex: 1 1 auto;
+    min-height: 1px;
+}
+
+.file-body {
+    padding-left: 1em;
+    margin-right: auto;
+}
+
+.file-info {
+    display: flex;
+}
+
+/* --- 移动设备样式：按钮下移 --- */
+@media (max-width: 600px) {
+    .file-block {
+        flex-direction: column;
+        align-items: stretch;
+        gap: .5rem;
+    }
+}

@@ -1,0 +1,168 @@
+.file-icon {
+    /* height: 3rem !important; */
+    width: 3rem !important;
+    border-radius: .6rem !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    filter: drop-shadow(2px 3px 10px var(--md-pic-shadow-color));
+    border: none !important;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.file-icon[data-type="pdf"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/pdf.svg');
+}
+
+.file-icon[data-type="ppt"],
+.file-icon[data-type="pptx"],
+.file-icon[data-type="powerpoint"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/powerpoint.svg');
+}
+
+.file-icon[data-type="docs"],
+.file-icon[data-type="docx"],
+.file-icon[data-type="word"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/word.svg');
+}
+
+.file-icon[data-type="xls"],
+.file-icon[data-type="xlsx"],
+.file-icon[data-type="csv"],
+.file-icon[data-type="excel"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/table.svg');
+}
+
+.file-icon[data-type="zip"],
+.file-icon[data-type="rar"],
+.file-icon[data-type="7z"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/zip.svg');
+}
+
+.file-icon[data-type="img"],
+.file-icon[data-type="jpg"],
+.file-icon[data-type="jpeg"],
+.file-icon[data-type="png"],
+.file-icon[data-type="gif"],
+.file-icon[data-type="webp"],
+.file-icon[data-type="bmp"],
+.file-icon[data-type="tiff"],
+.file-icon[data-type="ico"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/image.svg');
+}
+
+.file-icon[data-type="svg"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/svg.svg');
+}
+
+.file-icon[data-type="audio"],
+.file-icon[data-type="mp3"],
+.file-icon[data-type="wav"],
+.file-icon[data-type="flac"],
+.file-icon[data-type="aac"],
+.file-icon[data-type="ogg"],
+.file-icon[data-type="m4a"],
+.file-icon[data-type="wma"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/audio.svg');
+}
+
+.file-icon[data-type="video"],
+.file-icon[data-type="mp4"],
+.file-icon[data-type="avi"],
+.file-icon[data-type="mov"],
+.file-icon[data-type="mkv"],
+.file-icon[data-type="wmv"],
+.file-icon[data-type="flv"],
+.file-icon[data-type="webm"],
+.file-icon[data-type="mpeg"],
+.file-icon[data-type="mpg"],
+.file-icon[data-type="3gp"],
+.file-icon[data-type="3g2"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/video.svg');
+}
+
+.file-icon[data-type="markdown"],
+.file-icon[data-type="md"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/markdown.svg');
+}
+
+.file-icon[data-type="html"],
+.file-icon[data-type="htm"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/html.svg');
+}
+
+.file-icon[data-type="css"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/css.svg');
+}
+
+.file-icon[data-type="js"],
+.file-icon[data-type="jsx"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/javascript.svg');
+}
+
+.file-icon[data-type="ts"],
+.file-icon[data-type="tsx"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/typescript.svg');
+}
+
+.file-icon[data-type="json"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/json.svg');
+}
+
+.file-icon[data-type="xml"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/xml.svg');
+}
+
+.file-icon[data-type="yaml"],
+.file-icon[data-type="yml"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/yaml.svg');
+}
+
+.file-icon[data-type="3d"],
+.file-icon[data-type="fbx"],
+.file-icon[data-type="obj"],
+.file-icon[data-type="stl"],
+.file-icon[data-type="blend"],
+.file-icon[data-type="gltf"],
+.file-icon[data-type="glb"],
+.file-icon[data-type="dae"],
+.file-icon[data-type="dxf"],
+.file-icon[data-type="3ds"],
+.file-icon[data-type="max"],
+.file-icon[data-type="c4d"],
+.file-icon[data-type="blend"],
+.file-icon[data-type="3dsmax"],
+.file-icon[data-type="3dmax"],
+.file-icon[data-type="ksp"],
+.file-icon[data-type="mtl"],
+.file-icon[data-type="bip"],
+.file-icon[data-type="STEP"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/3d.svg');
+}
+
+.file-icon[data-type="font"],
+.file-icon[data-type="ttf"],
+.file-icon[data-type="otf"],
+.file-icon[data-type="woff"],
+.file-icon[data-type="woff2"],
+.file-icon[data-type="eot"],
+.file-icon[data-type="svg-font"],
+.file-icon[data-type="font-woff"],
+.file-icon[data-type="font-woff2"],
+.file-icon[data-type="font-eot"],
+.file-icon[data-type="font-svg"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/font.svg');
+}
+
+.file-icon[data-type="exe"],
+.file-icon[data-type="bat"],
+.file-icon[data-type="sh"],
+.file-icon[data-type="cmd"],
+.file-icon[data-type="ps1"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/exe.svg');
+}
+
+.file-icon[data-type="github"] {
+    background-image: url('https://cdn.mengze.vip/gh/material-extensions/vscode-material-icon-theme@main/icons/folder-github-open.svg');
+}

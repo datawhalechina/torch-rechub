@@ -1,0 +1,35 @@
+/* 代码块 */
+.md-typeset code {
+    border-radius: .5rem;
+}
+
+/* 行号 */
+
+.highlighttable .linenos {
+    border-bottom-left-radius: .5rem;
+    border-top-left-radius: .5rem;
+}
+
+a[href^="#__codelineno"] {
+    background: none !important;
+}
+
+/* 标题 */
+.highlight span.filename {
+    border-top-left-radius: .5rem;
+    border-top-right-radius: .5rem;
+}
+
+/* 内联 */
+.md-typeset code:not(pre code) {
+    border-radius: .3rem;
+}
+
+.md-annotation .md-annotation__index {
+    background: none;
+}
+
+.md-tooltip--active+.md-annotation__index:after,
+:hover>.md-annotation__index:after {
+    background-color: var(--md-link-color);
+}

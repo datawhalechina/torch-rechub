@@ -1,0 +1,5 @@
+.md-typeset .headerlink:focus,
+.md-typeset .headerlink:hover,
+.md-typeset :target>.headerlink {
+    background: none;
+}

@@ -1,22 +1,24 @@
 #mkdocs-decrypt-button {
-    width: 100%;
-    max-width: 15%;
+    min-width: 5rem;
+    max-width: 20%;
     padding: 0rem;
-    margin-left: 0;
     height: 2rem;
-    background-color: var(--md-code-bg-color);
-    color: var(--md-default-fg-color);
-    border: 2px solid var(--md-pic-shadow-color);
-    border-radius: 1rem;
-    transition: font-weight .25s, background-color .25s;
-    box-shadow: inset 0px 0px 8px 0px var(--md-pic-shadow-color);
+    margin: 1rem 0;
+    height: 2rem;
+    width: 100%;
+    align-self: center;
+    color: var(--md-link-color);
 }
 
 #mkdocs-decrypt-button:hover,
 #mkdocs-decrypt-button:focus {
-    border: none;
     margin-left: 0;
-    background-color: var(--md-pic-shadow-color);
-    font-weight: 900;
-    box-shadow: inset 0px 0px 20px 1px var(--md-pic-shadow-color);
+    color: white;
+}
+
+#mkdocs-decrypt-button svg {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.12em;
+    fill: currentColor;
 }
