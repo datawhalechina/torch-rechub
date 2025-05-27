@@ -1,10 +1,43 @@
-.md-header,
+/* .md-header,
 .md-tabs {
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
+} */
 
 .md-header__topic {
     font-size: 1rem;
     font-weight: 700;
+}
+
+.md-header--shadow {
+    box-shadow: 0 0 1rem #0000001a;
+}
+
+/* 移动端样式（屏幕宽度 < 960px） */
+@media screen and (max-width: 59.9844em) {
+
+    /* 为 Header 和 Tabs 添加伪元素模糊效果 */
+    .md-header::before,
+    .md-tabs::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        z-index: -1;
+        /* 确保伪元素在内容下方 */
+    }
+}
+
+/* 电脑端样式（屏幕宽度 ≥ 960px） */
+@media screen and (min-width: 60em) {
+
+    .md-header,
+    .md-tabs {
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+    }
 }

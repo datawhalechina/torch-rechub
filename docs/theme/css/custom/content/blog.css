@@ -14,6 +14,42 @@ article.md-post.md-post--excerpt {
     background-color: var(--md-primary-fg-color);
     border-radius: 1rem;
     border: 2px solid var(--md-pic-shadow-color);
-    padding: 20px;
+    padding: 20px 40px 20px 40px;
     margin-bottom: 20px;
+    overflow: hidden;
+}
+
+
+nav.md-post__action {
+    text-align: right;
+    padding: .5rem 0rem;
+}
+
+
+.md-post__action a {
+    display: inline-flex;
+    align-items: center;
+    /* background: none; */
+    font-weight: bold;
+    color: var(--md-link-color);
+    transition: color 0.2s ease-in-out, background-size 0.5s cubic-bezier(0.87, 0.29, 0.14, 0.61) 0s;
+}
+
+nav.md-post__action a svg {
+    height: 1rem;
+    padding: 0 0 0 0.5rem;
+    fill: currentColor;
+    margin-top: .125em;
+}
+
+.md-draft {
+    background-color: #ff1744;
+    border-radius: .35em;
+    padding-bottom: 3px;
+}
+
+@media screen and (max-width: 76.2344em) {
+    .md-sidebar.md-sidebar--post .md-nav {
+        display: none;
+    }
 }

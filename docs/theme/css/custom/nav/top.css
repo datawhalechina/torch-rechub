@@ -1,4 +1,4 @@
-.md-top{
+.md-top {
     background-color: var(--md-primary-fg-color);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
@@ -11,11 +11,14 @@
     bottom: 0;
     right: 0;
 }
-[dir=ltr] .md-top{
+
+[dir=ltr] .md-top {
     margin-top: auto;
-    margin-bottom: 10%;
+    margin-bottom: 1rem;
 }
-.md-top:focus, .md-top:hover{
+
+.md-top:focus,
+.md-top:hover {
     color: var(--md-default-fg-color);
     background-color: var(--md-primary-fg-color);
     border: 2px solid #9393938f;

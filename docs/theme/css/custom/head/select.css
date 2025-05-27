@@ -1,0 +1,6 @@
+.md-select:focus-within .md-select__inner,
+.md-select:hover .md-select__inner,
+.md-select__inner {
+    border-radius: .5rem;
+    margin-top: 10px;
+}
