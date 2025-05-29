@@ -26,13 +26,16 @@
 ### 特征类
 
 数值型特征
+
 * 例如年龄、薪资、日点击量等
 
 类别型特征
+
 * 例如城市、学历、性别等
 * LabelEncoder编码，得到Embedding向量
 
 序列特征
+
 * 有序兴趣序列：例如最近一周点击过的item list
 * 无序标签特征：例如电影类型（动作|悬疑|犯罪）
 * LabelEncoder编码，得到序列Embedding向量
@@ -55,11 +58,13 @@
 ### 模型类
 通用Layer
 浅层特征建模
+
 * LR：逻辑回归
 * MLP：多层感知机，可通过字典设置dims等参数
 * EmbeddinLayer：通用Embedding层，含三类特征的处理，维护一个dict格式的EmbeddingTable，输出经过模型所需要的输入embedding
 
 深层特征建模
+
 * FM、FFM、CIN
 * self-attention、target-attention、transformer
 

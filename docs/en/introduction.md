@@ -26,13 +26,16 @@
 ### Feature Classes
 
 Numerical Features
+
 * Such as age, salary, daily click - through rate, etc.
 
 Categorical Features
+
 * Such as city, education level, gender, etc.
 * Encode with LabelEncoder to obtain Embedding vectors.
 
 Sequence Features
+
 * Ordered interest sequences: such as the item list clicked in the last week.
 * Unordered tag features: such as movie genres (action | suspense | crime).
 * Encode with LabelEncoder to obtain sequence Embedding vectors.
@@ -55,11 +58,13 @@ Sequence Features
 ### Model Classes
 General Layers
 Shallow Feature Modeling
+
 * LR: Logistic Regression
 * MLP: Multi - Layer Perceptron, parameters such as dims can be set through a dictionary.
 * EmbeddingLayer: A general Embedding layer that handles three types of features, maintains an EmbeddingTable in dictionary format, and outputs the input embeddings required by the model.
 
 Deep Feature Modeling
+
 * FM, FFM, CIN
 * self - attention, target - attention, transformer
 
