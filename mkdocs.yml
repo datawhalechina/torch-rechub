@@ -22,17 +22,17 @@ theme:
     - search.suggest # 搜索建议
     - search.highlight # 搜索高亮
   palette:
-    - scheme: auto
+    - scheme: default
       primary: teal
       accent: orange
       toggle:
-        icon: material/brightness-7
+        icon: octicons/sun-16
         name: Switch to dark mode
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
-        icon: material/brightness-4
+        icon: octicons/moon-16
         name: Switch to light mode
   font:
     text: Roboto
@@ -77,7 +77,7 @@ plugins:
       default_language: en
       languages:
         - language: zh
-          name: 中文
+          name: 简体中文
           locale: zh
           build: true
           nav_translations:
@@ -109,17 +109,18 @@ plugins:
       nav_style: separate
       language_selector: true
       language_selector_position: header
-      language_selector_name: "🌐"
       nav_translate: true # 启用导航翻译
 
 # Markdown 扩展
 markdown_extensions:
   - admonition # 启用警告框
   - tables # 启用表格
+  - def_list # 默认定义列表
   - pymdownx.highlight # 启用代码高亮
   - pymdownx.superfences # 启用自定义代码块
   - pymdownx.details # 启用可折叠的详细信息
-  - pymdownx.emoji: # 启用表情符号
+  - attr_list # 启用属性列表
+  - pymdownx.emoji # 启用表情符号
   - pymdownx.inlinehilite # 启用行内代码高亮
   - pymdownx.arithmatex:
       generic: true # 启用数学公式
