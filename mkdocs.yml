@@ -39,6 +39,8 @@ theme:
     code: Roboto Mono
   icon:
     repo: fontawesome/brands/github
+  logo: file/img/favicon.png
+  favicon: file/img/favicon.png
 
 # 导航结构
 nav:
@@ -137,10 +139,10 @@ extra_css:
 
 extra_javascript:
   - theme/js/zoom.js #主题JS
-  - javascripts/tablesort.js # 表格排序支持
-  - javascripts/tablesort.min.js # 表格排序支持
+  - extra_js/tablesort.js # 表格排序支持
+  - extra_js/tablesort.min.js # 表格排序支持
 
   # katex数学公式支持
-  - javascripts/katex.js # 数学公式支持
-  - javascripts/katex.min.js # 数学公式支持
-  - javascripts/auto-render.min.js # 数学公式支持
+  - extra_js/katex.js # 数学公式支持
+  - extra_js/katex.min.js # 数学公式支持
+  - extra_js/auto-render.min.js # 数学公式支持
