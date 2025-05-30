@@ -18,7 +18,7 @@
         <link rel="prev" href="../matching/">
       
       
-        <link rel="next" href="../../api-reference/models/">
+        <link rel="next" href="../../api-reference/basic/">
       
       
       <link rel="icon" href="../../../file/img/favicon.png">
@@ -345,7 +345,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../api-reference/models/" class="md-tabs__link">
+        <a href="../../api-reference/basic/" class="md-tabs__link">
           
   
   
@@ -454,9 +454,7 @@
   
 
 
-  
-
-<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="导航栏" data-md-level="0">
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../../" title="Torch-RecHub" class="md-nav__button md-logo" aria-label="Torch-RecHub" data-md-component="logo">
       
@@ -522,9 +520,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -732,6 +728,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    多任务学习
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -743,6 +752,130 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      数据准备
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharedbottom" class="md-nav__link">
+    <span class="md-ellipsis">
+      SharedBottom 模型
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#esmm-entire-space-multi-task-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      ESMM (Entire Space Multi-Task Model)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mmoe-multi-gate-mixture-of-experts" class="md-nav__link">
+    <span class="md-ellipsis">
+      MMoE (Multi-gate Mixture-of-Experts)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ple-progressive-layered-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      PLE (Progressive Layered Extraction)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      任务权重优化
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="任务权重优化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gradnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      GradNorm
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metabalance" class="md-nav__link">
+    <span class="md-ellipsis">
+      MetaBalance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      模型评估
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      高级应用
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      注意事项
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -776,9 +909,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -800,6 +931,29 @@
             API参考
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    基础组件
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -897,9 +1051,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -1048,6 +1200,137 @@
               </div>
             
             
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      数据准备
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharedbottom" class="md-nav__link">
+    <span class="md-ellipsis">
+      SharedBottom 模型
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#esmm-entire-space-multi-task-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      ESMM (Entire Space Multi-Task Model)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mmoe-multi-gate-mixture-of-experts" class="md-nav__link">
+    <span class="md-ellipsis">
+      MMoE (Multi-gate Mixture-of-Experts)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ple-progressive-layered-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      PLE (Progressive Layered Extraction)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      任务权重优化
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="任务权重优化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gradnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      GradNorm
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metabalance" class="md-nav__link">
+    <span class="md-ellipsis">
+      MetaBalance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      模型评估
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      高级应用
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      注意事项
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
           
           
             <div class="md-content" data-md-component="content">
@@ -1061,7 +1344,161 @@
 
 
 <h1 id="_1">多任务学习教程</h1>
-<p>这里可以介绍多任务学习模型的使用方法和示例代码，如 SharedBottom、ESMM 等。</p>
+<p>本教程将介绍如何使用 Torch-RecHub 中的多任务学习模型。我们将使用阿里巴巴的电商数据集作为示例。</p>
+<h2 id="_2">数据准备</h2>
+<p>首先，我们需要准备多任务学习的数据：</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.models</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+
+<span class="c1"># 加载数据</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;ali_ccp_data.csv&quot;</span><span class="p">)</span>
+
+<span class="c1"># 特征定义</span>
+<span class="n">user_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="s1">&#39;gender&#39;</span><span class="p">,</span> <span class="s1">&#39;occupation&#39;</span><span class="p">]</span>
+<span class="n">item_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;item_id&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">,</span> <span class="s1">&#39;shop_id&#39;</span><span class="p">,</span> <span class="s1">&#39;brand_id&#39;</span><span class="p">]</span>
+<span class="n">features</span> <span class="o">=</span> <span class="n">user_features</span> <span class="o">+</span> <span class="n">item_features</span>
+
+<span class="c1"># 多任务标签</span>
+<span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;click&#39;</span><span class="p">,</span> <span class="s1">&#39;conversion&#39;</span><span class="p">]</span>  <span class="c1"># CTR 和 CVR 任务</span>
+</code></pre></div>
+<h2 id="sharedbottom">SharedBottom 模型</h2>
+<p>最基础的多任务学习模型，底层网络共享参数：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 模型配置</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SharedBottom</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span>
+    <span class="n">task_hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span>
+    <span class="n">num_tasks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">task_types</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;binary&#39;</span><span class="p">,</span> <span class="s1">&#39;binary&#39;</span><span class="p">])</span>
+
+<span class="c1"># 训练配置</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+    <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># 训练模型</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_dataloader</span><span class="p">,</span> <span class="n">val_dataloader</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="esmm-entire-space-multi-task-model">ESMM (Entire Space Multi-Task Model)</h2>
+<p>解决样本选择偏差的多任务模型：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 模型配置</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ESMM</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">tower_units</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">],</span>
+    <span class="n">embedding_dim</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="c1"># 训练配置</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+    <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="mmoe-multi-gate-mixture-of-experts">MMoE (Multi-gate Mixture-of-Experts)</h2>
+<p>通过专家机制实现任务间的软参数共享：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 模型配置</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MMoE</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">expert_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span>
+    <span class="n">num_experts</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">num_tasks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">expert_activation</span><span class="o">=</span><span class="s1">&#39;relu&#39;</span><span class="p">,</span>
+    <span class="n">gate_activation</span><span class="o">=</span><span class="s1">&#39;softmax&#39;</span><span class="p">)</span>
+
+<span class="c1"># 训练配置</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+    <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="ple-progressive-layered-extraction">PLE (Progressive Layered Extraction)</h2>
+<p>通过分层提取更好地建模任务关系：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 模型配置</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PLE</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">expert_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span>
+    <span class="n">num_experts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">num_shared_experts</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">task_types</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;binary&#39;</span><span class="p">,</span> <span class="s1">&#39;binary&#39;</span><span class="p">])</span>
+
+<span class="c1"># 训练配置</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+    <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="_3">任务权重优化</h2>
+<h3 id="gradnorm">GradNorm</h3>
+<p>使用 GradNorm 算法动态调整任务权重：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 配置 GradNorm</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+    <span class="n">task_weights_strategy</span><span class="o">=</span><span class="s1">&#39;gradnorm&#39;</span><span class="p">,</span>
+    <span class="n">gradnorm_alpha</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="metabalance">MetaBalance</h3>
+<p>使用 MetaBalance 优化器平衡任务梯度：</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetaBalance</span>
+
+<span class="c1"># 配置 MetaBalance 优化器</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">MetaBalance</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
+    <span class="n">relax_factor</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
+    <span class="n">beta</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="_4">模型评估</h2>
+<p>针对不同任务使用相应的评估指标：</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 评估模型</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">evaluate_multi_task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">test_dataloader</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">task</span><span class="p">,</span> <span class="n">metrics</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task: </span><span class="si">{</span><span class="n">task</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AUC: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;auc&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;LogLoss: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;logloss&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="_5">高级应用</h2>
+<ol>
+<li>
+<p>自定义任务损失权重
+<div class="highlight"><pre><span></span><code><span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">task_weights</span><span class="o">=</span><span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>  <span class="c1"># 设置固定任务权重</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>获取共享层和任务特定层
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">shared_task_layers</span>
+
+<span class="n">shared_params</span><span class="p">,</span> <span class="n">task_params</span> <span class="o">=</span> <span class="n">shared_task_layers</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>任务特定的学习率
+<div class="highlight"><pre><span></span><code><span class="n">trainer</span> <span class="o">=</span> <span class="n">MTLTrainer</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="n">task_specific_lr</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;click&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">,</span> <span class="s1">&#39;conversion&#39;</span><span class="p">:</span> <span class="mf">0.0005</span><span class="p">})</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h2 id="_6">注意事项</h2>
+<ol>
+<li>选择合适的多任务学习架构</li>
+<li>注意任务之间的相关性</li>
+<li>处理任务间的数据不平衡</li>
+<li>合理设置任务权重</li>
+<li>监控每个任务的训练进度</li>
+<li>防止任务间的负迁移</li>
+<li>考虑计算资源的限制</li>
+</ol>
 
 
 
@@ -1135,7 +1572,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "search.share", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "search.share", "navigation.sections", "navigation.path", "toc.follow", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
     
     
       <script src="../../../assets/javascripts/bundle.13a4f30d.min.js"></script>

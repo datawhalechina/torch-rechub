@@ -88,7 +88,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#matching-models-tutorial" class="md-skip">
+        <a href="#recall-model-tutorial" class="md-skip">
           Skip to content
         </a>
       
@@ -347,7 +347,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../api-reference/models/" class="md-tabs__link">
+        <a href="../../api-reference/basic/" class="md-tabs__link">
           
   
   
@@ -456,9 +456,7 @@
   
 
 
-  
-
-<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="Torch-RecHub" class="md-nav__button md-logo" aria-label="Torch-RecHub" data-md-component="logo">
       
@@ -524,9 +522,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -711,6 +707,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Matching Models
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -722,6 +731,97 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic-two-tower-model-dssm" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Two-Tower Model (DSSM)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequential-recommendation-model-gru4rec" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequential Recommendation Model (GRU4Rec)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-interest-model-mind" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Interest Model (MIND)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model Evaluation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vector-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vector Retrieval
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-techniques" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Techniques
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important Notes
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -778,9 +878,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -802,6 +900,29 @@
             API Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Components
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -899,9 +1020,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -1050,6 +1169,104 @@
               </div>
             
             
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic-two-tower-model-dssm" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Two-Tower Model (DSSM)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequential-recommendation-model-gru4rec" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequential Recommendation Model (GRU4Rec)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-interest-model-mind" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Interest Model (MIND)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model Evaluation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vector-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vector Retrieval
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-techniques" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Techniques
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important Notes
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
           
           
             <div class="md-content" data-md-component="content">
@@ -1062,8 +1279,131 @@
   
 
 
-<h1 id="matching-models-tutorial">Matching Models Tutorial</h1>
-<p>Tutorial and example code for matching models like DSSM.</p>
+<h1 id="recall-model-tutorial">Recall Model Tutorial</h1>
+<p>This tutorial will introduce how to use various recall models in Torch-RecHub. We'll use the MovieLens dataset as an example.</p>
+<h2 id="data-preparation">Data Preparation</h2>
+<p>First, we need to prepare the data. The MovieLens dataset contains user ratings for movies:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.models</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+
+<span class="c1"># Load data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;movielens.csv&quot;</span><span class="p">)</span>
+<span class="n">user_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="s1">&#39;gender&#39;</span><span class="p">,</span> <span class="s1">&#39;occupation&#39;</span><span class="p">]</span>
+<span class="n">item_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;movie_id&#39;</span><span class="p">,</span> <span class="s1">&#39;genre&#39;</span><span class="p">,</span> <span class="s1">&#39;year&#39;</span><span class="p">]</span>
+</code></pre></div>
+<h2 id="basic-two-tower-model-dssm">Basic Two-Tower Model (DSSM)</h2>
+<p>DSSM is the most basic two-tower model, modeling users and items separately:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">DSSM</span><span class="p">(</span><span class="n">user_features</span><span class="o">=</span><span class="n">user_features</span><span class="p">,</span>
+             <span class="n">item_features</span><span class="o">=</span><span class="n">item_features</span><span class="p">,</span>
+             <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">],</span>
+             <span class="n">dropout_rates</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MatchTrainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                      <span class="n">mode</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># point-wise training</span>
+                      <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                      <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># Train model</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_dataloader</span><span class="p">,</span> <span class="n">val_dataloader</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="sequential-recommendation-model-gru4rec">Sequential Recommendation Model (GRU4Rec)</h2>
+<p>GRU4Rec models user behavior sequences through GRU networks:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate sequence features</span>
+<span class="n">seq_features</span> <span class="o">=</span> <span class="n">generate_seq_feature</span><span class="p">(</span><span class="n">df</span><span class="p">,</span>
+                                  <span class="n">user_col</span><span class="o">=</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span>
+                                  <span class="n">item_col</span><span class="o">=</span><span class="s1">&#39;movie_id&#39;</span><span class="p">,</span>
+                                  <span class="n">time_col</span><span class="o">=</span><span class="s1">&#39;timestamp&#39;</span><span class="p">,</span>
+                                  <span class="n">item_attribute_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;genre&#39;</span><span class="p">])</span>
+
+<span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">GRU4Rec</span><span class="p">(</span><span class="n">item_num</span><span class="o">=</span><span class="n">item_num</span><span class="p">,</span>
+                <span class="n">hidden_size</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+                <span class="n">num_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MatchTrainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                      <span class="n">mode</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># pair-wise training</span>
+                      <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                      <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="multi-interest-model-mind">Multi-Interest Model (MIND)</h2>
+<p>The MIND model can capture users' diverse interests:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MIND</span><span class="p">(</span><span class="n">item_num</span><span class="o">=</span><span class="n">item_num</span><span class="p">,</span>
+            <span class="n">num_interests</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">hidden_size</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+            <span class="n">routing_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MatchTrainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                      <span class="n">mode</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># list-wise training</span>
+                      <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                      <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="model-evaluation">Model Evaluation</h2>
+<p>Use common recall metrics for evaluation:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Calculate recall rate and hit rate</span>
+<span class="n">recall_score</span> <span class="o">=</span> <span class="n">evaluate_recall</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">test_dataloader</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">hit_rate</span> <span class="o">=</span> <span class="n">evaluate_hit_rate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">test_dataloader</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recall@10: </span><span class="si">{</span><span class="n">recall_score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;HitRate@10: </span><span class="si">{</span><span class="n">hit_rate</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="vector-retrieval">Vector Retrieval</h2>
+<p>The trained model can be used to generate vector representations of users and items for fast retrieval:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Use Annoy for vector retrieval</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annoy</span>
+
+<span class="c1"># Build index</span>
+<span class="n">item_vectors</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get_item_vectors</span><span class="p">()</span>
+<span class="n">annoy</span> <span class="o">=</span> <span class="n">Annoy</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="s1">&#39;angular&#39;</span><span class="p">)</span>
+<span class="n">annoy</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">item_vectors</span><span class="p">)</span>
+
+<span class="c1"># Query similar items</span>
+<span class="n">user_vector</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get_user_vector</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">similar_items</span> <span class="o">=</span> <span class="n">annoy</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">user_vector</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="advanced-techniques">Advanced Techniques</h2>
+<ol>
+<li>
+<p>Temperature Coefficient Adjustment
+<div class="highlight"><pre><span></span><code><span class="n">trainer</span> <span class="o">=</span> <span class="n">MatchTrainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                      <span class="n">temperature</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>  <span class="c1"># Add temperature coefficient</span>
+                      <span class="n">mode</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Negative Sampling
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">negative_sample</span>
+
+<span class="n">neg_samples</span> <span class="o">=</span> <span class="n">negative_sample</span><span class="p">(</span><span class="n">items_cnt_order</span><span class="p">,</span>
+                            <span class="n">ratio</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                            <span class="n">method_id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Word2Vec-style sampling</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Model Saving and Loading
+<div class="highlight"><pre><span></span><code><span class="c1"># Save model</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s1">&#39;model.pth&#39;</span><span class="p">)</span>
+
+<span class="c1"># Load model</span>
+<span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;model.pth&#39;</span><span class="p">))</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h2 id="important-notes">Important Notes</h2>
+<ol>
+<li>Choose appropriate training mode (point-wise/pair-wise/list-wise)</li>
+<li>Pay attention to sequence feature length and padding method</li>
+<li>Adjust negative sample ratio based on actual scenarios</li>
+<li>Set appropriate batch_size and learning rate</li>
+<li>Use L2 regularization to prevent overfitting</li>
+</ol>
 
 
 
@@ -1137,7 +1477,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "search.share", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "search.share", "navigation.sections", "navigation.path", "toc.follow", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>

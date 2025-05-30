@@ -88,7 +88,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ranking-models-tutorial" class="md-skip">
+        <a href="#ranking-model-tutorial" class="md-skip">
           Skip to content
         </a>
       
@@ -347,7 +347,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../api-reference/models/" class="md-tabs__link">
+        <a href="../../api-reference/basic/" class="md-tabs__link">
           
   
   
@@ -456,9 +456,7 @@
   
 
 
-  
-
-<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="Torch-RecHub" class="md-nav__button md-logo" aria-label="Torch-RecHub" data-md-component="logo">
       
@@ -524,9 +522,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -688,6 +684,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Ranking Models
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -699,6 +708,106 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wide-deep-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wide &amp; Deep Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deepfm-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeepFM Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#din-deep-interest-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      DIN (Deep Interest Network)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dcn-v2-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      DCN-V2 Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model Evaluation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-engineering-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Feature Engineering Tips
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-applications" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Applications
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important Notes
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -778,9 +887,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -802,6 +909,29 @@
             API Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Components
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -899,9 +1029,7 @@
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -1050,6 +1178,113 @@
               </div>
             
             
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wide-deep-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wide &amp; Deep Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deepfm-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeepFM Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#din-deep-interest-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      DIN (Deep Interest Network)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dcn-v2-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      DCN-V2 Model
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model Evaluation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-engineering-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Feature Engineering Tips
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-applications" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Applications
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important Notes
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
           
           
             <div class="md-content" data-md-component="content">
@@ -1062,8 +1297,163 @@
   
 
 
-<h1 id="ranking-models-tutorial">Ranking Models Tutorial</h1>
-<p>Tutorial and example code for ranking models like DIN.</p>
+<h1 id="ranking-model-tutorial">Ranking Model Tutorial</h1>
+<p>This tutorial will introduce how to use various ranking models in Torch-RecHub. We'll use the Criteo and Avazu datasets as examples.</p>
+<h2 id="data-preparation">Data Preparation</h2>
+<p>First, we need to prepare the data and process features:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataGenerator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.models</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rechub.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+
+<span class="c1"># Load data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;criteo_sample.csv&quot;</span><span class="p">)</span>
+
+<span class="c1"># Feature column definitions</span>
+<span class="n">sparse_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;C1&#39;</span><span class="p">,</span> <span class="s1">&#39;C2&#39;</span><span class="p">,</span> <span class="s1">&#39;C3&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="s1">&#39;C26&#39;</span><span class="p">]</span>
+<span class="n">dense_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;I1&#39;</span><span class="p">,</span> <span class="s1">&#39;I2&#39;</span><span class="p">,</span> <span class="s1">&#39;I3&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="s1">&#39;I13&#39;</span><span class="p">]</span>
+<span class="n">features</span> <span class="o">=</span> <span class="n">sparse_features</span> <span class="o">+</span> <span class="n">dense_features</span>
+</code></pre></div>
+<h2 id="wide-deep-model">Wide &amp; Deep Model</h2>
+<p>Wide &amp; Deep model combines memorization and generalization capabilities:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">WideDeep</span><span class="p">(</span>
+    <span class="n">wide_features</span><span class="o">=</span><span class="n">sparse_features</span><span class="p">,</span>
+    <span class="n">deep_features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">dropout_rates</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                 <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                 <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cuda:0&#39;</span><span class="p">)</span>
+
+<span class="c1"># Train model</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_dataloader</span><span class="p">,</span> <span class="n">val_dataloader</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="deepfm-model">DeepFM Model</h2>
+<p>DeepFM model uses factorization machines and deep networks to model feature interactions:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">DeepFM</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">dropout_rates</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">],</span>
+    <span class="n">embedding_dim</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                 <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="din-deep-interest-network">DIN (Deep Interest Network)</h2>
+<p>DIN model uses attention mechanism to model user interests:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate behavior sequence features</span>
+<span class="n">behavior_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;item_id&#39;</span><span class="p">,</span> <span class="s1">&#39;category_id&#39;</span><span class="p">]</span>
+<span class="n">seq_features</span> <span class="o">=</span> <span class="n">generate_seq_feature</span><span class="p">(</span><span class="n">df</span><span class="p">,</span>
+                                  <span class="n">user_col</span><span class="o">=</span><span class="s1">&#39;user_id&#39;</span><span class="p">,</span>
+                                  <span class="n">item_col</span><span class="o">=</span><span class="s1">&#39;item_id&#39;</span><span class="p">,</span>
+                                  <span class="n">time_col</span><span class="o">=</span><span class="s1">&#39;timestamp&#39;</span><span class="p">,</span>
+                                  <span class="n">item_attribute_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;category_id&#39;</span><span class="p">])</span>
+
+<span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">DIN</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">behavior_features</span><span class="o">=</span><span class="n">behavior_features</span><span class="p">,</span>
+    <span class="n">attention_units</span><span class="o">=</span><span class="p">[</span><span class="mi">80</span><span class="p">,</span> <span class="mi">40</span><span class="p">],</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                 <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="dcn-v2-model">DCN-V2 Model</h2>
+<p>DCN-V2 explicitly models feature interactions through cross network:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Model configuration</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">DCNV2</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+    <span class="n">cross_num</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">hidden_units</span><span class="o">=</span><span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">dropout_rates</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">],</span>
+    <span class="n">cross_parameterization</span><span class="o">=</span><span class="s1">&#39;matrix&#39;</span><span class="p">)</span>  <span class="c1"># or &#39;vector&#39;</span>
+
+<span class="c1"># Training configuration</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">optimizer_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;lr&#39;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">},</span>
+                 <span class="n">n_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="model-evaluation">Model Evaluation</h2>
+<p>Use common ranking metrics for evaluation:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Evaluate model</span>
+<span class="n">auc</span> <span class="o">=</span> <span class="n">evaluate_auc</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">test_dataloader</span><span class="p">)</span>
+<span class="n">log_loss</span> <span class="o">=</span> <span class="n">evaluate_logloss</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">test_dataloader</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AUC: </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;LogLoss: </span><span class="si">{</span><span class="n">log_loss</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="feature-engineering-tips">Feature Engineering Tips</h2>
+<ol>
+<li>
+<p>Feature Preprocessing
+<div class="highlight"><pre><span></span><code><span class="c1"># Categorical feature encoding</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">LabelEncoder</span>
+<span class="k">for</span> <span class="n">feat</span> <span class="ow">in</span> <span class="n">sparse_features</span><span class="p">:</span>
+    <span class="n">lbe</span> <span class="o">=</span> <span class="n">LabelEncoder</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="n">feat</span><span class="p">]</span> <span class="o">=</span> <span class="n">lbe</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">feat</span><span class="p">])</span>
+
+<span class="c1"># Numerical feature normalization</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">MinMaxScaler</span>
+<span class="k">for</span> <span class="n">feat</span> <span class="ow">in</span> <span class="n">dense_features</span><span class="p">:</span>
+    <span class="n">scaler</span> <span class="o">=</span> <span class="n">MinMaxScaler</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="n">feat</span><span class="p">]</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">feat</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Feature Crossing
+<div class="highlight"><pre><span></span><code><span class="c1"># Manual feature crossing</span>
+<span class="n">df</span><span class="p">[</span><span class="s1">&#39;cross_feat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;feat1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;feat2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h2 id="advanced-applications">Advanced Applications</h2>
+<ol>
+<li>
+<p>Custom Loss Function
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FocalLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gamma</span> <span class="o">=</span> <span class="n">gamma</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+        <span class="c1"># Implement Focal Loss</span>
+        <span class="k">pass</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">loss_fn</span><span class="o">=</span><span class="n">FocalLoss</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Learning Rate Scheduling
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim.lr_scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">CosineAnnealingLR</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                 <span class="n">scheduler</span><span class="o">=</span><span class="s1">&#39;cosine&#39;</span><span class="p">,</span>  <span class="c1"># Use cosine annealing scheduler</span>
+                 <span class="n">scheduler_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;T_max&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">})</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h2 id="important-notes">Important Notes</h2>
+<ol>
+<li>Handle missing values and outliers appropriately</li>
+<li>Pay attention to feature engineering importance</li>
+<li>Choose appropriate evaluation metrics</li>
+<li>Focus on model interpretability</li>
+<li>Balance model complexity and efficiency</li>
+<li>Handle class imbalance issues</li>
+</ol>
 
 
 
@@ -1137,7 +1527,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "navigation.expand", "search.share", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.tabs", "navigation.top", "search.share", "navigation.sections", "navigation.path", "toc.follow", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>

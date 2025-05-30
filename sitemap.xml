@@ -50,6 +50,13 @@
         <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/introduction/"/>
     </url>
     <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/api-reference/basic/</loc>
+        <lastmod>2025-05-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/basic/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/basic/"/>
+    </url>
+    <url>
         <loc>https://datawhalechina.github.io/torch-rechub/api-reference/models/</loc>
         <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
@@ -153,6 +160,13 @@
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/introduction/"/>
         <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/introduction/"/>
+    </url>
+    <url>
+        <loc>https://datawhalechina.github.io/torch-rechub/zh/api-reference/basic/</loc>
+        <lastmod>2025-05-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/basic/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://datawhalechina.github.io/torch-rechub/api-reference/basic/"/>
     </url>
     <url>
         <loc>https://datawhalechina.github.io/torch-rechub/zh/api-reference/models/</loc>
