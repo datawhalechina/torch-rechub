@@ -14,10 +14,11 @@ theme:
     - content.code.copy # 开启代码复制功能
     - navigation.tabs
     - navigation.top
-    - navigation.expand
+    # - navigation.expand
     - search.share
     - navigation.sections # 在左侧导航栏中自动展开当前页面所在的部分
-    - toc.integrate # 将目录集成到左侧导航
+    - navigation.path # 在左侧导航栏中显示当前页面路径
+    - toc.follow # 在右侧目录中跟随页面滚动
     - navigation.top # 返回顶部按钮
     - search.suggest # 搜索建议
     - search.highlight # 搜索高亮
@@ -54,6 +55,7 @@ nav:
       - Matching Models: en/tutorials/matching.md
       - Multi-Task Learning: en/tutorials/multi-task.md
   - API Reference:
+      - Basic Components: en/api-reference/basic.md
       - Models: en/api-reference/models.md
       - Trainers: en/api-reference/trainers.md
       - Utilities: en/api-reference/utils.md
@@ -93,6 +95,7 @@ plugins:
             Matching Models: 召回模型
             Multi-Task Learning: 多任务学习
             API Reference: API参考
+            Basic Components: 基础组件
             Models: 模型
             Trainers: 训练器
             Utilities: 工具类
