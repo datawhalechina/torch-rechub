@@ -62,7 +62,6 @@ nav:
   - Blog:
       - Match Blog: en/blog/match.md
       - Rank Blog: en/blog/rank.md
-  - Examples: en/examples.md
   - FAQ: en/faq.md
   - Contribution Guide: en/contributing.md
 
@@ -99,7 +98,6 @@ plugins:
             Models: 模型
             Trainers: 训练器
             Utilities: 工具类
-            Examples: 示例
             FAQ: 常见问题
             Contribution Guide: 贡献指南
             Blog: 博客

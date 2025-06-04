@@ -4,12 +4,31 @@ import numpy as np
 import copy
 import random
 from collections import OrderedDict, Counter
-from annoy import AnnoyIndex
 from .data import pad_sequences, df_to_dict
-from pymilvus import Collection,CollectionSchema,DataType,FieldSchema,connections,utility
+
+# Optional imports with fallbacks
+try:
+    from annoy import AnnoyIndex
+    ANNOY_AVAILABLE = True
+except ImportError:
+    ANNOY_AVAILABLE = False
+    
+try:
+    from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
+    import torch
+    MILVUS_AVAILABLE = True
+except ImportError:
+    MILVUS_AVAILABLE = False
+    
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+
 
 def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_len, padding='pre', truncating='pre'):
-    """Merge user_profile and item_profile to df, pad and truncate history sequence feature
+    """Merge user_profile and item_profile to df, pad and truncate history sequence feature.
 
     Args:
         df (pd.DataFrame): data with history sequence feature
@@ -38,9 +57,10 @@ def gen_model_input(df, user_profile, user_col, item_profile, item_col, seq_max_
 
 
 def negative_sample(items_cnt_order, ratio, method_id=0):
-    """Negative Sample method for matching model
-    reference: https://github.com/wangzhegeek/DSSM-Lookalike/blob/master/utils.py
-    update more method and redesign this function.
+    """Negative Sample method for matching model.
+    
+    Reference: https://github.com/wangzhegeek/DSSM-Lookalike/blob/master/utils.py
+    Updated with more methods and redesigned this function.
 
     Args:
         items_cnt_order (dict): the item count dict, the keys(item) sorted by value(count) in reverse order.
@@ -88,7 +108,7 @@ def generate_seq_feature_match(data,
                                mode=0,
                                neg_ratio=0,
                                min_item=0):
-    """generate sequence feature and negative sample for match.
+    """Generate sequence feature and negative sample for match.
 
     Args:
         data (pd.DataFrame): the raw data.
@@ -177,53 +197,69 @@ def generate_seq_feature_match(data,
 
 
 class Annoy(object):
-    """Vector matching by Annoy
-
-    Args:
-        metric (str): distance metric
-        n_trees (int): n_trees
-        search_k (int): search_k
-    """
-
+    """A vector matching engine using Annoy library"""
+    
     def __init__(self, metric='angular', n_trees=10, search_k=-1):
+        if not ANNOY_AVAILABLE:
+            raise ImportError(
+                "Annoy is not available. To use Annoy engine, please install it first:\n"
+                "pip install annoy\n"
+                "Or use other available engines like Faiss or Milvus"
+            )
         self._n_trees = n_trees
         self._search_k = search_k
         self._metric = metric
 
     def fit(self, X):
+        """Build the Annoy index from input vectors.
+        
+        Args:
+            X (np.ndarray): input vectors with shape (n_samples, n_features)
+        """
         self._annoy = AnnoyIndex(X.shape[1], metric=self._metric)
         for i, x in enumerate(X):
             self._annoy.add_item(i, x.tolist())
         self._annoy.build(self._n_trees)
 
     def set_query_arguments(self, search_k):
+        """Set query parameters for searching.
+        
+        Args:
+            search_k (int): number of nodes to inspect during searching
+        """
         self._search_k = search_k
 
     def query(self, v, n):
-        return self._annoy.get_nns_by_vector(v.tolist(), n, self._search_k, include_distances=True)  #
+        """Find the n nearest neighbors to vector v.
+        
+        Args:
+            v (np.ndarray): query vector
+            n (int): number of nearest neighbors to return
+            
+        Returns:
+            tuple: (indices, distances) - lists of nearest neighbor indices and their distances
+        """
+        return self._annoy.get_nns_by_vector(v.tolist(), n, self._search_k, include_distances=True)
 
     def __str__(self):
         return 'Annoy(n_trees=%d, search_k=%d)' % (self._n_trees, self._search_k)
 
     
 class Milvus(object):
-    """Vector matching by Milvus.
-
-    Args:
-        dim (int): embedding dim
-        host (str): host address of Milvus
-        port (str): port of Milvus
-    """
-
+    """A vector matching engine using Milvus database"""
+    
     def __init__(self, dim=64, host="localhost", port="19530"):
-        print("Start connecting to Milvus")
-        connections.connect("default", host=host, port=port)
+        if not MILVUS_AVAILABLE:
+            raise ImportError(
+                "Milvus is not available. To use Milvus engine, please install it first:\n"
+                "pip install pymilvus\n"
+                "Or use other available engines like Annoy or Faiss"
+            )
         self.dim = dim
         has = utility.has_collection("rechub")
-        #print(f"Does collection rechub exist? {has}")
         if has:
             utility.drop_collection("rechub")
-        # Create collection
+        # Create collection with schema definition
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
             FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=dim),
@@ -232,15 +268,19 @@ class Milvus(object):
         self.milvus = Collection("rechub", schema=schema)
 
     def fit(self, X):
-        if torch.is_tensor(X):
+        """Insert vectors into Milvus collection and build index.
+        
+        Args:
+            X (np.ndarray or torch.Tensor): input vectors with shape (n_samples, n_features)
+        """
+        if hasattr(X, 'cpu'):  # Handle PyTorch tensor
             X = X.cpu().numpy()
         self.milvus.release()
         entities = [[i for i in range(len(X))], X]
         self.milvus.insert(entities)
-        print(
-            f"Number of entities in Milvus: {self.milvus.num_entities}"
-        )  # check the num_entites
+        print(f"Number of entities in Milvus: {self.milvus.num_entities}")
 
+        # Create IVF_FLAT index for efficient search
         index = {
             "index_type": "IVF_FLAT",
             "metric_type": "L2",
@@ -250,6 +290,14 @@ class Milvus(object):
 
     @staticmethod
     def process_result(results):
+        """Process Milvus search results into standard format.
+        
+        Args:
+            results: raw search results from Milvus
+            
+        Returns:
+            tuple: (indices_list, distances_list) - processed results
+        """
         idx_list = []
         score_list = []
         for r in results:
@@ -263,12 +311,151 @@ class Milvus(object):
         return idx_list, score_list
 
     def query(self, v, n):
+        """Query Milvus for the n nearest neighbors to vector v.
+        
+        Args:
+            v (np.ndarray or torch.Tensor): query vector
+            n (int): number of nearest neighbors to return
+            
+        Returns:
+            tuple: (indices, distances) - lists of nearest neighbor indices and their distances
+        """
         if torch.is_tensor(v):
-            v = v.cpu().numpy().reshape(-1, self.dim)
+            v = v.cpu().numpy()
         self.milvus.load()
         search_params = {"metric_type": "L2", "params": {"nprobe": 16}}
         results = self.milvus.search(v, "embeddings", search_params, n)
         return self.process_result(results)
 
-#annoy = Annoy(n_trees=10)
-#annoy.fit(item_embs)
+
+class Faiss(object):
+    """A vector matching engine using Faiss library"""
+    
+    def __init__(self, dim, index_type='flat', nlist=100, m=32, metric='l2'):
+        self.dim = dim
+        self.index_type = index_type.lower()
+        self.nlist = nlist
+        self.m = m
+        self.metric = metric.lower()
+        self.index = None
+        self.is_trained = False
+        
+        # Create index based on different index types and metrics
+        if self.metric == 'l2':
+            if self.index_type == 'flat':
+                self.index = faiss.IndexFlatL2(dim)
+            elif self.index_type == 'ivf':
+                quantizer = faiss.IndexFlatL2(dim)
+                self.index = faiss.IndexIVFFlat(quantizer, dim, nlist)
+            elif self.index_type == 'hnsw':
+                self.index = faiss.IndexHNSWFlat(dim, m)
+            else:
+                raise ValueError(f"Unsupported index type: {index_type}")
+        elif self.metric == 'ip':
+            if self.index_type == 'flat':
+                self.index = faiss.IndexFlatIP(dim)
+            elif self.index_type == 'ivf':
+                quantizer = faiss.IndexFlatIP(dim)
+                self.index = faiss.IndexIVFFlat(quantizer, dim, nlist)
+            elif self.index_type == 'hnsw':
+                self.index = faiss.IndexHNSWFlat(dim, m)
+                # HNSW defaults to L2, need to change to inner product
+                self.index.metric_type = faiss.METRIC_INNER_PRODUCT
+            else:
+                raise ValueError(f"Unsupported index type: {index_type}")
+        else:
+            raise ValueError(f"Unsupported metric: {metric}")
+    
+    def fit(self, X):
+        """Train and build the index from input vectors.
+        
+        Args:
+            X (np.ndarray): input vectors with shape (n_samples, dim)
+        """        
+
+        # For index types that require training (like IVF), train first
+        if self.index_type == 'ivf' and not self.is_trained:
+            print(f"Training {self.index_type.upper()} index with {X.shape[0]} vectors...")
+            self.index.train(X)
+            self.is_trained = True
+        
+        # Add vectors to the index
+        print(f"Adding {X.shape[0]} vectors to index...")
+        self.index.add(X)
+        print(f"Index built successfully. Total vectors: {self.index.ntotal}")
+    
+    def query(self, v, n):
+        """Query the nearest neighbors for given vector.
+        
+        Args:
+            v (np.ndarray or torch.Tensor): query vector
+            n (int): number of nearest neighbors to return
+            
+        Returns:
+            tuple: (indices, distances) - lists of nearest neighbor indices and distances
+        """
+        if hasattr(v, 'cpu'):  # Handle PyTorch tensor
+            v = v.cpu().numpy()
+        
+        # Ensure query vector has correct shape
+        if v.ndim == 1:
+            v = v.reshape(1, -1)
+        
+        v = v.astype(np.float32)
+        
+        # Set search parameters for IVF index
+        if self.index_type == 'ivf':
+            # Set number of clusters to search
+            nprobe = min(self.nlist, max(1, self.nlist // 4))
+            self.index.nprobe = nprobe
+        
+        # Execute search
+        distances, indices = self.index.search(v, n)
+        
+        return indices.tolist(), distances.tolist()
+    
+    def set_query_arguments(self, nprobe=None, efSearch=None):
+        """Set query parameters for search.
+        
+        Args:
+            nprobe (int): number of clusters to search for IVF index
+            efSearch (int): search parameter for HNSW index
+        """
+        if self.index_type == 'ivf' and nprobe is not None:
+            self.index.nprobe = min(nprobe, self.nlist)
+        elif self.index_type == 'hnsw' and efSearch is not None:
+            self.index.hnsw.efSearch = efSearch
+    
+    def save_index(self, filepath):
+        """Save index to file for later use."""
+        faiss.write_index(self.index, filepath)
+    
+    def load_index(self, filepath):
+        """Load index from file."""
+        self.index = faiss.read_index(filepath)
+        self.is_trained = True
+    
+    def __str__(self):
+        return f'Faiss(index_type={self.index_type}, dim={self.dim}, metric={self.metric}, ntotal={self.index.ntotal if self.index else 0})'
+
+
+if __name__ == '__main__':
+    # Generate random item embeddings (100 items, each with 64 dimensions)
+    item_embeddings = np.random.rand(100, 64).astype(np.float32)
+    
+    # Generate random user embedding (1 user, 64 dimensions) 
+    user_embedding = np.random.rand(1, 64).astype(np.float32)
+    
+    # Create FAISS index
+    faiss_index = Faiss(dim=64, index_type='ivf', nlist=100, metric='l2')
+
+    # Train and build the index
+    faiss_index.fit(item_embeddings)
+
+    # Query nearest neighbors
+    indices, distances = faiss_index.query(user_embedding, n=10)
+
+    print("Top 10 nearest neighbors:")
+    print(indices)  # Output indices of nearest neighbors
+    print(distances)  # Output distances of nearest neighbors
+    
