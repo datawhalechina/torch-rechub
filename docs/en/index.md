@@ -39,7 +39,7 @@ title: Welcome to use Torch-RecHub
 <section class="mdx-container">
   <div class="md-grid md-typeset">
     <div class="md-grid__cell md-grid__cell--center">
-      <img src="../torch-rechub/file/img/favicon.png" alt="Torch-RecHub Logo" width="100">
+      <img src="../torch-rechub/file/img/logo.png" alt="Torch-RecHub Logo" width="100">
       <h1 style="text-align: center; font-size: 3em; margin-top: 1em; margin-bottom: 0.5em;">Torch-RecHub</h1>
       <p style="text-align: center; font-size: 1.5em; margin-bottom: 1.5em; 
            text-shadow: 

@@ -232,6 +232,14 @@ match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
 ```
 
+## 👨‍💻‍ 贡献者
+
+感谢所有的贡献者！
+
+![GitHub contributors](https://img.shields.io/github/contributors/datawhalechina/torch-rechub?color=32A9C3&labelColor=1B3C4A&logo=contributorcovenant)
+
+[![contributors](https://contrib.rocks/image?repo=datawhalechina/torch-rechub)](https://github.com/datawhalechina/torch-rechub/graphs/contributors)
+
 ## 🤝 贡献指南
 
 我们欢迎各种形式的贡献！如果你想为这个项目做出贡献，请遵循以下步骤：
