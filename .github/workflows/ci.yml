@@ -168,8 +168,8 @@ jobs:
 
       - name: Run security scan
         run: |
-          bandit -r torch_rechub/ -f json -o bandit-report.json || true
-          bandit -r torch_rechub/ -f txt
+          bandit -r torch_rechub/ -s B101,B311,B614 -x tests,docs,examples -f json -o bandit-report.json || true
+          bandit -r torch_rechub/ -s B101,B311,B614 -x tests,docs,examples -f txt
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4

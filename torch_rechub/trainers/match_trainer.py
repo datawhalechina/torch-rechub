@@ -157,7 +157,7 @@ class MatchTrainer(object):
         # inference
         assert mode in ["user", "item"], "Invalid mode={}.".format(mode)
         model.mode = mode
-        model.load_state_dict(torch.load(os.path.join(model_path, "model.pth")))
+        model.load_state_dict(torch.load(os.path.join(model_path, "model.pth"), map_location=self.device, weights_only=True))
         model = model.to(self.device)
         model.eval()
         predicts = []
