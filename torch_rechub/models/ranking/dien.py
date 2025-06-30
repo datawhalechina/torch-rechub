@@ -8,9 +8,11 @@ Authors: Tao Fan, thisisevy@foxmail.com
 
 import torch
 from torch import nn
-from torch.nn import Parameter, init
+from torch.nn import init
+from torch.nn import Parameter
 
-from ...basic.layers import MLP, EmbeddingLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class AUGRU(nn.Module):
@@ -114,8 +116,7 @@ class DIEN(nn.Module):
         alpha (float): the weighting of auxiliary loss.
     """
 
-    def __init__(self, features, history_features, target_features, mlp_params, history_labels,
-                 alpha=0.2):
+    def __init__(self, features, history_features, target_features, mlp_params, history_labels, alpha=0.2):
         super().__init__()
         self.alpha = alpha  # 计算辅助损失函数时的权重
         self.features = features
@@ -125,10 +126,8 @@ class DIEN(nn.Module):
         self.all_dims = sum([fea.embed_dim for fea in features + history_features + target_features])
         # self.GRU = nn.GRU(batch_first=True)
         self.embedding = EmbeddingLayer(features + history_features + target_features)
-        self.interest_extractor_layers = nn.ModuleList(
-            [nn.GRU(fea.embed_dim, fea.embed_dim, batch_first=True) for fea in self.history_features])
-        self.interest_evolving_layers = nn.ModuleList(
-            [AUGRU(fea.embed_dim) for fea in self.history_features])
+        self.interest_extractor_layers = nn.ModuleList([nn.GRU(fea.embed_dim, fea.embed_dim, batch_first=True) for fea in self.history_features])
+        self.interest_evolving_layers = nn.ModuleList([AUGRU(fea.embed_dim) for fea in self.history_features])
 
         self.mlp = MLP(self.all_dims, activation="dice", **mlp_params)
         self.history_labels = torch.Tensor(history_labels)
@@ -161,8 +160,7 @@ class DIEN(nn.Module):
 
     def forward(self, x):
         embed_x_features = self.embedding(x, self.features)  # (batch_size, num_features, emb_dim)
-        embed_x_history = self.embedding(
-            x, self.history_features)  # (batch_size, num_history_features, seq_length, emb_dim)
+        embed_x_history = self.embedding(x, self.history_features)  # (batch_size, num_history_features, seq_length, emb_dim)
         embed_x_target = self.embedding(x, self.target_features)  # (batch_size, num_target_features, emb_dim)
 
         interest_extractor = []
@@ -172,20 +170,14 @@ class DIEN(nn.Module):
             # 利用GRU输出的outs得到辅助损失函数
             auxi_loss += self.auxiliary(outs, embed_x_history[:, i, :, :], self.history_labels)
             interest_extractor.append(outs.unsqueeze(1))  # (batch_size, 1, seq_length, emb_dim)
-        interest_extractor = torch.cat(interest_extractor,
-                                       dim=1)  # (batch_size, num_history_features, seq_length, emb_dim)
+        interest_extractor = torch.cat(interest_extractor, dim=1)  # (batch_size, num_history_features, seq_length, emb_dim)
         interest_evolving = []
         for i in range(self.num_history_features):
             _, h = self.interest_evolving_layers[i](interest_extractor[:, i, :, :], embed_x_target[:, i, :])
             interest_evolving.append(h.unsqueeze(1))  # (batch_size, 1, emb_dim)
         interest_evolving = torch.cat(interest_evolving, dim=1)  # (batch_size, num_history_features, emb_dim)
 
-        mlp_in = torch.cat([
-            interest_evolving.flatten(start_dim=1),
-            embed_x_target.flatten(start_dim=1),
-            embed_x_features.flatten(start_dim=1)
-        ],
-            dim=1)  # (batch_size, N)
+        mlp_in = torch.cat([interest_evolving.flatten(start_dim=1), embed_x_target.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  # (batch_size, N)
         y = self.mlp(mlp_in)
 
         return torch.sigmoid(y.squeeze(1)), self.alpha * auxi_loss

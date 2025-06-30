@@ -4,19 +4,29 @@ sys.path.append("../..")
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN, DCNv2, FiBiNet, EDCN, DeepFFM, FatDeepFFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SparseFeature
+from torch_rechub.models.ranking import DCN
+from torch_rechub.models.ranking import DCNv2
+from torch_rechub.models.ranking import DeepFFM
+from torch_rechub.models.ranking import DeepFM
+from torch_rechub.models.ranking import EDCN
+from torch_rechub.models.ranking import FatDeepFFM
+from torch_rechub.models.ranking import FiBiNet
+from torch_rechub.models.ranking import WideDeep
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
 
 
 def convert_numeric_feature(val):
     v = int(val)
     if v > 2:
-        return int(np.log(v)**2)
+        return int(np.log(v) ** 2)
     else:
         return v - 2
 
@@ -47,7 +57,7 @@ def get_criteo_data_dict(data_path):
     dense_feas = [DenseFeature(feature_name) for feature_name in dense_features]
     sparse_feas = [SparseFeature(feature_name, vocab_size=data[feature_name].nunique(), embed_dim=16) for feature_name in sparse_features]
     ffm_linear_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size, embed_dim=1) for feature in sparse_feas]
-    ffm_cross_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size*len(sparse_feas), embed_dim=10) for feature in sparse_feas]
+    ffm_cross_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size * len(sparse_feas), embed_dim=10) for feature in sparse_feas]
     y = data["label"]
     del data["label"]
     x = data

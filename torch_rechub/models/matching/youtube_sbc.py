@@ -6,10 +6,12 @@ References:
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-from ...basic.layers import MLP, EmbeddingLayer
-import numpy as np
+
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class YoutubeSBC(torch.nn.Module):
@@ -27,15 +29,7 @@ class YoutubeSBC(torch.nn.Module):
         temperature (float): temperature factor for similarity score, default to 1.0.
     """
 
-    def __init__(self,
-                 user_features,
-                 item_features,
-                 sample_weight_feature,
-                 user_params,
-                 item_params,
-                 batch_size,
-                 n_neg=3,
-                 temperature=1.0):
+    def __init__(self, user_features, item_features, sample_weight_feature, user_params, item_params, batch_size, n_neg=3, temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features

@@ -18,14 +18,7 @@ class SequenceFeature(object):
         initializer(Initializer): Initializer the embedding layer weight.
     """
 
-    def __init__(self,
-                 name,
-                 vocab_size,
-                 embed_dim=None,
-                 pooling="mean",
-                 shared_with=None,
-                 padding_idx=None,
-                 initializer=RandomNormal(0, 0.0001)):
+    def __init__(self, name, vocab_size, embed_dim=None, pooling="mean", shared_with=None, padding_idx=None, initializer=RandomNormal(0, 0.0001)):
         self.name = name
         self.vocab_size = vocab_size
         if embed_dim is None:
@@ -86,7 +79,7 @@ class DenseFeature(object):
         embed_dim (int): embedding vector's length, the value fixed `1`. If you put a vector (torch.tensor) , replace the embed_dim with your vector dimension.
     """
 
-    def __init__(self, name, embed_dim = 1):
+    def __init__(self, name, embed_dim=1):
         self.name = name
         self.embed_dim = embed_dim
 

@@ -8,10 +8,13 @@ Authors: Kai Wang, 306178200@qq.com
 """
 
 import torch
-
-from ...basic.layers import MLP, EmbeddingLayer, MultiInterestSA, CapsuleNetwork
 from torch import nn
 import torch.nn.functional as F
+
+from ...basic.layers import CapsuleNetwork
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
+from ...basic.layers import MultiInterestSA
 
 
 class MIND(torch.nn.Module):
@@ -38,10 +41,10 @@ class MIND(torch.nn.Module):
         self.temperature = temperature
         self.interest_num = interest_num
         self.max_length = max_length
-        self.user_dims = sum([fea.embed_dim for fea in user_features+history_features])
+        self.user_dims = sum([fea.embed_dim for fea in user_features + history_features])
 
         self.embedding = EmbeddingLayer(user_features + item_features + history_features)
-        self.capsule = CapsuleNetwork(self.history_features[0].embed_dim,self.max_length,bilinear_type=0,interest_num=self.interest_num)
+        self.capsule = CapsuleNetwork(self.history_features[0].embed_dim, self.max_length, bilinear_type=0, interest_num=self.interest_num)
         self.convert_user_weight = nn.Parameter(torch.rand(self.user_dims, self.history_features[0].embed_dim), requires_grad=True)
         self.mode = None
 
@@ -53,7 +56,7 @@ class MIND(torch.nn.Module):
         if self.mode == "item":
             return item_embedding
 
-        pos_item_embedding = item_embedding[:,0,:]
+        pos_item_embedding = item_embedding[:, 0, :]
         dot_res = torch.bmm(user_embedding, pos_item_embedding.squeeze(1).unsqueeze(-1))
         k_index = torch.argmax(dot_res, dim=1)
         best_interest_emb = torch.rand(user_embedding.shape[0], user_embedding.shape[2]).to(user_embedding.device)
@@ -72,12 +75,12 @@ class MIND(torch.nn.Module):
 
         history_emb = self.embedding(x, self.history_features).squeeze(1)
         mask = self.gen_mask(x)
-        multi_interest_emb = self.capsule(history_emb,mask)
+        multi_interest_emb = self.capsule(history_emb, mask)
 
-        input_user = torch.cat([input_user,multi_interest_emb],dim=-1)
+        input_user = torch.cat([input_user, multi_interest_emb], dim=-1)
 
         # user_embedding = self.user_mlp(input_user).unsqueeze(1)  #[batch_size, interest_num, embed_dim]
-        user_embedding = torch.matmul(input_user,self.convert_user_weight)
+        user_embedding = torch.matmul(input_user, self.convert_user_weight)
         user_embedding = F.normalize(user_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "user":
             return user_embedding  #inference embedding mode -> [batch_size, interest_num, embed_dim]
@@ -90,8 +93,7 @@ class MIND(torch.nn.Module):
         pos_embedding = F.normalize(pos_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "item":  #inference embedding mode
             return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
-        neg_embeddings = self.embedding(x, self.neg_item_feature,
-                                        squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
+        neg_embeddings = self.embedding(x, self.neg_item_feature, squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
         neg_embeddings = F.normalize(neg_embeddings, p=2, dim=-1)  # L2 normalize
         return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]
 

@@ -4,13 +4,18 @@ sys.path.append("../..")
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SparseFeature
+from torch_rechub.models.ranking import DCN
+from torch_rechub.models.ranking import DeepFM
+from torch_rechub.models.ranking import WideDeep
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
 
 
 def get_ali_ccp_data_dict(data_path='./data/ali-ccp'):

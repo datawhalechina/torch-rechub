@@ -4,9 +4,14 @@ sys.path.append("../..")
 
 import pandas as pd
 import torch
-from torch_rechub.models.multi_task import SharedBottom, MMOE, PLE, AITM
+
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SparseFeature
+from torch_rechub.models.multi_task import AITM
+from torch_rechub.models.multi_task import MMOE
+from torch_rechub.models.multi_task import PLE
+from torch_rechub.models.multi_task import SharedBottom
 from torch_rechub.trainers import MTLTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
 
 
@@ -35,69 +40,39 @@ def main(model_name, epoch, learning_rate, batch_size, weight_decay, device, sav
     features, x_train, y_train, x_test, y_test = get_aliexpress_data_dict()
     task_types = ["classification", "classification"]
     if model_name == "SharedBottom":
-        model = SharedBottom(features,
-                             task_types,
-                             bottom_params={"dims": [512, 256]},
-                             tower_params_list=[{
-                                 "dims": [128, 64]
-                             }, {
-                                 "dims": [128, 64]
-                             }])
+        model = SharedBottom(features, task_types, bottom_params={"dims": [512, 256]}, tower_params_list=[{"dims": [128, 64]}, {"dims": [128, 64]}])
     elif model_name == "MMOE":
-        model = MMOE(features,
-                     task_types,
-                     n_expert=8,
-                     expert_params={"dims": [512, 256]},
-                     tower_params_list=[{
-                         "dims": [128, 64]
-                     }, {
-                         "dims": [128, 64]
-                     }])
+        model = MMOE(features, task_types, n_expert=8, expert_params={"dims": [512, 256]}, tower_params_list=[{"dims": [128, 64]}, {"dims": [128, 64]}])
     elif model_name == "PLE":
-        model = PLE(features,
-                    task_types,
-                    n_level=1,
-                    n_expert_specific=4,
-                    n_expert_shared=4,
-                    expert_params={
-                        "dims": [512, 256],
-                    },
-                    tower_params_list=[{
-                        "dims": [128, 64]
-                    }, {
-                        "dims": [128, 64]
-                    }])
+        model = PLE(
+            features,
+            task_types,
+            n_level=1,
+            n_expert_specific=4,
+            n_expert_shared=4,
+            expert_params={
+                "dims": [512,
+                         256],
+            },
+            tower_params_list=[{
+                "dims": [128,
+                         64]
+            },
+                               {
+                                   "dims": [128,
+                                            64]
+                               }]
+        )
     elif model_name == "AITM":
-        model = AITM(features,
-                     n_task=2,
-                     bottom_params={"dims": [512, 256]},
-                     tower_params_list=[{
-                         "dims": [128, 64]
-                     }, {
-                         "dims": [128, 64]
-                     }])
+        model = AITM(features, n_task=2, bottom_params={"dims": [512, 256]}, tower_params_list=[{"dims": [128, 64]}, {"dims": [128, 64]}])
 
     dg = DataGenerator(x_train, y_train)
-    train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=x_test,
-                                                                               y_val=y_test,
-                                                                               x_test=x_test,
-                                                                               y_test=y_test,
-                                                                               batch_size=batch_size)
+    train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=x_test, y_val=y_test, x_test=x_test, y_test=y_test, batch_size=batch_size)
 
     #adaptive weight loss:
     #mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, adaptive_params={"method": "uwl"}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
     #metabalance
-    mtl_trainer = MTLTrainer(model,
-                             task_types=task_types,
-                             optimizer_params={
-                                 "lr": learning_rate,
-                                 "weight_decay": weight_decay
-                             },
-                             n_epoch=epoch,
-                             earlystop_patience=3,
-                             device=device,
-                             adaptive_params={'method': 'gradnorm'},
-                             model_path=save_dir)
+    mtl_trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=3, device=device, adaptive_params={'method': 'gradnorm'}, model_path=save_dir)
     mtl_trainer.fit(train_dataloader, val_dataloader)
     auc = mtl_trainer.evaluate(mtl_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
@@ -116,8 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=2022)
 
     args = parser.parse_args()
-    main(args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir,
-         args.seed)
+    main(args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
 """
 python run_gradnorm.py --model_name SharedBottom
 python run_gradnorm.py --model_name MMOE

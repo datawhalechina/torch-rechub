@@ -8,7 +8,9 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 
 import torch
 import torch.nn.functional as F
-from ...basic.layers import MLP, EmbeddingLayer
+
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class YoutubeDNN(torch.nn.Module):
@@ -65,7 +67,6 @@ class YoutubeDNN(torch.nn.Module):
         pos_embedding = F.normalize(pos_embedding, p=2, dim=2)
         if self.mode == "item":  #inference embedding mode
             return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
-        neg_embeddings = self.embedding(x, self.neg_item_feature,
-                                        squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
+        neg_embeddings = self.embedding(x, self.neg_item_feature, squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
         neg_embeddings = F.normalize(neg_embeddings, p=2, dim=2)
         return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]

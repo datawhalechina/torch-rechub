@@ -8,7 +8,9 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 
 import torch
 import torch.nn.functional as F
-from ...basic.layers import MLP, EmbeddingLayer
+
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class FaceBookDSSM(torch.nn.Module):
@@ -24,13 +26,7 @@ class FaceBookDSSM(torch.nn.Module):
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
     """
 
-    def __init__(self,
-                 user_features,
-                 pos_item_features,
-                 neg_item_features,
-                 user_params,
-                 item_params,
-                 temperature=1.0):
+    def __init__(self, user_features, pos_item_features, neg_item_features, user_params, item_params, temperature=1.0):
         super().__init__()
         self.user_features = user_features
         self.pos_item_features = pos_item_features

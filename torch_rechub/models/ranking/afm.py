@@ -7,9 +7,14 @@ Authors: Tao Fan, thisisevy@foxmail.com
 """
 
 import torch
-from ...basic.layers import FM, MLP, LR, EmbeddingLayer
 from torch import nn
-from torch.nn import Parameter, init
+from torch.nn import init
+from torch.nn import Parameter
+
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import FM
+from ...basic.layers import LR
+from ...basic.layers import MLP
 
 
 class AFM(nn.Module):

@@ -1,10 +1,14 @@
-import tqdm
-import pandas as pd
-import numpy as np
+from collections import Counter
+from collections import OrderedDict
 import copy
 import random
-from collections import OrderedDict, Counter
-from .data import pad_sequences, df_to_dict
+
+import numpy as np
+import pandas as pd
+import tqdm
+
+from .data import df_to_dict
+from .data import pad_sequences
 
 # Optional imports with fallbacks
 try:
@@ -12,14 +16,19 @@ try:
     ANNOY_AVAILABLE = True
 except ImportError:
     ANNOY_AVAILABLE = False
-    
+
 try:
-    from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
+    from pymilvus import Collection
+    from pymilvus import CollectionSchema
+    from pymilvus import connections
+    from pymilvus import DataType
+    from pymilvus import FieldSchema
+    from pymilvus import utility
     import torch
     MILVUS_AVAILABLE = True
 except ImportError:
     MILVUS_AVAILABLE = False
-    
+
 try:
     import faiss
     FAISS_AVAILABLE = True
@@ -83,7 +92,7 @@ def negative_sample(items_cnt_order, ratio, method_id=0):
         #items_cnt_freq = {item: count/len(items_cnt) for item, count in items_cnt_order.items()}
         #p_sel = {item: np.sqrt(1e-5/items_cnt_freq[item]) for item in items_cnt_order}
         #The most popular paramter is item_cnt**0.75:
-        p_sel = {item: count**0.75 for item, count in items_cnt_order.items()}
+        p_sel = {item: count ** 0.75 for item, count in items_cnt_order.items()}
         p_value = np.array(list(p_sel.values())) / sum(p_sel.values())
         neg_items = np.random.choice(items_set, size=ratio, replace=True, p=p_value)
     elif method_id == 2:
@@ -99,15 +108,7 @@ def negative_sample(items_cnt_order, ratio, method_id=0):
     return neg_items
 
 
-def generate_seq_feature_match(data,
-                               user_col,
-                               item_col,
-                               time_col,
-                               item_attribute_cols=None,
-                               sample_method=0,
-                               mode=0,
-                               neg_ratio=0,
-                               min_item=0):
+def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols=None, sample_method=0, mode=0, neg_ratio=0, min_item=0):
     """Generate sequence feature and negative sample for match.
 
     Args:
@@ -173,7 +174,7 @@ def generate_seq_feature_match(data,
                         train_set.append(sample_copy)
                 elif mode == 2:  #list-wise, the last col is neg_col, include neg_ratio negative items
                     last_col = "neg_items"
-                    sample.append(neg_list[neg_idx: neg_idx + neg_ratio])
+                    sample.append(neg_list[neg_idx:neg_idx + neg_ratio])
                     neg_idx += neg_ratio
                     train_set.append(sample)
                 else:
@@ -188,24 +189,20 @@ def generate_seq_feature_match(data,
     print("%d cold start user dropped " % n_cold_user)
 
     attr_hist_col = ["hist_" + col for col in item_attribute_cols]
-    df_train = pd.DataFrame(train_set,
-                            columns=[user_col, item_col, "hist_" + item_col, "histlen_" + item_col] + attr_hist_col + [last_col])
-    df_test = pd.DataFrame(test_set,
-                           columns=[user_col, item_col, "hist_" + item_col, "histlen_" + item_col] + attr_hist_col + [last_col])
+    df_train = pd.DataFrame(train_set, columns=[user_col, item_col, "hist_" + item_col, "histlen_" + item_col] + attr_hist_col + [last_col])
+    df_test = pd.DataFrame(test_set, columns=[user_col, item_col, "hist_" + item_col, "histlen_" + item_col] + attr_hist_col + [last_col])
 
     return df_train, df_test
 
 
 class Annoy(object):
     """A vector matching engine using Annoy library"""
-    
+
     def __init__(self, metric='angular', n_trees=10, search_k=-1):
         if not ANNOY_AVAILABLE:
-            raise ImportError(
-                "Annoy is not available. To use Annoy engine, please install it first:\n"
-                "pip install annoy\n"
-                "Or use other available engines like Faiss or Milvus"
-            )
+            raise ImportError("Annoy is not available. To use Annoy engine, please install it first:\n"
+                              "pip install annoy\n"
+                              "Or use other available engines like Faiss or Milvus")
         self._n_trees = n_trees
         self._search_k = search_k
         self._metric = metric
@@ -244,25 +241,27 @@ class Annoy(object):
     def __str__(self):
         return 'Annoy(n_trees=%d, search_k=%d)' % (self._n_trees, self._search_k)
 
-    
+
 class Milvus(object):
     """A vector matching engine using Milvus database"""
-    
+
     def __init__(self, dim=64, host="localhost", port="19530"):
         if not MILVUS_AVAILABLE:
-            raise ImportError(
-                "Milvus is not available. To use Milvus engine, please install it first:\n"
-                "pip install pymilvus\n"
-                "Or use other available engines like Annoy or Faiss"
-            )
+            raise ImportError("Milvus is not available. To use Milvus engine, please install it first:\n"
+                              "pip install pymilvus\n"
+                              "Or use other available engines like Annoy or Faiss")
         self.dim = dim
         has = utility.has_collection("rechub")
         if has:
             utility.drop_collection("rechub")
         # Create collection with schema definition
         fields = [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
-            FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=dim),
+            FieldSchema(name="id",
+                        dtype=DataType.INT64,
+                        is_primary=True),
+            FieldSchema(name="embeddings",
+                        dtype=DataType.FLOAT_VECTOR,
+                        dim=dim),
         ]
         schema = CollectionSchema(fields=fields)
         self.milvus = Collection("rechub", schema=schema)
@@ -284,7 +283,9 @@ class Milvus(object):
         index = {
             "index_type": "IVF_FLAT",
             "metric_type": "L2",
-            "params": {"nlist": 128},
+            "params": {
+                "nlist": 128
+            },
         }
         self.milvus.create_index("embeddings", index)
 
@@ -330,7 +331,7 @@ class Milvus(object):
 
 class Faiss(object):
     """A vector matching engine using Faiss library"""
-    
+
     def __init__(self, dim, index_type='flat', nlist=100, m=32, metric='l2'):
         self.dim = dim
         self.index_type = index_type.lower()
@@ -339,7 +340,7 @@ class Faiss(object):
         self.metric = metric.lower()
         self.index = None
         self.is_trained = False
-        
+
         # Create index based on different index types and metrics
         if self.metric == 'l2':
             if self.index_type == 'flat':
@@ -365,25 +366,25 @@ class Faiss(object):
                 raise ValueError(f"Unsupported index type: {index_type}")
         else:
             raise ValueError(f"Unsupported metric: {metric}")
-    
+
     def fit(self, X):
         """Train and build the index from input vectors.
         
         Args:
             X (np.ndarray): input vectors with shape (n_samples, dim)
-        """        
+        """
 
         # For index types that require training (like IVF), train first
         if self.index_type == 'ivf' and not self.is_trained:
             print(f"Training {self.index_type.upper()} index with {X.shape[0]} vectors...")
             self.index.train(X)
             self.is_trained = True
-        
+
         # Add vectors to the index
         print(f"Adding {X.shape[0]} vectors to index...")
         self.index.add(X)
         print(f"Index built successfully. Total vectors: {self.index.ntotal}")
-    
+
     def query(self, v, n):
         """Query the nearest neighbors for given vector.
         
@@ -396,24 +397,24 @@ class Faiss(object):
         """
         if hasattr(v, 'cpu'):  # Handle PyTorch tensor
             v = v.cpu().numpy()
-        
+
         # Ensure query vector has correct shape
         if v.ndim == 1:
             v = v.reshape(1, -1)
-        
+
         v = v.astype(np.float32)
-        
+
         # Set search parameters for IVF index
         if self.index_type == 'ivf':
             # Set number of clusters to search
             nprobe = min(self.nlist, max(1, self.nlist // 4))
             self.index.nprobe = nprobe
-        
+
         # Execute search
         distances, indices = self.index.search(v, n)
-        
+
         return indices.tolist(), distances.tolist()
-    
+
     def set_query_arguments(self, nprobe=None, efSearch=None):
         """Set query parameters for search.
         
@@ -425,16 +426,16 @@ class Faiss(object):
             self.index.nprobe = min(nprobe, self.nlist)
         elif self.index_type == 'hnsw' and efSearch is not None:
             self.index.hnsw.efSearch = efSearch
-    
+
     def save_index(self, filepath):
         """Save index to file for later use."""
         faiss.write_index(self.index, filepath)
-    
+
     def load_index(self, filepath):
         """Load index from file."""
         self.index = faiss.read_index(filepath)
         self.is_trained = True
-    
+
     def __str__(self):
         return f'Faiss(index_type={self.index_type}, dim={self.dim}, metric={self.metric}, ntotal={self.index.ntotal if self.index else 0})'
 
@@ -442,10 +443,10 @@ class Faiss(object):
 if __name__ == '__main__':
     # Generate random item embeddings (100 items, each with 64 dimensions)
     item_embeddings = np.random.rand(100, 64).astype(np.float32)
-    
-    # Generate random user embedding (1 user, 64 dimensions) 
+
+    # Generate random user embedding (1 user, 64 dimensions)
     user_embedding = np.random.rand(1, 64).astype(np.float32)
-    
+
     # Create FAISS index
     faiss_index = Faiss(dim=64, index_type='ivf', nlist=100, metric='l2')
 
@@ -458,4 +459,3 @@ if __name__ == '__main__':
     print("Top 10 nearest neighbors:")
     print(indices)  # Output indices of nearest neighbors
     print(distances)  # Output distances of nearest neighbors
-    

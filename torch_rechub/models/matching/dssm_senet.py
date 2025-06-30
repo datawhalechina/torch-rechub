@@ -7,8 +7,12 @@ Authors: @1985312383
 
 import torch
 import torch.nn.functional as F
-from ...basic.layers import MLP, EmbeddingLayer, SENETLayer
-from ...basic.features import SparseFeature, SequenceFeature
+
+from ...basic.features import SequenceFeature
+from ...basic.features import SparseFeature
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
+from ...basic.layers import SENETLayer
 
 
 class DSSM(torch.nn.Module):
@@ -58,7 +62,7 @@ class DSSM(torch.nn.Module):
         input_user = self.embedding(x, self.user_features, squeeze_dim=True)  #[batch_size, num_features * embed_dim]
         input_user = input_user.view(input_user.size(0), self.user_num_features, -1)  #[batch_size, num_features, embed_dim]
         input_user = self.user_senet(input_user)  #[batch_size, num_features, embed_dim]
-        input_user = input_user.view(input_user.size(0), -1)   #[batch_size, num_features * embed_dim]
+        input_user = input_user.view(input_user.size(0), -1)  #[batch_size, num_features * embed_dim]
         user_embedding = self.user_mlp(input_user)  #[batch_size, user_params["dims"][-1]]
         user_embedding = F.normalize(user_embedding, p=2, dim=1)  # L2 normalize
         return user_embedding
@@ -69,7 +73,7 @@ class DSSM(torch.nn.Module):
         input_item = self.embedding(x, self.item_features, squeeze_dim=True)  #[batch_size, num_features * embed_dim]
         input_item = input_item.view(input_item.size(0), self.item_num_features, -1)  #[batch_size, num_features, embed_dim]
         input_item = self.item_senet(input_item)  #[batch_size, num_features, embed_dim]
-        input_item = input_item.view(input_item.size(0), -1)   #[batch_size, num_features * embed_dim]
+        input_item = input_item.view(input_item.size(0), -1)  #[batch_size, num_features * embed_dim]
         item_embedding = self.item_mlp(input_item)  #[batch_size, item_params["dims"][-1]]
         item_embedding = F.normalize(item_embedding, p=2, dim=1)
         return item_embedding

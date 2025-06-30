@@ -4,9 +4,15 @@ sys.path.append("../..")
 
 import pandas as pd
 import torch
-from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
+
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SparseFeature
+from torch_rechub.models.multi_task import AITM
+from torch_rechub.models.multi_task import ESMM
+from torch_rechub.models.multi_task import MMOE
+from torch_rechub.models.multi_task import PLE
+from torch_rechub.models.multi_task import SharedBottom
 from torch_rechub.trainers import MTLTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
 
 

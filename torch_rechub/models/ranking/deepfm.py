@@ -8,7 +8,10 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 
 import torch
 
-from ...basic.layers import FM, MLP, LR, EmbeddingLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import FM
+from ...basic.layers import LR
+from ...basic.layers import MLP
 
 
 class DeepFM(torch.nn.Module):

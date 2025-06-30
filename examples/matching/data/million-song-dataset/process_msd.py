@@ -1,12 +1,12 @@
+import sqlite3
+
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-import sqlite3
 
 '''
 这里的行数设定为500000行作为sample数据，实际数据非常大，全量训练（32G内存）可以尝试用3000000行
 '''
-data = pd.read_csv(r'train_triplets.txt',
-                   sep='\t', header=None, names=['user', 'song', 'play_count'], nrows=500000)
+data = pd.read_csv(r'train_triplets.txt', sep='\t', header=None, names=['user', 'song', 'play_count'], nrows=500000)
 
 # label编码
 user_encoder = LabelEncoder()
@@ -14,7 +14,6 @@ data['user'] = user_encoder.fit_transform(data['user'].values)
 
 song_encoder = LabelEncoder()
 data['song'] = song_encoder.fit_transform(data['song'].values)
-
 
 # 数据类型转换
 data.astype({'user': 'int32', 'song': 'int32', 'play_count': 'int32'})
@@ -58,11 +57,9 @@ track_metadata_df['song_id'] = track_metadata_df['song_id'].apply(encoder)
 track_metadata_df = track_metadata_df.rename(columns={'song_id': 'song'})
 # 根据特征song进行拼接，将拼接后的数据重新命名为data
 data = pd.merge(data, track_metadata_df, on='song')
-data = data.astype({'play_count': 'int32', 'duration': 'float32', 'artist_familiarity': 'float32',
-            'artist_hotttnesss': 'float32', 'year': 'int32', 'track_7digitalid': 'int32'})
+data = data.astype({'play_count': 'int32', 'duration': 'float32', 'artist_familiarity': 'float32', 'artist_hotttnesss': 'float32', 'year': 'int32', 'track_7digitalid': 'int32'})
 # 去重
 data.drop_duplicates(inplace=True)
-
 '''
 为了进一步精简数据，这里删掉了部分列，可根据个人需要删除列
 '''

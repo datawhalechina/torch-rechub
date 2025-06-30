@@ -3,17 +3,23 @@ import sys
 sys.path.append("../..")
 
 import os
+
+from movielens_utils import match_evaluation
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler
 import torch
 
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SequenceFeature
+from torch_rechub.basic.features import SparseFeature
 from torch_rechub.models.matching import YoutubeDNN
 from torch_rechub.trainers import MatchTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.utils.match import generate_seq_feature_match, gen_model_input
-from torch_rechub.utils.data import df_to_dict, MatchDataGenerator
-from movielens_utils import match_evaluation
+from torch_rechub.utils.data import df_to_dict
+from torch_rechub.utils.data import MatchDataGenerator
+from torch_rechub.utils.match import gen_model_input
+from torch_rechub.utils.match import generate_seq_feature_match
 
 
 def get_movielens_data(data_path, load_cache=False):
@@ -40,15 +46,7 @@ def get_movielens_data(data_path, load_cache=False):
         x_train, y_train, x_test = np.load("./data/ml-1m/saved/data_cache.npy", allow_pickle=True)
     else:
         #Note: mode=2 means list-wise negative sample generate, saved in last col "neg_items"
-        df_train, df_test = generate_seq_feature_match(data,
-                                                       user_col,
-                                                       item_col,
-                                                       time_col="timestamp",
-                                                       item_attribute_cols=[],
-                                                       sample_method=1,
-                                                       mode=2,
-                                                       neg_ratio=3,
-                                                       min_item=0)
+        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=2, neg_ratio=3, min_item=0)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         y_train = np.array([0] * df_train.shape[0])  #label=0 means the first pred value is positive sample
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
@@ -57,22 +55,10 @@ def get_movielens_data(data_path, load_cache=False):
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
 
     user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-    user_features += [
-        SequenceFeature("hist_movie_id",
-                        vocab_size=feature_max_idx["movie_id"],
-                        embed_dim=16,
-                        pooling="mean",
-                        shared_with="movie_id")
-    ]
+    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id")]
 
     item_features = [SparseFeature('movie_id', vocab_size=feature_max_idx['movie_id'], embed_dim=16)]
-    neg_item_feature = [
-        SequenceFeature('neg_items',
-                        vocab_size=feature_max_idx['movie_id'],
-                        embed_dim=16,
-                        pooling="concat",
-                        shared_with="movie_id")
-    ]
+    neg_item_feature = [SequenceFeature('neg_items', vocab_size=feature_max_idx['movie_id'], embed_dim=16, pooling="concat", shared_with="movie_id")]
 
     all_item = df_to_dict(item_profile)
     test_user = x_test
@@ -89,15 +75,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     model = YoutubeDNN(user_features, item_features, neg_item_feature, user_params={"dims": [128, 64, 16]}, temperature=0.02)
 
     #mode=1 means pair-wise learning
-    trainer = MatchTrainer(model,
-                           mode=2,
-                           optimizer_params={
-                               "lr": learning_rate,
-                               "weight_decay": weight_decay
-                           },
-                           n_epoch=epoch,
-                           device=device,
-                           model_path=save_dir)
+    trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir)
 
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
     trainer.fit(train_dl)
@@ -125,8 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=2022)
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device,
-         args.save_dir, args.seed)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
 """
 python run_ml_youtube_dnn.py
 """

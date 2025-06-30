@@ -8,7 +8,9 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 import torch
 import torch.nn as nn
 
-from ...basic.layers import MLP, EmbeddingLayer, PredictionLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
+from ...basic.layers import PredictionLayer
 
 
 class SharedBottom(nn.Module):
@@ -29,8 +31,7 @@ class SharedBottom(nn.Module):
         self.bottom_dims = sum([fea.embed_dim for fea in features])
 
         self.bottom_mlp = MLP(self.bottom_dims, **{**bottom_params, **{"output_layer": False}})
-        self.towers = nn.ModuleList(
-            MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(len(task_types)))
+        self.towers = nn.ModuleList(MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(len(task_types)))
         self.predict_layers = nn.ModuleList(PredictionLayer(task_type) for task_type in task_types)
 
     def forward(self, x):

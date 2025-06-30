@@ -1,7 +1,9 @@
 import os
+
+from sklearn.metrics import roc_auc_score
 import torch
 import tqdm
-from sklearn.metrics import roc_auc_score
+
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import BPRLoss
 
@@ -28,13 +30,13 @@ class MatchTrainer(object):
         model,
         mode=0,
         optimizer_fn=torch.optim.Adam,
-            optimizer_params=None,
+        optimizer_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         n_epoch=10,
         earlystop_patience=10,
         device="cpu",
-            gpus=None,
+        gpus=None,
         model_path="./",
     ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
@@ -47,10 +49,7 @@ class MatchTrainer(object):
         self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         if optimizer_params is None:
-            optimizer_params = {
-                "lr": 1e-3,
-                "weight_decay": 1e-5
-            }
+            optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.mode = mode
         if mode == 0:  #point-wise loss, binary cross_entropy
             self.criterion = torch.nn.BCELoss()  #default loss binary cross_entropy
@@ -124,9 +123,7 @@ class MatchTrainer(object):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
-        torch.save(self.model.state_dict(), os.path.join(self.model_path,
-                                                            "model.pth"))  #save best auc model
-
+        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  #save best auc model
 
     def evaluate(self, model, data_loader):
         model.eval()

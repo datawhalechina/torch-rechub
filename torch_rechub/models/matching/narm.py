@@ -9,22 +9,26 @@ Authors: Bo Kang, klinux@live.com
 """
 
 import torch
+from torch import sigmoid
+from torch.nn import Dropout
+from torch.nn import Embedding
+from torch.nn import GRU
+from torch.nn import Parameter
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
-from torch import sigmoid
-from torch.nn import GRU, Embedding, Dropout, Parameter
 
 
 class NARM(nn.Module):
+
     def __init__(self, item_history_feature, hidden_dim, emb_dropout_p, session_rep_dropout_p):
-        super(NARM, self).__init__()        
-        
+        super(NARM, self).__init__()
+
         # item embedding layer
         self.item_history_feature = item_history_feature
         self.item_emb = Embedding(item_history_feature.vocab_size, item_history_feature.embed_dim, padding_idx=0)
 
         # embedding dropout layer
-        self.emb_dropout = Dropout(emb_dropout_p)        
+        self.emb_dropout = Dropout(emb_dropout_p)
 
         # gru unit
         self.gru = GRU(input_size=item_history_feature.embed_dim, hidden_size=hidden_dim)
@@ -41,9 +45,9 @@ class NARM(nn.Module):
         # bilinear projection matrix
         self.b = Parameter(torch.randn(item_history_feature.embed_dim, hidden_dim * 2))
 
-    def forward(self, input_dict):        
+    def forward(self, input_dict):
         # Eq. 1-4, index item embeddings and pass through gru
-        ## Fetch the embeddings for items in the session        
+        ## Fetch the embeddings for items in the session
         input = input_dict[self.item_history_feature.name]
         value_mask = (input != 0)
         value_counts = value_mask.sum(dim=1, keepdim=False).to("cpu").detach()
@@ -59,7 +63,7 @@ class NARM(nn.Module):
 
         # Eq. 8, compute similarity between final hidden state and previous hidden states
         q = sigmoid(h_t @ self.a_1.T + h @ self.a_2.T) @ self.v
-        
+
         # Eq. 7, compute attention
         alpha = torch.exp(q) * value_mask.unsqueeze(-1)
         alpha /= alpha.sum(dim=1, keepdim=True)
@@ -72,5 +76,5 @@ class NARM(nn.Module):
 
         # Eq. 10, compute bilinear similarity between current session and each candidate items
         s = c @ self.b.T @ self.item_emb.weight.T
-        
+
         return s

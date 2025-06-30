@@ -8,7 +8,9 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 
 import torch
 
-from ...basic.layers import LR, MLP, EmbeddingLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import LR
+from ...basic.layers import MLP
 
 
 class WideDeep(torch.nn.Module):

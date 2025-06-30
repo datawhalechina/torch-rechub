@@ -246,9 +246,13 @@ match_trainer.fit(train_dl)
 
 1.  **Fork 本仓库:** 点击页面右上角的 "Fork" 按钮。
 2.  **进行修改:** 实现你的新功能或修复 Bug。
-3.  **提交更改:** `git commit -m "feat: 添加了某某功能"` 或 `fix: 修复了某某问题"` (遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范更佳)。
-4.  **推送分支:** `git push origin` 
-5. **创建 Pull Request:** 回到 GitHub 原始仓库页面，点击 "New pull request"，选择你的分支与主仓库的 `main` 分支进行比较，并提交 PR。
+3.  **格式化代码:** 提交前运行代码格式化确保代码风格一致：
+    ```bash
+    python config/format_code.py
+    ```
+4.  **提交更改:** `git commit -m "feat: 添加了某某功能"` 或 `fix: 修复了某某问题"` (遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范更佳)。
+5.  **推送分支:** `git push origin` 
+6. **创建 Pull Request:** 回到 GitHub 原始仓库页面，点击 "New pull request"，选择你的分支与主仓库的 `main` 分支进行比较，并提交 PR。
 
 请确保你的 PR 描述清晰，说明了你所做的更改及其原因。
 
@@ -282,4 +286,4 @@ match_trainer.fit(train_dl)
 
 ---
 
-*最后更新: [2025-03-31]*
+*最后更新: [2025-06-30]*

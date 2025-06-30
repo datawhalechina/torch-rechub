@@ -10,7 +10,8 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 import torch
 import torch.nn as nn
 
-from ...basic.layers import MLP, EmbeddingLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class AITM(nn.Module):
@@ -31,13 +32,10 @@ class AITM(nn.Module):
         self.input_dims = sum([fea.embed_dim for fea in features])
         self.embedding = EmbeddingLayer(features)
 
-        self.bottoms = nn.ModuleList(
-            MLP(self.input_dims, output_layer=False, **bottom_params) for i in range(self.n_task))
+        self.bottoms = nn.ModuleList(MLP(self.input_dims, output_layer=False, **bottom_params) for i in range(self.n_task))
         self.towers = nn.ModuleList(MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(self.n_task))
 
-        self.info_gates = nn.ModuleList(
-            MLP(bottom_params["dims"][-1], output_layer=False, dims=[bottom_params["dims"][-1]])
-            for i in range(self.n_task - 1))
+        self.info_gates = nn.ModuleList(MLP(bottom_params["dims"][-1], output_layer=False, dims=[bottom_params["dims"][-1]]) for i in range(self.n_task - 1))
         self.aits = nn.ModuleList(AttentionLayer(bottom_params["dims"][-1]) for _ in range(self.n_task - 1))
 
     def forward(self, x):

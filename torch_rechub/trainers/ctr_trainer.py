@@ -1,7 +1,9 @@
 import os
+
+from sklearn.metrics import roc_auc_score
 import torch
 import tqdm
-from sklearn.metrics import roc_auc_score
+
 from ..basic.callback import EarlyStopper
 
 

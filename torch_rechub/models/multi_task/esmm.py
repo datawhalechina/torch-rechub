@@ -9,7 +9,8 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 import torch
 import torch.nn as nn
 
-from ...basic.layers import MLP, EmbeddingLayer
+from ...basic.layers import EmbeddingLayer
+from ...basic.layers import MLP
 
 
 class ESMM(nn.Module):

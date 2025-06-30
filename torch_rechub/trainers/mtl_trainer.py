@@ -1,12 +1,17 @@
 import os
-import tqdm
+
 import numpy as np
 import torch
 import torch.nn as nn
+import tqdm
+
 from ..basic.callback import EarlyStopper
-from ..utils.data import get_loss_func, get_metric_func
 from ..models.multi_task import ESMM
-from ..utils.mtl import shared_task_layers, gradnorm, MetaBalance
+from ..utils.data import get_loss_func
+from ..utils.data import get_metric_func
+from ..utils.mtl import gradnorm
+from ..utils.mtl import MetaBalance
+from ..utils.mtl import shared_task_layers
 
 
 class MTLTrainer(object):
@@ -48,10 +53,7 @@ class MTLTrainer(object):
         if gpus is None:
             gpus = []
         if optimizer_params is None:
-            optimizer_params = {
-                "lr": 1e-3,
-                "weight_decay": 1e-5
-            }
+            optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.task_types = task_types
         self.n_task = len(task_types)
         self.loss_weight = None
@@ -97,7 +99,6 @@ class MTLTrainer(object):
         self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         self.model_path = model_path
-
 
     def train_one_epoch(self, data_loader):
         self.model.train()
@@ -149,8 +150,7 @@ class MTLTrainer(object):
 
         return loss_list
 
-
-    def fit(self, train_dataloader, val_dataloader, mode = 'base', seed = 0):
+    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0):
         total_log = []
 
         for epoch_i in range(self.n_epoch):
@@ -169,15 +169,13 @@ class MTLTrainer(object):
             total_log.append(_log_per_epoch)
 
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
-                print('validation best auc of main task %d: %.6f' %
-                      (self.earlystop_taskid, self.early_stopper.best_auc))
+                print('validation best auc of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
                 self.model.load_state_dict(self.early_stopper.best_weights)
                 break
 
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  #save best auc model
 
         return total_log
-
 
     def evaluate(self, model, data_loader):
         model.eval()
@@ -193,7 +191,6 @@ class MTLTrainer(object):
         targets, predicts = np.array(targets), np.array(predicts)
         scores = [self.evaluate_fns[i](targets[:, i], predicts[:, i]) for i in range(self.n_task)]
         return scores
-
 
     def predict(self, model, data_loader):
         model.eval()

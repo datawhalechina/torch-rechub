@@ -1,15 +1,16 @@
-import re
-import os
 import gc
-import time
-import joblib
-import random
+import os
 import pickle
+import random
+import re
+import time
+
+import joblib
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
 
 random.seed(2022)
 np.random.seed(2022)
@@ -118,7 +119,7 @@ def preprocess_data(mode='train'):
 def reduce_mem(df):
     starttime = time.time()
     numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
-    start_mem = df.memory_usage().sum() / 1024**2
+    start_mem = df.memory_usage().sum() / 1024 ** 2
     for col in tqdm(df.columns):
         col_type = df[col].dtypes
         if col_type in numerics:
@@ -142,7 +143,7 @@ def reduce_mem(df):
                     df[col] = df[col].astype(np.float32)
                 else:
                     df[col] = df[col].astype(np.float64)
-    end_mem = df.memory_usage().sum() / 1024**2
+    end_mem = df.memory_usage().sum() / 1024 ** 2
     print('-- Mem. usage decreased to {:5.2f} Mb ({:.1f}% reduction),time spend:{:2.2f} min'.format(end_mem, 100 * (start_mem - end_mem) / start_mem, (time.time() - starttime) / 60))
     gc.collect()
     return df

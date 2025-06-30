@@ -1,14 +1,13 @@
 import pandas as pd
+
 #%%
 
 ui_path = '~/Rec/data/YidianNews/train_data.txt'
 user_path = '~/Rec/data/YidianNews/user_info.txt'
 
 # fetch first 1000 user-item rows for example, no missing values or inconsistent format
-ui_df = pd.read_csv(ui_path, header=None, sep='\t', nrows=1000,
-                    names=['userId', 'itemId', 'showTime', 'network', 'refresh', 'showPos', 'click', 'duration'])
-user_df = pd.read_csv(user_path, header=None, sep='\t',
-                      names=['userId', 'deviceName', 'OS', 'province', 'city', 'age', 'gender'])
+ui_df = pd.read_csv(ui_path, header=None, sep='\t', nrows=1000, names=['userId', 'itemId', 'showTime', 'network', 'refresh', 'showPos', 'click', 'duration'])
+user_df = pd.read_csv(user_path, header=None, sep='\t', names=['userId', 'deviceName', 'OS', 'province', 'city', 'age', 'gender'])
 
 #%%
 data = ui_df.merge(user_df, on='userId', how='left')

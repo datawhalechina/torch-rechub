@@ -2,13 +2,19 @@ import sys
 
 sys.path.append("../..")
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
+
+from torch_rechub.basic.features import DenseFeature
+from torch_rechub.basic.features import SequenceFeature
+from torch_rechub.basic.features import SparseFeature
 from torch_rechub.models.ranking import DIN
 from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.utils.data import DataGenerator, generate_seq_feature, df_to_dict, pad_sequences
+from torch_rechub.utils.data import DataGenerator
+from torch_rechub.utils.data import df_to_dict
+from torch_rechub.utils.data import generate_seq_feature
+from torch_rechub.utils.data import pad_sequences
 
 
 def get_amazon_data_dict(dataset_path):
@@ -19,11 +25,19 @@ def get_amazon_data_dict(dataset_path):
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     print(train)
 
-    features = [SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates+1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users+1, embed_dim=8)]
+    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
     target_features = features
     history_features = [
-        SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-        SequenceFeature("hist_cate_id", vocab_size=n_cates+1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
+        SequenceFeature("hist_item_id",
+                        vocab_size=n_items + 1,
+                        embed_dim=8,
+                        pooling="concat",
+                        shared_with="target_item_id"),
+        SequenceFeature("hist_cate_id",
+                        vocab_size=n_cates + 1,
+                        embed_dim=8,
+                        pooling="concat",
+                        shared_with="target_cate_id")
     ]
 
     print('========== Generate input dict ==========')

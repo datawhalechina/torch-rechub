@@ -8,8 +8,9 @@ Authors: Bo Kang, klinux@live.com
 """
 
 import torch
-import torch.nn.functional as F
 from torch import einsum
+import torch.nn.functional as F
+
 
 class SINE(torch.nn.Module):
     """The match model was proposed in `Sparse-Interest Network for Sequential Recommendation` paper.
@@ -27,13 +28,14 @@ class SINE(torch.nn.Module):
         num_heads （int): number of attention heads in self attention modules, default to 1
         temperature (float): temperature factor in the similarity measure, default to 1.0        
     """
+
     def __init__(self, history_features, item_features, neg_item_features, num_items, embedding_dim, hidden_dim, num_concept, num_intention, seq_max_len, num_heads=1, temperature=1.0):
-        super().__init__()        
+        super().__init__()
         self.item_features = item_features
         self.history_features = history_features
         self.neg_item_features = neg_item_features
         self.temperature = temperature
-        self.num_concept = num_concept        
+        self.num_concept = num_concept
         self.num_intention = num_intention
         self.seq_max_len = seq_max_len
 
@@ -44,9 +46,8 @@ class SINE(torch.nn.Module):
         torch.nn.init.normal_(self.concept_embedding.weight, 0, std)
         self.position_embedding = torch.nn.Embedding(seq_max_len, embedding_dim)
         torch.nn.init.normal_(self.position_embedding.weight, 0, std)
-    
 
-        self.w_1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)        
+        self.w_1 = torch.nn.Parameter(torch.rand(embedding_dim, hidden_dim), requires_grad=True)
         self.w_2 = torch.nn.Parameter(torch.rand(hidden_dim, num_heads), requires_grad=True)
 
         self.w_3 = torch.nn.Parameter(torch.rand(embedding_dim, embedding_dim), requires_grad=True)
@@ -66,7 +67,7 @@ class SINE(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
-        
+
         y = torch.mul(user_embedding, item_embedding).sum(dim=-1)
 
         # # compute covariance regularizer
@@ -78,7 +79,7 @@ class SINE(torch.nn.Module):
     def user_tower(self, x):
         if self.mode == "item":
             return None
-        
+
         # sparse interests extraction
         ## user specific historical item embedding X^u
         hist_item = x[self.history_features[0]]
@@ -88,7 +89,7 @@ class SINE(torch.nn.Module):
         ## user specific conceptual prototypes C^u
         ### attention a
         h_1 = einsum('bse, ed -> bsd', x_u, self.w_1).tanh()
-        a_hist = F.softmax(einsum('bsd, dh -> bsh', h_1, self.w_2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1) 
+        a_hist = F.softmax(einsum('bsd, dh -> bsh', h_1, self.w_2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1)
 
         ### virtual concept vector z_u
         z_u = einsum("bse, bsh -> be", x_u, a_hist)
@@ -98,18 +99,17 @@ class SINE(torch.nn.Module):
         s_u_top_k = torch.topk(s_u, self.num_intention)
 
         ### final C^u
-        c_u =  einsum("bk, bke -> bke", torch.sigmoid(s_u_top_k.values), self.concept_embedding(s_u_top_k.indices))
+        c_u = einsum("bk, bke -> bke", torch.sigmoid(s_u_top_k.values), self.concept_embedding(s_u_top_k.indices))
 
-        ## user intention assignment P_{k|t}        
-        p_u = F.softmax(einsum("bse, bke -> bks", F.normalize(x_u @ self.w_3, dim=-1),  F.normalize(c_u, p=2, dim=-1)), dim=1)
+        ## user intention assignment P_{k|t}
+        p_u = F.softmax(einsum("bse, bke -> bks", F.normalize(x_u @ self.w_3, dim=-1), F.normalize(c_u, p=2, dim=-1)), dim=1)
 
         ## attention weighing P_{t|k}
         h_2 = einsum('bse, ed -> bsd', x_u, self.w_k1).tanh()
-        a_concept_k = F.softmax(einsum('bsd, dk -> bsk', h_2, self.w_k2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1) 
+        a_concept_k = F.softmax(einsum('bsd, dk -> bsk', h_2, self.w_k2) + -1.e9 * (1 - x_u_mask.unsqueeze(-1).float()), dim=1)
 
         ## multiple interests encoding \phi_\theta^k(x^u)
         phi_u = einsum("bks, bse -> bke", p_u * a_concept_k.permute(0, 2, 1), x_u)
-
 
         # adaptive interest aggregation
         ## intention aware input behavior \hat{X^u}
@@ -117,16 +117,10 @@ class SINE(torch.nn.Module):
 
         ## user's next intention C^u_{apt}
         h_3 = einsum('bse, ed -> bsd', x_u_hat, self.w_4).tanh()
-        c_u_apt = F.normalize(
-                    einsum(
-                        "bs, bse -> be",
-                        F.softmax(einsum('bsd, dh -> bsh', h_3, self.w_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - x_u_mask.float()), dim=1),
-                        x_u_hat
-                    ), -1)
+        c_u_apt = F.normalize(einsum("bs, bse -> be", F.softmax(einsum('bsd, dh -> bsh', h_3, self.w_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - x_u_mask.float()), dim=1), x_u_hat), -1)
 
         ## aggregation weights e_k^u
-        e_u = F.softmax(einsum('be, bke -> bk', c_u_apt, phi_u) / self.temperature, dim=1)         
-
+        e_u = F.softmax(einsum('be, bke -> bk', c_u_apt, phi_u) / self.temperature, dim=1)
 
         # final user representation v^u
         v_u = einsum('bk, bke -> be', e_u, phi_u)
@@ -141,7 +135,7 @@ class SINE(torch.nn.Module):
         pos_embedding = self.item_embedding(x[self.item_features[0]]).unsqueeze(1)
         if self.mode == "item":  #inference embedding mode
             return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
-        neg_embeddings = self.item_embedding(x[self.neg_item_features[0]]).squeeze(1)  #[batch_size, n_neg_items, embed_dim]        
+        neg_embeddings = self.item_embedding(x[self.neg_item_features[0]]).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
 
         return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]
 

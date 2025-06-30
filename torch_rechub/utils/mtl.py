@@ -1,6 +1,10 @@
 import torch
 from torch.optim.optimizer import Optimizer
-from ..models.multi_task import MMOE, SharedBottom, PLE, AITM
+
+from ..models.multi_task import AITM
+from ..models.multi_task import MMOE
+from ..models.multi_task import PLE
+from ..models.multi_task import SharedBottom
 
 
 def shared_task_layers(model):
@@ -27,8 +31,7 @@ def shared_task_layers(model):
         task_layers = list(model.towers.parameters()) + list(model.predict_layers.parameters())
     elif isinstance(model, AITM):
         shared_layers += list(model.bottoms.parameters())
-        task_layers = list(model.info_gates.parameters()) + list(model.towers.parameters()) + list(
-            model.aits.parameters())
+        task_layers = list(model.info_gates.parameters()) + list(model.towers.parameters()) + list(model.aits.parameters())
     else:
         raise ValueError(f'this model {model} is not suitable for MetaBalance Optimizer')
     return shared_layers, task_layers
@@ -78,8 +81,7 @@ class MetaBalance(Optimizer):
                     gp.norms[idx] = gp.norms[idx] * beta + (1 - beta) * torch.norm(gp.grad)
                     # scale the auxiliary gradient
                     relax_factor = group['relax_factor']
-                    gp.grad = gp.grad * gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. -
-                                                                                                         relax_factor)
+                    gp.grad = gp.grad * gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. - relax_factor)
                     # store the gradient of each auxiliary task in state
                     if idx == 0:
                         state['sum_gradient'] = torch.zeros_like(gp.data)
@@ -117,7 +119,7 @@ def gradnorm(loss_list, loss_weight, share_layer, initial_task_loss, alpha):
     mean_loss_ratio = sum(loss_ratio) / len(loss_ratio)
     # compute the GradNorm loss
     # this term has to remain constant
-    constant_term = mean_norm * (mean_loss_ratio**alpha)
+    constant_term = mean_norm * (mean_loss_ratio ** alpha)
     grad_norm_loss = torch.sum(torch.abs(norms - constant_term))
     #print('GradNorm loss {}'.format(grad_norm_loss))
 
