@@ -6,7 +6,9 @@ References:
 Authors: lailai, lailai_zxy@tju.edu.cn
 """
 import torch
-from ...basic.layers import LR, MLP,CrossNetV2, CrossNetMix, EmbeddingLayer
+
+from ...basic.layers import LR, MLP, CrossNetMix, CrossNetV2, EmbeddingLayer
+
 
 class DCNv2(torch.nn.Module):
     """Deep & Cross Network with a mixture of low-rank architecture
@@ -19,15 +21,8 @@ class DCNv2(torch.nn.Module):
         low_rank (int): the rank size of low-rank matrices
         num_experts (int): the number of expert networks
     """
-    def __init__(self,
-                 features,
-                 n_cross_layers,
-                 mlp_params,
-                 model_structure="parallel",
-                 use_low_rank_mixture=True,
-                 low_rank=32,
-                 num_experts=4,
-                 **kwargs):
+
+    def __init__(self, features, n_cross_layers, mlp_params, model_structure="parallel", use_low_rank_mixture=True, low_rank=32, num_experts=4, **kwargs):
         super(DCNv2, self).__init__()
         self.features = features
         self.dims = sum([fea.embed_dim for fea in features])
@@ -38,21 +33,16 @@ class DCNv2(torch.nn.Module):
             self.crossnet = CrossNetV2(self.dims, n_cross_layers)
         self.model_structure = model_structure
         assert self.model_structure in ["crossnet_only", "stacked", "parallel"], \
-               "model_structure={} not supported!".format(self.model_structure)
+            "model_structure={} not supported!".format(self.model_structure)
         if self.model_structure == "stacked":
-            self.stacked_dnn = MLP(self.dims,
-                                   output_layer=False,
-                                   ** mlp_params)
+            self.stacked_dnn = MLP(self.dims, output_layer=False, **mlp_params)
             final_dim = mlp_params["dims"][-1]
         if self.model_structure == "parallel":
-            self.parallel_dnn =  MLP(self.dims,
-                                     output_layer = False,
-                                   ** mlp_params)
+            self.parallel_dnn = MLP(self.dims, output_layer=False, **mlp_params)
             final_dim = mlp_params["dims"][-1] + self.dims
-        if self.model_structure == "crossnet_only": # only CrossNet
+        if self.model_structure == "crossnet_only":  # only CrossNet
             final_dim = self.dims
         self.linear = LR(final_dim)
-
 
     def forward(self, x):
         embed_x = self.embedding(x, self.features, squeeze_dim=True)
@@ -65,5 +55,5 @@ class DCNv2(torch.nn.Module):
             dnn_out = self.parallel_dnn(embed_x)
             final_out = torch.cat([cross_out, dnn_out], dim=1)
         y_pred = self.linear(final_out)
-        y_pred =  torch.sigmoid(y_pred.squeeze(1))
+        y_pred = torch.sigmoid(y_pred.squeeze(1))
         return y_pred

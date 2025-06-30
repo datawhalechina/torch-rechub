@@ -3,7 +3,7 @@ import copy
 
 class EarlyStopper(object):
     """Early stops the training if validation loss doesn't improve after a given patience.
-        
+
     Args:
         patience (int): How long to wait after last time validation auc improved.
     """

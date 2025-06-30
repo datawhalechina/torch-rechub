@@ -1,12 +1,14 @@
 import os
-import tqdm
+
 import numpy as np
 import torch
 import torch.nn as nn
+import tqdm
+
 from ..basic.callback import EarlyStopper
-from ..utils.data import get_loss_func, get_metric_func
 from ..models.multi_task import ESMM
-from ..utils.mtl import shared_task_layers, gradnorm, MetaBalance
+from ..utils.data import get_loss_func, get_metric_func
+from ..utils.mtl import MetaBalance, gradnorm, shared_task_layers
 
 
 class MTLTrainer(object):
@@ -19,7 +21,7 @@ class MTLTrainer(object):
         optimizer_params (dict): parameters of optimizer_fn.
         scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
-        adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`. 
+        adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
         n_epoch (int): epoch number of training.
         earlystop_taskid (int): task id of earlystop metrics relies between multi task (default = 0).
         earlystop_patience (int): how long to wait after last time validation auc improved (default = 10).
@@ -48,10 +50,7 @@ class MTLTrainer(object):
         if gpus is None:
             gpus = []
         if optimizer_params is None:
-            optimizer_params = {
-                "lr": 1e-3,
-                "weight_decay": 1e-5
-            }
+            optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.task_types = task_types
         self.n_task = len(task_types)
         self.loss_weight = None
@@ -71,7 +70,8 @@ class MTLTrainer(object):
                 self.adaptive_method = "gradnorm"
                 self.alpha = adaptive_params.get("alpha", 0.16)
                 share_layers = shared_task_layers(self.model)[0]
-                #gradnorm calculate the gradients of each loss on the last fully connected shared layer weight(dimension is 2)
+                # gradnorm calculate the gradients of each loss on the last
+                # fully connected shared layer weight(dimension is 2)
                 for i in range(len(share_layers)):
                     if share_layers[-i].ndim == 2:
                         self.last_share_layer = share_layers[-i]
@@ -80,7 +80,7 @@ class MTLTrainer(object):
                 self.loss_weight = nn.ParameterList(nn.Parameter(torch.ones(1)) for _ in range(self.n_task))
                 self.model.add_module("loss weight", self.loss_weight)
         if self.adaptive_method != "metabalance":
-            self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default Adam optimizer
+            self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default Adam optimizer
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
@@ -94,24 +94,25 @@ class MTLTrainer(object):
         if len(gpus) > 1:
             print('parallel running on these gpus:', gpus)
             self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
-        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device)
         self.model.to(self.device)
         self.model_path = model_path
-
 
     def train_one_epoch(self, data_loader):
         self.model.train()
         total_loss = np.zeros(self.n_task)
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for iter_i, (x_dict, ys) in enumerate(tk0):
-            x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
+            x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             ys = ys.to(self.device)
             y_preds = self.model(x_dict)
             loss_list = [self.loss_fns[i](y_preds[:, i], ys[:, i].float()) for i in range(self.n_task)]
             if isinstance(self.model, ESMM):
-                loss = sum(loss_list[1:])  #ESSM only compute loss for ctr and ctcvr task
+                # ESSM only compute loss for ctr and ctcvr task
+                loss = sum(loss_list[1:])
             else:
-                if self.adaptive_method != None:
+                if self.adaptive_method is not None:
                     if self.adaptive_method == "uwl":
                         loss = 0
                         for loss_i, w_i in zip(loss_list, self.loss_weight):
@@ -149,8 +150,7 @@ class MTLTrainer(object):
 
         return loss_list
 
-
-    def fit(self, train_dataloader, val_dataloader, mode = 'base', seed = 0):
+    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0):
         total_log = []
 
         for epoch_i in range(self.n_epoch):
@@ -159,7 +159,7 @@ class MTLTrainer(object):
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  #update lr in epoch level by scheduler
+                self.scheduler.step()  # update lr in epoch level by scheduler
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
@@ -169,15 +169,13 @@ class MTLTrainer(object):
             total_log.append(_log_per_epoch)
 
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
-                print('validation best auc of main task %d: %.6f' %
-                      (self.earlystop_taskid, self.early_stopper.best_auc))
+                print('validation best auc of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
                 self.model.load_state_dict(self.early_stopper.best_weights)
                 break
 
-        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  #save best auc model
+        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  # save best auc model
 
         return total_log
-
 
     def evaluate(self, model, data_loader):
         model.eval()
@@ -185,7 +183,7 @@ class MTLTrainer(object):
         with torch.no_grad():
             tk0 = tqdm.tqdm(data_loader, desc="validation", smoothing=0, mininterval=1.0)
             for i, (x_dict, ys) in enumerate(tk0):
-                x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
+                x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
                 ys = ys.to(self.device)
                 y_preds = self.model(x_dict)
                 targets.extend(ys.tolist())
@@ -193,7 +191,6 @@ class MTLTrainer(object):
         targets, predicts = np.array(targets), np.array(predicts)
         scores = [self.evaluate_fns[i](targets[:, i], predicts[:, i]) for i in range(self.n_task)]
         return scores
-
 
     def predict(self, model, data_loader):
         model.eval()

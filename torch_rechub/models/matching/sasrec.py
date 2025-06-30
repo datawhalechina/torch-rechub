@@ -10,8 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.basic.layers import EmbeddingLayer, MLP
+from torch_rechub.basic.features import (DenseFeature, SequenceFeature, SparseFeature)
+from torch_rechub.basic.layers import MLP, EmbeddingLayer
 
 
 class SASRec(torch.nn.Module):
@@ -23,13 +23,15 @@ class SASRec(torch.nn.Module):
         num_heads: The number of heads in MultiheadAttention.
 
     """
-    def __init__(self,
-                 features,
-                 max_len=50,
-                 dropout_rate=0.5,
-                 num_blocks=2,
-                 num_heads=1,
-                 ):
+
+    def __init__(
+        self,
+        features,
+        max_len=50,
+        dropout_rate=0.5,
+        num_blocks=2,
+        num_heads=1,
+    ):
         super(SASRec, self).__init__()
 
         self.features = features
@@ -51,9 +53,7 @@ class SASRec(torch.nn.Module):
             new_attn_layernorm = torch.nn.LayerNorm(self.embed_dim, eps=1e-8)
             self.attention_layernorms.append(new_attn_layernorm)
 
-            new_attn_layer = torch.nn.MultiheadAttention(self.embed_dim,
-                                                         num_heads,
-                                                         dropout_rate)
+            new_attn_layer = torch.nn.MultiheadAttention(self.embed_dim, num_heads, dropout_rate)
             self.attention_layers.append(new_attn_layer)
 
             new_fwd_layernorm = torch.nn.LayerNorm(self.embed_dim, eps=1e-8)
@@ -65,8 +65,8 @@ class SASRec(torch.nn.Module):
     def seq_forward(self, x, embed_x_feature):
         x = x['seq']
 
-        embed_x_feature *= self.features[0].embed_dim ** 0.5
-        embed_x_feature = embed_x_feature.squeeze() # (bacth_size, max_len, embed_dim)
+        embed_x_feature *= self.features[0].embed_dim**0.5
+        embed_x_feature = embed_x_feature.squeeze()  # (bacth_size, max_len, embed_dim)
 
         positions = np.tile(np.array(range(x.shape[1])), [x.shape[0], 1])
 
@@ -81,8 +81,7 @@ class SASRec(torch.nn.Module):
         for i in range(len(self.attention_layers)):
             embed_x_feature = torch.transpose(embed_x_feature, 0, 1)
             Q = self.attention_layernorms[i](embed_x_feature)
-            mha_outputs, _ = self.attention_layers[i](Q, embed_x_feature, embed_x_feature,
-                                                      attn_mask=attention_mask)
+            mha_outputs, _ = self.attention_layers[i](Q, embed_x_feature, embed_x_feature, attn_mask=attention_mask)
 
             embed_x_feature = Q + mha_outputs
             embed_x_feature = torch.transpose(embed_x_feature, 0, 1)
@@ -96,18 +95,22 @@ class SASRec(torch.nn.Module):
         return seq_output
 
     def forward(self, x):
-        embedding = self.item_emb(x, self.features) # (batch_size, 3, max_len, embed_dim)
-        seq_embed, pos_embed, neg_embed = embedding[:, 0], embedding[:, 1], embedding[:, 2] # (batch_size, max_len, embed_dim)
+        # (batch_size, 3, max_len, embed_dim)
+        embedding = self.item_emb(x, self.features)
+        # (batch_size, max_len, embed_dim)
+        seq_embed, pos_embed, neg_embed = embedding[:, 0], embedding[:, 1], embedding[:, 2]
 
-        seq_output = self.seq_forward(x, seq_embed) # (batch_size, max_len, embed_dim)
+        # (batch_size, max_len, embed_dim)
+        seq_output = self.seq_forward(x, seq_embed)
 
         pos_logits = (seq_output * pos_embed).sum(dim=-1)
-        neg_logits = (seq_output * neg_embed).sum(dim=-1) # (batch_size, max_len)
+        neg_logits = (seq_output * neg_embed).sum(dim=-1)  # (batch_size, max_len)
 
         return pos_logits, neg_logits
 
 
 class PointWiseFeedForward(torch.nn.Module):
+
     def __init__(self, hidden_units, dropout_rate):
         super(PointWiseFeedForward, self).__init__()
 

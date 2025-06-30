@@ -10,8 +10,8 @@ def main(data_path):
     data['user_mean'] = data.groupby(by='user_id')['rating'].transform('mean')
     data['item_mean'] = data.groupby(by='item_id')['rating'].transform('mean')
 
-    data.loc[(data.rating>=data.user_mean), 'label'] = 1
-    data.loc[(data.rating<data.user_mean), 'label'] = 0
+    data.loc[(data.rating >= data.user_mean), 'label'] = 1
+    data.loc[(data.rating < data.user_mean), 'label'] = 0
 
     data = data[['user_id', 'item_id', 'time', 'label']]
     for feat in data:

@@ -1,15 +1,16 @@
-import re
-import os
 import gc
-import time
-import joblib
-import random
+import os
 import pickle
+import random
+import re
+import time
+
+import joblib
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
 
 random.seed(2022)
 np.random.seed(2022)
@@ -22,7 +23,8 @@ write_features_map_path = save_path + 'features_map.pkl'
 write_features_path = save_path + 'all_features'
 sparse_columns = ['101', '121', '122', '124', '125', '126', '127', '128', '129', '205', '206', '207', '210', '216', '508', '509', '702', '853', '301', '109_14', '110_14', '127_14', '150_14']
 dense_columns = ['109_14', '110_14', '127_14', '150_14', '508', '509', '702', '853']
-uses_columns = [col for col in sparse_columns] + ['D' + col for col in dense_columns]
+uses_columns = [col for col in sparse_columns] + \
+    ['D' + col for col in dense_columns]
 
 
 def preprocess_data(mode='train'):

@@ -1,16 +1,18 @@
+from itertools import combinations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from itertools import combinations
+
 from .activation import activation_layer
-from .features import DenseFeature, SparseFeature, SequenceFeature
+from .features import DenseFeature, SequenceFeature, SparseFeature
 
 
 class PredictionLayer(nn.Module):
     """Prediction Layer.
 
     Args:
-        task_type (str): if `task_type='classification'`, then return sigmoid(x), 
+        task_type (str): if `task_type='classification'`, then return sigmoid(x),
                     change the input logits to probability. if`task_type='regression'`, then return x.
     """
 
@@ -30,17 +32,17 @@ class EmbeddingLayer(nn.Module):
     """General Embedding Layer.
     We save all the feature embeddings in embed_dict: `{feature_name : embedding table}`.
 
-    
+
     Args:
         features (list): the list of `Feature Class`. It is means all the features which we want to create a embedding table.
 
     Shape:
-        - Input: 
+        - Input:
             x (dict): {feature_name: feature_value}, sequence feature value is a 2D tensor with shape:`(batch_size, seq_len)`,\
                       sparse/dense feature value is a 1D tensor with shape `(batch_size)`.
             features (list): the list of `Feature Class`. It is means the current features which we want to do embedding lookup.
             squeeze_dim (bool): whether to squeeze dim of output (default = `False`).
-        - Output: 
+        - Output:
             - if input Dense: `(batch_size, num_features_dense)`.
             - if input Sparse: `(batch_size, num_features, embed_dim)` or  `(batch_size, num_features * embed_dim)`.
             - if input Sequence: same with input sparse or `(batch_size, num_features_seq, seq_length, embed_dim)` when `pooling=="concat"`.
@@ -54,11 +56,11 @@ class EmbeddingLayer(nn.Module):
         self.n_dense = 0
 
         for fea in features:
-            if fea.name in self.embed_dict:  #exist
+            if fea.name in self.embed_dict:  # exist
                 continue
-            if isinstance(fea, SparseFeature) and fea.shared_with == None:
+            if isinstance(fea, SparseFeature) and fea.shared_with is None:
                 self.embed_dict[fea.name] = fea.get_embedding_layer()
-            elif isinstance(fea, SequenceFeature) and fea.shared_with == None:
+            elif isinstance(fea, SequenceFeature) and fea.shared_with is None:
                 self.embed_dict[fea.name] = fea.get_embedding_layer()
             elif isinstance(fea, DenseFeature):
                 self.n_dense += 1
@@ -68,7 +70,7 @@ class EmbeddingLayer(nn.Module):
         sparse_exists, dense_exists = False, False
         for fea in features:
             if isinstance(fea, SparseFeature):
-                if fea.shared_with == None:
+                if fea.shared_with is None:
                     sparse_emb.append(self.embed_dict[fea.name](x[fea.name].long()).unsqueeze(1))
                 else:
                     sparse_emb.append(self.embed_dict[fea.shared_with](x[fea.name].long()).unsqueeze(1))
@@ -80,15 +82,14 @@ class EmbeddingLayer(nn.Module):
                 elif fea.pooling == "concat":
                     pooling_layer = ConcatPooling()
                 else:
-                    raise ValueError("Sequence pooling method supports only pooling in %s, got %s." %
-                                     (["sum", "mean"], fea.pooling))
+                    raise ValueError("Sequence pooling method supports only pooling in %s, got %s." % (["sum", "mean"], fea.pooling))
                 fea_mask = InputMask()(x, fea)
-                if fea.shared_with == None:
+                if fea.shared_with is None:
                     sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long()), fea_mask).unsqueeze(1))
                 else:
-                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long()), fea_mask).unsqueeze(1))  #shared specific sparse feature embedding
+                    sparse_emb.append(pooling_layer(self.embed_dict[fea.shared_with](x[fea.name].long()), fea_mask).unsqueeze(1))  # shared specific sparse feature embedding
             else:
-                dense_values.append(x[fea.name].float() if x[fea.name].float().dim() > 1 else x[fea.name].float().unsqueeze(1))  #.unsqueeze(1).unsqueeze(1)
+                dense_values.append(x[fea.name].float() if x[fea.name].float().dim() > 1 else x[fea.name].float().unsqueeze(1))  # .unsqueeze(1).unsqueeze(1)
 
         if len(dense_values) > 0:
             dense_exists = True
@@ -96,36 +97,36 @@ class EmbeddingLayer(nn.Module):
         if len(sparse_emb) > 0:
             sparse_exists = True
             # TODO: support concat dynamic embed_dim in dim 2
-            sparse_emb = torch.cat(sparse_emb, dim=1)  #[batch_size, num_features, embed_dim] 
+            # [batch_size, num_features, embed_dim]
+            sparse_emb = torch.cat(sparse_emb, dim=1)
 
-        if squeeze_dim:  #Note: if the emb_dim of sparse features is different, we must squeeze_dim
-            if dense_exists and not sparse_exists:  #only input dense features
+        if squeeze_dim:  # Note: if the emb_dim of sparse features is different, we must squeeze_dim
+            if dense_exists and not sparse_exists:  # only input dense features
                 return dense_values
             elif not dense_exists and sparse_exists:
-                return sparse_emb.flatten(start_dim=1)  #squeeze dim to : [batch_size, num_features*embed_dim]
+                # squeeze dim to : [batch_size, num_features*embed_dim]
+                return sparse_emb.flatten(start_dim=1)
             elif dense_exists and sparse_exists:
-                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values),
-                                 dim=1)  #concat dense value with sparse embedding
+                # concat dense value with sparse embedding
+                return torch.cat((sparse_emb.flatten(start_dim=1), dense_values), dim=1)
             else:
                 raise ValueError("The input features can note be empty")
         else:
             if sparse_exists:
-                return sparse_emb  #[batch_size, num_features, embed_dim]
+                return sparse_emb  # [batch_size, num_features, embed_dim]
             else:
-                raise ValueError(
-                    "If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" %
-                    ("SparseFeatures", features))
+                raise ValueError("If keep the original shape:[batch_size, num_features, embed_dim], expected %s in feature list, got %s" % ("SparseFeatures", features))
 
 
 class InputMask(nn.Module):
     """Return inputs mask from given features
 
     Shape:
-        - Input: 
+        - Input:
             x (dict): {feature_name: feature_value}, sequence feature value is a 2D tensor with shape:`(batch_size, seq_len)`,\
                       sparse/dense feature value is a 1D tensor with shape `(batch_size)`.
             features (list or SparseFeature or SequenceFeature): Note that the elements in features are either all instances of SparseFeature or all instances of SequenceFeature.
-        - Output: 
+        - Output:
             - if input Sparse: `(batch_size, num_features)`
             - if input Sequence: `(batch_size, num_features_seq, seq_length)`
     """
@@ -139,7 +140,7 @@ class InputMask(nn.Module):
             features = [features]
         for fea in features:
             if isinstance(fea, SparseFeature) or isinstance(fea, SequenceFeature):
-                if fea.padding_idx != None:
+                if fea.padding_idx is not None:
                     fea_mask = x[fea.name].long() != fea.padding_idx
                 else:
                     fea_mask = x[fea.name].long() != -1
@@ -150,7 +151,7 @@ class InputMask(nn.Module):
 
 
 class LR(nn.Module):
-    """Logistic Regression Module. It is the one Non-linear 
+    """Logistic Regression Module. It is the one Non-linear
     transformation for input feature.
 
     Args:
@@ -176,7 +177,7 @@ class LR(nn.Module):
 
 class ConcatPooling(nn.Module):
     """Keep the origin sequence embedding shape
-   
+
     Shape:
     - Input: `(batch_size, seq_length, embed_dim)`
     - Output: `(batch_size, seq_length, embed_dim)`
@@ -191,7 +192,7 @@ class ConcatPooling(nn.Module):
 
 class AveragePooling(nn.Module):
     """Pooling the sequence embedding matrix by `mean`.
-    
+
     Shape:
         - Input
             x: `(batch_size, seq_length, embed_dim)`
@@ -203,7 +204,7 @@ class AveragePooling(nn.Module):
         super().__init__()
 
     def forward(self, x, mask=None):
-        if mask == None:
+        if mask is None:
             return torch.mean(x, dim=1)
         else:
             sum_pooling_matrix = torch.bmm(mask, x).squeeze(1)
@@ -225,20 +226,20 @@ class SumPooling(nn.Module):
         super().__init__()
 
     def forward(self, x, mask=None):
-        if mask == None:
+        if mask is None:
             return torch.sum(x, dim=1)
         else:
             return torch.bmm(mask, x).squeeze(1)
 
 
 class MLP(nn.Module):
-    """Multi Layer Perceptron Module, it is the most widely used module for 
-    learning feature. Note we default add `BatchNorm1d` and `Activation` 
+    """Multi Layer Perceptron Module, it is the most widely used module for
+    learning feature. Note we default add `BatchNorm1d` and `Activation`
     `Dropout` for each `Linear` Module.
 
     Args:
         input dim (int): input size of the first Linear Layer.
-        output_layer (bool): whether this MLP module is the output layer. If `True`, then append one Linear(*,1) module. 
+        output_layer (bool): whether this MLP module is the output layer. If `True`, then append one Linear(*,1) module.
         dims (list): output size of Linear Layer (default=[]).
         dropout (float): probability of an element to be zeroed (default = 0.5).
         activation (str): the activation function, support `[sigmoid, relu, prelu, dice, softmax]` (default='relu').
@@ -269,7 +270,7 @@ class MLP(nn.Module):
 
 class FM(nn.Module):
     """The Factorization Machine module, mentioned in the `DeepFM paper
-    <https://arxiv.org/pdf/1703.04247.pdf>`. It is used to learn 2nd-order 
+    <https://arxiv.org/pdf/1703.04247.pdf>`. It is used to learn 2nd-order
     feature interactions.
 
     Args:
@@ -299,7 +300,7 @@ class CIN(nn.Module):
     Args:
         input_dim (int): input dim of input tensor.
         cin_size (list[int]): out channels of Conv1d.
-    
+
     Shape:
         - Input: `(batch_size, num_features, embed_dim)`
         - Output: `(batch_size, 1)`
@@ -335,12 +336,14 @@ class CIN(nn.Module):
             xs.append(x)
         return self.fc(torch.sum(torch.cat(xs, dim=1), 2))
 
+
 class CrossLayer(nn.Module):
     """
         Cross layer.
     Args:
         input_dim (int): input dim of input tensor
     """
+
     def __init__(self, input_dim):
         super(CrossLayer, self).__init__()
         self.w = torch.nn.Linear(input_dim, 1, bias=False)
@@ -356,11 +359,11 @@ class CrossNetwork(nn.Module):
 
     Args:
         input_dim (int): input dim of input tensor
-    
+
     Shape:
         - Input: `(batch_size, *)`
         - Output: `(batch_size, *)`
-        
+
     """
 
     def __init__(self, input_dim, num_layers):
@@ -379,19 +382,21 @@ class CrossNetwork(nn.Module):
             x = x0 * xw + self.b[i] + x
         return x
 
+
 class CrossNetV2(nn.Module):
+
     def __init__(self, input_dim, num_layers):
         super().__init__()
         self.num_layers = num_layers
         self.w = torch.nn.ModuleList([torch.nn.Linear(input_dim, input_dim, bias=False) for _ in range(num_layers)])
         self.b = torch.nn.ParameterList([torch.nn.Parameter(torch.zeros((input_dim,))) for _ in range(num_layers)])
 
-
     def forward(self, x):
         x0 = x
         for i in range(self.num_layers):
-            x =x0*self.w[i](x) + self.b[i] + x
+            x = x0 * self.w[i](x) + self.b[i] + x
         return x
+
 
 class CrossNetMix(nn.Module):
     """ CrossNetMix improves CrossNetwork by:
@@ -406,18 +411,14 @@ class CrossNetMix(nn.Module):
         self.num_experts = num_experts
 
         # U: (input_dim, low_rank)
-        self.u_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(
-            torch.empty(num_experts, input_dim, low_rank))) for i in range(self.num_layers)])
+        self.u_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(torch.empty(num_experts, input_dim, low_rank))) for i in range(self.num_layers)])
         # V: (input_dim, low_rank)
-        self.v_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(
-            torch.empty(num_experts, input_dim, low_rank))) for i in range(self.num_layers)])
+        self.v_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(torch.empty(num_experts, input_dim, low_rank))) for i in range(self.num_layers)])
         # C: (low_rank, low_rank)
-        self.c_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(
-            torch.empty(num_experts, low_rank, low_rank))) for i in range(self.num_layers)])
+        self.c_list = torch.nn.ParameterList([nn.Parameter(nn.init.xavier_normal_(torch.empty(num_experts, low_rank, low_rank))) for i in range(self.num_layers)])
         self.gating = nn.ModuleList([nn.Linear(input_dim, 1, bias=False) for i in range(self.num_experts)])
 
-        self.bias = torch.nn.ParameterList([nn.Parameter(nn.init.zeros_(
-            torch.empty(input_dim, 1))) for i in range(self.num_layers)])
+        self.bias = torch.nn.ParameterList([nn.Parameter(nn.init.zeros_(torch.empty(input_dim, 1))) for i in range(self.num_layers)])
 
     def forward(self, x):
         x_0 = x.unsqueeze(2)  # (bs, in_features, 1)
@@ -447,7 +448,8 @@ class CrossNetMix(nn.Module):
 
                 output_of_experts.append(dot_.squeeze(2))
 
-            # (3) mixture of low-rank experts
+
+# (3) mixture of low-rank experts
             output_of_experts = torch.stack(output_of_experts, 2)  # (bs, in_features, num_experts)
             gating_score_experts = torch.stack(gating_score_experts, 1)  # (bs, num_experts, 1)
             moe_out = torch.matmul(output_of_experts, gating_score_experts.softmax(1))
@@ -455,6 +457,7 @@ class CrossNetMix(nn.Module):
 
         x_l = x_l.squeeze()  # (bs, in_features)
         return x_l
+
 
 class SENETLayer(nn.Module):
     """
@@ -466,18 +469,18 @@ class SENETLayer(nn.Module):
         - num_fields: `(batch_size, *)`
         - Output: `(batch_size, *)`
     """
+
     def __init__(self, num_fields, reduction_ratio=3):
         super(SENETLayer, self).__init__()
-        reduced_size = max(1, int(num_fields/ reduction_ratio))
-        self.mlp = nn.Sequential(nn.Linear(num_fields, reduced_size, bias=False),
-                                 nn.ReLU(),
-                                 nn.Linear(reduced_size, num_fields, bias=False),
-                                 nn.ReLU())
+        reduced_size = max(1, int(num_fields / reduction_ratio))
+        self.mlp = nn.Sequential(nn.Linear(num_fields, reduced_size, bias=False), nn.ReLU(), nn.Linear(reduced_size, num_fields, bias=False), nn.ReLU())
+
     def forward(self, x):
         z = torch.mean(x, dim=-1, out=None)
         a = self.mlp(z)
-        v = x*a.unsqueeze(-1)
+        v = x * a.unsqueeze(-1)
         return v
+
 
 class BiLinearInteractionLayer(nn.Module):
     """
@@ -489,7 +492,8 @@ class BiLinearInteractionLayer(nn.Module):
         - num_fields: `(batch_size, *)`
         - Output: `(batch_size, *)`
     """
-    def __init__(self, input_dim, num_fields, bilinear_type = "field_interaction"):
+
+    def __init__(self, input_dim, num_fields, bilinear_type="field_interaction"):
         super(BiLinearInteractionLayer, self).__init__()
         self.bilinear_type = bilinear_type
         if self.bilinear_type == "field_all":
@@ -497,21 +501,19 @@ class BiLinearInteractionLayer(nn.Module):
         elif self.bilinear_type == "field_each":
             self.bilinear_layer = nn.ModuleList([nn.Linear(input_dim, input_dim, bias=False) for i in range(num_fields)])
         elif self.bilinear_type == "field_interaction":
-            self.bilinear_layer = nn.ModuleList([nn.Linear(input_dim, input_dim, bias=False) for i,j in combinations(range(num_fields), 2)])
+            self.bilinear_layer = nn.ModuleList([nn.Linear(input_dim, input_dim, bias=False) for i, j in combinations(range(num_fields), 2)])
         else:
             raise NotImplementedError()
 
     def forward(self, x):
         feature_emb = torch.split(x, 1, dim=1)
         if self.bilinear_type == "field_all":
-            bilinear_list = [self.bilinear_layer(v_i)*v_j for v_i, v_j in combinations(feature_emb, 2)]
+            bilinear_list = [self.bilinear_layer(v_i) * v_j for v_i, v_j in combinations(feature_emb, 2)]
         elif self.bilinear_type == "field_each":
-            bilinear_list = [self.bilinear_layer[i](feature_emb[i])*feature_emb[j] for i,j in combinations(range(len(feature_emb)), 2)]
+            bilinear_list = [self.bilinear_layer[i](feature_emb[i]) * feature_emb[j] for i, j in combinations(range(len(feature_emb)), 2)]
         elif self.bilinear_type == "field_interaction":
-            bilinear_list = [self.bilinear_layer[i](v[0])*v[1] for i,v in enumerate(combinations(feature_emb, 2))]
+            bilinear_list = [self.bilinear_layer[i](v[0]) * v[1] for i, v in enumerate(combinations(feature_emb, 2))]
         return torch.cat(bilinear_list, dim=1)
-
-
 
 
 class MultiInterestSA(nn.Module):
@@ -533,7 +535,7 @@ class MultiInterestSA(nn.Module):
         super(MultiInterestSA, self).__init__()
         self.embedding_dim = embedding_dim
         self.interest_num = interest_num
-        if hidden_dim == None:
+        if hidden_dim is None:
             self.hidden_dim = self.embedding_dim * 4
         self.W1 = torch.nn.Parameter(torch.rand(self.embedding_dim, self.hidden_dim), requires_grad=True)
         self.W2 = torch.nn.Parameter(torch.rand(self.hidden_dim, self.interest_num), requires_grad=True)
@@ -541,8 +543,9 @@ class MultiInterestSA(nn.Module):
 
     def forward(self, seq_emb, mask=None):
         H = torch.einsum('bse, ed -> bsd', seq_emb, self.W1).tanh()
-        if mask != None:
-            A = torch.einsum('bsd, dk -> bsk', H, self.W2) + -1.e9 * (1 - mask.float())
+        if mask is not None:
+            A = torch.einsum('bsd, dk -> bsk', H, self.W2) + - \
+                1.e9 * (1 - mask.float())
             A = F.softmax(A, dim=1)
         else:
             A = F.softmax(torch.einsum('bsd, dk -> bsk', H, self.W2), dim=1)
@@ -606,17 +609,9 @@ class CapsuleNetwork(nn.Module):
             item_eb_hat_iter = item_eb_hat
 
         if self.bilinear_type > 0:
-            capsule_weight = torch.zeros(item_eb_hat.shape[0],
-                                         self.interest_num,
-                                         self.seq_len,
-                                         device=item_eb.device,
-                                         requires_grad=False)
+            capsule_weight = torch.zeros(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
         else:
-            capsule_weight = torch.randn(item_eb_hat.shape[0],
-                                         self.interest_num,
-                                         self.seq_len,
-                                         device=item_eb.device,
-                                         requires_grad=False)
+            capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
 
         for i in range(self.routing_times):  # 动态路由传播3次
             atten_mask = torch.unsqueeze(mask, 1).repeat(1, self.interest_num, 1)
@@ -629,7 +624,8 @@ class CapsuleNetwork(nn.Module):
             if i < 2:
                 interest_capsule = torch.matmul(capsule_softmax_weight, item_eb_hat_iter)
                 cap_norm = torch.sum(torch.square(interest_capsule), -1, True)
-                scalar_factor = cap_norm / (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
+                scalar_factor = cap_norm / \
+                    (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
                 interest_capsule = scalar_factor * interest_capsule
 
                 delta_weight = torch.matmul(item_eb_hat_iter, torch.transpose(interest_capsule, 2, 3).contiguous())
@@ -638,7 +634,8 @@ class CapsuleNetwork(nn.Module):
             else:
                 interest_capsule = torch.matmul(capsule_softmax_weight, item_eb_hat)
                 cap_norm = torch.sum(torch.square(interest_capsule), -1, True)
-                scalar_factor = cap_norm / (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
+                scalar_factor = cap_norm / \
+                    (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
                 interest_capsule = scalar_factor * interest_capsule
 
         interest_capsule = torch.reshape(interest_capsule, (-1, self.interest_num, self.embedding_dim))
@@ -651,8 +648,8 @@ class CapsuleNetwork(nn.Module):
 
 class FFM(nn.Module):
     """The Field-aware Factorization Machine module, mentioned in the `FFM paper
-    <https://dl.acm.org/doi/abs/10.1145/2959100.2959134>`. It explicitly models 
-    multi-channel second-order feature interactions, with each feature filed 
+    <https://dl.acm.org/doi/abs/10.1145/2959100.2959134>`. It explicitly models
+    multi-channel second-order feature interactions, with each feature filed
     corresponding to one channel.
 
     Args:
@@ -665,19 +662,20 @@ class FFM(nn.Module):
     """
 
     def __init__(self, num_fields, reduce_sum=True):
-        super().__init__()        
+        super().__init__()
         self.num_fields = num_fields
         self.reduce_sum = reduce_sum
 
     def forward(self, x):
         # compute (non-redundant) second order field-aware feature crossings
         crossed_embeddings = []
-        for i in range(self.num_fields-1):
-            for j in range(i+1, self.num_fields):
-                crossed_embeddings.append(x[:, i, j, :] *  x[:, j, i, :])        
+        for i in range(self.num_fields - 1):
+            for j in range(i + 1, self.num_fields):
+                crossed_embeddings.append(x[:, i, j, :] * x[:, j, i, :])
         crossed_embeddings = torch.stack(crossed_embeddings, dim=1)
-        
-        # if reduce_sum is true, the crossing operation is effectively inner product, other wise Hadamard-product
+
+        # if reduce_sum is true, the crossing operation is effectively inner
+        # product, other wise Hadamard-product
         if self.reduce_sum:
             crossed_embeddings = torch.sum(crossed_embeddings, dim=-1, keepdim=True)
         return crossed_embeddings
@@ -685,8 +683,8 @@ class FFM(nn.Module):
 
 class CEN(nn.Module):
     """The Compose-Excitation Network module, mentioned in the `FAT-DeepFFM paper
-    <https://arxiv.org/abs/1905.06336>`, a modified version of 
-    `Squeeze-and-Excitation Network” (SENet) (Hu et al., 2017)`. It is used to 
+    <https://arxiv.org/abs/1905.06336>`, a modified version of
+    `Squeeze-and-Excitation Network” (SENet) (Hu et al., 2017)`. It is used to
     highlight the importance of second-order feature crosses.
 
     Args:
@@ -698,23 +696,26 @@ class CEN(nn.Module):
         - Input: `(batch_size, num_fields, num_fields, embed_dim)`
         - Output: `(batch_size, num_fields*(num_fields-1)/2 * embed_dim)`
     """
+
     def __init__(self, embed_dim, num_field_crosses, reduction_ratio):
-        super().__init__()        
-        
+        super().__init__()
+
         # convolution weight (Eq.7 FAT-DeepFFM)
         self.u = torch.nn.Parameter(torch.rand(num_field_crosses, embed_dim), requires_grad=True)
 
         # two FC layers that computes the field attention
-        self.mlp_att = MLP(num_field_crosses, dims=[num_field_crosses//reduction_ratio, num_field_crosses], output_layer=False, activation="relu")
-        
+        self.mlp_att = MLP(num_field_crosses, dims=[num_field_crosses // reduction_ratio, num_field_crosses], output_layer=False, activation="relu")
 
-    def forward(self, em):  
-        # compute descriptor vector (Eq.7 FAT-DeepFFM), output shape [batch_size, num_field_crosses]
+    def forward(self, em):
+        # compute descriptor vector (Eq.7 FAT-DeepFFM), output shape
+        # [batch_size, num_field_crosses]
         d = F.relu((self.u.squeeze(0) * em).sum(-1))
-        
-        # compute field attention (Eq.9), output shape [batch_size, num_field_crosses]    
-        s = self.mlp_att(d)                             
 
-        # rescale original embedding with field attention (Eq.10), output shape [batch_size, num_field_crosses, embed_dim]
-        aem = s.unsqueeze(-1) * em                 
-        return aem.flatten(start_dim=1)        
+        # compute field attention (Eq.9), output shape [batch_size,
+        # num_field_crosses]
+        s = self.mlp_att(d)
+
+        # rescale original embedding with field attention (Eq.10), output shape
+        # [batch_size, num_field_crosses, embed_dim]
+        aem = s.unsqueeze(-1) * em
+        return aem.flatten(start_dim=1)

@@ -249,9 +249,13 @@ We welcome all types of contributions! If you'd like to contribute to this proje
 
 1. **Fork the repository:** Click the "Fork" button in the upper right corner.
 2. **Make your changes:** Implement new features or fix bugs.
-3. **Commit changes:** `git commit -m "feat: add new feature"` or `fix: fix some issue"` (Following [Conventional Commits](https://www.conventionalcommits.org/) is preferred).
-4. **Push to branch:** `git push origin`
-5. **Create Pull Request:** Go back to the original repository page, click "New pull request", compare your branch with the `main` branch of the main repository, and submit PR.
+3. **Format code:** Run code formatting before committing to ensure consistent code style:
+   ```bash
+   python config/format_code.py
+   ```
+4. **Commit changes:** `git commit -m "feat: add new feature"` or `fix: fix some issue"` (Following [Conventional Commits](https://www.conventionalcommits.org/) is preferred).
+5. **Push to branch:** `git push origin`
+6. **Create Pull Request:** Go back to the original repository page, click "New pull request", compare your branch with the `main` branch of the main repository, and submit PR.
 
 Please ensure your PR description clearly explains the changes and their purpose.
 
@@ -285,4 +289,4 @@ If you use this framework in your research or work, please consider citing:
 
 ---
 
-*Last updated: [2025-03-31]*
+*Last updated: [2025-06-30]*

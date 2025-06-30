@@ -1,6 +1,6 @@
 """
 Date: create on 12/05/2022
-References: 
+References:
     paper: (AKDD'2017) Deep & Cross Network for Ad Click Predictions
     url: https://arxiv.org/abs/1708.05123
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn

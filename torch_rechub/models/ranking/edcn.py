@@ -8,7 +8,8 @@ Authors: lailai, lailai_zxy@tju.edu.cn
 
 import torch
 from torch import nn
-from ...basic.layers import LR, MLP, CrossLayer,  EmbeddingLayer
+
+from ...basic.layers import LR, MLP, CrossLayer, EmbeddingLayer
 
 
 class EDCN(torch.nn.Module):
@@ -23,8 +24,7 @@ class EDCN(torch.nn.Module):
         temperature (int): the temperature coefficient to control distribution
     """
 
-    def __init__(self, features, n_cross_layers, mlp_params, bridge_type="hadamard_product", use_regulation_module=True,
-                 temperature=1):
+    def __init__(self, features, n_cross_layers, mlp_params, bridge_type="hadamard_product", use_regulation_module=True, temperature=1):
         super().__init__()
         self.features = features
         self.n_cross_layers = n_cross_layers
@@ -34,10 +34,7 @@ class EDCN(torch.nn.Module):
         self.embedding = EmbeddingLayer(features)
         self.cross_layers = nn.ModuleList([CrossLayer(self.dims) for _ in range(n_cross_layers)])
         self.bridge_modules = nn.ModuleList([BridgeModule(self.dims, bridge_type) for _ in range(n_cross_layers)])
-        self.regulation_modules = nn.ModuleList([RegulationModule(self.num_fields,
-                                                   self.fea_dims,
-                                                   tau=temperature,
-                                                   use_regulation=use_regulation_module) for _ in range(n_cross_layers)])
+        self.regulation_modules = nn.ModuleList([RegulationModule(self.num_fields, self.fea_dims, tau=temperature, use_regulation=use_regulation_module) for _ in range(n_cross_layers)])
         mlp_params["dims"] = [self.dims, self.dims]
         self.mlps = nn.ModuleList([MLP(self.dims, output_layer=False, **mlp_params) for _ in range(n_cross_layers)])
         self.linear = LR(self.dims * 3)
@@ -47,7 +44,7 @@ class EDCN(torch.nn.Module):
         cross_i, deep_i = self.regulation_modules[0](embed_x)
         cross_0 = cross_i
         for i in range(self.n_cross_layers):
-            if i>0:
+            if i > 0:
                 cross_i, deep_i = self.regulation_modules[i](bridge_i)
             cross_i = cross_i + self.cross_layers[i](cross_0, cross_i)
             deep_i = self.mlps[i](deep_i)
@@ -58,23 +55,17 @@ class EDCN(torch.nn.Module):
 
 
 class BridgeModule(torch.nn.Module):
+
     def __init__(self, input_dim, bridge_type):
         super(BridgeModule, self).__init__()
-        assert bridge_type in ["hadamard_product", "pointwise_addition", "concatenation",
-                               "attention_pooling"], 'bridge_type= is not supported'.format(bridge_type)
+        assert bridge_type in ["hadamard_product", "pointwise_addition", "concatenation", "attention_pooling"], 'bridge_type= is not supported'.format(bridge_type)
         self.bridge_type = bridge_type
-        if bridge_type=="concatenation":
-            self.concat_pooling = nn.Sequential(nn.Linear(input_dim * 2, input_dim),
-                                                nn.ReLU())
-        elif bridge_type=="attention_pooling":
-            self.attention_x = nn.Sequential(nn.Linear(input_dim, input_dim),
-                                             nn.ReLU(),
-                                             nn.Linear(input_dim, input_dim,bias=False),
-                                             nn.Softmax(dim=-1))
-            self.attention_h = nn.Sequential(nn.Linear(input_dim, input_dim),
-                                             nn.ReLU(),
-                                             nn.Linear(input_dim, input_dim,bias=False),
-                                             nn.Softmax(dim=-1))
+        if bridge_type == "concatenation":
+            self.concat_pooling = nn.Sequential(nn.Linear(input_dim * 2, input_dim), nn.ReLU())
+        elif bridge_type == "attention_pooling":
+            self.attention_x = nn.Sequential(nn.Linear(input_dim, input_dim), nn.ReLU(), nn.Linear(input_dim, input_dim, bias=False), nn.Softmax(dim=-1))
+            self.attention_h = nn.Sequential(nn.Linear(input_dim, input_dim), nn.ReLU(), nn.Linear(input_dim, input_dim, bias=False), nn.Softmax(dim=-1))
+
     def forward(self, x, h):
         if self.bridge_type == "hadamard_product":
             out = x * h
@@ -88,10 +79,8 @@ class BridgeModule(torch.nn.Module):
 
 
 class RegulationModule(torch.nn.Module):
-    def __init__(self, num_fields,
-                 dims,
-                 tau,
-                 use_regulation=True):
+
+    def __init__(self, num_fields, dims, tau, use_regulation=True):
         super(RegulationModule, self).__init__()
         self.use_regulation = use_regulation
         if self.use_regulation:
@@ -103,15 +92,10 @@ class RegulationModule(torch.nn.Module):
 
     def forward(self, x):
         if self.use_regulation:
-            g1 = torch.cat([(self.g1[i]/ self.tau).softmax(dim=-1).unsqueeze(-1).repeat(1, self.dims[i]) for i in range(self.num_fields)], dim=-1)
+            g1 = torch.cat([(self.g1[i] / self.tau).softmax(dim=-1).unsqueeze(-1).repeat(1, self.dims[i]) for i in range(self.num_fields)], dim=-1)
             g2 = torch.cat([(self.g2[i] / self.tau).softmax(dim=-1).unsqueeze(-1).repeat(1, self.dims[i]) for i in range(self.num_fields)], dim=-1)
 
-            out1, out2 = g1*x, g2*x
+            out1, out2 = g1 * x, g2 * x
         else:
             out1, out2 = x, x
         return out1, out2
-
-
-
-
-

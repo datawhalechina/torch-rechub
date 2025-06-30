@@ -1,0 +1,240 @@
+# ===================================================================
+# CI/CD 流程配置 - 代码质量检查、测试、构建、发布
+# ===================================================================
+# 这个workflow在代码文件变更时触发，运行完整的CI/CD流程
+# 排除docs目录和markdown文件的变更
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'mkdocs.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'mkdocs.yml'
+  release:
+    types: [published]
+
+# 环境变量
+env:
+  PYTHON_VERSION: '3.8'
+  TORCH_INDEX_URL: 'https://download.pytorch.org/whl/cpu'
+
+jobs:
+  # ===================================================================
+  # 代码质量检查
+  # ===================================================================
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+            ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          # 安装特定版本的格式化工具以确保一致性
+          pip install yapf==0.32.0 isort==5.10.1 flake8>=3.8.0 mypy>=0.800
+
+      - name: Format & Lint
+        run: |
+          # 步骤1: isort
+          isort torch_rechub/ examples/ tests/
+          # 步骤2: yapf
+          yapf_style="{based_on_style: google, column_limit: 248, join_multiple_lines: false, split_all_comma_separated_values: true, split_before_logical_operator: true, dedent_closing_brackets: true, align_closing_bracket_with_visual_indent: true, indent_width: 4}"
+          yapf --in-place --recursive --style="$yapf_style" torch_rechub/ examples/ tests/
+          
+          # 步骤3: 检查工作区是否干净，确认所有格式化都已提交
+          git diff --exit-code
+          
+          # 步骤4: 运行flake8进行最终的代码质量检查
+          flake8 --max-line-length=248 --extend-ignore=E203,W503,E501,E722,E402,F821,F523,E711,E741,F401,E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302 --max-complexity=30 torch_rechub/ examples/ tests/
+
+      - name: Type checking (MyPy) - Optional
+        continue-on-error: true
+        run: |
+          mypy torch_rechub/ --ignore-missing-imports
+
+  # ===================================================================
+  # 测试矩阵
+  # ===================================================================
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # 排除一些不必要的组合以加速CI
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/torch
+          key: ${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ matrix.python-version }}-
+            ${{ runner.os }}-
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install CPU-only PyTorch for faster CI
+          pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
+          # Install the package with dev dependencies
+          pip install -e .[dev] || pip install -r requirements-dev.txt && pip install -e .
+
+      - name: Run tests
+        run: |
+          pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # ===================================================================
+  # 安全检查
+  # ===================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run security scan
+        run: |
+          bandit -r torch_rechub/ -s B101,B311,B614 -x tests,docs,examples -f json -o bandit-report.json || true
+          bandit -r torch_rechub/ -s B101,B311,B614 -x tests,docs,examples -f txt
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  # ===================================================================
+  # 构建检查
+  # ===================================================================
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [test, security]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel setuptools
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Check package
+        run: |
+          twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+  # ===================================================================
+  # 自动发布到PyPI
+  # ===================================================================
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: pypi
+    permissions:
+      id-token: write  # Required for trusted publishing
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository-url: https://upload.pypi.org/legacy/ 

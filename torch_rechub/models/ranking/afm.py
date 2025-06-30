@@ -1,15 +1,16 @@
 """
 Date: create on 23/04/2024
-References: 
+References:
     paper: (IJCAI'2017) Attentional Factorization Machines：Learning the Weight of Feature Interactions via Attention Networks
     url: https://arxiv.org/abs/1708.04617
 Authors: Tao Fan, thisisevy@foxmail.com
 """
 
 import torch
-from ...basic.layers import FM, MLP, LR, EmbeddingLayer
 from torch import nn
 from torch.nn import Parameter, init
+
+from ...basic.layers import FM, LR, MLP, EmbeddingLayer
 
 
 class AFM(nn.Module):
@@ -50,7 +51,8 @@ class AFM(nn.Module):
         return atts
 
     def forward(self, x):
-        input_fm = self.embedding(x, self.fm_features, squeeze_dim=False)  # [batch_size, num_fields, embed_dim]
+        # [batch_size, num_fields, embed_dim]
+        input_fm = self.embedding(x, self.fm_features, squeeze_dim=False)
 
         y_linear = self.linear(input_fm.flatten(start_dim=1))
         y_fm = self.fm(input_fm)

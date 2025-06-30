@@ -1,22 +1,23 @@
 import sys
 
-sys.path.append("../..")
-
 import numpy as np
 import pandas as pd
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN, DeepFFM, FatDeepFFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.models.ranking import (DCN, DeepFFM, DeepFM, FatDeepFFM, WideDeep)
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
+
+sys.path.append("../..")
 
 
 def convert_numeric_feature(val):
     v = int(val)
     if v > 2:
-        return int(np.log(v) ** 2)
+        return int(np.log(v)**2)
     else:
         return v - 2
 
@@ -34,9 +35,7 @@ def get_avazu_data_dict(data_path):
     sparse_features = features[3:]
     data[sparse_features] = data[sparse_features].fillna("-996",)
     data[dense_features] = data[dense_features].fillna(0,)
-    for feat in tqdm(
-        dense_features
-    ):  # discretize dense feature and as new sparse feature
+    for feat in tqdm(dense_features):  # discretize dense feature and as new sparse feature
         sparse_features.append(feat + "_cat")
         data[feat + "_cat"] = data[feat].apply(lambda x: convert_numeric_feature(x))
 
@@ -46,33 +45,16 @@ def get_avazu_data_dict(data_path):
         lbe = LabelEncoder()
         data[feat] = lbe.fit_transform(data[feat])
     dense_feas = [DenseFeature(feature_name) for feature_name in dense_features]
-    sparse_feas = [
-        SparseFeature(
-            feature_name, vocab_size=data[feature_name].nunique(), embed_dim=16
-        )
-        for feature_name in features
-    ]
-    ffm_linear_feas = [
-        SparseFeature(
-            feature.name, vocab_size=feature.vocab_size, embed_dim=1
-        ) 
-        for feature in sparse_feas
-    ]
-    ffm_cross_feas = [
-        SparseFeature(
-            feature.name, vocab_size=feature.vocab_size*len(sparse_feas), 
-            embed_dim=10
-        ) 
-        for feature in sparse_feas
-    ]
+    sparse_feas = [SparseFeature(feature_name, vocab_size=data[feature_name].nunique(), embed_dim=16) for feature_name in features]
+    ffm_linear_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size, embed_dim=1) for feature in sparse_feas]
+    ffm_cross_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size * len(sparse_feas), embed_dim=10) for feature in sparse_feas]
     y = data["label"]
     del data["label"]
     x = data
     x_train, y_train = x[:train_idx], y[:train_idx]
     x_val, y_val = x[train_idx:val_idx], y[train_idx:val_idx]
     x_test, y_test = x[val_idx:], y[val_idx:]
-    return (dense_feas, sparse_feas, ffm_linear_feas, ffm_cross_feas, x_train, 
-            y_train, x_val, y_val, x_test, y_test)
+    return (dense_feas, sparse_feas, ffm_linear_feas, ffm_cross_feas, x_train, y_train, x_val, y_val, x_test, y_test)
 
 
 def main(
@@ -100,46 +82,68 @@ def main(
         y_test,
     ) = get_avazu_data_dict(dataset_path)
     dg = DataGenerator(x_train, y_train)
-    train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(
-        x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=batch_size
-    )
+    train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=batch_size)
 
     if model_name == "widedeep":
         model = WideDeep(
             wide_features=dense_feas,
             deep_features=sparse_feas,
-            mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
+            mlp_params={
+                "dims": [256,
+                         128],
+                "dropout": 0.2,
+                "activation": "relu"
+            },
         )
     elif model_name == "deepfm":
         model = DeepFM(
             deep_features=dense_feas,
             fm_features=sparse_feas,
-            mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
+            mlp_params={
+                "dims": [256,
+                         128],
+                "dropout": 0.2,
+                "activation": "relu"
+            },
         )
     elif model_name == "dcn":
         model = DCN(
             features=dense_feas + sparse_feas,
             n_cross_layers=3,
-            mlp_params={"dims": [256, 128]},
+            mlp_params={"dims": [256,
+                                 128]},
         )
     elif model_name == "deepffm":
         model = DeepFFM(
-            linear_features=ffm_linear_feas, 
+            linear_features=ffm_linear_feas,
             cross_features=ffm_cross_feas,
-            embed_dim=10,            
-            mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"},
+            embed_dim=10,
+            mlp_params={
+                "dims": [1600,
+                         1600],
+                "dropout": 0.5,
+                "activation": "relu"
+            },
         )
     elif model_name == "fat_deepffm":
         model = FatDeepFFM(
-            linear_features=ffm_linear_feas, 
+            linear_features=ffm_linear_feas,
             cross_features=ffm_cross_feas,
             embed_dim=10,
             reduction_ratio=1,
-            mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"},
+            mlp_params={
+                "dims": [1600,
+                         1600],
+                "dropout": 0.5,
+                "activation": "relu"
+            },
         )
     ctr_trainer = CTRTrainer(
         model,
-        optimizer_params={"lr": learning_rate, "weight_decay": weight_decay},
+        optimizer_params={
+            "lr": learning_rate,
+            "weight_decay": weight_decay
+        },
         n_epoch=epoch,
         earlystop_patience=10,
         device=device,

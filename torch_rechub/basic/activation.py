@@ -30,7 +30,7 @@ def activation_layer(act_name):
 
     Args:
         act_name: str or nn.Module, name of activation function
-    
+
     Returns:
         act_layer: activation layer
     """

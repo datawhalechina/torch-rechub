@@ -1,7 +1,9 @@
 import os
+
 import torch
 import tqdm
 from sklearn.metrics import roc_auc_score
+
 from ..basic.callback import EarlyStopper
 
 
@@ -43,17 +45,18 @@ class CTRTrainer(object):
         if len(gpus) > 1:
             print('parallel running on these gpus:', gpus)
             self.model = torch.nn.DataParallel(self.model, device_ids=gpus)
-        self.device = torch.device(device)  #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device)
         self.model.to(self.device)
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
-        self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  #default optimizer
+        self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
         self.loss_mode = loss_mode
-        self.criterion = torch.nn.BCELoss()  #default loss cross_entropy
-        self.evaluate_fn = roc_auc_score  #default evaluate function
+        self.criterion = torch.nn.BCELoss()  # default loss cross_entropy
+        self.evaluate_fn = roc_auc_score  # default evaluate function
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.model_path = model_path
@@ -63,7 +66,7 @@ class CTRTrainer(object):
         total_loss = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (x_dict, y) in enumerate(tk0):
-            x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  #tensor to GPU
+            x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             y = y.to(self.device).float()
             if self.loss_mode:
                 y_pred = self.model(x_dict)
@@ -86,7 +89,7 @@ class CTRTrainer(object):
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  #update lr in epoch level by scheduler
+                self.scheduler.step()  # update lr in epoch level by scheduler
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
@@ -94,7 +97,7 @@ class CTRTrainer(object):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
-        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  #save best auc model
+        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
 
     def evaluate(self, model, data_loader):
         model.eval()
@@ -103,7 +106,8 @@ class CTRTrainer(object):
             tk0 = tqdm.tqdm(data_loader, desc="validation", smoothing=0, mininterval=1.0)
             for i, (x_dict, y) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}
-                y = y.to(self.device).float().view(-1, 1)  # 确保y是float类型且维度为[batch_size, 1]
+                # 确保y是float类型且维度为[batch_size, 1]
+                y = y.to(self.device).float().view(-1, 1)
                 if self.loss_mode:
                     y_pred = model(x_dict)
                 else:

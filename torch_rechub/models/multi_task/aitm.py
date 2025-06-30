@@ -1,6 +1,6 @@
 """
 Date: create on 14/05/2022
-References: 
+References:
     paper: (KDD'2021) Modeling the Sequential Dependence among Audience Multi-step Conversions with Multi-task Learning in Targeted Display Advertising
     url: https://arxiv.org/abs/2105.08489
     code: https://github.com/adtalos/AITM-torch
@@ -14,7 +14,7 @@ from ...basic.layers import MLP, EmbeddingLayer
 
 
 class AITM(nn.Module):
-    """ Adaptive Information Transfer Multi-task (AITM) framework. 
+    """ Adaptive Information Transfer Multi-task (AITM) framework.
         all the task type must be binary classificatioon.
 
     Args:
@@ -31,21 +31,20 @@ class AITM(nn.Module):
         self.input_dims = sum([fea.embed_dim for fea in features])
         self.embedding = EmbeddingLayer(features)
 
-        self.bottoms = nn.ModuleList(
-            MLP(self.input_dims, output_layer=False, **bottom_params) for i in range(self.n_task))
+        self.bottoms = nn.ModuleList(MLP(self.input_dims, output_layer=False, **bottom_params) for i in range(self.n_task))
         self.towers = nn.ModuleList(MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(self.n_task))
 
-        self.info_gates = nn.ModuleList(
-            MLP(bottom_params["dims"][-1], output_layer=False, dims=[bottom_params["dims"][-1]])
-            for i in range(self.n_task - 1))
+        self.info_gates = nn.ModuleList(MLP(bottom_params["dims"][-1], output_layer=False, dims=[bottom_params["dims"][-1]]) for i in range(self.n_task - 1))
         self.aits = nn.ModuleList(AttentionLayer(bottom_params["dims"][-1]) for _ in range(self.n_task - 1))
 
     def forward(self, x):
-        embed_x = self.embedding(x, self.features, squeeze_dim=True)  #[batch_size, *]
-        input_towers = [self.bottoms[i](embed_x) for i in range(self.n_task)]  #[i]:[batch_size, bottom_dims[-1]]
-        for i in range(1, self.n_task):  #for task 1:n-1
-            info = self.info_gates[i - 1](input_towers[i - 1]).unsqueeze(1)  #[batch_size,1,bottom_dims[-1]]
-            ait_input = torch.cat([input_towers[i].unsqueeze(1), info], dim=1)  #[batch_size, 2, bottom_dims[-1]]
+        embed_x = self.embedding(x, self.features, squeeze_dim=True)  # [batch_size, *]
+        input_towers = [self.bottoms[i](embed_x) for i in range(self.n_task)]  # [i]:[batch_size, bottom_dims[-1]]
+        for i in range(1, self.n_task):  # for task 1:n-1
+            # [batch_size,1,bottom_dims[-1]]
+            info = self.info_gates[i - 1](input_towers[i - 1]).unsqueeze(1)
+            # [batch_size, 2, bottom_dims[-1]]
+            ait_input = torch.cat([input_towers[i].unsqueeze(1), info], dim=1)
             input_towers[i] = self.aits[i - 1](ait_input)
 
         ys = []
@@ -60,7 +59,7 @@ class AttentionLayer(nn.Module):
 
     Args:
         dim (int): attention dim
-    
+
     Shape:
         Input: (batch_size, 2, dim)
         Output: (batch_size, dim)

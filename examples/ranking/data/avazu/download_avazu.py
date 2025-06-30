@@ -1,12 +1,14 @@
 # This file is modified from https://github.com/openbenchmark/BARS/tree/master/ctr_prediction/datasets/Avazu
 # to download the preprocessed data split Avazu_x1
 import os
-import zipfile
 import urllib.request
+import zipfile
+
 from tqdm import tqdm
 
 
 class DownloadProgressBar(tqdm):
+
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
             self.total = tsize
@@ -14,9 +16,7 @@ class DownloadProgressBar(tqdm):
 
 
 def download(url, output_path):
-    with DownloadProgressBar(
-        unit="B", unit_scale=True, miniters=1, desc=url.split("/")[-1]
-    ) as t:
+    with DownloadProgressBar(unit="B", unit_scale=True, miniters=1, desc=url.split("/")[-1]) as t:
         urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
 
 

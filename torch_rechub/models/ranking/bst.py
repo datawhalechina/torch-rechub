@@ -1,6 +1,6 @@
 """
 Date: create on 26/02/2024, update on 30/04/2022
-References: 
+References:
     paper: Behavior Sequence Transformer for E-commerce Recommendation in Alibaba
     url: https://arxiv.org/pdf/1905.06874
     code: https://github.com/jiwidi/Behavior-Sequence-Transformer-Pytorch/blob/master/pytorch_bst.ipynb
@@ -10,7 +10,7 @@ Authors: Tao Fan, thisisevy@foxmail.com
 import torch
 import torch.nn as nn
 
-from ...basic.layers import EmbeddingLayer, MLP
+from ...basic.layers import MLP, EmbeddingLayer
 
 
 class BST(nn.Module):
@@ -38,26 +38,24 @@ class BST(nn.Module):
         self.embedding = EmbeddingLayer(features + history_features + target_features)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embed_dim, nhead=nhead, dropout=dropout)
         self.transformer_layers = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
-        self.mlp = MLP(self.all_dims, activation="leakyrelu",
-                       **mlp_params)  # # 定义模型，模型的参数需要我们之前的feature类，用于构建模型的输入层，mlp指定模型后续DNN的结构
+        # # 定义模型，模型的参数需要我们之前的feature类，用于构建模型的输入层，mlp指定模型后续DNN的结构
+        self.mlp = MLP(self.all_dims, activation="leakyrelu", **mlp_params)
 
     def forward(self, x):
-        embed_x_features = self.embedding(x, self.features)  # (batch_size, num_features, emb_dim)
-        embed_x_history = self.embedding(x,
-                                         self.history_features)  # (batch_size, num_history_features, seq_length, emb_dim)
-        embed_x_target = self.embedding(x, self.target_features)  # (batch_size, num_target_features, emb_dim)
+        # (batch_size, num_features, emb_dim)
+        embed_x_features = self.embedding(x, self.features)
+        # (batch_size, num_history_features, seq_length, emb_dim)
+        embed_x_history = self.embedding(x, self.history_features)
+        # (batch_size, num_target_features, emb_dim)
+        embed_x_target = self.embedding(x, self.target_features)
         attention_pooling = []
         for i in range(self.num_history_features):
-            attention_seq = self.transformer_layers(
-                torch.cat([torch.squeeze(embed_x_history[:, i, :, :], 1), embed_x_target], dim=1))
-            attention_pooling.append(attention_seq)  # (batch_size, seq_length + num_target_features, emb_dim)
-        attention_pooling = torch.cat(attention_pooling,
-                                      dim=1)  # (batch_size, num_history_features * (seq_length + num_target_features), emb_dim)
+            attention_seq = self.transformer_layers(torch.cat([torch.squeeze(embed_x_history[:, i, :, :], 1), embed_x_target], dim=1))
+            # (batch_size, seq_length + num_target_features, emb_dim)
+            attention_pooling.append(attention_seq)
+        # (batch_size, num_history_features * (seq_length + num_target_features), emb_dim)
+        attention_pooling = torch.cat(attention_pooling, dim=1)
 
-        mlp_in = torch.cat([
-            attention_pooling.flatten(start_dim=1),
-            embed_x_features.flatten(start_dim=1)
-        ],
-            dim=1)  # (batch_size, N)
+        mlp_in = torch.cat([attention_pooling.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  # (batch_size, N)
         y = self.mlp(mlp_in)
         return torch.sigmoid(y.squeeze(1))

@@ -1,11 +1,12 @@
 import random
-import torch
+
 import numpy as np
 import pandas as pd
+import torch
 import tqdm
+from sklearn.metrics import mean_squared_error, roc_auc_score
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import roc_auc_score, mean_squared_error
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import DataLoader, Dataset, random_split
 
 
 class TorchDataset(Dataset):
@@ -62,15 +63,13 @@ class DataGenerator(object):
         self.dataset = TorchDataset(x, y)
         self.length = len(self.dataset)
 
-    def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16,
-                            num_workers=0):
-        if split_ratio != None:
+    def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16, num_workers=0):
+        if split_ratio is not None:
             train_length = int(self.length * split_ratio[0])
             val_length = int(self.length * split_ratio[1])
             test_length = self.length - train_length - val_length
             print("the samples of train : val : test are  %d : %d : %d" % (train_length, val_length, test_length))
-            train_dataset, val_dataset, test_dataset = random_split(self.dataset,
-                                                                    (train_length, val_length, test_length))
+            train_dataset, val_dataset, test_dataset = random_split(self.dataset, (train_length, val_length, test_length))
         else:
             train_dataset = self.dataset
             val_dataset = TorchDataset(x_val, y_val)
@@ -88,7 +87,7 @@ def get_auto_embedding_dim(num_classes):
     reference: Deep & Cross Network for Ad Click Predictions.(ADKDD'17)
     Args:
         num_classes: number of classes in the category
-    
+
     Returns:
         the dim of embedding vector
     """
@@ -113,14 +112,7 @@ def get_metric_func(task_type="classification"):
         raise ValueError("task_type must be classification or regression")
 
 
-def generate_seq_feature(data,
-                         user_col,
-                         item_col,
-                         time_col,
-                         item_attribute_cols=[],
-                         min_item=0,
-                         shuffle=True,
-                         max_len=50):
+def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols=[], min_item=0, shuffle=True, max_len=50):
     """generate sequence feature and negative sample for ranking.
 
     Args:
@@ -145,7 +137,8 @@ def generate_seq_feature(data,
     for feat in data:
         le = LabelEncoder()
         data[feat] = le.fit_transform(data[feat])
-        data[feat] = data[feat].apply(lambda x: x + 1)  # 0 to be used as the symbol for padding
+        # 0 to be used as the symbol for padding
+        data[feat] = data[feat].apply(lambda x: x + 1)
     data = data.astype('int32')
 
     # generate item to attribute mapping
@@ -194,10 +187,11 @@ def generate_seq_feature(data,
     col_name = ['label', 'target_item_id', user_col, 'hist_item_id']
     if len(item_attribute_cols) > 0:
         for attr_col in item_attribute_cols:  # the history of item attribute features
-            name = ['hist_'+attr_col, 'target_'+attr_col]
+            name = ['hist_' + attr_col, 'target_' + attr_col]
             col_name += name
 
-    # shuffle
+
+# shuffle
     if shuffle:
         random.shuffle(train_data)
         random.shuffle(val_data)
@@ -235,7 +229,7 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncati
     """ Pads sequences (list of list) to the ndarray of same length.
         This is an equivalent implementation of tf.keras.preprocessing.sequence.pad_sequences
         reference: https://github.com/huawei-noah/benchmark/tree/main/FuxiCTR/fuxictr
-    
+
     Args:
         sequences (pd.DataFrame): data that needs to pad or truncate
         maxlen (int): maximum sequence length. Defaults to None.
@@ -247,7 +241,6 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncati
     Returns:
         _type_: _description_
     """
-    
 
     assert padding in ["pre", "post"], "Invalid padding={}.".format(padding)
     assert truncating in ["pre", "post"], "Invalid truncating={}.".format(truncating)
@@ -308,7 +301,8 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
     for feat in data:
         le = LabelEncoder()
         data[feat] = le.fit_transform(data[feat])
-        data[feat] = data[feat].apply(lambda x: x + 1)  # 0 to be used as the symbol for padding
+        # 0 to be used as the symbol for padding
+        data[feat] = data[feat].apply(lambda x: x + 1)
     data = data.astype('int32')
 
     n_items = data["item_id"].max()
@@ -345,7 +339,8 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
                 train_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
                 train_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
 
-    # shuffle
+
+# shuffle
     if shuffle:
         random.shuffle(train_data)
         random.shuffle(val_data)
@@ -357,4 +352,3 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
     test = pd.DataFrame(test_data, columns=col_name)
 
     return train, val, test
-
