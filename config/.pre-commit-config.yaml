@@ -1,0 +1,56 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+# pre-commit是一个在git commit时自动检查代码质量的工具。
+# 它通过运行一系列预定义的"钩子"（hooks）来工作。
+# 如果任何一个钩子失败，commit就会被中止，直到你修复了相关问题。
+
+# repos定义了一系列代码仓库，pre-commit会从这些仓库中拉取钩子。
+repos:
+  # 这个仓库包含了一些基础的、通用的检查钩子。
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0  # 使用一个具体的版本号以保证构建的稳定性。
+    hooks:
+      # trailing-whitespace: 检查并移除行尾多余的空格。
+      - id: trailing-whitespace
+      # end-of-file-fixer: 确保文件以一个空行结尾。
+      - id: end-of-file-fixer
+      # check-yaml: 检查YAML文件的语法是否正确。
+      - id: check-yaml
+      # check-added-large-files: 防止意外提交大文件（如模型权重、数据集）。
+      - id: check-added-large-files
+
+  # 这个仓库提供了yapf的代码格式化钩子。
+  # yapf是Google开发的代码格式化工具。
+  - repo: https://github.com/google/yapf
+    rev: v0.40.2
+    hooks:
+      - id: yapf
+        name: yapf
+        entry: yapf
+        # --style: 指定yapf的配置文件路径。
+        # --diff: 只显示差异，不修改文件，用于检查。
+        # --recursive: 递归处理目录。
+        args: ["--style=config/.style.yapf", "--diff", "--recursive"]
+
+  # 这个仓库提供了isort的导入排序钩子。
+  # isort可以自动地对Python代码中的import语句进行排序和格式化。
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort
+        entry: isort
+        # --profile black: 使用与black和yapf兼容的配置，解决与yapf的冲突。
+        # --check-only: 只检查，不修改文件。
+        # --diff: 显示差异。
+        args: ["--profile", "black", "--check-only", "--diff"]
+
+  # 这个仓库提供了flake8的代码风格和逻辑错误检查钩子。
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        name: flake8
+        entry: flake8
+        # --config: 指定flake8的配置文件路径。
+        args: ["--config=config/.flake8"]

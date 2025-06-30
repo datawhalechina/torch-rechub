@@ -1,6 +1,7 @@
 import torch
 from torch.optim.optimizer import Optimizer
-from ..models.multi_task import MMOE, SharedBottom, PLE, AITM
+
+from ..models.multi_task import AITM, MMOE, PLE, SharedBottom
 
 
 def shared_task_layers(model):
@@ -17,18 +18,20 @@ def shared_task_layers(model):
     task_layers = None
     if isinstance(model, SharedBottom):
         shared_layers += list(model.bottom_mlp.parameters())
-        task_layers = list(model.towers.parameters()) + list(model.predict_layers.parameters())
+        task_layers = list(model.towers.parameters()) + \
+            list(model.predict_layers.parameters())
     elif isinstance(model, MMOE):
         shared_layers += list(model.experts.parameters())
-        task_layers = list(model.towers.parameters()) + list(model.predict_layers.parameters())
+        task_layers = list(model.towers.parameters()) + \
+            list(model.predict_layers.parameters())
         task_layers += list(model.gates.parameters())
     elif isinstance(model, PLE):
         shared_layers += list(model.cgc_layers.parameters())
-        task_layers = list(model.towers.parameters()) + list(model.predict_layers.parameters())
+        task_layers = list(model.towers.parameters()) + \
+            list(model.predict_layers.parameters())
     elif isinstance(model, AITM):
         shared_layers += list(model.bottoms.parameters())
-        task_layers = list(model.info_gates.parameters()) + list(model.towers.parameters()) + list(
-            model.aits.parameters())
+        task_layers = list(model.info_gates.parameters()) + list(model.towers.parameters()) + list(model.aits.parameters())
     else:
         raise ValueError(f'this model {model} is not suitable for MetaBalance Optimizer')
     return shared_layers, task_layers
@@ -65,7 +68,7 @@ class MetaBalance(Optimizer):
                         break
                     if gp.grad.is_sparse:
                         raise RuntimeError('MetaBalance does not support sparse gradients')
-                    # store the result of moving average
+# store the result of moving average
                     state = self.state[gp]
                     if len(state) == 0:
                         for i in range(len(losses)):
@@ -73,13 +76,16 @@ class MetaBalance(Optimizer):
                                 gp.norms = [0]
                             else:
                                 gp.norms.append(0)
-                    # calculate the moving average
+
+
+# calculate the moving average
                     beta = group['beta']
-                    gp.norms[idx] = gp.norms[idx] * beta + (1 - beta) * torch.norm(gp.grad)
+                    gp.norms[idx] = gp.norms[idx] * beta + \
+                        (1 - beta) * torch.norm(gp.grad)
                     # scale the auxiliary gradient
                     relax_factor = group['relax_factor']
-                    gp.grad = gp.grad * gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. -
-                                                                                                         relax_factor)
+                    gp.grad = gp.grad * \
+                        gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. - relax_factor)
                     # store the gradient of each auxiliary task in state
                     if idx == 0:
                         state['sum_gradient'] = torch.zeros_like(gp.data)
@@ -99,14 +105,18 @@ def gradnorm(loss_list, loss_weight, share_layer, initial_task_loss, alpha):
     for loss_i, w_i in zip(loss_list, loss_weight):
         loss += loss_i * w_i
     loss.backward(retain_graph=True)
-    # set the gradients of w_i(t) to zero because these gradients have to be updated using the GradNorm loss
+    # set the gradients of w_i(t) to zero because these gradients have to be
+    # updated using the GradNorm loss
     for w_i in loss_weight:
         w_i.grad.data = w_i.grad.data * 0.0
-    # get the gradient norms for each of the tasks
-    # G^{(i)}_w(t)
+
+
+# get the gradient norms for each of the tasks
+# G^{(i)}_w(t)
     norms, loss_ratio = [], []
     for i in range(len(loss_list)):
-        # get the gradient of this task loss with respect to the shared parameters
+        # get the gradient of this task loss with respect to the shared
+        # parameters
         gygw = torch.autograd.grad(loss_list[i], share_layer, retain_graph=True)
         # compute the norm
         norms.append(torch.norm(torch.mul(loss_weight[i], gygw[0])))
@@ -119,7 +129,7 @@ def gradnorm(loss_list, loss_weight, share_layer, initial_task_loss, alpha):
     # this term has to remain constant
     constant_term = mean_norm * (mean_loss_ratio**alpha)
     grad_norm_loss = torch.sum(torch.abs(norms - constant_term))
-    #print('GradNorm loss {}'.format(grad_norm_loss))
+    # print('GradNorm loss {}'.format(grad_norm_loss))
 
     # compute the gradient for the weights
     for w_i in loss_weight:

@@ -1,14 +1,15 @@
 import sys
 
-sys.path.append("../..")
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
+
+from torch_rechub.basic.features import (DenseFeature, SequenceFeature, SparseFeature)
 from torch_rechub.models.ranking import DIN
 from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
-from torch_rechub.utils.data import DataGenerator, generate_seq_feature, df_to_dict, pad_sequences
+from torch_rechub.utils.data import (DataGenerator, df_to_dict, generate_seq_feature, pad_sequences)
+
+sys.path.append("../..")
 
 
 def get_amazon_data_dict(dataset_path):
@@ -19,11 +20,19 @@ def get_amazon_data_dict(dataset_path):
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     print(train)
 
-    features = [SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates+1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users+1, embed_dim=8)]
+    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
     target_features = features
     history_features = [
-        SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-        SequenceFeature("hist_cate_id", vocab_size=n_cates+1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
+        SequenceFeature("hist_item_id",
+                        vocab_size=n_items + 1,
+                        embed_dim=8,
+                        pooling="concat",
+                        shared_with="target_item_id"),
+        SequenceFeature("hist_cate_id",
+                        vocab_size=n_cates + 1,
+                        embed_dim=8,
+                        pooling="concat",
+                        shared_with="target_cate_id")
     ]
 
     print('========== Generate input dict ==========')
@@ -41,8 +50,7 @@ def get_amazon_data_dict(dataset_path):
 
 def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
     torch.manual_seed(seed)
-    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = \
-        get_amazon_data_dict(dataset_path)
+    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_amazon_data_dict(dataset_path)
     dg = DataGenerator(train_x, train_y)
 
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=val_x, y_val=val_y, x_test=test_x, y_test=test_y, batch_size=batch_size)
@@ -62,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=4096)
     parser.add_argument('--weight_decay', type=float, default=1e-3)
-    parser.add_argument('--device', default='cpu')  #cuda:0
+    parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
 

@@ -1,16 +1,17 @@
 import sys
 
-sys.path.append("../..")
-
 import numpy as np
 import pandas as pd
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.models.ranking import DCN, DeepFM, WideDeep
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
+
+sys.path.append("../..")
 
 
 def get_ali_ccp_data_dict(data_path='./data/ali-ccp'):
@@ -50,7 +51,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     elif model_name == "dcn":
         model = DCN(features=dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims": [256, 128]})
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
-    #scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
+    # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
@@ -61,11 +62,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/ali-ccp")
     parser.add_argument('--model_name', default='widedeep')
-    parser.add_argument('--epoch', type=int, default=2)  #100
+    parser.add_argument('--epoch', type=int, default=2)  # 100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=2048)  #4096
+    parser.add_argument('--batch_size', type=int, default=2048)  # 4096
     parser.add_argument('--weight_decay', type=float, default=1e-3)
-    parser.add_argument('--device', default='cpu')  #cuda:0
+    parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
 

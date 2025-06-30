@@ -1,0 +1,51 @@
+# ===================================================================
+# Dependabot 配置文件 - 自动依赖更新
+# ===================================================================
+# 这个文件配置了GitHub Dependabot自动检查和更新项目依赖
+# 更多信息请参考: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Python 依赖更新
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    # 只创建安全更新的PR
+    open-pull-requests-limit: 5
+    # PR标签
+    labels:
+      - "dependencies"
+      - "python"
+    # 提交信息前缀
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # 审查者（可选）
+    reviewers:
+      - "datawhalechina"
+    # 允许的更新类型
+    allow:
+      - dependency-type: "direct"
+        update-type: "all"
+      - dependency-type: "indirect"
+        update-type: "security"
+
+  # GitHub Actions 依赖更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(actions)"
+      include: "scope" 

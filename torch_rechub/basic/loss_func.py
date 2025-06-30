@@ -31,4 +31,7 @@ class BPRLoss(torch.nn.Module):
     def forward(self, pos_score, neg_score):
         loss = torch.mean(-(pos_score - neg_score).sigmoid().log(), dim=-1)
         return loss
-        #loss = -torch.mean(F.logsigmoid(pos_score - torch.max(neg_score, dim=-1))) need v1.10
+
+
+# loss = -torch.mean(F.logsigmoid(pos_score - torch.max(neg_score,
+# dim=-1))) need v1.10

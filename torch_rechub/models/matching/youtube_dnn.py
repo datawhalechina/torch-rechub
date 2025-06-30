@@ -1,6 +1,6 @@
 """
 Date: create on 23/05/2022
-References: 
+References:
     paper: (RecSys'2016) Deep Neural Networks for YouTube Recommendations
     url: https://dl.acm.org/doi/10.1145/2959100.2959190
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
@@ -8,6 +8,7 @@ Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 
 import torch
 import torch.nn.functional as F
+
 from ...basic.layers import MLP, EmbeddingLayer
 
 
@@ -43,7 +44,8 @@ class YoutubeDNN(torch.nn.Module):
         if self.mode == "item":
             return item_embedding
 
-        # calculate cosine score
+
+# calculate cosine score
         y = torch.mul(user_embedding, item_embedding).sum(dim=2)
         y = y / self.temperature
         return y
@@ -51,21 +53,23 @@ class YoutubeDNN(torch.nn.Module):
     def user_tower(self, x):
         if self.mode == "item":
             return None
-        input_user = self.embedding(x, self.user_features, squeeze_dim=True)  #[batch_size, num_features*deep_dims]
-        user_embedding = self.user_mlp(input_user).unsqueeze(1)  #[batch_size, 1, embed_dim]
+        # [batch_size, num_features*deep_dims]
+        input_user = self.embedding(x, self.user_features, squeeze_dim=True)
+        user_embedding = self.user_mlp(input_user).unsqueeze(1)  # [batch_size, 1, embed_dim]
         user_embedding = F.normalize(user_embedding, p=2, dim=2)
         if self.mode == "user":
-            return user_embedding.squeeze(1)  #inference embedding mode -> [batch_size, embed_dim]
+            # inference embedding mode -> [batch_size, embed_dim]
+            return user_embedding.squeeze(1)
         return user_embedding
 
     def item_tower(self, x):
         if self.mode == "user":
             return None
-        pos_embedding = self.embedding(x, self.item_features, squeeze_dim=False)  #[batch_size, 1, embed_dim]
+        pos_embedding = self.embedding(x, self.item_features, squeeze_dim=False)  # [batch_size, 1, embed_dim]
         pos_embedding = F.normalize(pos_embedding, p=2, dim=2)
-        if self.mode == "item":  #inference embedding mode
-            return pos_embedding.squeeze(1)  #[batch_size, embed_dim]
-        neg_embeddings = self.embedding(x, self.neg_item_feature,
-                                        squeeze_dim=False).squeeze(1)  #[batch_size, n_neg_items, embed_dim]
+        if self.mode == "item":  # inference embedding mode
+            return pos_embedding.squeeze(1)  # [batch_size, embed_dim]
+        neg_embeddings = self.embedding(x, self.neg_item_feature, squeeze_dim=False).squeeze(1)  # [batch_size, n_neg_items, embed_dim]
         neg_embeddings = F.normalize(neg_embeddings, p=2, dim=2)
-        return torch.cat((pos_embedding, neg_embeddings), dim=1)  #[batch_size, 1+n_neg_items, embed_dim]
+        # [batch_size, 1+n_neg_items, embed_dim]
+        return torch.cat((pos_embedding, neg_embeddings), dim=1)

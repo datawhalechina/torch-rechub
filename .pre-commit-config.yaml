@@ -1,0 +1,55 @@
+# ===================================================================
+# Pre-commit 配置文件 - Git钩子自动化
+# ===================================================================
+# 这个文件配置了提交前自动运行的代码质量检查
+# 安装: pip install pre-commit && pre-commit install
+# 手动运行: pre-commit run --all-files
+# 更多信息请参考: config/CONFIG_GUIDE.md
+
+repos:
+  # 基础钩子 - 文件格式和基本检查
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace          # 移除行尾空白
+      - id: end-of-file-fixer           # 确保文件以换行符结尾
+      - id: check-yaml                  # 检查YAML文件语法
+      - id: check-toml                  # 检查TOML文件语法
+      - id: check-json                  # 检查JSON文件语法
+      - id: check-merge-conflict        # 检查合并冲突标记
+      - id: check-added-large-files     # 检查大文件
+        args: ['--maxkb=1000']
+
+  # YAPF - Python代码格式化 (Google风格)
+  - repo: https://github.com/google/yapf
+    rev: v0.40.2
+    hooks:
+      - id: yapf
+        name: yapf (Python代码格式化)
+        args: [--style=config/.style.yapf, --in-place]
+        additional_dependencies: []
+
+  # isort - 导入语句排序
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (导入排序)
+        args: [--settings-path=pyproject.toml]
+
+  # Flake8 - Python代码质量检查
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: flake8 (代码质量检查)
+        args: [--config=config/.flake8]
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-import-order
+
+# 配置选项
+default_stages: [commit]
+fail_fast: true                      # 遇到第一个错误时停止
+default_language_version:
+  python: python3 

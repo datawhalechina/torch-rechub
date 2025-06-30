@@ -38,8 +38,8 @@ class RandomUniform(object):
 
 
 class XavierNormal(object):
-    """Returns an embedding initialized with  the method described in 
-    `Understanding the difficulty of training deep feedforward neural networks` 
+    """Returns an embedding initialized with  the method described in
+    `Understanding the difficulty of training deep feedforward neural networks`
     - Glorot, X. & Bengio, Y. (2010), using a uniform distribution.
 
     Args:
@@ -56,8 +56,8 @@ class XavierNormal(object):
 
 
 class XavierUniform(object):
-    """Returns an embedding initialized with the method described in 
-    `Understanding the difficulty of training deep feedforward neural networks` 
+    """Returns an embedding initialized with the method described in
+    `Understanding the difficulty of training deep feedforward neural networks`
     - Glorot, X. & Bengio, Y. (2010), using a uniform distribution.
 
     Args:

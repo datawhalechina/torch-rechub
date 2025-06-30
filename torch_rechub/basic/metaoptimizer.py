@@ -1,4 +1,4 @@
-"""The metaoptimizer module, it provides a class MetaBalance 
+"""The metaoptimizer module, it provides a class MetaBalance
 MetaBalance is used to scale the gradient and balance the gradient of each task
 Authors: Qida Dong, dongjidan@126.com
 """
@@ -14,7 +14,7 @@ class MetaBalance(Optimizer):
         parameters (list): the parameters of model
         relax_factor (float, optional): the relax factor of gradient scaling (default: 0.7)
         beta (float, optional): the coefficient of moving average (default: 0.9)
-		"""
+                """
 
     def __init__(self, parameters, relax_factor=0.7, beta=0.9):
 
@@ -44,7 +44,7 @@ class MetaBalance(Optimizer):
                         break
                     if gp.grad.is_sparse:
                         raise RuntimeError('MetaBalance does not support sparse gradients')
-                    # store the result of moving average
+# store the result of moving average
                     state = self.state[gp]
                     if len(state) == 0:
                         for i in range(len(losses)):
@@ -52,12 +52,16 @@ class MetaBalance(Optimizer):
                                 gp.norms = [0]
                             else:
                                 gp.norms.append(0)
-                    # calculate the moving average
+
+
+# calculate the moving average
                     beta = group['beta']
-                    gp.norms[idx] = gp.norms[idx] * beta + (1 - beta) * torch.norm(gp.grad)
+                    gp.norms[idx] = gp.norms[idx] * beta + \
+                        (1 - beta) * torch.norm(gp.grad)
                     # scale the auxiliary gradient
                     relax_factor = group['relax_factor']
-                    gp.grad = gp.grad * gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. - relax_factor)
+                    gp.grad = gp.grad * \
+                        gp.norms[0] / (gp.norms[idx] + 1e-5) * relax_factor + gp.grad * (1. - relax_factor)
                     # store the gradient of each auxiliary task in state
                     if idx == 0:
                         state['sum_gradient'] = torch.zeros_like(gp.data)

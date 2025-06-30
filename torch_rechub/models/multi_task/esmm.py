@@ -1,7 +1,7 @@
 """
 Date: create on 04/05/2022
-References: 
-    paper: (SIGIR'2018) Entire Space Multi-Task Model: An Effective Approach for Estimating Post-Click Conversion Rate 
+References:
+    paper: (SIGIR'2018) Entire Space Multi-Task Model: An Effective Approach for Estimating Post-Click Conversion Rate
     url: https://arxiv.org/abs/1804.07931
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
@@ -34,7 +34,8 @@ class ESMM(nn.Module):
     def forward(self, x):
         # # Field-wise Pooling Layer for user and item
         # embed_user_features = self.embedding(x, self.user_features, squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
-        # embed_item_features = self.embedding(x, self.item_features, squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
+        # embed_item_features = self.embedding(x, self.item_features,
+        # squeeze_dim=False).sum(dim=1)  #[batch_size, embed_dim]
 
         # Here we concat all the features instead of field-wise pooling them
         # [batch_size, num_features, embed_dim] --> [batch_size, num_features * embed_dim]

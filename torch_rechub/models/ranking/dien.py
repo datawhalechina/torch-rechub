@@ -1,6 +1,6 @@
 """
 Date: create on 01/05/2024
-References: 
+References:
     paper: (AAAI'2019) Deep Interest Evolution Network for Click-Through Rate Prediction
     url: https://arxiv.org/pdf/1809.03672
 Authors: Tao Fan, thisisevy@foxmail.com
@@ -32,7 +32,7 @@ class AUGRU(nn.Module):
         h = None
         # 开始循环，x.shape[1]是序列的长度
         for i in range(x.shape[1]):
-            if h == None:
+            if h is None:
                 # 初始化第一层的输入h
                 h = Parameter(torch.rand(x.shape[0], self.embed_dim).to(x.device))
             h = self.augru_cell(x[:, i], h, item)
@@ -68,7 +68,9 @@ class AUGRU_Cell(nn.Module):
         # 初始化注意计算里的模型参数
         self.Wa = init.xavier_uniform_(Parameter(torch.empty(embed_dim, embed_dim)))
 
-    # 注意力的计算
+
+# 注意力的计算
+
     def attention(self, x, item):
         '''
         :param x: 输入的序列中第t个向量 [ batch_size, embed_dim ]
@@ -114,8 +116,7 @@ class DIEN(nn.Module):
         alpha (float): the weighting of auxiliary loss.
     """
 
-    def __init__(self, features, history_features, target_features, mlp_params, history_labels,
-                 alpha=0.2):
+    def __init__(self, features, history_features, target_features, mlp_params, history_labels, alpha=0.2):
         super().__init__()
         self.alpha = alpha  # 计算辅助损失函数时的权重
         self.features = features
@@ -125,20 +126,20 @@ class DIEN(nn.Module):
         self.all_dims = sum([fea.embed_dim for fea in features + history_features + target_features])
         # self.GRU = nn.GRU(batch_first=True)
         self.embedding = EmbeddingLayer(features + history_features + target_features)
-        self.interest_extractor_layers = nn.ModuleList(
-            [nn.GRU(fea.embed_dim, fea.embed_dim, batch_first=True) for fea in self.history_features])
-        self.interest_evolving_layers = nn.ModuleList(
-            [AUGRU(fea.embed_dim) for fea in self.history_features])
+        self.interest_extractor_layers = nn.ModuleList([nn.GRU(fea.embed_dim, fea.embed_dim, batch_first=True) for fea in self.history_features])
+        self.interest_evolving_layers = nn.ModuleList([AUGRU(fea.embed_dim) for fea in self.history_features])
 
         self.mlp = MLP(self.all_dims, activation="dice", **mlp_params)
         self.history_labels = torch.Tensor(history_labels)
         self.BCELoss = nn.BCELoss()
-        # # 注意力计算中的线性层
-        # self.attention_liner = nn.Linear(self.embed_dim, t)
-        # # AFM公式中的h
-        # self.h = init.xavier_uniform_(Parameter(torch.empty(t, 1)))
-        # # AFM公式中的p
-        # self.p = init.xavier_uniform_(Parameter(torch.empty(self.embed_dim, 1)))
+
+
+# # 注意力计算中的线性层
+# self.attention_liner = nn.Linear(self.embed_dim, t)
+# # AFM公式中的h
+# self.h = init.xavier_uniform_(Parameter(torch.empty(t, 1)))
+# # AFM公式中的p
+# self.p = init.xavier_uniform_(Parameter(torch.empty(self.embed_dim, 1)))
 
     def auxiliary(self, outs, history_features, history_labels):
         '''
@@ -160,10 +161,12 @@ class DIEN(nn.Module):
         return self.BCELoss(out, history_labels)
 
     def forward(self, x):
-        embed_x_features = self.embedding(x, self.features)  # (batch_size, num_features, emb_dim)
-        embed_x_history = self.embedding(
-            x, self.history_features)  # (batch_size, num_history_features, seq_length, emb_dim)
-        embed_x_target = self.embedding(x, self.target_features)  # (batch_size, num_target_features, emb_dim)
+        # (batch_size, num_features, emb_dim)
+        embed_x_features = self.embedding(x, self.features)
+        # (batch_size, num_history_features, seq_length, emb_dim)
+        embed_x_history = self.embedding(x, self.history_features)
+        # (batch_size, num_target_features, emb_dim)
+        embed_x_target = self.embedding(x, self.target_features)
 
         interest_extractor = []
         auxi_loss = 0
@@ -171,21 +174,18 @@ class DIEN(nn.Module):
             outs, _ = self.interest_extractor_layers[i](embed_x_history[:, i, :, :])
             # 利用GRU输出的outs得到辅助损失函数
             auxi_loss += self.auxiliary(outs, embed_x_history[:, i, :, :], self.history_labels)
-            interest_extractor.append(outs.unsqueeze(1))  # (batch_size, 1, seq_length, emb_dim)
-        interest_extractor = torch.cat(interest_extractor,
-                                       dim=1)  # (batch_size, num_history_features, seq_length, emb_dim)
+            # (batch_size, 1, seq_length, emb_dim)
+            interest_extractor.append(outs.unsqueeze(1))
+        # (batch_size, num_history_features, seq_length, emb_dim)
+        interest_extractor = torch.cat(interest_extractor, dim=1)
         interest_evolving = []
         for i in range(self.num_history_features):
             _, h = self.interest_evolving_layers[i](interest_extractor[:, i, :, :], embed_x_target[:, i, :])
             interest_evolving.append(h.unsqueeze(1))  # (batch_size, 1, emb_dim)
-        interest_evolving = torch.cat(interest_evolving, dim=1)  # (batch_size, num_history_features, emb_dim)
+        # (batch_size, num_history_features, emb_dim)
+        interest_evolving = torch.cat(interest_evolving, dim=1)
 
-        mlp_in = torch.cat([
-            interest_evolving.flatten(start_dim=1),
-            embed_x_target.flatten(start_dim=1),
-            embed_x_features.flatten(start_dim=1)
-        ],
-            dim=1)  # (batch_size, N)
+        mlp_in = torch.cat([interest_evolving.flatten(start_dim=1), embed_x_target.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  # (batch_size, N)
         y = self.mlp(mlp_in)
 
         return torch.sigmoid(y.squeeze(1)), self.alpha * auxi_loss

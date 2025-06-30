@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def json_to_df(file_path):
     with open(file_path, 'r') as f:
         df = {}
@@ -43,9 +44,6 @@ def parse_data_to_df(reviews_file_path, meta_file_path):
     reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
 
     data = pd.merge(reviews_df, meta_df, how='inner', on='asin')
-    data.rename(columns={'asin': 'item_id',
-                         'reviewerID': 'user_id',
-                         'unixReviewTime': 'time',
-                         'categories': 'cate_id'}, inplace=True)
+    data.rename(columns={'asin': 'item_id', 'reviewerID': 'user_id', 'unixReviewTime': 'time', 'categories': 'cate_id'}, inplace=True)
 
     return data

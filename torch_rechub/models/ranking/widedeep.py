@@ -1,7 +1,7 @@
 """
 Date: create on 22/04/2022
-References: 
-    paper: (DLRS'2016) Wide & Deep Learning for Recommender Systems 
+References:
+    paper: (DLRS'2016) Wide & Deep Learning for Recommender Systems
     url: https://arxiv.org/abs/1606.07792
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
@@ -31,11 +31,11 @@ class WideDeep(torch.nn.Module):
         self.mlp = MLP(self.deep_dims, **mlp_params)
 
     def forward(self, x):
-        input_wide = self.embedding(x, self.wide_features, squeeze_dim=True)  #[batch_size, wide_dims]
-        input_deep = self.embedding(x, self.deep_features, squeeze_dim=True)  #[batch_size, deep_dims]
+        input_wide = self.embedding(x, self.wide_features, squeeze_dim=True)  # [batch_size, wide_dims]
+        input_deep = self.embedding(x, self.deep_features, squeeze_dim=True)  # [batch_size, deep_dims]
 
-        y_wide = self.linear(input_wide)  #[batch_size, 1]
-        y_deep = self.mlp(input_deep)  #[batch_size, 1]
+        y_wide = self.linear(input_wide)  # [batch_size, 1]
+        y_deep = self.mlp(input_deep)  # [batch_size, 1]
         y = y_wide + y_deep
         y = torch.sigmoid(y.squeeze(1))
         return y

@@ -1,16 +1,17 @@
 import sys
 
-sys.path.append("../..")
-
 import numpy as np
 import pandas as pd
 import torch
-from torch_rechub.models.ranking import WideDeep, DeepFM, DCN, DCNv2, FiBiNet, EDCN, DeepFFM, FatDeepFFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.models.ranking import (DCN, EDCN, DCNv2, DeepFFM, DeepFM, FatDeepFFM, FiBiNet, WideDeep)
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
+
+sys.path.append("../..")
 
 
 def convert_numeric_feature(val):
@@ -22,7 +23,7 @@ def convert_numeric_feature(val):
 
 
 def get_criteo_data_dict(data_path):
-    if data_path.endswith(".gz"):  #if the raw_data is gz file:
+    if data_path.endswith(".gz"):  # if the raw_data is gz file:
         data = pd.read_csv(data_path, compression="gzip")
     else:
         data = pd.read_csv(data_path)
@@ -33,21 +34,21 @@ def get_criteo_data_dict(data_path):
     data[sparse_features] = data[sparse_features].fillna('0')
     data[dense_features] = data[dense_features].fillna(0)
 
-    for feat in tqdm(dense_features):  #discretize dense feature and as new sparse feature
+    for feat in tqdm(dense_features):  # discretize dense feature and as new sparse feature
         sparse_features.append(feat + "_cat")
         data[feat + "_cat"] = data[feat].apply(lambda x: convert_numeric_feature(x))
 
-    sca = MinMaxScaler()  #scaler dense feature
+    sca = MinMaxScaler()  # scaler dense feature
     data[dense_features] = sca.fit_transform(data[dense_features])
 
-    for feat in tqdm(sparse_features):  #encode sparse feature
+    for feat in tqdm(sparse_features):  # encode sparse feature
         lbe = LabelEncoder()
         data[feat] = lbe.fit_transform(data[feat])
 
     dense_feas = [DenseFeature(feature_name) for feature_name in dense_features]
     sparse_feas = [SparseFeature(feature_name, vocab_size=data[feature_name].nunique(), embed_dim=16) for feature_name in sparse_features]
     ffm_linear_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size, embed_dim=1) for feature in sparse_feas]
-    ffm_cross_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size*len(sparse_feas), embed_dim=10) for feature in sparse_feas]
+    ffm_cross_feas = [SparseFeature(feature.name, vocab_size=feature.vocab_size * len(sparse_feas), embed_dim=10) for feature in sparse_feas]
     y = data["label"]
     del data["label"]
     x = data
@@ -76,7 +77,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     elif model_name == "fat_deepffm":
         model = FatDeepFFM(linear_features=ffm_linear_feas, cross_features=ffm_cross_feas, embed_dim=10, reduction_ratio=1, mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"})
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
-    #scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
+    # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
@@ -87,11 +88,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/criteo/criteo_sample.csv")
     parser.add_argument('--model_name', default='fibinet')
-    parser.add_argument('--epoch', type=int, default=2)  #100
+    parser.add_argument('--epoch', type=int, default=2)  # 100
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=2048)  #4096
+    parser.add_argument('--batch_size', type=int, default=2048)  # 4096
     parser.add_argument('--weight_decay', type=float, default=1e-3)
-    parser.add_argument('--device', default='cpu')  #cuda:0
+    parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
 

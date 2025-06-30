@@ -1,6 +1,6 @@
 """
 Date: create on 04/05/2022
-Reference: 
+Reference:
     paper: Caruana, R. (1997). Multitask learning. Machine learning, 28(1), 41-75.
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
@@ -29,8 +29,7 @@ class SharedBottom(nn.Module):
         self.bottom_dims = sum([fea.embed_dim for fea in features])
 
         self.bottom_mlp = MLP(self.bottom_dims, **{**bottom_params, **{"output_layer": False}})
-        self.towers = nn.ModuleList(
-            MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(len(task_types)))
+        self.towers = nn.ModuleList(MLP(bottom_params["dims"][-1], **tower_params_list[i]) for i in range(len(task_types)))
         self.predict_layers = nn.ModuleList(PredictionLayer(task_type) for task_type in task_types)
 
     def forward(self, x):
@@ -40,6 +39,7 @@ class SharedBottom(nn.Module):
         ys = []
         for tower, predict_layer in zip(self.towers, self.predict_layers):
             tower_out = tower(x)
-            y = predict_layer(tower_out)  #regression->keep, binary classification->sigmoid
+            # regression->keep, binary classification->sigmoid
+            y = predict_layer(tower_out)
             ys.append(y)
         return torch.cat(ys, dim=1)
