@@ -25,7 +25,7 @@ class SINE(torch.nn.Module):
         num_concept (int): number of concept, also called conceptual prototypes
         num_intention (int): number of (user) specific intentions out of the concepts
         seq_max_len (int): max sequence length of input item sequence
-        num_heads （int): number of attention heads in self attention modules, default to 1
+        num_heads (int): number of attention heads in self attention modules, default to 1
         temperature (float): temperature factor in the similarity measure, default to 1.0
     """
 
