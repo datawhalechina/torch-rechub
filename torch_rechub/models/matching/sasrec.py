@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torch_rechub.basic.features import (DenseFeature, SequenceFeature, SparseFeature)
+from torch_rechub.basic.features import DenseFeature, SequenceFeature, SparseFeature
 from torch_rechub.basic.layers import MLP, EmbeddingLayer
 
 

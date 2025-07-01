@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from ...basic.layers import (MLP, CapsuleNetwork, EmbeddingLayer, MultiInterestSA)
+from ...basic.layers import MLP, CapsuleNetwork, EmbeddingLayer, MultiInterestSA
 
 
 class ComirecSA(torch.nn.Module):

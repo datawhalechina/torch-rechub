@@ -14,12 +14,13 @@ dev_requirements = [
     'mypy>=0.800',  # 类型检查
     'bandit>=1.7.0',  # 安全检查
     'coverage>=5.0.0',  # 覆盖率
+    'toml>=0.10.2',  # TOML解析，yapf需要
 ]
 
 setup(
     name='torch-rechub',
-    version='0.0.3',
-    description='A Lighting Pytorch Framework for Recommendation System, Easy-to-use and Easy-to-extend.',
+    version='0.1.0',
+    description='A Pytorch Toolbox for Recommendation Models, Easy-to-use and Easy-to-extend.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='Datawhale',

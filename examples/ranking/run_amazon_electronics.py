@@ -4,10 +4,10 @@ import numpy as np
 import pandas as pd
 import torch
 
-from torch_rechub.basic.features import (DenseFeature, SequenceFeature, SparseFeature)
+from torch_rechub.basic.features import DenseFeature, SequenceFeature, SparseFeature
 from torch_rechub.models.ranking import DIN
 from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import (DataGenerator, df_to_dict, generate_seq_feature, pad_sequences)
+from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feature, pad_sequences
 
 sys.path.append("../..")
 

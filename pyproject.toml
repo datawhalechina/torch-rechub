@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch-rechub"
+version = "0.1.0"
+description = "A Pytorch Toolbox for Recommendation Models, Easy-to-use and Easy-to-extend."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "rechub team", email = "morningsky@tju.edu.cn" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=1.10.0",
+    "numpy>=1.19.0",
+    "pandas>=1.2.0",
+    "scikit-learn>=0.24.0",
+    "tqdm>=4.60.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "flake8>=3.8.0",
+    "yapf==0.32.0",
+    "isort==5.10.1",
+    "mypy>=0.800",
+    "pre-commit>=2.20.0",
+    "bandit>=1.7.0",
+    "toml>=0.10.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/morningsky/Torch-RecHub"
+Documentation = "https://www.torch-rechub.com"
+Repository = "https://github.com/morningsky/Torch-RecHub.git"
+Issues = "https://github.com/morningsky/Torch-RecHub/issues"
+
+# 工具配置
+[tool.setuptools]
+packages = ["torch_rechub"]
+
+[tool.isort]
+profile = "black"
+line_length = 248
+known_third_party = ["torch", "numpy", "pandas", "sklearn", "tqdm"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip_glob = ["**/migrations/*", "**/__pycache__/*"]
+
+[tool.yapf]
+based_on_style = "google"
+column_limit = 248
+join_multiple_lines = false
+split_all_comma_separated_values = true
+split_before_logical_operator = true
+dedent_closing_brackets = true
+align_closing_bracket_with_visual_indent = true
+indent_width = 4
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+source = ["torch_rechub"]
+omit = ["*/tests/*", "*/examples/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true 

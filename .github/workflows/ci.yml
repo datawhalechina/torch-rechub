@@ -57,12 +57,12 @@ jobs:
         run: |
           pip install --upgrade pip
           # 安装特定版本的格式化工具以确保一致性
-          pip install yapf==0.32.0 isort==5.10.1 flake8>=3.8.0 mypy>=0.800
+          pip install yapf==0.32.0 isort==5.10.1 flake8>=3.8.0 mypy>=0.800 toml>=0.10.2
 
       - name: Format & Lint
         run: |
           # 步骤1: isort
-          isort torch_rechub/ examples/ tests/
+          isort --profile black torch_rechub/ examples/ tests/
           # 步骤2: yapf
           yapf_style="{based_on_style: google, column_limit: 248, join_multiple_lines: false, split_all_comma_separated_values: true, split_before_logical_operator: true, dedent_closing_brackets: true, align_closing_bracket_with_visual_indent: true, indent_width: 4}"
           yapf --in-place --recursive --style="$yapf_style" torch_rechub/ examples/ tests/

@@ -10,7 +10,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from torch_rechub.models.matching import SINE
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import (gen_model_input, generate_seq_feature_match)
+from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
 
 sys.path.append("../..")
 

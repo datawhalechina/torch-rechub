@@ -1,3 +1,5 @@
+__all__ = ['WideDeep', 'DeepFM', 'DCN', 'DCNv2', 'EDCN', 'AFM', 'FiBiNet', 'DeepFFM', 'BST', 'DIN', 'DIEN', 'FatDeepFFM']
+
 from .afm import AFM
 from .bst import BST
 from .dcn import DCN
