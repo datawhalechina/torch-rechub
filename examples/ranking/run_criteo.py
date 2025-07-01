@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tqdm import tqdm
 
 from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.models.ranking import (DCN, EDCN, DCNv2, DeepFFM, DeepFM, FatDeepFFM, FiBiNet, WideDeep)
+from torch_rechub.models.ranking import DCN, EDCN, DCNv2, DeepFFM, DeepFM, FatDeepFFM, FiBiNet, WideDeep
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.utils.data import DataGenerator
 

@@ -9,7 +9,7 @@ import torch
 from torch import nn
 
 from ...basic.features import SparseFeature
-from ...basic.layers import (MLP, BiLinearInteractionLayer, EmbeddingLayer, SENETLayer)
+from ...basic.layers import MLP, BiLinearInteractionLayer, EmbeddingLayer, SENETLayer
 
 
 class FiBiNet(torch.nn.Module):

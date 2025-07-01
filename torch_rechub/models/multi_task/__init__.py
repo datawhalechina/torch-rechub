@@ -1,3 +1,5 @@
+__all__ = ['SharedBottom', 'ESMM', 'MMOE', 'PLE', 'AITM']
+
 from .aitm import AITM
 from .esmm import ESMM
 from .mmoe import MMOE

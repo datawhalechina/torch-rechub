@@ -1,36 +1,73 @@
 [flake8]
+# 基本配置
 max-line-length = 248
-extend-ignore =
-    E203,
-    W503,
-    E501,
-    E722,
-    E402,
-    F821,
-    F523,
-    E711,
-    E741,
-    F401,
-    E265,
-    C901,
-    E301,
-    E305,
-    W293,
-    E261,
-    W291,
-    W292,
-    E111,
-    E117,
-    F841,
-    E302
-exclude =
+max-complexity = 30
+exclude = 
     .git,
     __pycache__,
-    build,
-    dist,
-    .venv,
-    venv,
-    .eggs,
-    *.egg
-max-complexity = 30
-docstring-convention = google
+    docs/,
+    build/,
+    dist/,
+    .eggs/,
+    *.egg-info/,
+    htmlcov/,
+    .pytest_cache/,
+    .mypy_cache/,
+    .tox/,
+    .venv/,
+    venv/,
+    env/
+
+# 忽略的错误代码
+ignore = 
+    # E203: whitespace before ':' (与Black格式化工具冲突)
+    E203,
+    # W503: line break before binary operator (已过时的规则)
+    W503,
+    # E501: line too long (我们用248字符限制)
+    E501,
+    # E722: do not use bare except (有时确实需要)
+    E722,
+    # E402: module level import not at top of file
+    E402,
+    # F821: undefined name (有时是动态导入)
+    F821,
+    # F523: '...'.format(...) has unused arguments
+    F523,
+    # E711: comparison to None should be 'if cond is None:'
+    E711,
+    # E741: ambiguous variable name
+    E741,
+    # F401: imported but unused (在__init__.py中常见)
+    F401,
+    # E265: block comment should start with '# '
+    E265,
+    # C901: too complex (已通过max-complexity设置)
+    C901,
+    # E301: expected 1 blank line, found 0
+    E301,
+    # E305: expected 2 blank lines after class or function definition
+    E305,
+    # W293: blank line contains whitespace
+    W293,
+    # E261: at least two spaces before inline comment
+    E261,
+    # W291: trailing whitespace
+    W291,
+    # W292: no newline at end of file
+    W292,
+    # E111: indentation is not a multiple of four
+    E111,
+    # E117: over-indented
+    E117,
+    # F841: local variable is assigned to but never used
+    F841,
+    # E302: expected 2 blank lines, found 1
+    E302
+
+# 每个文件的最大导入数
+max-imports = 30
+
+# 统计信息
+statistics = True
+count = True

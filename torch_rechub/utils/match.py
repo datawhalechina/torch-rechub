@@ -17,7 +17,7 @@ except ImportError:
 
 try:
     import torch
-    from pymilvus import (Collection, CollectionSchema, DataType, FieldSchema, connections, utility)
+    from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
     MILVUS_AVAILABLE = True
 except ImportError:
     MILVUS_AVAILABLE = False

@@ -28,7 +28,7 @@ def main():
 
     # 阶段一: isort
     print("\n--- 阶段一: 使用 isort 排序导入 ---")
-    isort_command = [sys.executable, '-m', 'isort'] + source_dirs
+    isort_command = [sys.executable, '-m', 'isort', '--profile', 'black'] + source_dirs
     run_command(isort_command, "isort")
 
     # 阶段二: yapf

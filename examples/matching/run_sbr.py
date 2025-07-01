@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.utils.rnn as rnn_utils
-from data.session_based.preprocess_session_based import (INTERNAL_ITEM_ID_FIELD, TEST_DATA_PREFIX, TRAIN_DATA_PREFIX)
+from data.session_based.preprocess_session_based import INTERNAL_ITEM_ID_FIELD, TEST_DATA_PREFIX, TRAIN_DATA_PREFIX
 from torch.utils.data import DataLoader
 
 from torch_rechub.basic.features import SequenceFeature
