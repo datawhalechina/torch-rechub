@@ -134,6 +134,11 @@ jobs:
 
       - name: Run tests
         run: |
+          pytest -c config/pytest.ini tests/ -v
+
+      - name: Run tests with coverage (only for main combination)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+        run: |
           pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
@@ -237,4 +242,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-          repository-url: https://upload.pypi.org/legacy/ 
+          repository-url: https://upload.pypi.org/legacy/
