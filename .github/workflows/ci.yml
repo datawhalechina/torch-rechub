@@ -15,9 +15,6 @@ on:
       - 'examples/**'
       - 'config/**'
       - 'tests/**'
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.ipynb'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -26,9 +23,6 @@ on:
       - 'examples/**'
       - 'config/**'
       - 'tests/**'
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.ipynb'
   release:
     types: [published]
 
