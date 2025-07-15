@@ -59,36 +59,38 @@ English | [简体中文](README_zh.md)
 * Scikit-learn
 
 ### Installation Steps
-- **Stable Version**
+
+**Stable Version (Recommended for Users):**
 ```bash
 pip install torch-rechub
 ```
 
-- **Latest Version (Recommended)**
+**Latest Version:**
 ```bash
+# Install uv first (if not already installed)
+pip install uv
+
+# Clone and install
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
-python setup.py install
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ## 🚀 Quick Start
 
-Here's a simple example of training a model (e.g., MF - Matrix Factorization) on the MovieLens-100k dataset:
+Here's a simple example of training a model (e.g., DSSM) on the MovieLens dataset:
 
 ```bash
-# 1. Prepare data (if preprocessing needed)
-# python examples/matching/data/ml-1m/preprocess_ml.py
+# Clone the repository (if using latest version)
+git clone https://github.com/datawhalechina/torch-rechub.git
+cd torch-rechub
+uv sync
 
-# 2. Train model
-python run_ml_dssm.py
-# Or override config with command-line arguments:
-# python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+# Run example
+python examples/matching/run_ml_dssm.py
+
+# Or with custom parameters:
+python examples/matching/run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
 ```
 
 After training, model files will be saved in the `saved/dssm_ml-100k` directory (or your configured directory).
@@ -98,22 +100,35 @@ After training, model files will be saved in the `saved/dssm_ml-100k` directory 
 ```
 torch-rechub/             # Root directory
 ├── README.md             # Project documentation
+├── pyproject.toml        # Project configuration and dependencies
 ├── torch_rechub/         # Core library
 │   ├── basic/            # Basic components
+│   │   ├── activation.py # Activation functions
+│   │   ├── features.py   # Feature engineering
+│   │   ├── layers.py     # Neural network layers
+│   │   ├── loss_func.py  # Loss functions
+│   │   └── metric.py     # Evaluation metrics
 │   ├── models/           # Recommendation model implementations
 │   │   ├── matching/     # Matching models (DSSM/MIND/GRU4Rec etc.)
-│   │   └── ranking/      # Ranking models (WideDeep/DeepFM/DIN etc.)
+│   │   ├── ranking/      # Ranking models (WideDeep/DeepFM/DIN etc.)
 │   │   └── multi_task/   # Multi-task models (MMoE/ESMM etc.)
-│   ├── trainers/         # Trainers
-│   ├── utils/            # Utility functions
+│   ├── trainers/         # Training frameworks
+│   │   ├── ctr_trainer.py    # CTR prediction trainer
+│   │   ├── match_trainer.py  # Matching model trainer
+│   │   └── mtl_trainer.py    # Multi-task learning trainer
+│   └── utils/            # Utility functions
+│       ├── data.py       # Data processing utilities
+│       ├── match.py      # Matching utilities
+│       └── mtl.py        # Multi-task utilities
 ├── examples/             # Example scripts
 │   ├── matching/         # Matching task examples
 │   └── ranking/          # Ranking task examples
 ├── docs/                 # Documentation
 ├── tutorials/            # Jupyter tutorials
-├── setup.py              # Package installation script
-├── mkdocs.yml            # MkDocs config file
-└── requirements.txt      # Project dependencies
+├── tests/                # Unit tests
+├── config/               # Configuration files
+├── scripts/              # Utility scripts
+└── mkdocs.yml            # MkDocs config file
 ```
 
 ## 💡 Supported Models
@@ -245,19 +260,7 @@ Thanks to all contributors!
 
 ## 🤝 Contributing
 
-We welcome all types of contributions! If you'd like to contribute to this project, please follow these steps:
-
-1. **Fork the repository:** Click the "Fork" button in the upper right corner.
-2. **Make your changes:** Implement new features or fix bugs.
-3. **Format code:** Run code formatting before committing to ensure consistent code style:
-   ```bash
-   python config/format_code.py
-   ```
-4. **Commit changes:** `git commit -m "feat: add new feature"` or `fix: fix some issue"` (Following [Conventional Commits](https://www.conventionalcommits.org/) is preferred).
-5. **Push to branch:** `git push origin`
-6. **Create Pull Request:** Go back to the original repository page, click "New pull request", compare your branch with the `main` branch of the main repository, and submit PR.
-
-Please ensure your PR description clearly explains the changes and their purpose.
+We welcome contributions in all forms! Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 We also welcome bug reports and feature suggestions through [Issues](https://github.com/datawhalechina/torch-rechub/issues).
 
