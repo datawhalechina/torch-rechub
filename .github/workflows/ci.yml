@@ -9,16 +9,26 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'torch_rechub/**'
+      - 'tutorials/**'
+      - 'examples/**'
+      - 'config/**'
+      - 'tests/**'
     paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'mkdocs.yml'
+      - '**/*.md'
+      - '**/*.ipynb'
   pull_request:
     branches: [ main, develop ]
+    paths:
+      - 'torch_rechub/**'
+      - 'tutorials/**'
+      - 'examples/**'
+      - 'config/**'
+      - 'tests/**'
     paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'mkdocs.yml'
+      - '**/*.md'
+      - '**/*.ipynb'
   release:
     types: [published]
 

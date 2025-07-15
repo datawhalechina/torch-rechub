@@ -176,7 +176,7 @@ torch-rechub/             # 根目录
 * **Amazon**
 * **Criteo**
 * **Avazu** 
-* **Census-Income"
+* **Census-Income**
 * **BookCrossing**
 * **Ali-ccp**
 * **Yidian**
