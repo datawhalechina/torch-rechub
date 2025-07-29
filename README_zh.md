@@ -292,6 +292,9 @@ match_trainer.fit(train_dl)
 * **项目负责人:** [morningsky](https://github.com/morningsky) 
 * [**GitHub Issues**](https://github.com/datawhalechina/torch-rechub/issues)
 
+## ⭐️ 项目 star 历史
+
+[![Star History Chart](https://api.star-history.com/svg?repos=datawhalechina/torch-rechub&type=Date)](https://www.star-history.com/#datawhalechina/torch-rechub&Date)
 
 ---
 
