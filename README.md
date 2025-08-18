@@ -290,6 +290,11 @@ If you use this framework in your research or work, please consider citing:
 * [**GitHub Issues**](https://github.com/datawhalechina/torch-rechub/issues)
 
 
+
+## ⭐️ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=datawhalechina/torch-rechub&type=Date)](https://www.star-history.com/#datawhalechina/torch-rechub&Date)
+
 ---
 
 *Last updated: [2025-06-30]*
