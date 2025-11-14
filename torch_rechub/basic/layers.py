@@ -719,3 +719,190 @@ class CEN(nn.Module):
         # [batch_size, num_field_crosses, embed_dim]
         aem = s.unsqueeze(-1) * em
         return aem.flatten(start_dim=1)
+
+
+# ============ HSTU Layers (新增) ============
+
+class HSTULayer(nn.Module):
+    """Hierarchical Sequential Transduction Units Layer.
+
+    HSTU层是HSTU模型的核心组件，结合了自注意力机制和门控机制。
+    该层通过多头自注意力和门控机制来捕捉序列中的长期依赖关系。
+
+    Args:
+        d_model (int): 模型维度，默认512
+        n_heads (int): 多头注意力的头数，默认8
+        dqk (int): Query/Key的维度，默认64
+        dv (int): Value的维度，默认64
+        dropout (float): Dropout概率，默认0.1
+        use_rel_pos_bias (bool): 是否使用相对位置偏置，默认True
+
+    Shape:
+        - Input: `(batch_size, seq_len, d_model)`
+        - Output: `(batch_size, seq_len, d_model)`
+
+    Example:
+        >>> layer = HSTULayer(d_model=512, n_heads=8)
+        >>> x = torch.randn(32, 256, 512)
+        >>> output = layer(x)
+        >>> output.shape
+        torch.Size([32, 256, 512])
+    """
+
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64,
+                 dropout=0.1, use_rel_pos_bias=True):
+        super().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.dqk = dqk
+        self.dv = dv
+        self.dropout_rate = dropout
+        self.use_rel_pos_bias = use_rel_pos_bias
+
+        # 验证维度
+        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+
+        # 投影层1: d_model -> 2*n_heads*dqk + 2*n_heads*dv
+        proj1_out_dim = 2 * n_heads * dqk + 2 * n_heads * dv
+        self.proj1 = nn.Linear(d_model, proj1_out_dim)
+
+        # 投影层2: n_heads*dv -> d_model
+        self.proj2 = nn.Linear(n_heads * dv, d_model)
+
+        # LayerNorm
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
+
+        # 缩放因子
+        self.scale = 1.0 / (dqk ** 0.5)
+
+    def forward(self, x, rel_pos_bias=None):
+        """前向传播.
+
+        Args:
+            x (Tensor): 输入张量，shape: (batch_size, seq_len, d_model)
+            rel_pos_bias (Tensor, optional): 相对位置偏置，shape: (1, n_heads, seq_len, seq_len)
+
+        Returns:
+            Tensor: 输出张量，shape: (batch_size, seq_len, d_model)
+        """
+        batch_size, seq_len, _ = x.shape
+
+        # 残差连接
+        residual = x
+
+        # LayerNorm
+        x = self.norm1(x)
+
+        # 投影层1: (B, L, D) -> (B, L, 2*H*dqk + 2*H*dv)
+        proj_out = self.proj1(x)
+
+        # 分解为Q, K, U, V
+        # Q, K: (B, L, H, dqk)
+        # U, V: (B, L, H, dv)
+        q = proj_out[..., :self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
+        k = proj_out[..., self.n_heads * self.dqk:2 * self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
+        u = proj_out[..., 2 * self.n_heads * self.dqk:2 * self.n_heads * self.dqk + self.n_heads * self.dv].reshape(batch_size, seq_len, self.n_heads, self.dv)
+        v = proj_out[..., 2 * self.n_heads * self.dqk + self.n_heads * self.dv:].reshape(batch_size, seq_len, self.n_heads, self.dv)
+
+        # 转置为 (B, H, L, dqk/dv)
+        q = q.transpose(1, 2)  # (B, H, L, dqk)
+        k = k.transpose(1, 2)  # (B, H, L, dqk)
+        u = u.transpose(1, 2)  # (B, H, L, dv)
+        v = v.transpose(1, 2)  # (B, H, L, dv)
+
+        # 计算注意力分数: (B, H, L, L)
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+
+        # 添加相对位置偏置
+        if rel_pos_bias is not None:
+            scores = scores + rel_pos_bias
+
+        # 应用softmax
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        # 计算注意力输出: (B, H, L, dv)
+        attn_output = torch.matmul(attn_weights, v)
+
+        # 门控机制: gate = LayerNorm(attn_output) * u
+        # 先转回 (B, L, H, dv)
+        attn_output = attn_output.transpose(1, 2)  # (B, L, H, dv)
+        u = u.transpose(1, 2)  # (B, L, H, dv)
+
+        # 应用门控: (B, L, H, dv)
+        gated_output = attn_output * torch.sigmoid(u)
+
+        # 合并多头: (B, L, H*dv)
+        gated_output = gated_output.reshape(batch_size, seq_len, self.n_heads * self.dv)
+
+        # 投影层2: (B, L, H*dv) -> (B, L, D)
+        output = self.proj2(gated_output)
+        output = self.dropout(output)
+
+        # 残差连接
+        output = output + residual
+
+        # 第二个LayerNorm和前馈网络（简化版本）
+        residual = output
+        output = self.norm2(output)
+
+        return output
+
+
+class HSTUBlock(nn.Module):
+    """HSTU Block - 多层HSTU的堆栈.
+
+    将多个HSTULayer堆叠在一起，形成深层的HSTU模型。
+
+    Args:
+        d_model (int): 模型维度，默认512
+        n_heads (int): 多头注意力的头数，默认8
+        n_layers (int): HSTU层的数量，默认4
+        dqk (int): Query/Key的维度，默认64
+        dv (int): Value的维度，默认64
+        dropout (float): Dropout概率，默认0.1
+        use_rel_pos_bias (bool): 是否使用相对位置偏置，默认True
+
+    Shape:
+        - Input: `(batch_size, seq_len, d_model)`
+        - Output: `(batch_size, seq_len, d_model)`
+
+    Example:
+        >>> block = HSTUBlock(d_model=512, n_heads=8, n_layers=4)
+        >>> x = torch.randn(32, 256, 512)
+        >>> output = block(x)
+        >>> output.shape
+        torch.Size([32, 256, 512])
+    """
+
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64,
+                 dropout=0.1, use_rel_pos_bias=True):
+        super().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+
+        # 创建多个HSTULayer
+        self.layers = nn.ModuleList([
+            HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv,
+                     dropout=dropout, use_rel_pos_bias=use_rel_pos_bias)
+            for _ in range(n_layers)
+        ])
+
+    def forward(self, x, rel_pos_bias=None):
+        """前向传播.
+
+        Args:
+            x (Tensor): 输入张量，shape: (batch_size, seq_len, d_model)
+            rel_pos_bias (Tensor, optional): 相对位置偏置
+
+        Returns:
+            Tensor: 输出张量，shape: (batch_size, seq_len, d_model)
+        """
+        for layer in self.layers:
+            x = layer(x, rel_pos_bias=rel_pos_bias)
+        return x
