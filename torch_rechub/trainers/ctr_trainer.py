@@ -5,6 +5,7 @@ import tqdm
 from sklearn.metrics import roc_auc_score
 
 from ..basic.callback import EarlyStopper
+from ..basic.loss_func import RegularizationLoss
 
 
 class CTRTrainer(object):
@@ -22,6 +23,10 @@ class CTRTrainer(object):
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
         loss_mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+        embedding_l1 (float): L1 regularization coefficient for embedding parameters (default=0.0).
+        embedding_l2 (float): L2 regularization coefficient for embedding parameters (default=0.0).
+        dense_l1 (float): L1 regularization coefficient for dense parameters (default=0.0).
+        dense_l2 (float): L2 regularization coefficient for dense parameters (default=0.0).
     """
 
     def __init__(
@@ -29,6 +34,7 @@ class CTRTrainer(object):
         model,
         optimizer_fn=torch.optim.Adam,
         optimizer_params=None,
+        regularization_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         n_epoch=10,
@@ -51,6 +57,8 @@ class CTRTrainer(object):
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
+        if regularization_params is None:
+            regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.scheduler = None
         if scheduler_fn is not None:
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
@@ -60,6 +68,8 @@ class CTRTrainer(object):
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.model_path = model_path
+        # Initialize regularization loss
+        self.reg_loss_fn = RegularizationLoss(**regularization_params)
 
     def train_one_epoch(self, data_loader, log_interval=10):
         self.model.train()
@@ -74,6 +84,11 @@ class CTRTrainer(object):
             else:
                 y_pred, other_loss = self.model(x_dict)
                 loss = self.criterion(y_pred, y) + other_loss
+
+            # Add regularization loss
+            reg_loss = self.reg_loss_fn(self.model)
+            loss = loss + reg_loss
+
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
