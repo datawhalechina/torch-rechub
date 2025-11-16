@@ -1,15 +1,22 @@
 """HSTU Model Example on MovieLens Dataset."""
 
-import torch
-import numpy as np
-import pickle
 import os
+import pickle
+import sys
+
+import numpy as np
+import torch
+import tqdm
+
+from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hstu import HSTUModel
-from torch_rechub.utils.data import SequenceDataGenerator
 from torch_rechub.trainers.seq_trainer import SeqTrainer
+from torch_rechub.utils.data import SequenceDataGenerator
+
+sys.path.append("../..")
 
 
-def load_real_data(data_dir="./data/ml-1m/processed/"):
+def get_movielens_data(data_dir="./data/ml-1m/processed/"):
     """加载真实的MovieLens-1M数据.
 
     Args:
@@ -47,35 +54,73 @@ def load_real_data(data_dir="./data/ml-1m/processed/"):
     return train_data, val_data, test_data, vocab_size
 
 
-def generate_dummy_data(num_samples=1000, seq_len=256, vocab_size=10000):
-    """生成虚拟数据用于测试.
+def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
+    """评估推荐排序指标.
 
     Args:
-        num_samples (int): 样本数量
-        seq_len (int): 序列长度
-        vocab_size (int): 词表大小
+        model: 训练好的模型
+        data_loader: 测试数据加载器
+        device: 设备
+        topKs: 评估的K值列表
 
     Returns:
-        tuple: (seq_tokens, seq_positions, targets)
+        dict: 包含各种推荐指标的字典
     """
-    # 生成随机序列token
-    seq_tokens = np.random.randint(2, vocab_size, size=(num_samples, seq_len))
+    model.eval()
+    y_true = {}
+    y_pred = {}
 
-    # 生成位置编码
-    seq_positions = np.tile(np.arange(seq_len), (num_samples, 1))
+    user_idx = 0
+    with torch.no_grad():
+        for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
+            # 移动到设备
+            seq_tokens = seq_tokens.to(device)
+            seq_time_diffs = seq_time_diffs.to(device)
+            targets = targets.cpu().numpy()
 
-    # 生成目标token
-    targets = np.random.randint(2, vocab_size, size=(num_samples,))
+            # 前向传播
+            logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-    return seq_tokens, seq_positions, targets
+            # 对于next-item prediction任务，只使用最后一个位置的预测
+            last_logits = logits[:, -1, :]  # (B, V)
+
+            # 获取每个样本的top-K推荐
+            batch_size = last_logits.shape[0]
+            max_k = max(topKs)
+
+            # 获取top-K的物品索引
+            _, top_items = torch.topk(last_logits, k=max_k, dim=-1)  # (B, max_k)
+            top_items = top_items.cpu().numpy()
+
+            # 为每个样本构建y_true和y_pred
+            for i in range(batch_size):
+                user_id = str(user_idx)
+                y_true[user_id] = [int(targets[i])]  # 真实的下一个物品
+                y_pred[user_id] = top_items[i].tolist()  # 推荐的top-K物品
+                user_idx += 1
+
+    # 计算推荐指标
+    results = topk_metrics(y_true, y_pred, topKs=topKs)
+    return results
 
 
-def main(use_real_data=False):
+def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, max_seq_len):
     """主函数.
 
     Args:
-        use_real_data (bool): 是否使用真实数据，默认False
+        dataset_path (str): 数据集路径
+        model_name (str): 模型名称
+        epoch (int): 训练轮数
+        learning_rate (float): 学习率
+        batch_size (int): 批次大小
+        weight_decay (float): 权重衰减
+        device (str): 设备
+        save_dir (str): 模型保存目录
+        seed (int): 随机种子
+        max_seq_len (int): 最大序列长度
     """
+    torch.manual_seed(seed)
+
     print("=" * 80)
     print("HSTU Model Example on MovieLens")
     print("=" * 80)
@@ -84,71 +129,54 @@ def main(use_real_data=False):
     d_model = 256
     n_heads = 8
     n_layers = 2
-    batch_size = 32
-    epochs = 3
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f"\n设备: {device}")
     print(f"模型维度: {d_model}")
     print(f"多头数: {n_heads}")
     print(f"层数: {n_layers}")
+    print(f"序列长度: {max_seq_len}")
 
     # 加载数据
     print("\n加载数据...")
-    if use_real_data:
-        result = load_real_data()
-        if result is None:
-            print("使用虚拟数据代替...")
-            use_real_data = False
-        else:
-            train_data, val_data, test_data, vocab_size = result
+    result = get_movielens_data(dataset_path)
+    if result is None:
+        print("数据加载失败，退出...")
+        return
 
-    if not use_real_data:
-        print("生成虚拟数据...")
-        vocab_size = 10000
-        seq_tokens, seq_positions, targets = generate_dummy_data(
-            num_samples=1000,
-            seq_len=256,
-            vocab_size=vocab_size
-        )
-        print(f"数据形状: seq_tokens={seq_tokens.shape}, targets={targets.shape}")
+    train_data, val_data, test_data, vocab_size = result
 
-        # 创建数据加载器
-        print("\n创建数据加载器...")
-        data_gen = SequenceDataGenerator(seq_tokens, seq_positions, targets)
-        train_loader, val_loader, test_loader = data_gen.generate_dataloader(
-            batch_size=batch_size,
-            num_workers=0,
-            split_ratio=(0.7, 0.1, 0.2)
-        )
-    else:
-        # 使用真实数据
-        print("\n创建数据加载器（真实数据）...")
-        train_gen = SequenceDataGenerator(
-            train_data['seq_tokens'],
-            train_data['seq_positions'],
-            train_data['targets']
-        )
-        val_gen = SequenceDataGenerator(
-            val_data['seq_tokens'],
-            val_data['seq_positions'],
-            val_data['targets']
-        )
-        test_gen = SequenceDataGenerator(
-            test_data['seq_tokens'],
-            test_data['seq_positions'],
-            test_data['targets']
-        )
+    # 使用真实数据（支持时间差）
+    print("\n创建数据加载器（真实数据）...")
+    print("✅ 使用时间感知的位置编码")
 
-        train_loader = train_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-        val_loader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-        test_loader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
+    train_gen = SequenceDataGenerator(
+        train_data['seq_tokens'],
+        train_data['seq_positions'],
+        train_data['targets'],
+        train_data['seq_time_diffs']
+    )
+    val_gen = SequenceDataGenerator(
+        val_data['seq_tokens'],
+        val_data['seq_positions'],
+        val_data['targets'],
+        val_data['seq_time_diffs']
+    )
+    test_gen = SequenceDataGenerator(
+        test_data['seq_tokens'],
+        test_data['seq_positions'],
+        test_data['targets'],
+        test_data['seq_time_diffs']
+    )
+
+    train_dataloader = train_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
+    val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
+    test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
 
     print(f"词表大小: {vocab_size}")
-    print(f"训练集大小: {len(train_loader.dataset)}")
-    print(f"验证集大小: {len(val_loader.dataset)}")
-    print(f"测试集大小: {len(test_loader.dataset)}")
-    
+    print(f"训练集大小: {len(train_dataloader.dataset)}")
+    print(f"验证集大小: {len(val_dataloader.dataset)}")
+    print(f"测试集大小: {len(test_dataloader.dataset)}")
+
     # 创建模型
     print("\n创建模型...")
     model = HSTUModel(
@@ -156,42 +184,45 @@ def main(use_real_data=False):
         d_model=d_model,
         n_heads=n_heads,
         n_layers=n_layers,
-        max_seq_len=256,
+        max_seq_len=max_seq_len,
         dropout=0.1
     )
     print(f"模型参数数量: {sum(p.numel() for p in model.parameters()):,}")
-    
-    # 创建优化器
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    
+
     # 创建训练器
     print("\n创建训练器...")
-    trainer = SeqTrainer(model, optimizer, device=device)
-    
+    trainer = SeqTrainer(
+        model,
+        optimizer_fn=torch.optim.Adam,
+        optimizer_params={"lr": learning_rate, "weight_decay": weight_decay},
+        n_epoch=epoch,
+        earlystop_patience=10,
+        device=device,
+        model_path=save_dir
+    )
+
     # 训练模型
     print("\n开始训练...")
-    history = trainer.fit(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        epochs=epochs,
-        early_stopping_patience=2,
-        save_path='hstu_model.pt'
-    )
-    
+    trainer.fit(train_dataloader, val_dataloader)
+
     # 评估模型
     print("\n评估模型...")
-    test_loss, test_accuracy = trainer.evaluate(test_loader)
+    test_loss, test_accuracy = trainer.evaluate(test_dataloader)
     print(f"测试集损失: {test_loss:.4f}")
     print(f"测试集准确率: {test_accuracy:.4f}")
-    
-    # 打印训练历史
-    print("\n训练历史:")
-    for epoch in range(len(history['train_loss'])):
-        print(f"Epoch {epoch+1}: "
-              f"train_loss={history['train_loss'][epoch]:.4f}, "
-              f"val_loss={history['val_loss'][epoch]:.4f}, "
-              f"val_accuracy={history['val_accuracy'][epoch]:.4f}")
-    
+
+    # 评估推荐指标
+    print("\n计算推荐指标...")
+    ranking_results = evaluate_ranking(model, test_dataloader, device, topKs=[10, 50, 200])
+
+    print("\n测试集推荐指标:")
+    print("=" * 50)
+    # 提取并打印HR和NDCG指标
+    for metric_name in ['Hit', 'NDCG']:
+        for result_str in ranking_results[metric_name]:
+            print(result_str)
+    print("=" * 50)
+
     print("\n" + "=" * 80)
     print("训练完成!")
     print("=" * 80)
@@ -199,11 +230,18 @@ def main(use_real_data=False):
 
 if __name__ == '__main__':
     import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset_path', default="./data/ml-1m/processed/")
+    parser.add_argument('--model_name', default='hstu')
+    parser.add_argument('--epoch', type=int, default=5)
+    parser.add_argument('--learning_rate', type=float, default=1e-3)
+    parser.add_argument('--batch_size', type=int, default=512)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument('--device', default='cuda')  # cuda:0
+    parser.add_argument('--save_dir', default='./')
+    parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--max_seq_len', type=int, default=200)
 
-    parser = argparse.ArgumentParser(description='HSTU Model Example on MovieLens')
-    parser.add_argument('--use-real-data', action='store_true',
-                        help='使用真实MovieLens-1M数据')
     args = parser.parse_args()
-
-    main(use_real_data=args.use_real_data)
-
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size,
+         args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len)

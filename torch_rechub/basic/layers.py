@@ -769,6 +769,17 @@ class HSTULayer(nn.Module):
         # 投影层2: n_heads*dv -> d_model
         self.proj2 = nn.Linear(n_heads * dv, d_model)
 
+        # 前馈网络（FFN）
+        # 标准Transformer使用4*d_model作为FFN的隐藏层维度
+        ffn_hidden_dim = 4 * d_model
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, ffn_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(ffn_hidden_dim, d_model),
+            nn.Dropout(dropout)
+        )
+
         # LayerNorm
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
@@ -817,6 +828,11 @@ class HSTULayer(nn.Module):
         # 计算注意力分数: (B, H, L, L)
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
 
+        # 添加causal mask（防止看到未来信息）
+        # 对于生成式模型，这是必须的，确保位置i只能attend到位置<=i的token
+        causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
+        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
         # 添加相对位置偏置
         if rel_pos_bias is not None:
             scores = scores + rel_pos_bias
@@ -846,9 +862,11 @@ class HSTULayer(nn.Module):
         # 残差连接
         output = output + residual
 
-        # 第二个LayerNorm和前馈网络（简化版本）
+        # 第二个残差块：LayerNorm + FFN + 残差连接
         residual = output
         output = self.norm2(output)
+        output = self.ffn(output)
+        output = output + residual
 
         return output
 
