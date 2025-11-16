@@ -739,17 +739,17 @@ class InteractingLayer(nn.Module):
         super().__init__()
         if embed_dim % num_heads != 0:
             raise ValueError("embed_dim must be divisible by num_heads")
-        
+
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
         self.residual = residual
 
         self.W_Q = nn.Linear(embed_dim, embed_dim, bias=False)
         self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
         self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
-        
+
         # Residual connection
         self.W_Res = nn.Linear(embed_dim, embed_dim, bias=False) if residual else None
         self.dropout = nn.Dropout(dropout) if dropout > 0 else None
@@ -776,7 +776,7 @@ class InteractingLayer(nn.Module):
         # (batch_size, num_heads, num_fields, num_fields)
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
         attn_weights = F.softmax(attn_scores, dim=-1)
-        
+
         if self.dropout is not None:
             attn_weights = self.dropout(attn_weights)
 
