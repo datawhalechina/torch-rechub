@@ -719,3 +719,77 @@ class CEN(nn.Module):
         # [batch_size, num_field_crosses, embed_dim]
         aem = s.unsqueeze(-1) * em
         return aem.flatten(start_dim=1)
+
+
+class InteractingLayer(nn.Module):
+    """Multi-head Self-Attention based Interacting Layer, used in AutoInt model.
+
+    Args:
+        embed_dim (int): the embedding dimension.
+        num_heads (int): the number of attention heads (default=2).
+        dropout (float): the dropout rate (default=0.0).
+        residual (bool): whether to use residual connection (default=True).
+
+    Shape:
+        - Input: `(batch_size, num_fields, embed_dim)`
+        - Output: `(batch_size, num_fields, embed_dim)`
+    """
+
+    def __init__(self, embed_dim, num_heads=2, dropout=0.0, residual=True):
+        super().__init__()
+        if embed_dim % num_heads != 0:
+            raise ValueError("embed_dim must be divisible by num_heads")
+        
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.residual = residual
+
+        self.W_Q = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
+        
+        # Residual connection
+        self.W_Res = nn.Linear(embed_dim, embed_dim, bias=False) if residual else None
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else None
+
+    def forward(self, x):
+        """
+        Args:
+            x: input tensor with shape (batch_size, num_fields, embed_dim)
+        """
+        batch_size, num_fields, embed_dim = x.shape
+
+        # Linear projections
+        Q = self.W_Q(x)  # (batch_size, num_fields, embed_dim)
+        K = self.W_K(x)  # (batch_size, num_fields, embed_dim)
+        V = self.W_V(x)  # (batch_size, num_fields, embed_dim)
+
+        # Reshape for multi-head attention
+        # (batch_size, num_heads, num_fields, head_dim)
+        Q = Q.view(batch_size, num_fields, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.view(batch_size, num_fields, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.view(batch_size, num_fields, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Scaled dot-product attention
+        # (batch_size, num_heads, num_fields, num_fields)
+        attn_scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+        attn_weights = F.softmax(attn_scores, dim=-1)
+        
+        if self.dropout is not None:
+            attn_weights = self.dropout(attn_weights)
+
+        # Apply attention to values
+        # (batch_size, num_heads, num_fields, head_dim)
+        attn_output = torch.matmul(attn_weights, V)
+
+        # Concatenate heads
+        # (batch_size, num_fields, embed_dim)
+        attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, num_fields, embed_dim)
+
+        # Residual connection
+        if self.residual and self.W_Res is not None:
+            attn_output = attn_output + self.W_Res(x)
+
+        return F.relu(attn_output)
