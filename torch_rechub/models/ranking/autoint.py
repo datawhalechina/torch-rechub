@@ -28,9 +28,12 @@ class AutoInt(torch.nn.Module):
     def __init__(self, sparse_features, dense_features, num_layers=3, num_heads=2, dropout=0.0, mlp_params=None):
         super(AutoInt, self).__init__()
         self.sparse_features = sparse_features
+
         self.dense_features = dense_features if dense_features is not None else []
         embed_dims = [fea.embed_dim for fea in self.sparse_features]
         self.embed_dim = embed_dims[0]
+        if len(self.sparse_features) == 0:
+            raise ValueError("AutoInt requires at least one sparse feature to determine embed_dim.")
 
         # field nums = sparse + dense
         self.num_sparse = len(self.sparse_features)
@@ -64,15 +67,17 @@ class AutoInt(torch.nn.Module):
         # sparse feature embedding: [B, num_sparse, embed_dim]
         sparse_emb = self.sparse_embedding(x, self.sparse_features, squeeze_dim=False)
 
-        # dense feature embedding: [B, 1, embed_dim]
         dense_emb_list = []
         for fea in self.dense_features:
             v = x[fea.name].float().view(-1, 1, 1)
             dense_emb = self.dense_embeddings[fea.name](v)  # [B, 1, embed_dim]
             dense_emb_list.append(dense_emb)
 
-        dense_emb = torch.cat(dense_emb_list, dim=1)  # [B, num_dense, embed_dim]
-        embed_x = torch.cat([sparse_emb, dense_emb], dim=1)  # [B, num_fields, embed_dim]
+        if len(dense_emb_list) > 0:
+            dense_emb = torch.cat(dense_emb_list, dim=1)           # [B, num_dense, d]
+            embed_x = torch.cat([sparse_emb, dense_emb], dim=1)    # [B, num_fields, d]
+        else:
+            embed_x = sparse_emb                                   # [B, num_sparse, d]
 
         embed_x_flatten = embed_x.flatten(start_dim=1)  # [B, num_fields * embed_dim]
 
