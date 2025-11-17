@@ -74,10 +74,10 @@ class AutoInt(torch.nn.Module):
             dense_emb_list.append(dense_emb)
 
         if len(dense_emb_list) > 0:
-            dense_emb = torch.cat(dense_emb_list, dim=1)           # [B, num_dense, d]
-            embed_x = torch.cat([sparse_emb, dense_emb], dim=1)    # [B, num_fields, d]
+            dense_emb = torch.cat(dense_emb_list, dim=1)  # [B, num_dense, d]
+            embed_x = torch.cat([sparse_emb, dense_emb], dim=1)  # [B, num_fields, d]
         else:
-            embed_x = sparse_emb                                   # [B, num_sparse, d]
+            embed_x = sparse_emb  # [B, num_sparse, d]
 
         embed_x_flatten = embed_x.flatten(start_dim=1)  # [B, num_fields * embed_dim]
 
