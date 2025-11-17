@@ -7,6 +7,7 @@ Authors: Yang Zhou, zyaztec@gmail.com
 """
 
 import torch
+import torch.nn as nn
 
 from ...basic.layers import LR, MLP, EmbeddingLayer, InteractingLayer
 
@@ -15,34 +16,44 @@ class AutoInt(torch.nn.Module):
     """AutoInt Model
 
     Args:
-        features (list): the list of `Feature Class`, training by the entire model.
-        num_layers (int): the number of interacting layers.
-        num_heads (int): the number of attention heads (default=2).
-        dropout (float): the dropout rate for attention layers (default=0.0).
-        mlp_params (dict): the params of the last MLP module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
+        sparse_features (list): the list of `SparseFeature` Class
+        dense_features (list): the list of `DenseFeature` Class
+        num_layers (int): number of interacting layers
+        num_heads (int): number of attention heads
+        dropout (float): dropout rate for attention
+        mlp_params (dict): parameters for MLP, keys: {"dims":list, "activation":str,
+                                             "dropout":float, "output_layer":bool"}
     """
 
-    def __init__(self, features, num_layers=3, num_heads=2, dropout=0.0, mlp_params=None):
+    def __init__(self, sparse_features, dense_features, num_layers=3, num_heads=2, dropout=0.0, mlp_params=None):
         super(AutoInt, self).__init__()
-        self.features = features
-        self.dims = sum([fea.embed_dim for fea in features])
-        self.num_layers = num_layers
-
-        self.embedding = EmbeddingLayer(features)
-
-        # Check if all features have the same embedding dimension
-        embed_dims = [fea.embed_dim for fea in features]
-        if len(set(embed_dims)) != 1:
-            raise ValueError("All features must have the same embedding dimension for AutoInt")
+        self.sparse_features = sparse_features
+        self.dense_features = dense_features if dense_features is not None else []
+        embed_dims = [fea.embed_dim for fea in self.sparse_features]
         self.embed_dim = embed_dims[0]
 
-        # Interacting layers (multi-head self-attention)
+        # field nums = sparse + dense
+        self.num_sparse = len(self.sparse_features)
+        self.num_dense = len(self.dense_features)
+        self.num_fields = self.num_sparse + self.num_dense
+
+        # total dims = num_fields * embed_dim
+        self.dims = self.num_fields * self.embed_dim
+        self.num_layers = num_layers
+
+        self.sparse_embedding = EmbeddingLayer(self.sparse_features)
+
+        # dense feature embedding
+        self.dense_embeddings = nn.ModuleDict()
+        for fea in self.dense_features:
+            self.dense_embeddings[fea.name] = nn.Linear(1, self.embed_dim, bias=False)
+
         self.interacting_layers = torch.nn.ModuleList([InteractingLayer(self.embed_dim, num_heads=num_heads, dropout=dropout, residual=True) for _ in range(num_layers)])
 
-        # Linear part for 1st-order feature interactions
         self.linear = LR(self.dims)
 
-        # Optional MLP for deep learning
+        self.attn_linear = nn.Linear(self.dims, 1)
+
         if mlp_params is not None:
             self.use_mlp = True
             self.mlp = MLP(self.dims, **mlp_params)
@@ -50,29 +61,37 @@ class AutoInt(torch.nn.Module):
             self.use_mlp = False
 
     def forward(self, x):
-        # Embedding layer: [batch_size, num_fields, embed_dim]
-        embed_x = self.embedding(x, self.features, squeeze_dim=False)
+        # sparse feature embedding: [B, num_sparse, embed_dim]
+        sparse_emb = self.sparse_embedding(x, self.sparse_features, squeeze_dim=False)
+
+        # dense feature embedding: [B, 1, embed_dim]
+        dense_emb_list = []
+        for fea in self.dense_features:
+            v = x[fea.name].float().view(-1, 1, 1)
+            dense_emb = self.dense_embeddings[fea.name](v)  # [B, 1, embed_dim]
+            dense_emb_list.append(dense_emb)
+
+        dense_emb = torch.cat(dense_emb_list, dim=1)  # [B, num_dense, embed_dim]
+        embed_x = torch.cat([sparse_emb, dense_emb], dim=1)  # [B, num_fields, embed_dim]
+
+        embed_x_flatten = embed_x.flatten(start_dim=1)  # [B, num_fields * embed_dim]
 
         # Multi-head self-attention layers
         attn_out = embed_x
         for layer in self.interacting_layers:
-            attn_out = layer(attn_out)
+            attn_out = layer(attn_out)  # [B, num_fields, embed_dim]
 
-        # Flatten attention output: [batch_size, num_fields * embed_dim]
-        attn_out = attn_out.flatten(start_dim=1)
+        # Attention linear
+        attn_out_flatten = attn_out.flatten(start_dim=1)  # [B, num_fields * embed_dim]
+        y_attn = self.attn_linear(attn_out_flatten)  # [B, 1]
 
-        # Linear part (1st-order)
-        y_linear = self.linear(embed_x.flatten(start_dim=1))
+        # Linear part
+        y_linear = self.linear(embed_x_flatten)  # [B, 1]
 
-        # Attention part (high-order)
-        y_attn = torch.sum(attn_out, dim=1, keepdim=True)
-
-        # Combine results
-        y = y_linear + y_attn
-
-        # Optional MLP
+        # Deep MLP
+        y = y_attn + y_linear
         if self.use_mlp:
-            y_deep = self.mlp(embed_x.flatten(start_dim=1))
+            y_deep = self.mlp(embed_x_flatten)  # [B, 1]
             y = y + y_deep
 
         return torch.sigmoid(y.squeeze(1))

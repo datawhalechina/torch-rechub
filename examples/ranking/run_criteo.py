@@ -73,7 +73,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     elif model_name == "edcn":
         model = EDCN(features=dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "autoint":
-        model = AutoInt(features=sparse_feas, num_layers=3, num_heads=2, dropout=0.2, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
+        model = AutoInt(dense_features=dense_feas, sparse_features=sparse_feas, num_layers=3, num_heads=2, dropout=0.2, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "deepffm":
         model = DeepFFM(linear_features=ffm_linear_feas, cross_features=ffm_cross_feas, embed_dim=10, mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"})
     elif model_name == "fat_deepffm":
