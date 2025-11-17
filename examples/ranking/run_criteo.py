@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tqdm import tqdm
 
 from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.models.ranking import DCN, EDCN, DCNv2, DeepFFM, DeepFM, FatDeepFFM, FiBiNet, WideDeep
+from torch_rechub.models.ranking import DCN, EDCN, AutoInt, DCNv2, DeepFFM, DeepFM, FatDeepFFM, FiBiNet, WideDeep
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.utils.data import DataGenerator
 
@@ -72,6 +72,8 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         model = FiBiNet(features=dense_feas + sparse_feas, reduction_ratio=3, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "edcn":
         model = EDCN(features=dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
+    elif model_name == "autoint":
+        model = AutoInt(dense_features=dense_feas, sparse_features=sparse_feas, num_layers=3, num_heads=2, dropout=0.2, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "deepffm":
         model = DeepFFM(linear_features=ffm_linear_feas, cross_features=ffm_cross_feas, embed_dim=10, mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"})
     elif model_name == "fat_deepffm":
@@ -104,6 +106,7 @@ python run_criteo.py --model_name deepfm
 python run_criteo.py --model_name dcn
 python run_criteo.py --model_name dcn_v2
 python run_criteo.py --model_name edcn
+python run_criteo.py --model_name autoint
 python run_criteo.py --model_name deepffm
 python run_criteo.py --model_name fat_deepffm
 """
