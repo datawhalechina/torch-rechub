@@ -246,7 +246,7 @@ class MovieLensHSTUPreprocessor:
         # 统计时间差信息
         non_zero_time_diffs = seq_time_diffs[seq_time_diffs > 0]
         if len(non_zero_time_diffs) > 0:
-            print(f"时间差统计（秒）:")
+            print("时间差统计（秒）:")
             print(f"  平均: {np.mean(non_zero_time_diffs):.1f}")
             print(f"  中位数: {np.median(non_zero_time_diffs):.1f}")
             print(f"  最小: {np.min(non_zero_time_diffs)}")
