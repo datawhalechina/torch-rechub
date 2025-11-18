@@ -721,6 +721,205 @@ class CEN(nn.Module):
         return aem.flatten(start_dim=1)
 
 
+# ============ HSTU Layers (新增) ============
+
+
+class HSTULayer(nn.Module):
+    """Single HSTU layer.
+
+    This layer implements the core HSTU "sequential transduction unit": a
+    multi-head self-attention block with gating and a position-wise FFN, plus
+    residual connections and LayerNorm.
+
+    Args:
+        d_model (int): Hidden dimension of the model. Default: 512.
+        n_heads (int): Number of attention heads. Default: 8.
+        dqk (int): Dimension of query/key per head. Default: 64.
+        dv (int): Dimension of value per head. Default: 64.
+        dropout (float): Dropout rate applied in the layer. Default: 0.1.
+        use_rel_pos_bias (bool): Whether to use relative position bias.
+
+    Shape:
+        - Input: ``(batch_size, seq_len, d_model)``
+        - Output: ``(batch_size, seq_len, d_model)``
+
+    Example:
+        >>> layer = HSTULayer(d_model=512, n_heads=8)
+        >>> x = torch.randn(32, 256, 512)
+        >>> output = layer(x)
+        >>> output.shape
+        torch.Size([32, 256, 512])
+    """
+
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
+        super().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.dqk = dqk
+        self.dv = dv
+        self.dropout_rate = dropout
+        self.use_rel_pos_bias = use_rel_pos_bias
+
+        # Validate dimensions
+        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+
+        # Projection 1: d_model -> 2*n_heads*dqk + 2*n_heads*dv
+        proj1_out_dim = 2 * n_heads * dqk + 2 * n_heads * dv
+        self.proj1 = nn.Linear(d_model, proj1_out_dim)
+
+        # Projection 2: n_heads*dv -> d_model
+        self.proj2 = nn.Linear(n_heads * dv, d_model)
+
+        # Feed-forward network (FFN)
+        # Standard Transformer uses 4*d_model as the hidden dimension of FFN
+        ffn_hidden_dim = 4 * d_model
+        self.ffn = nn.Sequential(nn.Linear(d_model, ffn_hidden_dim), nn.ReLU(), nn.Dropout(dropout), nn.Linear(ffn_hidden_dim, d_model), nn.Dropout(dropout))
+
+        # Layer normalization
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
+
+        # Scaling factor for attention scores
+        self.scale = 1.0 / (dqk**0.5)
+
+    def forward(self, x, rel_pos_bias=None):
+        """Forward pass of a single HSTU layer.
+
+        Args:
+            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
+            rel_pos_bias (Tensor, optional): Relative position bias of shape
+                ``(1, n_heads, seq_len, seq_len)``.
+
+        Returns:
+            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
+        """
+        batch_size, seq_len, _ = x.shape
+
+        # Residual connection
+        residual = x
+
+        # Layer normalization
+        x = self.norm1(x)
+
+        # Projection 1: (B, L, D) -> (B, L, 2*H*dqk + 2*H*dv)
+        proj_out = self.proj1(x)
+
+        # Split into Q, K, U, V
+        # Q, K: (B, L, H, dqk)
+        # U, V: (B, L, H, dv)
+        q = proj_out[..., :self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
+        k = proj_out[..., self.n_heads * self.dqk:2 * self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
+        u = proj_out[..., 2 * self.n_heads * self.dqk:2 * self.n_heads * self.dqk + self.n_heads * self.dv].reshape(batch_size, seq_len, self.n_heads, self.dv)
+        v = proj_out[..., 2 * self.n_heads * self.dqk + self.n_heads * self.dv:].reshape(batch_size, seq_len, self.n_heads, self.dv)
+
+        # Transpose to (B, H, L, dqk/dv)
+        q = q.transpose(1, 2)  # (B, H, L, dqk)
+        k = k.transpose(1, 2)  # (B, H, L, dqk)
+        u = u.transpose(1, 2)  # (B, H, L, dv)
+        v = v.transpose(1, 2)  # (B, H, L, dv)
+
+        # Compute attention scores: (B, H, L, L)
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+
+        # Add causal mask (prevent attending to future positions)
+        # For generative models this is required so that position i only attends
+        # to positions <= i.
+        causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
+        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        # Add relative position bias if provided
+        if rel_pos_bias is not None:
+            scores = scores + rel_pos_bias
+
+        # Softmax over attention scores
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        # Attention output: (B, H, L, dv)
+        attn_output = torch.matmul(attn_weights, v)
+
+        # Gating mechanism: apply a learned gate on top of attention output
+        # First transpose back to (B, L, H, dv)
+        attn_output = attn_output.transpose(1, 2)  # (B, L, H, dv)
+        u = u.transpose(1, 2)  # (B, L, H, dv)
+
+        # Apply element-wise gate: (B, L, H, dv)
+        gated_output = attn_output * torch.sigmoid(u)
+
+        # Merge heads: (B, L, H*dv)
+        gated_output = gated_output.reshape(batch_size, seq_len, self.n_heads * self.dv)
+
+        # Projection 2: (B, L, H*dv) -> (B, L, D)
+        output = self.proj2(gated_output)
+        output = self.dropout(output)
+
+        # Residual connection
+        output = output + residual
+
+        # Second residual block: LayerNorm + FFN + residual connection
+        residual = output
+        output = self.norm2(output)
+        output = self.ffn(output)
+        output = output + residual
+
+        return output
+
+
+class HSTUBlock(nn.Module):
+    """Stacked HSTU block.
+
+    This block stacks multiple :class:`HSTULayer` layers to form a deep HSTU
+    encoder for sequential recommendation.
+
+    Args:
+        d_model (int): Hidden dimension of the model. Default: 512.
+        n_heads (int): Number of attention heads. Default: 8.
+        n_layers (int): Number of stacked HSTU layers. Default: 4.
+        dqk (int): Dimension of query/key per head. Default: 64.
+        dv (int): Dimension of value per head. Default: 64.
+        dropout (float): Dropout rate applied in each layer. Default: 0.1.
+        use_rel_pos_bias (bool): Whether to use relative position bias.
+
+    Shape:
+        - Input: ``(batch_size, seq_len, d_model)``
+        - Output: ``(batch_size, seq_len, d_model)``
+
+    Example:
+        >>> block = HSTUBlock(d_model=512, n_heads=8, n_layers=4)
+        >>> x = torch.randn(32, 256, 512)
+        >>> output = block(x)
+        >>> output.shape
+        torch.Size([32, 256, 512])
+    """
+
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
+        super().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+
+        # Create a stack of HSTULayer modules
+        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, use_rel_pos_bias=use_rel_pos_bias) for _ in range(n_layers)])
+
+    def forward(self, x, rel_pos_bias=None):
+        """Forward pass through all stacked HSTULayer modules.
+
+        Args:
+            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
+            rel_pos_bias (Tensor, optional): Relative position bias shared across
+                all layers.
+
+        Returns:
+            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
+        """
+        for layer in self.layers:
+            x = layer(x, rel_pos_bias=rel_pos_bias)
+        return x
+
+
 class InteractingLayer(nn.Module):
     """Multi-head Self-Attention based Interacting Layer, used in AutoInt model.
 
