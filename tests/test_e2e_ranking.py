@@ -72,6 +72,8 @@ def test_ranking_e2e(model_class, ranking_data):
         params = {"features": features, "attention_dim": 16, "mlp_params": {"dims": [32]}}
     elif model_name == 'FiBiNet':
         params = {"features": features, "reduction_ratio": 3, "mlp_params": {"dims": [32]}}
+    elif model_name == 'AutoInt':
+        params = {"sparse_features": sparse_feats, "dense_features": dense_feats, "num_layers": 3, "num_heads": 2, "dropout": 0.0, "mlp_params": {"dims": [32]}}
     elif model_name in ["DeepFFM", "FatDeepFFM"]:
         # DeepFFM needs special features
         ffm_feats = [SparseFeature(f.name, f.vocab_size, 16) for f in sparse_feats]

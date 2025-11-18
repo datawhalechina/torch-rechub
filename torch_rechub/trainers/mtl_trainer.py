@@ -6,6 +6,7 @@ import torch.nn as nn
 import tqdm
 
 from ..basic.callback import EarlyStopper
+from ..basic.loss_func import RegularizationLoss
 from ..models.multi_task import ESMM
 from ..utils.data import get_loss_func, get_metric_func
 from ..utils.mtl import MetaBalance, gradnorm, shared_task_layers
@@ -36,6 +37,7 @@ class MTLTrainer(object):
         task_types,
         optimizer_fn=torch.optim.Adam,
         optimizer_params=None,
+        regularization_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         adaptive_params=None,
@@ -51,6 +53,8 @@ class MTLTrainer(object):
             gpus = []
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
+        if regularization_params is None:
+            regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.task_types = task_types
         self.n_task = len(task_types)
         self.loss_weight = None
@@ -98,6 +102,8 @@ class MTLTrainer(object):
         self.device = torch.device(device)
         self.model.to(self.device)
         self.model_path = model_path
+        # Initialize regularization loss
+        self.reg_loss_fn = RegularizationLoss(**regularization_params)
 
     def train_one_epoch(self, data_loader):
         self.model.train()
@@ -120,6 +126,10 @@ class MTLTrainer(object):
                             loss += 2 * loss_i * torch.exp(-w_i) + w_i
                 else:
                     loss = sum(loss_list) / self.n_task
+
+            # Add regularization loss
+            reg_loss = self.reg_loss_fn(self.model)
+            loss = loss + reg_loss
             if self.adaptive_method == 'metabalance':
                 self.share_optimizer.zero_grad()
                 self.task_optimizer.zero_grad()

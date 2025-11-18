@@ -5,7 +5,7 @@ import tqdm
 from sklearn.metrics import roc_auc_score
 
 from ..basic.callback import EarlyStopper
-from ..basic.loss_func import BPRLoss
+from ..basic.loss_func import BPRLoss, RegularizationLoss
 
 
 class MatchTrainer(object):
@@ -31,6 +31,7 @@ class MatchTrainer(object):
         mode=0,
         optimizer_fn=torch.optim.Adam,
         optimizer_params=None,
+        regularization_params=None,
         scheduler_fn=None,
         scheduler_params=None,
         n_epoch=10,
@@ -51,6 +52,8 @@ class MatchTrainer(object):
         self.model.to(self.device)
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
+        if regularization_params is None:
+            regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.mode = mode
         if mode == 0:  # point-wise loss, binary cross_entropy
             self.criterion = torch.nn.BCELoss()  # default loss binary cross_entropy
@@ -68,6 +71,8 @@ class MatchTrainer(object):
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.model_path = model_path
+        # Initialize regularization loss
+        self.reg_loss_fn = RegularizationLoss(**regularization_params)
 
     def train_one_epoch(self, data_loader, log_interval=10):
         self.model.train()
@@ -87,20 +92,23 @@ class MatchTrainer(object):
                 y_pred = self.model(x_dict)
                 loss = self.criterion(y_pred, y)
 
+            # Add regularization loss
+            reg_loss = self.reg_loss_fn(self.model)
+            loss = loss + reg_loss
 
-# used for debug
-# if i == 0:
-#     print()
-#     if self.mode == 0:
-#         print('pred: ', [f'{float(each):5.2g}' for each in y_pred.detach().cpu().tolist()])
-#         print('truth:', [f'{float(each):5.2g}' for each in y.detach().cpu().tolist()])
-#     elif self.mode == 2:
-#         pred = y_pred.detach().cpu().mean(0)
-#         pred = torch.softmax(pred, dim=0).tolist()
-#         print('pred: ', [f'{float(each):4.2g}' for each in pred])
-#     elif self.mode == 1:
-#         print('pos:', [f'{float(each):5.2g}' for each in pos_score.detach().cpu().tolist()])
-#         print('neg: ', [f'{float(each):5.2g}' for each in neg_score.detach().cpu().tolist()])
+            # used for debug
+            # if i == 0:
+            #     print()
+            #     if self.mode == 0:
+            #         print('pred: ', [f'{float(each):5.2g}' for each in y_pred.detach().cpu().tolist()])
+            #         print('truth:', [f'{float(each):5.2g}' for each in y.detach().cpu().tolist()])
+            #     elif self.mode == 2:
+            #         pred = y_pred.detach().cpu().mean(0)
+            #         pred = torch.softmax(pred, dim=0).tolist()
+            #         print('pred: ', [f'{float(each):4.2g}' for each in pred])
+            #     elif self.mode == 1:
+            #         print('pos:', [f'{float(each):5.2g}' for each in pos_score.detach().cpu().tolist()])
+            #         print('neg: ', [f'{float(each):5.2g}' for each in neg_score.detach().cpu().tolist()])
 
             self.model.zero_grad()
             loss.backward()
