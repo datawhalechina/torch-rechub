@@ -4,8 +4,7 @@
 
 - 当前实现的整体架构与关键设计细节；
 - 与 Meta 官方开源实现/论文的一致之处；
-- 有意简化或仍然存在差异的部分；
-- 近期两次提交对 HSTU 相关代码的演进。
+- 有意简化或仍然存在差异的部分。
 
 ---
 
@@ -218,15 +217,11 @@ elif fn == 'log':
 
 ---
 
-## 6. 近期两次提交的演进总结
-
-### 提交 1：`b947ba8` — Add HSTU generative model and training pipeline
+## 6. 近期提交总结
 
 - 引入了 HSTU 模型、HSTULayer/HSTUBlock、SeqTrainer、SeqDataset 等完整骨架；
 - 实现了基本的生成式 next-item 训练与评估流程；
 - 时间戳处理、时间嵌入与部分细节尚处于初版实现阶段。
-
-### 提交 2：`28f60ce` — Enhance HSTU pipeline with time-aware sliding window
 
 - 重构 MovieLens 预处理脚本：
   - 使用滑动窗口策略大幅增加训练样本；
