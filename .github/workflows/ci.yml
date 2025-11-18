@@ -60,8 +60,8 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
-          # 安装特定版本的格式化工具以确保一致性
-          pip install yapf==0.32.0 isort==5.10.1 flake8>=3.8.0 mypy>=0.800 toml>=0.10.2
+          # 安装特定版本的格式化工具以确保一致性（与 pyproject.toml 保持一致）
+          pip install yapf==0.43.0 isort==5.13.2 flake8>=3.8.0 mypy>=0.800 toml>=0.10.2
 
       - name: Format & Lint
         run: |
