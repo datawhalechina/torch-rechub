@@ -8,34 +8,36 @@ from torch_rechub.utils.hstu_utils import RelPosBias
 
 
 class HSTUModel(nn.Module):
-    """HSTU: Hierarchical Sequential Transduction Units.
+    """HSTU: Hierarchical Sequential Transduction Units model.
 
-    生成式推荐模型，用于序列生成任务。
-    该模型通过多层HSTU块来捕捉序列中的长期依赖关系，
-    并生成下一个item的概率分布。
+    Autoregressive generative recommendation model for sequential data.
+    This module stacks multiple ``HSTUBlock`` layers to capture long-range
+    dependencies in user interaction sequences and predicts the next item.
 
     Args:
-        vocab_size (int): 词表大小
-        d_model (int): 模型维度，默认512
-        n_heads (int): 多头注意力的头数，默认8
-        n_layers (int): HSTU层的数量，默认4
-        dqk (int): Query/Key的维度，默认64
-        dv (int): Value的维度，默认64
-        max_seq_len (int): 最大序列长度，默认256
-        dropout (float): Dropout概率，默认0.1
-        use_rel_pos_bias (bool): 是否使用相对位置偏置，默认True
-        use_time_embedding (bool): 是否使用时间嵌入，默认True
-        num_time_buckets (int): 时间bucket数量，默认2048
-        time_bucket_fn (str): 时间bucket化函数，'sqrt'或'log'，默认'sqrt'
+        vocab_size (int): Vocabulary size (number of distinct items, including PAD).
+        d_model (int): Hidden dimension of the model. Default: 512.
+        n_heads (int): Number of attention heads. Default: 8.
+        n_layers (int): Number of stacked HSTU layers. Default: 4.
+        dqk (int): Dimension of query/key vectors per head. Default: 64.
+        dv (int): Dimension of value vectors per head. Default: 64.
+        max_seq_len (int): Maximum sequence length. Default: 256.
+        dropout (float): Dropout rate applied in the model. Default: 0.1.
+        use_rel_pos_bias (bool): Whether to use relative position bias. Default: True.
+        use_time_embedding (bool): Whether to use time-difference embeddings. Default: True.
+        num_time_buckets (int): Number of time buckets for time embeddings. Default: 2048.
+        time_bucket_fn (str): Function used to bucketize time differences, ``"sqrt"``
+            or ``"log"``. Default: ``"sqrt"``.
 
     Shape:
-        - Input: `(batch_size, seq_len)` 或 `(batch_size, seq_len), (batch_size, seq_len)`
-        - Output: `(batch_size, seq_len, vocab_size)`
+        - Input: ``x`` of shape ``(batch_size, seq_len)``; optional ``time_diffs``
+          of shape ``(batch_size, seq_len)`` representing time differences in seconds.
+        - Output: Logits of shape ``(batch_size, seq_len, vocab_size)``.
 
     Example:
         >>> model = HSTUModel(vocab_size=100000, d_model=512)
         >>> x = torch.randint(0, 100000, (32, 256))
-        >>> time_diffs = torch.randint(0, 86400, (32, 256))  # 时间差（秒）
+        >>> time_diffs = torch.randint(0, 86400, (32, 256))
         >>> logits = model(x, time_diffs)
         >>> logits.shape
         torch.Size([32, 256, 100000])
@@ -55,22 +57,22 @@ class HSTUModel(nn.Module):
         self.num_time_buckets = num_time_buckets
         self.time_bucket_fn = time_bucket_fn
 
-        # Alpha缩放因子（参考Meta官方实现）
+        # Alpha scaling factor (following the Meta reference implementation)
         self.alpha = math.sqrt(d_model)
 
-        # Token Embedding
+        # Token embedding
         self.token_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)
 
-        # Position Embedding
+        # Absolute positional embedding
         self.position_embedding = nn.Embedding(max_seq_len, d_model)
 
-        # Time Embedding（新增）
+        # Time embedding
         if use_time_embedding:
-            # 时间嵌入表：将时间差映射到嵌入向量
-            # num_time_buckets + 1: 包括padding的bucket
+            # Embedding table for time-difference buckets
+            # num_time_buckets + 1: extra bucket reserved for padding
             self.time_embedding = nn.Embedding(num_time_buckets + 1, d_model, padding_idx=0)
 
-        # HSTU Block
+        # HSTU block
         self.hstu_block = HSTUBlock(
             d_model=d_model,
             n_heads=n_heads,
@@ -81,7 +83,7 @@ class HSTUModel(nn.Module):
             use_rel_pos_bias=use_rel_pos_bias
         )
 
-        # 相对位置偏置
+        # Relative position bias
         self.use_rel_pos_bias = use_rel_pos_bias
         if use_rel_pos_bias:
             self.rel_pos_bias = RelPosBias(n_heads, max_seq_len)
@@ -92,11 +94,11 @@ class HSTUModel(nn.Module):
         # Dropout
         self.dropout = nn.Dropout(dropout)
 
-        # 初始化权重
+        # Initialize model parameters
         self._init_weights()
-    
+
     def _init_weights(self):
-        """初始化模型权重."""
+        """Initialize model parameters."""
         for name, param in self.named_parameters():
             if 'weight' in name and len(param.shape) > 1:
                 nn.init.xavier_uniform_(param)
@@ -104,89 +106,94 @@ class HSTUModel(nn.Module):
                 nn.init.constant_(param, 0)
 
     def _time_diff_to_bucket(self, time_diffs):
-        """将时间差转换为bucket索引.
+        """Map raw time differences (in seconds) to discrete bucket indices.
 
-        参考Meta官方实现，使用sqrt或log函数将连续的时间差映射到离散的bucket。
+        Following the Meta HSTU implementation, continuous time differences are
+        first converted to minutes and then bucketized using either a square-root
+        or logarithmic transform.
 
         Args:
-            time_diffs (Tensor): 时间差（秒），shape: (batch_size, seq_len)
+            time_diffs (Tensor): Time differences in seconds,
+                shape ``(batch_size, seq_len)``.
 
         Returns:
-            Tensor: bucket索引，shape: (batch_size, seq_len)
+            Tensor: Integer bucket indices of shape ``(batch_size, seq_len)``.
         """
-        # 时间单位转换：秒 → 分钟（参考Meta官方实现）
+        # Convert seconds to minutes (as in the Meta reference implementation)
         time_bucket_increments = 60.0
         time_diffs = time_diffs.float() / time_bucket_increments
 
-        # 确保时间差非负，使用1e-6避免log(0)
+        # Ensure non-negative values and avoid log(0)
         time_diffs = torch.clamp(time_diffs, min=1e-6)
 
         if self.time_bucket_fn == 'sqrt':
-            # 使用平方根函数：适合时间差分布较均匀的情况
-            # sqrt(time_diff / 60) 将时间差（分钟）压缩到较小的范围
+            # Use the square-root transform: suitable when time differences
+            # are relatively evenly distributed.
             buckets = torch.sqrt(time_diffs).long()
         elif self.time_bucket_fn == 'log':
-            # 使用对数函数：适合时间差跨度很大的情况
-            # log(time_diff / 60) 避免log(0)
+            # Use the logarithmic transform: suitable when time differences
+            # span several orders of magnitude.
             buckets = torch.log(time_diffs).long()
         else:
-            raise ValueError(f"不支持的time_bucket_fn: {self.time_bucket_fn}")
+            raise ValueError(f"Unsupported time_bucket_fn: {self.time_bucket_fn}")
 
-        # 限制bucket范围：[0, num_time_buckets-1]
+        # Clamp bucket indices to the valid range [0, num_time_buckets - 1]
         buckets = torch.clamp(buckets, min=0, max=self.num_time_buckets - 1)
 
         return buckets
 
     def forward(self, x, time_diffs=None):
-        """前向传播.
+        """Forward pass.
 
         Args:
-            x (Tensor): 输入token序列，shape: (batch_size, seq_len)
-            time_diffs (Tensor, optional): 时间差序列（秒），shape: (batch_size, seq_len)
-                如果为None且use_time_embedding=True，则使用全0的时间差
+            x (Tensor): Input token ids of shape ``(batch_size, seq_len)``.
+            time_diffs (Tensor, optional): Time differences in seconds,
+                shape ``(batch_size, seq_len)``. If ``None`` and
+                ``use_time_embedding=True``, all-zero time differences are used.
 
         Returns:
-            Tensor: 输出logits，shape: (batch_size, seq_len, vocab_size)
+            Tensor: Logits over the vocabulary of shape
+                ``(batch_size, seq_len, vocab_size)``.
         """
         batch_size, seq_len = x.shape
 
-        # Token Embedding（应用Alpha缩放，参考Meta官方实现）
+        # Token embedding with alpha scaling (as in the Meta implementation)
         token_emb = self.token_embedding(x) * self.alpha  # (B, L, D)
 
-        # Position Embedding
+        # Absolute positional embedding
         positions = torch.arange(seq_len, dtype=torch.long, device=x.device)
         pos_emb = self.position_embedding(positions)  # (L, D)
 
-        # 合并token和position embedding
+        # Combine token and position embeddings
         embeddings = token_emb + pos_emb.unsqueeze(0)  # (B, L, D)
 
-        # Time Embedding（新增）
+        # Optional time-difference embedding
         if self.use_time_embedding:
             if time_diffs is None:
-                # 如果没有提供时间差，使用全0（向后兼容）
+                # Fallback: use all-zero time differences when none are provided
                 time_diffs = torch.zeros(batch_size, seq_len, dtype=torch.long, device=x.device)
 
-            # 将时间差转换为bucket索引
+            # Map raw time differences to bucket indices
             time_buckets = self._time_diff_to_bucket(time_diffs)  # (B, L)
 
-            # 获取时间嵌入
+            # Look up time embeddings and add to the sequence representation
             time_emb = self.time_embedding(time_buckets)  # (B, L, D)
 
-            # 合并时间嵌入：embeddings = token_emb + pos_emb + time_emb
+            # embeddings = token_emb + pos_emb + time_emb
             embeddings = embeddings + time_emb
 
         embeddings = self.dropout(embeddings)
 
-        # 计算相对位置偏置
+        # Relative position bias for self-attention
         rel_pos_bias = None
         if self.use_rel_pos_bias:
             rel_pos_bias = self.rel_pos_bias(seq_len)  # (1, H, L, L)
 
-        # HSTU Block
+        # HSTU block
         hstu_output = self.hstu_block(embeddings, rel_pos_bias=rel_pos_bias)  # (B, L, D)
 
-        # 输出投影
+        # Final projection to vocabulary logits
         logits = self.output_projection(hstu_output)  # (B, L, V)
-        
+
         return logits
 

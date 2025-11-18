@@ -125,31 +125,31 @@ class SeqTrainer(object):
         return history
 
     def train_one_epoch(self, data_loader, log_interval=10):
-        """训练一个epoch.
+        """Train the model for a single epoch.
 
         Args:
-            data_loader (DataLoader): 训练数据加载器
-            log_interval (int): 日志打印间隔
+            data_loader (DataLoader): Training data loader.
+            log_interval (int): Interval (in steps) for logging average loss.
 
         Returns:
-            float: 平均损失
+            float: Average training loss for this epoch.
         """
         self.model.train()
         total_loss = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (seq_tokens, seq_positions, seq_time_diffs, targets) in enumerate(tk0):
-            # 移动到设备
+            # Move tensors to the target device
             seq_tokens = seq_tokens.to(self.device)
             seq_positions = seq_positions.to(self.device)
             seq_time_diffs = seq_time_diffs.to(self.device)
             targets = targets.to(self.device).squeeze(-1)
 
-            # 前向传播
+            # Forward pass
             logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-            # 计算损失
-            # 对于next-item prediction任务，只使用最后一个位置的预测
-            # logits[:, -1, :] 表示取每个序列的最后一个位置的预测
+            # Compute loss
+            # For next-item prediction we only use the last position in the sequence
+            # logits[:, -1, :] selects the prediction at the last step for each sequence
             last_logits = logits[:, -1, :]  # (B, V)
 
             loss = self.loss_fn(last_logits, targets)
@@ -165,13 +165,13 @@ class SeqTrainer(object):
                 total_loss = 0
 
     def evaluate(self, data_loader):
-        """评估模型.
+        """Evaluate the model on a validation/test data loader.
 
         Args:
-            data_loader (DataLoader): 验证数据加载器
+            data_loader (DataLoader): Validation or test data loader.
 
         Returns:
-            tuple: (平均损失, 准确率)
+            tuple: ``(avg_loss, top1_accuracy)``.
         """
         self.model.eval()
         total_loss = 0.0
@@ -180,23 +180,22 @@ class SeqTrainer(object):
 
         with torch.no_grad():
             for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
-                # 移动到设备
+                # Move tensors to the target device
                 seq_tokens = seq_tokens.to(self.device)
                 seq_positions = seq_positions.to(self.device)
                 seq_time_diffs = seq_time_diffs.to(self.device)
                 targets = targets.to(self.device).squeeze(-1)
 
-                # 前向传播
+                # Forward pass
                 logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-                # 计算损失
-                # 对于next-item prediction任务，只使用最后一个位置的预测
+                # Compute loss using only the last position (next-item prediction)
                 last_logits = logits[:, -1, :]  # (B, V)
 
                 loss = self.loss_fn(last_logits, targets)
                 total_loss += loss.item()
 
-                # 计算准确率
+                # Compute top-1 accuracy
                 predictions = torch.argmax(last_logits, dim=-1)  # (B,)
                 correct = (predictions == targets).sum().item()
                 total_correct += correct

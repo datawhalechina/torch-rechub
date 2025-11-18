@@ -1,4 +1,4 @@
-"""HSTU模型的工具函数和类."""
+"""Utility classes and functions for the HSTU model."""
 
 import torch
 import torch.nn as nn
@@ -6,26 +6,27 @@ import numpy as np
 
 
 class RelPosBias(nn.Module):
-    """相对位置偏置模块.
-    
-    用于HSTU层中的自注意力计算，支持时间bucketing。
-    相对位置偏置可以帮助模型更好地捕捉序列中的相对位置信息。
-    
+    """Relative position bias module.
+
+    This module is used in HSTU self-attention layers to provide a learnable
+    bias that depends on the relative distance between sequence positions. It
+    can be combined with time-based bucketing when needed.
+
     Args:
-        n_heads (int): 多头注意力的头数
-        max_seq_len (int): 最大序列长度
-        num_buckets (int): 时间bucket的数量，默认32
-        
+        n_heads (int): Number of attention heads.
+        max_seq_len (int): Maximum supported sequence length.
+        num_buckets (int): Number of relative position buckets. Default: 32.
+
     Shape:
-        - Output: `(1, n_heads, seq_len, seq_len)`
-        
+        - Output: ``(1, n_heads, seq_len, seq_len)``
+
     Example:
         >>> rel_pos_bias = RelPosBias(n_heads=8, max_seq_len=256)
         >>> bias = rel_pos_bias(256)
         >>> bias.shape
         torch.Size([1, 8, 256, 256])
     """
-    
+
     def __init__(self, n_heads, max_seq_len, num_buckets=32):
         super().__init__()
         self.n_heads = n_heads
@@ -38,37 +39,36 @@ class RelPosBias(nn.Module):
         )
         
     def _relative_position_bucket(self, relative_position):
-        """将相对位置映射到bucket.
-        
+        """Map relative positions to bucket indices.
+
         Args:
-            relative_position (Tensor): 相对位置张量
-            
+            relative_position (Tensor): Relative position tensor ``(L, L)``.
+
         Returns:
-            Tensor: bucket索引
+            Tensor: Integer bucket indices with the same ``(L, L)`` shape.
         """
         num_buckets = self.num_buckets
         max_distance = self.max_seq_len
         
-        # 处理负数位置
+        # Use absolute distance and linearly map it to bucket indices
         relative_position = torch.abs(relative_position)
-        
-        # 线性映射到bucket
+
         bucket = torch.clamp(
             relative_position * (num_buckets - 1) // max_distance,
             0,
-            num_buckets - 1
+            num_buckets - 1,
         )
-        
+
         return bucket.long()
-    
+
     def forward(self, seq_len):
-        """计算相对位置偏置.
-        
+        """Compute relative position bias for a given sequence length.
+
         Args:
-            seq_len (int): 序列长度
-            
+            seq_len (int): Sequence length ``L``.
+
         Returns:
-            Tensor: 相对位置偏置，shape: (1, n_heads, seq_len, seq_len)
+            Tensor: Relative position bias of shape ``(1, n_heads, L, L)``.
         """
         # 创建位置索引
         positions = torch.arange(seq_len, dtype=torch.long, device=self.rel_pos_bias_table.device)
@@ -89,35 +89,35 @@ class RelPosBias(nn.Module):
 
 
 class VocabMask(nn.Module):
-    """词表掩码模块，用于推理时约束生成.
-    
-    在推理时，可以通过掩码来排除某些无效的item，
-    确保生成的item都是有效的。
-    
+    """Vocabulary mask used to constrain generation during inference.
+
+    At inference time this module can be used to mask out invalid item IDs
+    so that the model never generates them.
+
     Args:
-        vocab_size (int): 词表大小
-        invalid_items (list, optional): 无效item的列表
-        
+        vocab_size (int): Vocabulary size.
+        invalid_items (list, optional): List of invalid item IDs to be masked.
+
     Methods:
-        apply_mask: 应用掩码到logits
-        
+        apply_mask: Apply the mask to logits.
+
     Example:
         >>> mask = VocabMask(vocab_size=1000, invalid_items=[0, 1, 2])
         >>> logits = torch.randn(32, 1000)
         >>> masked_logits = mask.apply_mask(logits)
     """
-    
+
     def __init__(self, vocab_size, invalid_items=None):
         super().__init__()
         self.vocab_size = vocab_size
         
-        # 创建掩码
+        # Create a boolean mask over the vocabulary
         self.register_buffer(
             'mask',
-            torch.ones(vocab_size, dtype=torch.bool)
+            torch.ones(vocab_size, dtype=torch.bool),
         )
-        
-        # 标记无效item
+
+        # Mark invalid items
         if invalid_items is not None:
             for item_id in invalid_items:
                 if 0 <= item_id < vocab_size:
@@ -140,27 +140,28 @@ class VocabMask(nn.Module):
 
 
 class VocabMapper(object):
-    """词表映射器，处理item_id和token_id的转换.
-    
-    在序列生成任务中，需要将item_id映射到token_id，
-    以及将token_id映射回item_id。
-    
+    """Simple mapper between ``item_id`` and ``token_id``.
+
+    In sequence generation tasks we often treat item IDs as tokens. This
+    helper keeps a trivial identity mapping but makes the intent explicit and
+    allows future extensions (e.g., reserved IDs, remapping, etc.).
+
     Args:
-        vocab_size (int): 词表大小
-        pad_id (int): PAD token的ID，默认0
-        unk_id (int): UNK token的ID，默认1
-        
+        vocab_size (int): Size of the vocabulary.
+        pad_id (int): ID used for the PAD token. Default: 0.
+        unk_id (int): ID used for unknown tokens. Default: 1.
+
     Methods:
-        encode: item_id -> token_id
-        decode: token_id -> item_id
-        
+        encode: Map ``item_id`` to ``token_id``.
+        decode: Map ``token_id`` back to ``item_id``.
+
     Example:
         >>> mapper = VocabMapper(vocab_size=1000)
         >>> item_ids = np.array([10, 20, 30])
         >>> token_ids = mapper.encode(item_ids)
         >>> decoded_ids = mapper.decode(token_ids)
     """
-    
+
     def __init__(self, vocab_size, pad_id=0, unk_id=1):
         super().__init__()
         self.vocab_size = vocab_size

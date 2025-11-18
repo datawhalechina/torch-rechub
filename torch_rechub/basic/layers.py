@@ -724,22 +724,23 @@ class CEN(nn.Module):
 # ============ HSTU Layers (新增) ============
 
 class HSTULayer(nn.Module):
-    """Hierarchical Sequential Transduction Units Layer.
+    """Single HSTU layer.
 
-    HSTU层是HSTU模型的核心组件，结合了自注意力机制和门控机制。
-    该层通过多头自注意力和门控机制来捕捉序列中的长期依赖关系。
+    This layer implements the core HSTU "sequential transduction unit": a
+    multi-head self-attention block with gating and a position-wise FFN, plus
+    residual connections and LayerNorm.
 
     Args:
-        d_model (int): 模型维度，默认512
-        n_heads (int): 多头注意力的头数，默认8
-        dqk (int): Query/Key的维度，默认64
-        dv (int): Value的维度，默认64
-        dropout (float): Dropout概率，默认0.1
-        use_rel_pos_bias (bool): 是否使用相对位置偏置，默认True
+        d_model (int): Hidden dimension of the model. Default: 512.
+        n_heads (int): Number of attention heads. Default: 8.
+        dqk (int): Dimension of query/key per head. Default: 64.
+        dv (int): Dimension of value per head. Default: 64.
+        dropout (float): Dropout rate applied in the layer. Default: 0.1.
+        use_rel_pos_bias (bool): Whether to use relative position bias.
 
     Shape:
-        - Input: `(batch_size, seq_len, d_model)`
-        - Output: `(batch_size, seq_len, d_model)`
+        - Input: ``(batch_size, seq_len, d_model)``
+        - Output: ``(batch_size, seq_len, d_model)``
 
     Example:
         >>> layer = HSTULayer(d_model=512, n_heads=8)
@@ -759,18 +760,18 @@ class HSTULayer(nn.Module):
         self.dropout_rate = dropout
         self.use_rel_pos_bias = use_rel_pos_bias
 
-        # 验证维度
+        # Validate dimensions
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
 
-        # 投影层1: d_model -> 2*n_heads*dqk + 2*n_heads*dv
+        # Projection 1: d_model -> 2*n_heads*dqk + 2*n_heads*dv
         proj1_out_dim = 2 * n_heads * dqk + 2 * n_heads * dv
         self.proj1 = nn.Linear(d_model, proj1_out_dim)
 
-        # 投影层2: n_heads*dv -> d_model
+        # Projection 2: n_heads*dv -> d_model
         self.proj2 = nn.Linear(n_heads * dv, d_model)
 
-        # 前馈网络（FFN）
-        # 标准Transformer使用4*d_model作为FFN的隐藏层维度
+        # Feed-forward network (FFN)
+        # Standard Transformer uses 4*d_model as the hidden dimension of FFN
         ffn_hidden_dim = 4 * d_model
         self.ffn = nn.Sequential(
             nn.Linear(d_model, ffn_hidden_dim),
@@ -780,38 +781,39 @@ class HSTULayer(nn.Module):
             nn.Dropout(dropout)
         )
 
-        # LayerNorm
+        # Layer normalization
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
 
         # Dropout
         self.dropout = nn.Dropout(dropout)
 
-        # 缩放因子
+        # Scaling factor for attention scores
         self.scale = 1.0 / (dqk ** 0.5)
 
     def forward(self, x, rel_pos_bias=None):
-        """前向传播.
+        """Forward pass of a single HSTU layer.
 
         Args:
-            x (Tensor): 输入张量，shape: (batch_size, seq_len, d_model)
-            rel_pos_bias (Tensor, optional): 相对位置偏置，shape: (1, n_heads, seq_len, seq_len)
+            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
+            rel_pos_bias (Tensor, optional): Relative position bias of shape
+                ``(1, n_heads, seq_len, seq_len)``.
 
         Returns:
-            Tensor: 输出张量，shape: (batch_size, seq_len, d_model)
+            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
         """
         batch_size, seq_len, _ = x.shape
 
-        # 残差连接
+        # Residual connection
         residual = x
 
-        # LayerNorm
+        # Layer normalization
         x = self.norm1(x)
 
-        # 投影层1: (B, L, D) -> (B, L, 2*H*dqk + 2*H*dv)
+        # Projection 1: (B, L, D) -> (B, L, 2*H*dqk + 2*H*dv)
         proj_out = self.proj1(x)
 
-        # 分解为Q, K, U, V
+        # Split into Q, K, U, V
         # Q, K: (B, L, H, dqk)
         # U, V: (B, L, H, dv)
         q = proj_out[..., :self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
@@ -819,50 +821,51 @@ class HSTULayer(nn.Module):
         u = proj_out[..., 2 * self.n_heads * self.dqk:2 * self.n_heads * self.dqk + self.n_heads * self.dv].reshape(batch_size, seq_len, self.n_heads, self.dv)
         v = proj_out[..., 2 * self.n_heads * self.dqk + self.n_heads * self.dv:].reshape(batch_size, seq_len, self.n_heads, self.dv)
 
-        # 转置为 (B, H, L, dqk/dv)
+        # Transpose to (B, H, L, dqk/dv)
         q = q.transpose(1, 2)  # (B, H, L, dqk)
         k = k.transpose(1, 2)  # (B, H, L, dqk)
         u = u.transpose(1, 2)  # (B, H, L, dv)
         v = v.transpose(1, 2)  # (B, H, L, dv)
 
-        # 计算注意力分数: (B, H, L, L)
+        # Compute attention scores: (B, H, L, L)
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
 
-        # 添加causal mask（防止看到未来信息）
-        # 对于生成式模型，这是必须的，确保位置i只能attend到位置<=i的token
+        # Add causal mask (prevent attending to future positions)
+        # For generative models this is required so that position i only attends
+        # to positions <= i.
         causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
         scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
-        # 添加相对位置偏置
+        # Add relative position bias if provided
         if rel_pos_bias is not None:
             scores = scores + rel_pos_bias
 
-        # 应用softmax
+        # Softmax over attention scores
         attn_weights = F.softmax(scores, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # 计算注意力输出: (B, H, L, dv)
+        # Attention output: (B, H, L, dv)
         attn_output = torch.matmul(attn_weights, v)
 
-        # 门控机制: gate = LayerNorm(attn_output) * u
-        # 先转回 (B, L, H, dv)
+        # Gating mechanism: apply a learned gate on top of attention output
+        # First transpose back to (B, L, H, dv)
         attn_output = attn_output.transpose(1, 2)  # (B, L, H, dv)
         u = u.transpose(1, 2)  # (B, L, H, dv)
 
-        # 应用门控: (B, L, H, dv)
+        # Apply element-wise gate: (B, L, H, dv)
         gated_output = attn_output * torch.sigmoid(u)
 
-        # 合并多头: (B, L, H*dv)
+        # Merge heads: (B, L, H*dv)
         gated_output = gated_output.reshape(batch_size, seq_len, self.n_heads * self.dv)
 
-        # 投影层2: (B, L, H*dv) -> (B, L, D)
+        # Projection 2: (B, L, H*dv) -> (B, L, D)
         output = self.proj2(gated_output)
         output = self.dropout(output)
 
-        # 残差连接
+        # Residual connection
         output = output + residual
 
-        # 第二个残差块：LayerNorm + FFN + 残差连接
+        # Second residual block: LayerNorm + FFN + residual connection
         residual = output
         output = self.norm2(output)
         output = self.ffn(output)
@@ -872,22 +875,23 @@ class HSTULayer(nn.Module):
 
 
 class HSTUBlock(nn.Module):
-    """HSTU Block - 多层HSTU的堆栈.
+    """Stacked HSTU block.
 
-    将多个HSTULayer堆叠在一起，形成深层的HSTU模型。
+    This block stacks multiple :class:`HSTULayer` layers to form a deep HSTU
+    encoder for sequential recommendation.
 
     Args:
-        d_model (int): 模型维度，默认512
-        n_heads (int): 多头注意力的头数，默认8
-        n_layers (int): HSTU层的数量，默认4
-        dqk (int): Query/Key的维度，默认64
-        dv (int): Value的维度，默认64
-        dropout (float): Dropout概率，默认0.1
-        use_rel_pos_bias (bool): 是否使用相对位置偏置，默认True
+        d_model (int): Hidden dimension of the model. Default: 512.
+        n_heads (int): Number of attention heads. Default: 8.
+        n_layers (int): Number of stacked HSTU layers. Default: 4.
+        dqk (int): Dimension of query/key per head. Default: 64.
+        dv (int): Dimension of value per head. Default: 64.
+        dropout (float): Dropout rate applied in each layer. Default: 0.1.
+        use_rel_pos_bias (bool): Whether to use relative position bias.
 
     Shape:
-        - Input: `(batch_size, seq_len, d_model)`
-        - Output: `(batch_size, seq_len, d_model)`
+        - Input: ``(batch_size, seq_len, d_model)``
+        - Output: ``(batch_size, seq_len, d_model)``
 
     Example:
         >>> block = HSTUBlock(d_model=512, n_heads=8, n_layers=4)
@@ -904,7 +908,7 @@ class HSTUBlock(nn.Module):
         self.n_heads = n_heads
         self.n_layers = n_layers
 
-        # 创建多个HSTULayer
+        # Create a stack of HSTULayer modules
         self.layers = nn.ModuleList([
             HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv,
                      dropout=dropout, use_rel_pos_bias=use_rel_pos_bias)
@@ -912,14 +916,15 @@ class HSTUBlock(nn.Module):
         ])
 
     def forward(self, x, rel_pos_bias=None):
-        """前向传播.
+        """Forward pass through all stacked HSTULayer modules.
 
         Args:
-            x (Tensor): 输入张量，shape: (batch_size, seq_len, d_model)
-            rel_pos_bias (Tensor, optional): 相对位置偏置
+            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
+            rel_pos_bias (Tensor, optional): Relative position bias shared across
+                all layers.
 
         Returns:
-            Tensor: 输出张量，shape: (batch_size, seq_len, d_model)
+            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
         """
         for layer in self.layers:
             x = layer(x, rel_pos_bias=rel_pos_bias)

@@ -17,13 +17,13 @@ sys.path.append("../..")
 
 
 def get_movielens_data(data_dir="./data/ml-1m/processed/"):
-    """加载真实的MovieLens-1M数据.
+    """Load preprocessed MovieLens-1M data from disk.
 
     Args:
-        data_dir (str): 数据目录
+        data_dir (str): Directory containing preprocessed files.
 
     Returns:
-        tuple: (train_data, val_data, test_data, vocab_size)
+        tuple: ``(train_data, val_data, test_data, vocab_size)``.
     """
     print("加载真实数据...")
 
@@ -55,16 +55,16 @@ def get_movielens_data(data_dir="./data/ml-1m/processed/"):
 
 
 def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
-    """评估推荐排序指标.
+    """Evaluate top-K ranking metrics on the test set.
 
     Args:
-        model: 训练好的模型
-        data_loader: 测试数据加载器
-        device: 设备
-        topKs: 评估的K值列表
+        model: Trained recommendation model.
+        data_loader: DataLoader providing test sequences.
+        device: Target device for inference.
+        topKs: List of K values to evaluate (e.g. [10, 50, 200]).
 
     Returns:
-        dict: 包含各种推荐指标的字典
+        dict: A mapping from metric name to formatted result strings.
     """
     model.eval()
     y_true = {}
@@ -73,51 +73,51 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
     user_idx = 0
     with torch.no_grad():
         for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
-            # 移动到设备
+            # Move tensors to device
             seq_tokens = seq_tokens.to(device)
             seq_time_diffs = seq_time_diffs.to(device)
             targets = targets.cpu().numpy()
 
-            # 前向传播
+            # Forward pass
             logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-            # 对于next-item prediction任务，只使用最后一个位置的预测
+            # For next-item prediction, only use the last position
             last_logits = logits[:, -1, :]  # (B, V)
 
-            # 获取每个样本的top-K推荐
+            # Get top-K recommendations for each sample
             batch_size = last_logits.shape[0]
             max_k = max(topKs)
 
-            # 获取top-K的物品索引
+            # Indices of top-K items
             _, top_items = torch.topk(last_logits, k=max_k, dim=-1)  # (B, max_k)
             top_items = top_items.cpu().numpy()
 
-            # 为每个样本构建y_true和y_pred
+            # Build y_true and y_pred for each sample
             for i in range(batch_size):
                 user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]  # 真实的下一个物品
-                y_pred[user_id] = top_items[i].tolist()  # 推荐的top-K物品
+                y_true[user_id] = [int(targets[i])]  # ground-truth next item
+                y_pred[user_id] = top_items[i].tolist()  # predicted top-K items
                 user_idx += 1
 
-    # 计算推荐指标
+    # Compute ranking metrics
     results = topk_metrics(y_true, y_pred, topKs=topKs)
     return results
 
 
 def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, max_seq_len):
-    """主函数.
+    """Main training and evaluation entry point.
 
     Args:
-        dataset_path (str): 数据集路径
-        model_name (str): 模型名称
-        epoch (int): 训练轮数
-        learning_rate (float): 学习率
-        batch_size (int): 批次大小
-        weight_decay (float): 权重衰减
-        device (str): 设备
-        save_dir (str): 模型保存目录
-        seed (int): 随机种子
-        max_seq_len (int): 最大序列长度
+        dataset_path (str): Path to preprocessed MovieLens data.
+        model_name (str): Model name (kept for CLI consistency).
+        epoch (int): Number of training epochs.
+        learning_rate (float): Learning rate for the optimizer.
+        batch_size (int): Batch size.
+        weight_decay (float): Weight decay (L2 regularization).
+        device (str): Device spec, e.g. ``"cuda"`` or ``"cpu"``.
+        save_dir (str): Directory to save model checkpoints.
+        seed (int): Random seed for reproducibility.
+        max_seq_len (int): Maximum sequence length.
     """
     torch.manual_seed(seed)
 
@@ -125,19 +125,19 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     print("HSTU Model Example on MovieLens")
     print("=" * 80)
 
-    # 超参数
+    # Model hyper-parameters
     d_model = 256
     n_heads = 8
     n_layers = 2
 
-    print(f"\n设备: {device}")
-    print(f"模型维度: {d_model}")
-    print(f"多头数: {n_heads}")
-    print(f"层数: {n_layers}")
-    print(f"序列长度: {max_seq_len}")
+    print(f"\nDevice: {device}")
+    print(f"Hidden dim: {d_model}")
+    print(f"Num heads: {n_heads}")
+    print(f"Num layers: {n_layers}")
+    print(f"Max sequence length: {max_seq_len}")
 
-    # 加载数据
-    print("\n加载数据...")
+    # Load data
+    print("\nLoading data...")
     result = get_movielens_data(dataset_path)
     if result is None:
         print("数据加载失败，退出...")
@@ -145,9 +145,9 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
 
     train_data, val_data, test_data, vocab_size = result
 
-    # 使用真实数据（支持时间差）
-    print("\n创建数据加载器（真实数据）...")
-    print("✅ 使用时间感知的位置编码")
+    # Build data loaders (with time-aware features)
+    print("\nBuilding data loaders (with time-aware features)...")
+    print("✅ Using time-aware positional encoding")
 
     train_gen = SequenceDataGenerator(
         train_data['seq_tokens'],
@@ -172,25 +172,25 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
     test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
 
-    print(f"词表大小: {vocab_size}")
-    print(f"训练集大小: {len(train_dataloader.dataset)}")
-    print(f"验证集大小: {len(val_dataloader.dataset)}")
-    print(f"测试集大小: {len(test_dataloader.dataset)}")
+    print(f"Vocab size: {vocab_size}")
+    print(f"Train size: {len(train_dataloader.dataset)}")
+    print(f"Val size: {len(val_dataloader.dataset)}")
+    print(f"Test size: {len(test_dataloader.dataset)}")
 
-    # 创建模型
-    print("\n创建模型...")
+    # Create model
+    print("\nCreating model...")
     model = HSTUModel(
         vocab_size=vocab_size,
         d_model=d_model,
         n_heads=n_heads,
         n_layers=n_layers,
         max_seq_len=max_seq_len,
-        dropout=0.1
+        dropout=0.1,
     )
-    print(f"模型参数数量: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Number of parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-    # 创建训练器
-    print("\n创建训练器...")
+    # Create trainer
+    print("\nCreating trainer...")
     trainer = SeqTrainer(
         model,
         optimizer_fn=torch.optim.Adam,
@@ -198,33 +198,33 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         n_epoch=epoch,
         earlystop_patience=10,
         device=device,
-        model_path=save_dir
+        model_path=save_dir,
     )
 
-    # 训练模型
-    print("\n开始训练...")
+    # Train model
+    print("\nStart training...")
     trainer.fit(train_dataloader, val_dataloader)
 
-    # 评估模型
-    print("\n评估模型...")
+    # Evaluate model
+    print("\nEvaluating model...")
     test_loss, test_accuracy = trainer.evaluate(test_dataloader)
-    print(f"测试集损失: {test_loss:.4f}")
-    print(f"测试集准确率: {test_accuracy:.4f}")
+    print(f"Test loss: {test_loss:.4f}")
+    print(f"Test accuracy: {test_accuracy:.4f}")
 
-    # 评估推荐指标
-    print("\n计算推荐指标...")
+    # Evaluate ranking metrics
+    print("\nComputing ranking metrics...")
     ranking_results = evaluate_ranking(model, test_dataloader, device, topKs=[10, 50, 200])
 
-    print("\n测试集推荐指标:")
+    print("\nRanking metrics on the test set:")
     print("=" * 50)
-    # 提取并打印HR和NDCG指标
-    for metric_name in ['Hit', 'NDCG']:
+    # Print HR and NDCG metrics
+    for metric_name in ["Hit", "NDCG"]:
         for result_str in ranking_results[metric_name]:
             print(result_str)
     print("=" * 50)
 
     print("\n" + "=" * 80)
-    print("训练完成!")
+    print("Training finished!")
     print("=" * 80)
 
 

@@ -1,14 +1,17 @@
-"""MovieLens-1M数据预处理脚本 - 用于HSTU模型.
+"""MovieLens-1M preprocessing script for the HSTU model.
 
-该脚本将MovieLens-1M原始数据转换为HSTU模型所需的格式：
-- 按用户构建行为序列
-- 按时间排序
-- 使用滑动窗口生成训练样本（大幅提升数据量）
-- 生成train/val/test分割
-- 输出seq_tokens, seq_positions, targets
+This script converts the raw MovieLens-1M data into the format required by
+HSTU-based generative recommendation experiments:
 
-参考实现: https://github.com/meta-recsys/generative-recommenders
-关键改进: 采用滑动窗口策略，从每个用户序列生成多个训练样本
+- build interaction sequences per user;
+- sort interactions by timestamp;
+- generate multiple training samples per user via a sliding window;
+- create train/validation/test splits at the user level;
+- output ``seq_tokens``, ``seq_positions``, ``seq_time_diffs`` and ``targets``.
+
+Reference implementation: https://github.com/meta-recsys/generative-recommenders
+Key difference: we use an explicit sliding-window strategy to greatly increase
+training data while preserving temporal order.
 """
 
 import pandas as pd
@@ -19,14 +22,15 @@ from collections import defaultdict
 
 
 class MovieLensHSTUPreprocessor:
-    """MovieLens-1M数据预处理器 - HSTU格式.
+    """Preprocessor for MovieLens-1M data in HSTU format.
 
-    采用滑动窗口策略，从每个用户序列生成多个训练样本，
-    大幅提升数据利用率和模型训练效果。
+    This class applies a sliding-window strategy to each user's interaction
+    sequence to generate multiple training samples, which significantly
+    increases data utilization and improves model training.
 
-    示例：
-        用户序列: [item1, item2, item3, item4, item5]
-        生成样本:
+    Example:
+        User sequence: [item1, item2, item3, item4, item5]
+        Generated samples:
             ([item1], item2)
             ([item1, item2], item3)
             ([item1, item2, item3], item4)
@@ -34,24 +38,24 @@ class MovieLensHSTUPreprocessor:
     """
 
     def __init__(self, data_dir="./data/ml-1m/", output_dir="./data/ml-1m/processed/"):
-        """初始化预处理器.
+        """Initialize the preprocessor.
 
         Args:
-            data_dir (str): 原始数据目录
-            output_dir (str): 输出目录
+            data_dir (str): Directory containing the raw MovieLens-1M files.
+            output_dir (str): Directory where processed files will be stored.
         """
         self.data_dir = data_dir
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-        # 参数
-        self.min_seq_len = 5  # 最小序列长度（用户至少要有5个交互）
-        self.max_seq_len = 200  # 最大序列长度（减少到200以提高效率）
-        self.rating_threshold = 3  # 评分阈值（>=3为正样本）
-        self.min_item_count = 5  # item至少出现5次（冷启动过滤）
+        # Core preprocessing hyperparameters
+        self.min_seq_len = 5  # Minimum sequence length per user
+        self.max_seq_len = 200  # Maximum sequence length (for truncation/padding)
+        self.rating_threshold = 3  # Ratings >= threshold are treated as positive
+        self.min_item_count = 5  # Item must appear at least this many times
 
     def load_data(self):
-        """加载MovieLens-1M数据."""
+        """Load raw MovieLens-1M rating and movie metadata files."""
         print("加载MovieLens-1M数据...")
 
         # 读取ratings数据
@@ -81,28 +85,31 @@ class MovieLensHSTUPreprocessor:
         return ratings, movies
 
     def filter_data(self, ratings):
-        """过滤数据：评分阈值 + 冷启动过滤.
+        """Filter ratings by threshold and apply cold-start heuristics.
+
+        The procedure keeps only high-rated interactions, removes very rare
+        items, and users with too few interactions.
 
         Args:
-            ratings (pd.DataFrame): 原始评分数据
+            ratings (pd.DataFrame): Raw ratings dataframe.
 
         Returns:
-            pd.DataFrame: 过滤后的评分数据
+            pd.DataFrame: Filtered ratings dataframe.
         """
         print("\n数据过滤...")
         print(f"过滤前: {len(ratings)} 条评分")
 
-        # 1. 过滤低评分（只保留>=3的评分）
+        # 1) Filter out low ratings (keep only ratings >= threshold)
         ratings = ratings[ratings['rating'] >= self.rating_threshold]
         print(f"评分过滤后 (>={self.rating_threshold}): {len(ratings)} 条评分")
 
-        # 2. 冷启动过滤：item至少出现min_item_count次
+        # 2) Item cold-start filter: keep items with at least min_item_count ratings
         item_counts = ratings['movie_id'].value_counts()
         valid_items = item_counts[item_counts >= self.min_item_count].index
         ratings = ratings[ratings['movie_id'].isin(valid_items)]
         print(f"Item过滤后 (>={self.min_item_count}次): {len(ratings)} 条评分")
 
-        # 3. 冷启动过滤：user至少有min_seq_len个交互
+        # 3) User cold-start filter: keep users with at least min_seq_len interactions
         user_counts = ratings['user_id'].value_counts()
         valid_users = user_counts[user_counts >= self.min_seq_len].index
         ratings = ratings[ratings['user_id'].isin(valid_users)]
@@ -113,18 +120,18 @@ class MovieLensHSTUPreprocessor:
         return ratings
 
     def create_vocab(self, ratings):
-        """创建电影ID到token的映射.
+        """Create a mapping from raw movie IDs to token IDs.
 
         Args:
-            ratings (pd.DataFrame): 评分数据
+            ratings (pd.DataFrame): Filtered ratings dataframe.
 
         Returns:
-            dict: movie_id -> token_id 的映射
+            dict: Mapping from ``movie_id`` to ``token_id``.
         """
         print("\n创建词表...")
 
         unique_movies = sorted(ratings['movie_id'].unique())
-        # token_id从1开始，0保留给PAD
+        # token_id starts from 1; 0 is reserved for PAD
         vocab = {movie_id: idx + 1 for idx, movie_id in enumerate(unique_movies)}
         vocab[0] = 0  # PAD token
 
@@ -132,29 +139,32 @@ class MovieLensHSTUPreprocessor:
         return vocab
 
     def build_user_sequences(self, ratings):
-        """构建用户序列（按时间排序）.
+        """Build sorted user interaction sequences.
+
+        For each user, interactions are sorted by timestamp and both the
+        movie_ids and timestamps are stored.
 
         Args:
-            ratings (pd.DataFrame): 评分数据
+            ratings (pd.DataFrame): Filtered ratings dataframe.
 
         Returns:
-            tuple: (user_sequences, user_timestamps)
-                - user_sequences: {user_id: [movie_id1, movie_id2, ...]}
-                - user_timestamps: {user_id: [timestamp1, timestamp2, ...]}
+            tuple: ``(user_sequences, user_timestamps)`` where
+                - ``user_sequences`` is ``{user_id: [movie_id1, ...]}``
+                - ``user_timestamps`` is ``{user_id: [timestamp1, ...]}``
         """
         print("\n构建用户序列...")
 
-        # 按时间排序
+        # Sort by user and timestamp
         ratings_sorted = ratings.sort_values(['user_id', 'timestamp'])
 
-        # 按用户分组，同时保存movie_id和timestamp
+        # Group by user and collect movie_ids and timestamps
         user_sequences = {}
         user_timestamps = {}
         for user_id, group in ratings_sorted.groupby('user_id'):
             user_sequences[user_id] = group['movie_id'].tolist()
             user_timestamps[user_id] = group['timestamp'].tolist()
 
-        # 统计序列长度
+        # Log sequence length statistics
         seq_lengths = [len(seq) for seq in user_sequences.values()]
         print(f"用户数: {len(user_sequences)}")
         print(f"序列长度统计: 平均={np.mean(seq_lengths):.1f}, 最小={np.min(seq_lengths)}, 最大={np.max(seq_lengths)}")
@@ -162,27 +172,31 @@ class MovieLensHSTUPreprocessor:
         return user_sequences, user_timestamps
 
     def generate_training_samples_sliding_window(self, user_sequences, user_timestamps, vocab):
-        """使用滑动窗口生成训练样本（支持时间戳）.
+        """Generate training samples using a sliding window (with timestamps).
 
-        关键改进：从每个用户序列生成多个训练样本，大幅提升数据量。
-        新增功能：计算时间差并保存，用于时间感知的位置编码。
+        Key ideas:
+        * For each user sequence, generate multiple prefix-target pairs via a
+          sliding window, greatly increasing the number of training samples.
+        * Compute time differences relative to the query time (last event in
+          the prefix) and store them for time-aware positional encoding.
 
-        示例：
-            用户序列: [item1, item2, item3, item4, item5]
-            时间戳: [t1, t2, t3, t4, t5]
-            生成样本:
-                ([item1], item2, time_diffs=[0, t2-t1])
-                ([item1, item2], item3, time_diffs=[0, t2-t1, t3-t2])
-                ([item1, item2, item3], item4, time_diffs=[0, t2-t1, t3-t2, t4-t3])
-                ([item1, item2, item3, item4], item5, time_diffs=[0, t2-t1, t3-t2, t4-t3, t5-t4])
+        Example:
+            User sequence: [item1, item2, item3, item4, item5]
+            Timestamps: [t1, t2, t3, t4, t5]
+            Generated samples:
+                ([item1], item2, time_diffs=[0, t2 - t1])
+                ([item1, item2], item3, time_diffs=[0, t2 - t1, t3 - t2])
+                ([item1, item2, item3], item4, time_diffs=[0, t2 - t1, t3 - t2, t4 - t3])
+                ([item1, item2, item3, item4], item5,
+                 time_diffs=[0, t2 - t1, t3 - t2, t4 - t3, t5 - t4])
 
         Args:
-            user_sequences (dict): 用户序列字典 {user_id: [movie_id1, ...]}
-            user_timestamps (dict): 用户时间戳字典 {user_id: [timestamp1, ...]}
-            vocab (dict): 词表映射
+            user_sequences (dict): User sequences {user_id: [movie_id1, ...]}.
+            user_timestamps (dict): User timestamps {user_id: [timestamp1, ...]}.
+            vocab (dict): Mapping from ``movie_id`` to ``token_id``.
 
         Returns:
-            tuple: (seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)
+            tuple: ``(seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)``.
         """
         print("\n使用滑动窗口生成训练样本（支持时间戳）...")
 
@@ -224,7 +238,7 @@ class MovieLensHSTUPreprocessor:
                 seq_len = len(seq_tokens)
                 pad_len = self.max_seq_len - seq_len
                 seq_tokens = [0] * pad_len + seq_tokens
-                seq_time_diffs = [0] * pad_len + seq_time_diffs  # padding位置的时间差为0
+                seq_time_diffs = [0] * pad_len + seq_time_diffs  # time difference is 0 at padding positions
 
                 # 位置编码
                 seq_positions = list(range(self.max_seq_len))
@@ -238,7 +252,7 @@ class MovieLensHSTUPreprocessor:
 
         seq_tokens = np.array(seq_tokens_list, dtype=np.int32)
         seq_positions = np.array(seq_positions_list, dtype=np.int32)
-        seq_time_diffs = np.array(seq_time_diffs_list, dtype=np.int32)  # 新增
+        seq_time_diffs = np.array(seq_time_diffs_list, dtype=np.int32)  # time differences per position
         targets = np.array(targets_list, dtype=np.int32)
         user_ids = np.array(user_ids_list, dtype=np.int32)
 
@@ -260,21 +274,23 @@ class MovieLensHSTUPreprocessor:
 
     def split_data_by_user(self, seq_tokens, seq_positions, seq_time_diffs, targets, user_ids,
                            train_ratio=0.7, val_ratio=0.1):
-        """按用户分割数据集（避免数据泄露）.
+        """Split data into train/val/test sets at the user level.
 
-        重要：按用户分割而不是按样本随机分割，避免同一用户的数据出现在训练集和测试集中。
+        Important: we split on users instead of individual samples to avoid
+        information leakage (the same user's interactions appearing in both
+        train and test sets).
 
         Args:
-            seq_tokens (ndarray): 序列tokens
-            seq_positions (ndarray): 序列位置
-            seq_time_diffs (ndarray): 序列时间差
-            targets (ndarray): 目标tokens
-            user_ids (ndarray): 用户IDs
-            train_ratio (float): 训练集比例
-            val_ratio (float): 验证集比例
+            seq_tokens (ndarray): Sequence tokens.
+            seq_positions (ndarray): Position indices.
+            seq_time_diffs (ndarray): Time-difference sequences.
+            targets (ndarray): Target tokens.
+            user_ids (ndarray): User IDs per sample.
+            train_ratio (float): Fraction of users assigned to the training set.
+            val_ratio (float): Fraction of users assigned to the validation set.
 
         Returns:
-            dict: 包含train/val/test数据的字典
+            dict: A dictionary with ``train``, ``val`` and ``test`` splits.
         """
         print("\n按用户分割数据集...")
 
@@ -302,19 +318,19 @@ class MovieLensHSTUPreprocessor:
             'train': {
                 'seq_tokens': seq_tokens[train_mask],
                 'seq_positions': seq_positions[train_mask],
-                'seq_time_diffs': seq_time_diffs[train_mask],  # 新增
+                'seq_time_diffs': seq_time_diffs[train_mask],  # time differences for each prefix
                 'targets': targets[train_mask]
             },
             'val': {
                 'seq_tokens': seq_tokens[val_mask],
                 'seq_positions': seq_positions[val_mask],
-                'seq_time_diffs': seq_time_diffs[val_mask],  # 新增
+                'seq_time_diffs': seq_time_diffs[val_mask],  # time differences for each prefix
                 'targets': targets[val_mask]
             },
             'test': {
                 'seq_tokens': seq_tokens[test_mask],
                 'seq_positions': seq_positions[test_mask],
-                'seq_time_diffs': seq_time_diffs[test_mask],  # 新增
+                'seq_time_diffs': seq_time_diffs[test_mask],  # time differences for each prefix
                 'targets': targets[test_mask]
             }
         }
@@ -325,15 +341,15 @@ class MovieLensHSTUPreprocessor:
         return data_split
 
     def save_data(self, data_split, vocab):
-        """保存处理后的数据.
+        """Save processed data splits and vocabulary to disk.
 
         Args:
-            data_split (dict): 分割后的数据
-            vocab (dict): 词表映射
+            data_split (dict): Dictionary containing train/val/test splits.
+            vocab (dict): Mapping from ``movie_id`` to ``token_id``.
         """
         print("\n保存数据...")
 
-        # 保存数据
+        # Save split data
         for split_name, split_data in data_split.items():
             output_file = os.path.join(self.output_dir, f'{split_name}_data.pkl')
             with open(output_file, 'wb') as f:
@@ -350,9 +366,9 @@ class MovieLensHSTUPreprocessor:
         print(f"保存词表到 {vocab_file}")
 
     def preprocess(self):
-        """执行完整的预处理流程."""
+        """Run the full preprocessing pipeline."""
         print("=" * 80)
-        print("MovieLens-1M HSTU数据预处理 - 滑动窗口版本（支持时间戳）")
+        print("MovieLens-1M HSTU data preprocessing - sliding window with timestamps")
         print("=" * 80)
 
         # 1. 加载数据
@@ -392,8 +408,7 @@ class MovieLensHSTUPreprocessor:
 
 
 if __name__ == '__main__':
-    # 使用当前目录作为数据目录
-    import sys
+    # Use the current directory as the data directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = script_dir
     output_dir = os.path.join(script_dir, 'processed')

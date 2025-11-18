@@ -357,18 +357,21 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
 # ============ Sequence Data Classes (新增) ============
 
 class SeqDataset(Dataset):
-    """序列数据集类，用于HSTU等生成式模型.
+    """Sequence dataset for HSTU-style generative models.
 
-    该类用于处理序列生成任务的数据，支持序列token、位置编码、时间差和目标token。
+    This class wraps precomputed sequence features for next-item prediction
+    tasks, including tokens, positions, time differences and targets.
 
     Args:
-        seq_tokens (np.ndarray): 序列token数组，shape: (num_samples, seq_len)
-        seq_positions (np.ndarray): 位置编码数组，shape: (num_samples, seq_len)
-        targets (np.ndarray): 目标token数组，shape: (num_samples,)
-        seq_time_diffs (np.ndarray): 时间差数组，shape: (num_samples, seq_len)
+        seq_tokens (np.ndarray): Token ids of shape ``(num_samples, seq_len)``.
+        seq_positions (np.ndarray): Position indices of shape
+            ``(num_samples, seq_len)``.
+        targets (np.ndarray): Target token ids of shape ``(num_samples,)``.
+        seq_time_diffs (np.ndarray): Time-difference features of shape
+            ``(num_samples, seq_len)``.
 
     Shape:
-        - Output: 返回 (seq_tokens, seq_positions, seq_time_diffs, target) 元组
+        - Output: A tuple ``(seq_tokens, seq_positions, seq_time_diffs, target)``.
 
     Example:
         >>> seq_tokens = np.random.randint(0, 1000, (100, 256))
@@ -387,7 +390,7 @@ class SeqDataset(Dataset):
         self.targets = targets
         self.seq_time_diffs = seq_time_diffs
 
-        # 验证数据一致性
+        # Validate basic shape consistency
         assert len(seq_tokens) == len(targets), "seq_tokens and targets must have same length"
         assert len(seq_tokens) == len(seq_positions), "seq_tokens and seq_positions must have same length"
         assert len(seq_tokens) == len(seq_time_diffs), "seq_tokens and seq_time_diffs must have same length"
@@ -395,13 +398,13 @@ class SeqDataset(Dataset):
         assert seq_tokens.shape[1] == seq_time_diffs.shape[1], "seq_tokens and seq_time_diffs must have same seq_len"
 
     def __getitem__(self, index):
-        """获取单个样本.
+        """Return a single sample.
 
         Args:
-            index (int): 样本索引
+            index (int): Sample index.
 
         Returns:
-            tuple: (seq_tokens, seq_positions, seq_time_diffs, target)
+            tuple: ``(seq_tokens, seq_positions, seq_time_diffs, target)``.
         """
         return (
             torch.LongTensor(self.seq_tokens[index]),
@@ -411,23 +414,26 @@ class SeqDataset(Dataset):
         )
 
     def __len__(self):
-        """获取数据集大小."""
+        """Return the dataset size."""
         return len(self.targets)
 
 
 class SequenceDataGenerator(object):
-    """序列数据生成器，用于HSTU等生成式模型.
+    """Sequence data generator used for HSTU-style models.
 
-    该类用于处理序列生成任务的数据加载，支持train/val/test分割。
+    This helper wraps a :class:`SeqDataset` and provides convenient utilities
+    to construct train/val/test ``DataLoader`` objects.
 
     Args:
-        seq_tokens (np.ndarray): 序列token数组，shape: (num_samples, seq_len)
-        seq_positions (np.ndarray): 位置编码数组，shape: (num_samples, seq_len)
-        targets (np.ndarray): 目标token数组，shape: (num_samples,)
-        seq_time_diffs (np.ndarray): 时间差数组，shape: (num_samples, seq_len)
+        seq_tokens (np.ndarray): Token ids of shape ``(num_samples, seq_len)``.
+        seq_positions (np.ndarray): Position indices of shape
+            ``(num_samples, seq_len)``.
+        targets (np.ndarray): Target token ids of shape ``(num_samples,)``.
+        seq_time_diffs (np.ndarray): Time-difference features of shape
+            ``(num_samples, seq_len)``.
 
     Methods:
-        generate_dataloader: 生成train/val/test数据加载器
+        generate_dataloader: Build train/val/test data loaders.
 
     Example:
         >>> seq_tokens = np.random.randint(0, 1000, (1000, 256))
@@ -445,7 +451,7 @@ class SequenceDataGenerator(object):
         self.targets = targets
         self.seq_time_diffs = seq_time_diffs
 
-        # 创建数据集
+        # Underlying dataset
         self.dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
 
     def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None):
