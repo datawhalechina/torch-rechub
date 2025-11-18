@@ -149,24 +149,9 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     print("\nBuilding data loaders (with time-aware features)...")
     print("✅ Using time-aware positional encoding")
 
-    train_gen = SequenceDataGenerator(
-        train_data['seq_tokens'],
-        train_data['seq_positions'],
-        train_data['targets'],
-        train_data['seq_time_diffs']
-    )
-    val_gen = SequenceDataGenerator(
-        val_data['seq_tokens'],
-        val_data['seq_positions'],
-        val_data['targets'],
-        val_data['seq_time_diffs']
-    )
-    test_gen = SequenceDataGenerator(
-        test_data['seq_tokens'],
-        test_data['seq_positions'],
-        test_data['targets'],
-        test_data['seq_time_diffs']
-    )
+    train_gen = SequenceDataGenerator(train_data['seq_tokens'], train_data['seq_positions'], train_data['targets'], train_data['seq_time_diffs'])
+    val_gen = SequenceDataGenerator(val_data['seq_tokens'], val_data['seq_positions'], val_data['targets'], val_data['seq_time_diffs'])
+    test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
 
     train_dataloader = train_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
     val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
@@ -194,7 +179,10 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
     trainer = SeqTrainer(
         model,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params={"lr": learning_rate, "weight_decay": weight_decay},
+        optimizer_params={
+            "lr": learning_rate,
+            "weight_decay": weight_decay
+        },
         n_epoch=epoch,
         earlystop_patience=10,
         device=device,
@@ -243,5 +231,4 @@ if __name__ == '__main__':
     parser.add_argument('--max_seq_len', type=int, default=200)
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size,
-         args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len)

@@ -1,8 +1,10 @@
 """HSTU: Hierarchical Sequential Transduction Units Model."""
 
 import math
+
 import torch
 import torch.nn as nn
+
 from torch_rechub.basic.layers import HSTUBlock
 from torch_rechub.utils.hstu_utils import RelPosBias
 
@@ -43,10 +45,7 @@ class HSTUModel(nn.Module):
         torch.Size([32, 256, 100000])
     """
 
-    def __init__(self, vocab_size, d_model=512, n_heads=8, n_layers=4,
-                 dqk=64, dv=64, max_seq_len=256, dropout=0.1,
-                 use_rel_pos_bias=True, use_time_embedding=True,
-                 num_time_buckets=2048, time_bucket_fn='sqrt'):
+    def __init__(self, vocab_size, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt'):
         super().__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
@@ -73,15 +72,7 @@ class HSTUModel(nn.Module):
             self.time_embedding = nn.Embedding(num_time_buckets + 1, d_model, padding_idx=0)
 
         # HSTU block
-        self.hstu_block = HSTUBlock(
-            d_model=d_model,
-            n_heads=n_heads,
-            n_layers=n_layers,
-            dqk=dqk,
-            dv=dv,
-            dropout=dropout,
-            use_rel_pos_bias=use_rel_pos_bias
-        )
+        self.hstu_block = HSTUBlock(d_model=d_model, n_heads=n_heads, n_layers=n_layers, dqk=dqk, dv=dv, dropout=dropout, use_rel_pos_bias=use_rel_pos_bias)
 
         # Relative position bias
         self.use_rel_pos_bias = use_rel_pos_bias
@@ -196,4 +187,3 @@ class HSTUModel(nn.Module):
         logits = self.output_projection(hstu_output)  # (B, L, V)
 
         return logits
-

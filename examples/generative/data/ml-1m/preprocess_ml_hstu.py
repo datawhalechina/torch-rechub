@@ -14,11 +14,12 @@ Key difference: we use an explicit sliding-window strategy to greatly increase
 training data while preserving temporal order.
 """
 
-import pandas as pd
-import numpy as np
-import pickle
 import os
+import pickle
 from collections import defaultdict
+
+import numpy as np
+import pandas as pd
 
 
 class MovieLensHSTUPreprocessor:
@@ -60,25 +61,11 @@ class MovieLensHSTUPreprocessor:
 
         # 读取ratings数据
         rnames = ['user_id', 'movie_id', 'rating', 'timestamp']
-        ratings = pd.read_csv(
-            os.path.join(self.data_dir, 'ratings.dat'),
-            sep='::',
-            header=None,
-            names=rnames,
-            engine='python',
-            encoding='ISO-8859-1'
-        )
+        ratings = pd.read_csv(os.path.join(self.data_dir, 'ratings.dat'), sep='::', header=None, names=rnames, engine='python', encoding='ISO-8859-1')
 
         # 读取movies数据
         mnames = ['movie_id', 'title', 'genres']
-        movies = pd.read_csv(
-            os.path.join(self.data_dir, 'movies.dat'),
-            sep='::',
-            header=None,
-            names=mnames,
-            engine='python',
-            encoding='ISO-8859-1'
-        )
+        movies = pd.read_csv(os.path.join(self.data_dir, 'movies.dat'), sep='::', header=None, names=mnames, engine='python', encoding='ISO-8859-1')
 
         print(f"原始数据: {len(ratings)} 条评分, {ratings['user_id'].nunique()} 用户, {ratings['movie_id'].nunique()} 电影")
 
@@ -272,8 +259,7 @@ class MovieLensHSTUPreprocessor:
 
         return seq_tokens, seq_positions, seq_time_diffs, targets, user_ids
 
-    def split_data_by_user(self, seq_tokens, seq_positions, seq_time_diffs, targets, user_ids,
-                           train_ratio=0.7, val_ratio=0.1):
+    def split_data_by_user(self, seq_tokens, seq_positions, seq_time_diffs, targets, user_ids, train_ratio=0.7, val_ratio=0.1):
         """Split data into train/val/test sets at the user level.
 
         Important: we split on users instead of individual samples to avoid
@@ -384,14 +370,10 @@ class MovieLensHSTUPreprocessor:
         user_sequences, user_timestamps = self.build_user_sequences(ratings_filtered)
 
         # 5. 使用滑动窗口生成训练样本（包含时间差）
-        seq_tokens, seq_positions, seq_time_diffs, targets, user_ids = self.generate_training_samples_sliding_window(
-            user_sequences, user_timestamps, vocab
-        )
+        seq_tokens, seq_positions, seq_time_diffs, targets, user_ids = self.generate_training_samples_sliding_window(user_sequences, user_timestamps, vocab)
 
         # 6. 按用户分割数据
-        data_split = self.split_data_by_user(
-            seq_tokens, seq_positions, seq_time_diffs, targets, user_ids
-        )
+        data_split = self.split_data_by_user(seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)
 
         # 7. 保存数据
         self.save_data(data_split, vocab)
@@ -418,4 +400,3 @@ if __name__ == '__main__':
 
     preprocessor = MovieLensHSTUPreprocessor(data_dir=data_dir, output_dir=output_dir)
     preprocessor.preprocess()
-

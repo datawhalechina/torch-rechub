@@ -723,6 +723,7 @@ class CEN(nn.Module):
 
 # ============ HSTU Layers (新增) ============
 
+
 class HSTULayer(nn.Module):
     """Single HSTU layer.
 
@@ -750,8 +751,7 @@ class HSTULayer(nn.Module):
         torch.Size([32, 256, 512])
     """
 
-    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64,
-                 dropout=0.1, use_rel_pos_bias=True):
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
@@ -773,13 +773,7 @@ class HSTULayer(nn.Module):
         # Feed-forward network (FFN)
         # Standard Transformer uses 4*d_model as the hidden dimension of FFN
         ffn_hidden_dim = 4 * d_model
-        self.ffn = nn.Sequential(
-            nn.Linear(d_model, ffn_hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(ffn_hidden_dim, d_model),
-            nn.Dropout(dropout)
-        )
+        self.ffn = nn.Sequential(nn.Linear(d_model, ffn_hidden_dim), nn.ReLU(), nn.Dropout(dropout), nn.Linear(ffn_hidden_dim, d_model), nn.Dropout(dropout))
 
         # Layer normalization
         self.norm1 = nn.LayerNorm(d_model)
@@ -789,7 +783,7 @@ class HSTULayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # Scaling factor for attention scores
-        self.scale = 1.0 / (dqk ** 0.5)
+        self.scale = 1.0 / (dqk**0.5)
 
     def forward(self, x, rel_pos_bias=None):
         """Forward pass of a single HSTU layer.
@@ -901,19 +895,14 @@ class HSTUBlock(nn.Module):
         torch.Size([32, 256, 512])
     """
 
-    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64,
-                 dropout=0.1, use_rel_pos_bias=True):
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
         self.n_layers = n_layers
 
         # Create a stack of HSTULayer modules
-        self.layers = nn.ModuleList([
-            HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv,
-                     dropout=dropout, use_rel_pos_bias=use_rel_pos_bias)
-            for _ in range(n_layers)
-        ])
+        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, use_rel_pos_bias=use_rel_pos_bias) for _ in range(n_layers)])
 
     def forward(self, x, rel_pos_bias=None):
         """Forward pass through all stacked HSTULayer modules.

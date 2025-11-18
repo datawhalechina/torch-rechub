@@ -45,19 +45,7 @@ class SeqTrainer(object):
         ... )
     """
 
-    def __init__(
-        self,
-        model,
-        optimizer_fn=torch.optim.Adam,
-        optimizer_params=None,
-        scheduler_fn=None,
-        scheduler_params=None,
-        n_epoch=10,
-        earlystop_patience=10,
-        device='cpu',
-        gpus=None,
-        model_path='./'
-    ):
+    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./'):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
@@ -92,11 +80,7 @@ class SeqTrainer(object):
         Returns:
             dict: 训练历史
         """
-        history = {
-            'train_loss': [],
-            'val_loss': [],
-            'val_accuracy': []
-        }
+        history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
 
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
@@ -205,4 +189,3 @@ class SeqTrainer(object):
         accuracy = total_correct / total_samples
 
         return avg_loss, accuracy
-

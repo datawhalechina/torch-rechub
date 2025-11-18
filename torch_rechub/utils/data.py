@@ -339,7 +339,6 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
                 train_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
                 train_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
 
-
 # shuffle
     if shuffle:
         random.shuffle(train_data)
@@ -355,6 +354,7 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
 
 
 # ============ Sequence Data Classes (新增) ============
+
 
 class SeqDataset(Dataset):
     """Sequence dataset for HSTU-style generative models.
@@ -406,12 +406,7 @@ class SeqDataset(Dataset):
         Returns:
             tuple: ``(seq_tokens, seq_positions, seq_time_diffs, target)``.
         """
-        return (
-            torch.LongTensor(self.seq_tokens[index]),
-            torch.LongTensor(self.seq_positions[index]),
-            torch.LongTensor(self.seq_time_diffs[index]),
-            torch.LongTensor([self.targets[index]])
-        )
+        return (torch.LongTensor(self.seq_tokens[index]), torch.LongTensor(self.seq_positions[index]), torch.LongTensor(self.seq_time_diffs[index]), torch.LongTensor([self.targets[index]]))
 
     def __len__(self):
         """Return the dataset size."""
@@ -485,31 +480,13 @@ class SequenceDataGenerator(object):
         test_size = total_size - train_size - val_size
 
         # 分割数据集
-        train_dataset, val_dataset, test_dataset = random_split(
-            self.dataset,
-            [train_size, val_size, test_size]
-        )
+        train_dataset, val_dataset, test_dataset = random_split(self.dataset, [train_size, val_size, test_size])
 
         # 创建数据加载器
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=num_workers
-        )
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers
-        )
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers
-        )
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         return train_loader, val_loader, test_loader
