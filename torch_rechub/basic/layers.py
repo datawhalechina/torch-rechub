@@ -918,6 +918,8 @@ class HSTUBlock(nn.Module):
         for layer in self.layers:
             x = layer(x, rel_pos_bias=rel_pos_bias)
         return x
+
+
 class InteractingLayer(nn.Module):
     """Multi-head Self-Attention based Interacting Layer, used in AutoInt model.
 
