@@ -12,19 +12,19 @@
         <meta name="author" content="Datawhale">
       
       
-        <link rel="canonical" href="https://datawhalechina.github.io/torch-rechub/zh/api-reference/utils/">
+        <link rel="canonical" href="https://datawhalechina.github.io/torch-rechub/zh/blog/hstu_reproduction/">
       
       
-        <link rel="prev" href="../trainers/">
+        <link rel="prev" href="../rank/">
       
       
-        <link rel="next" href="../../blog/match/">
+        <link rel="next" href="../../faq/">
       
       
         
           <link rel="alternate" href="./" hreflang="zh">
         
-          <link rel="alternate" href="../../../api-reference/utils/" hreflang="en">
+          <link rel="alternate" href="/torch-rechub/" hreflang="en">
         
       
       
@@ -33,7 +33,7 @@
     
     
       
-        <title>工具类 - Torch-RecHub</title>
+        <title>HSTU 模型复现说明 - Torch-RecHub</title>
       
     
     
@@ -92,7 +92,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api" class="md-skip">
+        <a href="#hstu-torch-rechub" class="md-skip">
           跳转至
         </a>
       
@@ -125,7 +125,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              工具类
+              HSTU 模型复现说明
             
           </span>
         </div>
@@ -178,7 +178,7 @@
           </li>
         
           <li class="md-select__item">
-            <a href="../../../api-reference/utils/" hreflang="en" class="md-select__link">
+            <a href="/torch-rechub/" hreflang="en" class="md-select__link">
               English
             </a>
           </li>
@@ -345,13 +345,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../basic/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../api-reference/basic/" class="md-tabs__link">
           
   
   
@@ -367,11 +365,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../blog/match/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../match/" class="md-tabs__link">
           
   
   
@@ -781,31 +781,26 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -823,7 +818,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -841,7 +836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic/" class="md-nav__link">
+      <a href="../../api-reference/basic/" class="md-nav__link">
         
   
   
@@ -869,7 +864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../models/" class="md-nav__link">
+      <a href="../../api-reference/models/" class="md-nav__link">
         
   
   
@@ -897,7 +892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../trainers/" class="md-nav__link">
+      <a href="../../api-reference/trainers/" class="md-nav__link">
         
   
   
@@ -922,37 +917,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    工具类
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../api-reference/utils/" class="md-nav__link">
         
   
   
@@ -968,361 +936,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="目录">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      目录
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#datapy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        数据处理工具 (data.py)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="数据处理工具 (data.py)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        数据集类
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="数据集类">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#torchdataset" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TorchDataset
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#predictdataset" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PredictDataset
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchdatagenerator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MatchDataGenerator
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datagenerator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DataGenerator
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        工具函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="工具函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get_auto_embedding_dim" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_auto_embedding_dim
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get_loss_func" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_loss_func
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get_metric_func" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_metric_func
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#generate_seq_feature" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        generate_seq_feature
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#matchpy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        召回工具 (match.py)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="召回工具 (match.py)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        数据处理函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="数据处理函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gen_model_input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        gen_model_input
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#negative_sample" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        negative_sample
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        向量检索类
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="向量检索类">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#annoy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Annoy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#milvus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Milvus
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mtlpy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        多任务学习工具 (mtl.py)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="多任务学习工具 (mtl.py)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        工具函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="工具函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#shared_task_layers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        shared_task_layers
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        优化器类
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="优化器类">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metabalance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MetaBalance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        梯度处理函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="梯度处理函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gradnorm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        gradnorm
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1339,26 +952,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1376,7 +994,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1394,7 +1012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../blog/match/" class="md-nav__link">
+      <a href="../match/" class="md-nav__link">
         
   
   
@@ -1422,7 +1040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../blog/rank/" class="md-nav__link">
+      <a href="../rank/" class="md-nav__link">
         
   
   
@@ -1447,10 +1065,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../blog/hstu_reproduction/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HSTU 模型复现说明
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1466,6 +1109,263 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#hstu-torch-rechub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HSTU 模型在 torch-rechub 中的复现说明
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 整体架构概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 整体架构概览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 模块划分
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 数据与任务
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-hstulayer-hstublock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. HSTULayer 与 HSTUBlock 实现细节
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. HSTULayer 与 HSTUBlock 实现细节">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-hstulayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 HSTULayer：核心转导单元
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-hstublock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 HSTUBlock：多层堆叠
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 时间戳建模与时间嵌入
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 时间戳建模与时间嵌入">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 数据预处理中的时间差计算
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-bucket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 模型中的时间嵌入与 bucket 化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 训练与评估流水线
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 训练与评估流水线">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-seqdataset-sequencedatagenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 SeqDataset 与 SequenceDataGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-seqtrainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 SeqTrainer：训练与评估
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 示例脚本与推荐指标
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 与 Meta 官方实现的一致性与差异
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 与 Meta 官方实现的一致性与差异">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 主要一致点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 主要差异与简化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 近期提交总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1549,8 +1449,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -1559,34 +1457,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#datapy" class="md-nav__link">
+  <a href="#hstu-torch-rechub" class="md-nav__link">
     <span class="md-ellipsis">
       
-        数据处理工具 (data.py)
+        HSTU 模型在 torch-rechub 中的复现说明
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="数据处理工具 (data.py)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 整体架构概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 整体架构概览">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#11" class="md-nav__link">
     <span class="md-ellipsis">
       
-        数据集类
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="数据集类">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#torchdataset" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TorchDataset
+        1.1 模块划分
       
     </span>
   </a>
@@ -1594,101 +1491,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#predictdataset" class="md-nav__link">
+  <a href="#12" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PredictDataset
+        1.2 数据与任务
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchdatagenerator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MatchDataGenerator
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datagenerator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DataGenerator
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        工具函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="工具函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get_auto_embedding_dim" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_auto_embedding_dim
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get_loss_func" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_loss_func
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get_metric_func" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        get_metric_func
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#generate_seq_feature" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        generate_seq_feature
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -1698,34 +1507,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#matchpy" class="md-nav__link">
+  <a href="#2-hstulayer-hstublock" class="md-nav__link">
     <span class="md-ellipsis">
       
-        召回工具 (match.py)
+        2. HSTULayer 与 HSTUBlock 实现细节
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="召回工具 (match.py)">
+    <nav class="md-nav" aria-label="2. HSTULayer 与 HSTUBlock 实现细节">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
+  <a href="#21-hstulayer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        数据处理函数
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="数据处理函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gen_model_input" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        gen_model_input
+        2.1 HSTULayer：核心转导单元
       
     </span>
   </a>
@@ -1733,10 +1530,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#negative_sample" class="md-nav__link">
+  <a href="#22-hstublock" class="md-nav__link">
     <span class="md-ellipsis">
       
-        negative_sample
+        2.2 HSTUBlock：多层堆叠
       
     </span>
   </a>
@@ -1747,24 +1544,24 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        向量检索类
+        3. 时间戳建模与时间嵌入
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="向量检索类">
+    <nav class="md-nav" aria-label="3. 时间戳建模与时间嵌入">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#annoy" class="md-nav__link">
+  <a href="#31" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annoy
+        3.1 数据预处理中的时间差计算
       
     </span>
   </a>
@@ -1772,10 +1569,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#milvus" class="md-nav__link">
+  <a href="#32-bucket" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Milvus
+        3.2 模型中的时间嵌入与 bucket 化
       
     </span>
   </a>
@@ -1784,6 +1581,51 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 训练与评估流水线
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 训练与评估流水线">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-seqdataset-sequencedatagenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 SeqDataset 与 SequenceDataGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-seqtrainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 SeqTrainer：训练与评估
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 示例脚本与推荐指标
+      
+    </span>
+  </a>
   
 </li>
         
@@ -1793,34 +1635,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mtlpy" class="md-nav__link">
+  <a href="#5-meta" class="md-nav__link">
     <span class="md-ellipsis">
       
-        多任务学习工具 (mtl.py)
+        5. 与 Meta 官方实现的一致性与差异
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="多任务学习工具 (mtl.py)">
+    <nav class="md-nav" aria-label="5. 与 Meta 官方实现的一致性与差异">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#51" class="md-nav__link">
     <span class="md-ellipsis">
       
-        工具函数
+        5.1 主要一致点
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="工具函数">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#shared_task_layers" class="md-nav__link">
+  <a href="#52" class="md-nav__link">
     <span class="md-ellipsis">
       
-        shared_task_layers
+        5.2 主要差异与简化
       
     </span>
   </a>
@@ -1831,65 +1672,26 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        优化器类
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="优化器类">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metabalance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        MetaBalance
+        6. 近期提交总结
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        梯度处理函数
+        7. 小结
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="梯度处理函数">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#gradnorm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        gradnorm
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1936,10 +1738,10 @@
     
     
       <li class="md-path__item">
-        <a href="../basic/" class="md-path__link">
+        <a href="../match/" class="md-path__link">
           
   <span class="md-ellipsis">
-    API参考
+    博客
   </span>
 
         </a>
@@ -1961,172 +1763,259 @@
   
 
 
-<h1 id="api">工具类 API 参考</h1>
-<p>本文档详细介绍 Torch-RecHub 中各个工具类的 API 接口和参数说明。</p>
-<h2 id="datapy">数据处理工具 (data.py)</h2>
-<h3 id="_1">数据集类</h3>
-<h4 id="torchdataset">TorchDataset</h4>
+  <h1>HSTU 模型复现说明</h1>
+
+<h2 id="hstu-torch-rechub">HSTU 模型在 torch-rechub 中的复现说明</h2>
+<p>本文件总结 torch-rechub 中对 Meta HSTU（Hierarchical Sequential Transduction Units）模型的复现情况，重点说明：</p>
 <ul>
-<li><strong>简介</strong>：PyTorch数据集的基础实现，用于处理特征和标签数据。</li>
-<li><strong>参数</strong>：</li>
-<li><code>x</code> (dict): 特征字典，键为特征名，值为特征数据</li>
-<li><code>y</code> (array): 标签数据</li>
+<li>当前实现的整体架构与关键设计细节；</li>
+<li>与 Meta 官方开源实现/论文的一致之处；</li>
+<li>有意简化或仍然存在差异的部分。</li>
 </ul>
-<h4 id="predictdataset">PredictDataset</h4>
+<hr />
+<h2 id="1">1. 整体架构概览</h2>
+<h3 id="11">1.1 模块划分</h3>
+<p>与 HSTU 相关的主要模块如下：</p>
 <ul>
-<li><strong>简介</strong>：用于预测阶段的数据集类，只包含特征数据。</li>
-<li><strong>参数</strong>：</li>
-<li><code>x</code> (dict): 特征字典，键为特征名，值为特征数据</li>
+<li><strong>模型主体</strong>：<code>torch_rechub/models/generative/hstu.py</code></li>
+<li><code>HSTUModel</code>：Embedding + HSTUBlock + 输出投影</li>
+<li><strong>核心层与 Block</strong>：<code>torch_rechub/basic/layers.py</code></li>
+<li><code>HSTULayer</code>：单层 HSTU 转导单元（多头注意力 + 门控 + FFN）</li>
+<li><code>HSTUBlock</code>：多层 HSTULayer 堆叠</li>
+<li><strong>相对位置偏置与词表工具</strong>：<code>torch_rechub/utils/hstu_utils.py</code></li>
+<li><code>RelPosBias</code>、<code>VocabMask</code>、<code>VocabMapper</code></li>
+<li><strong>时间感知数据预处理</strong>：<code>examples/generative/data/ml-1m/preprocess_ml_hstu.py</code></li>
+<li><strong>数据集与数据生成器</strong>：<code>torch_rechub/utils/data.py</code></li>
+<li><code>SeqDataset</code>、<code>SequenceDataGenerator</code></li>
+<li><strong>训练与评估</strong>：</li>
+<li><code>torch_rechub/trainers/seq_trainer.py</code>：<code>SeqTrainer</code></li>
+<li><code>examples/generative/run_hstu_movielens.py</code>：示例脚本、评估指标</li>
 </ul>
-<h4 id="matchdatagenerator">MatchDataGenerator</h4>
+<h3 id="12">1.2 数据与任务</h3>
 <ul>
-<li><strong>简介</strong>：召回任务的数据生成器，用于生成训练和测试数据加载器。</li>
-<li><strong>主要方法</strong>：</li>
-<li><code>generate_dataloader(x_test_user, x_all_item, batch_size, num_workers=8)</code>: 生成训练、测试和物品数据加载器</li>
-<li><strong>参数</strong>：<ul>
-<li><code>x_test_user</code> (dict): 测试用户特征</li>
-<li><code>x_all_item</code> (dict): 所有物品特征</li>
-<li><code>batch_size</code> (int): 批次大小</li>
-<li><code>num_workers</code> (int): 数据加载的工作进程数</li>
+<li>数据集：MovieLens-1M <code>ratings.dat</code>（包含时间戳）</li>
+<li>任务形式：<strong>Next-item prediction</strong>（给定历史序列，预测下一个 item）</li>
+<li>训练目标：自回归式的 next-token 交叉熵损失（仅使用序列最后一个位置的 logits）</li>
+<li>评估指标：HR@K、NDCG@K（K=10, 50, 200）</li>
+</ul>
+<hr />
+<h2 id="2-hstulayer-hstublock">2. HSTULayer 与 HSTUBlock 实现细节</h2>
+<h3 id="21-hstulayer">2.1 HSTULayer：核心转导单元</h3>
+<p><code>torch_rechub/basic/layers.py::HSTULayer</code> 实现了论文中的“Sequential Transduction Unit”核心思想：</p>
+<ol>
+<li><strong>输入与线性投影</strong></li>
+<li>输入形状：<code>(B, L, D)</code></li>
+<li>
+<p>通过 <code>proj1: Linear(D → 2·H·dqk + 2·H·dv)</code> 同时产生 Q / K / U / V：</p>
+<ul>
+<li>Q, K 形状：<code>(B, H, L, dqk)</code></li>
+<li>U, V 形状：<code>(B, H, L, dv)</code></li>
 </ul>
 </li>
-</ul>
-<h4 id="datagenerator">DataGenerator</h4>
-<ul>
-<li><strong>简介</strong>：通用数据生成器，支持数据集的划分和加载。</li>
-<li><strong>主要方法</strong>：</li>
-<li><code>generate_dataloader(x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16, num_workers=0)</code>: 生成训练、验证和测试数据加载器</li>
-<li><strong>参数</strong>：<ul>
-<li><code>x_val</code>, <code>y_val</code>: 验证集特征和标签</li>
-<li><code>x_test</code>, <code>y_test</code>: 测试集特征和标签</li>
-<li><code>split_ratio</code> (list): 训练集、验证集、测试集的划分比例</li>
-<li><code>batch_size</code> (int): 批次大小</li>
-<li><code>num_workers</code> (int): 数据加载的工作进程数</li>
-</ul>
+<li>
+<p><strong>多头自注意力 + causal mask</strong></p>
 </li>
-</ul>
-<h3 id="_2">工具函数</h3>
-<h4 id="get_auto_embedding_dim">get_auto_embedding_dim</h4>
-<ul>
-<li><strong>简介</strong>：根据类别数自动计算嵌入向量维度。</li>
-<li><strong>参数</strong>：</li>
-<li><code>num_classes</code> (int): 类别数量</li>
-<li><strong>返回</strong>：</li>
-<li>int: 嵌入向量维度，计算公式：<code>[6 * (num_classes)^(1/4)]</code></li>
-</ul>
-<h4 id="get_loss_func">get_loss_func</h4>
-<ul>
-<li><strong>简介</strong>：获取损失函数。</li>
-<li><strong>参数</strong>：</li>
-<li><code>task_type</code> (str): 任务类型，"classification"或"regression"</li>
-<li><strong>返回</strong>：</li>
-<li>torch.nn.Module: 对应的损失函数</li>
-</ul>
-<h4 id="get_metric_func">get_metric_func</h4>
-<ul>
-<li><strong>简介</strong>：获取评估指标函数。</li>
-<li><strong>参数</strong>：</li>
-<li><code>task_type</code> (str): 任务类型，"classification"或"regression"</li>
-<li><strong>返回</strong>：</li>
-<li>function: 对应的评估指标函数</li>
-</ul>
-<h4 id="generate_seq_feature">generate_seq_feature</h4>
-<ul>
-<li><strong>简介</strong>：生成序列特征和负样本。</li>
-<li><strong>参数</strong>：</li>
-<li><code>data</code> (pd.DataFrame): 原始数据</li>
-<li><code>user_col</code> (str): 用户ID列名</li>
-<li><code>item_col</code> (str): 物品ID列名</li>
-<li><code>time_col</code> (str): 时间戳列名</li>
-<li><code>item_attribute_cols</code> (list): 需要生成序列特征的物品属性列</li>
-<li><code>min_item</code> (int): 用户最少交互物品数</li>
-<li><code>shuffle</code> (bool): 是否打乱数据</li>
-<li><code>max_len</code> (int): 序列最大长度</li>
-</ul>
-<h2 id="matchpy">召回工具 (match.py)</h2>
-<h3 id="_3">数据处理函数</h3>
-<h4 id="gen_model_input">gen_model_input</h4>
-<ul>
-<li><strong>简介</strong>：合并用户和物品特征，处理序列特征。</li>
-<li><strong>参数</strong>：</li>
-<li><code>df</code> (pd.DataFrame): 带有历史序列特征的数据</li>
-<li><code>user_profile</code> (pd.DataFrame): 用户特征数据</li>
-<li><code>user_col</code> (str): 用户列名</li>
-<li><code>item_profile</code> (pd.DataFrame): 物品特征数据</li>
-<li><code>item_col</code> (str): 物品列名</li>
-<li><code>seq_max_len</code> (int): 序列最大长度</li>
-<li><code>padding</code> (str): 填充方式，'pre'或'post'</li>
-<li><code>truncating</code> (str): 截断方式，'pre'或'post'</li>
-</ul>
-<h4 id="negative_sample">negative_sample</h4>
-<ul>
-<li><strong>简介</strong>：召回模型的负采样方法。</li>
-<li><strong>参数</strong>：</li>
-<li><code>items_cnt_order</code> (dict): 物品计数字典，按计数降序排序</li>
-<li><code>ratio</code> (int): 负样本比例</li>
-<li><code>method_id</code> (int): 采样方法ID<ul>
-<li>0: 随机采样</li>
-<li>1: Word2Vec式流行度采样</li>
-<li>2: 对数流行度采样</li>
-<li>3: 腾讯RALM采样</li>
-</ul>
+<li>注意力打分：<code>scores = (Q @ K^T) / sqrt(dqk)</code>，形状 <code>(B, H, L, L)</code></li>
+<li>使用严格的 <strong>causal mask</strong>：位置 i 只能看到 <code>≤ i</code> 的 token，防止未来信息泄露。</li>
+<li>可选加上相对位置偏置 <code>RelPosBias</code>。</li>
+<li>
+<p>softmax 后得到 <code>attn_weights</code>，再与 V 相乘得到 <code>attn_output</code>。</p>
 </li>
-</ul>
-<h3 id="_4">向量检索类</h3>
-<h4 id="annoy">Annoy</h4>
+<li>
+<p><strong>门控机制（Gated Attention）</strong></p>
+</li>
+<li>将注意力输出 <code>attn_output</code> 与门控向量 U 进行逐元素门控：</li>
+<li>
+<p><code>gated_output = attn_output * sigmoid(U)</code>，形状 <code>(B, L, H·dv)</code>。</p>
+</li>
+<li>
+<p><strong>输出投影与残差 + FFN</strong></p>
+</li>
+<li>使用 <code>proj2: Linear(H·dv → D)</code> 将多头输出还原到模型维度。</li>
+<li>两个残差块：<ol>
+<li>自注意力 + 门控 + 投影 + Dropout + 残差</li>
+<li>LayerNorm + FFN(4D) + Dropout + 残差</li>
+</ol>
+</li>
+<li>使用 <code>LayerNorm</code> 做 pre-norm，提升深层训练稳定性。</li>
+</ol>
+<h3 id="22-hstublock">2.2 HSTUBlock：多层堆叠</h3>
+<p><code>HSTUBlock</code> 是多个 <code>HSTULayer</code> 的简单堆叠：</p>
 <ul>
-<li><strong>简介</strong>：基于Annoy的向量召回工具。</li>
-<li><strong>参数</strong>：</li>
-<li><code>metric</code> (str): 距离度量方式</li>
-<li><code>n_trees</code> (int): 树的数量</li>
-<li><code>search_k</code> (int): 搜索参数</li>
-<li><strong>主要方法</strong>：</li>
-<li><code>fit(X)</code>: 构建索引</li>
-<li><code>query(v, n)</code>: 查询最近邻</li>
+<li>初始化时构建 <code>n_layers</code> 个 HSTULayer；</li>
+<li>前向传播中按顺序依次传递；</li>
+<li>未做层间不同窗口/不同参数共享的“显式层级结构”，这一点属于对论文中“Hierarchical”概念的工程化简化。</li>
 </ul>
-<h4 id="milvus">Milvus</h4>
+<p>这一设计与 Meta 官方开源代码的风格一致：通过多层堆叠来实现逐层抽象的“层级”表示，而不是显式的多分辨率分支。</p>
+<hr />
+<h2 id="3">3. 时间戳建模与时间嵌入</h2>
+<h3 id="31">3.1 数据预处理中的时间差计算</h3>
+<p>文件：<code>examples/generative/data/ml-1m/preprocess_ml_hstu.py</code></p>
+<p>核心设计：</p>
 <ul>
-<li><strong>简介</strong>：基于Milvus的向量召回工具。</li>
-<li><strong>参数</strong>：</li>
-<li><code>dim</code> (int): 向量维度</li>
-<li><code>host</code> (str): Milvus服务器地址</li>
-<li><code>port</code> (str): Milvus服务器端口</li>
-<li><strong>主要方法</strong>：</li>
-<li><code>fit(X)</code>: 构建索引</li>
-<li><code>query(v, n)</code>: 查询最近邻</li>
+<li>对每个用户的交互序列，使用滑动窗口生成 <code>(history, target)</code> 样本：</li>
+<li>history = 序列前缀；target = 当前 prefix 之后的一个 item；</li>
+<li>对于每个 history，计算 <strong>相对于查询时间的时间差</strong>：</li>
+<li>查询时间 = history 中最后一个事件的时间戳 <code>query_timestamp</code>；</li>
+<li>对每个历史事件 <code>ts</code>，时间差为 <code>query_timestamp - ts</code>；</li>
+<li>例如时间戳 <code>[100, 200, 300, 400]</code> → 时间差 <code>[300, 200, 100, 0]</code>；</li>
+<li>时间差以秒为单位保存为 <code>seq_time_diffs</code>，与 <code>seq_tokens</code> 同长；</li>
+<li>所有序列截断/左侧 padding 到固定长度 <code>max_seq_len</code>，padding 的时间差为 0。</li>
 </ul>
-<h2 id="mtlpy">多任务学习工具 (mtl.py)</h2>
-<h3 id="_5">工具函数</h3>
-<h4 id="shared_task_layers">shared_task_layers</h4>
+<p>这与 Meta 官方 HSTU 代码中 <code>query_time - timestamps</code> 的处理方式保持一致，而不是相邻事件时间间隔的形式。</p>
+<h3 id="32-bucket">3.2 模型中的时间嵌入与 bucket 化</h3>
+<p>文件：<code>torch_rechub/models/generative/hstu.py</code></p>
+<ol>
+<li><strong>时间嵌入表</strong></li>
+<li><code>self.time_embedding = nn.Embedding(num_time_buckets + 1, d_model, padding_idx=0)</code></li>
+<li>
+<p>其中 bucket 0 作为 padding bucket。</p>
+</li>
+<li>
+<p><strong>时间差 → bucket 的映射</strong></p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># 伪代码</span>
+<span class="c1"># 1) 秒 → 分钟</span>
+<span class="n">minutes</span> <span class="o">=</span> <span class="n">time_diffs</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">/</span> <span class="mf">60.0</span>
+<span class="c1"># 2) 避免 log(0)</span>
+<span class="n">minutes</span> <span class="o">=</span> <span class="n">clamp</span><span class="p">(</span><span class="n">minutes</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span>
+<span class="c1"># 3) 按 sqrt 或 log 映射到 bucket</span>
+<span class="k">if</span> <span class="n">fn</span> <span class="o">==</span> <span class="s1">&#39;sqrt&#39;</span><span class="p">:</span>
+    <span class="n">bucket</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">minutes</span><span class="p">)</span>
+<span class="k">elif</span> <span class="n">fn</span> <span class="o">==</span> <span class="s1">&#39;log&#39;</span><span class="p">:</span>
+    <span class="n">bucket</span> <span class="o">=</span> <span class="n">log</span><span class="p">(</span><span class="n">minutes</span><span class="p">)</span>
+<span class="c1"># 4) 截断到 [0, num_time_buckets-1]</span>
+</code></pre></div>
+<ol>
+<li>
+<p><strong>嵌入融合与 Alpha 缩放</strong></p>
+</li>
+<li>
+<p>Token Embedding 使用 Alpha 缩放：<code>token_emb = token_embedding(x) * sqrt(d_model)</code>；</p>
+</li>
+<li>Position Embedding 为标准的绝对位置嵌入；</li>
+<li>Time Embedding 通过上述 bucket 索引查表得到；</li>
+<li>最终序列表示：<code>embeddings = token_emb + pos_emb + time_emb</code>。</li>
+</ol>
+<p>这部分在最近一次提交中完成了对 Meta 官方实现的细节对齐：</p>
 <ul>
-<li><strong>简介</strong>：获取多任务模型中的共享层和任务特定层参数。</li>
-<li><strong>参数</strong>：</li>
-<li><code>model</code> (torch.nn.Module): 多任务模型，支持MMOE、SharedBottom、PLE、AITM</li>
-<li><strong>返回</strong>：</li>
-<li>list: 共享层参数列表</li>
-<li>list: 任务特定层参数列表</li>
+<li>修复了时间差计算方式（由相邻间隔 → 与查询时间差）；</li>
+<li>增加了 <code>/60.0</code> 的时间单位转换；</li>
+<li>增加了 <code>alpha = sqrt(d_model)</code> 的缩放。</li>
 </ul>
-<h3 id="_6">优化器类</h3>
-<h4 id="metabalance">MetaBalance</h4>
+<hr />
+<h2 id="4">4. 训练与评估流水线</h2>
+<h3 id="41-seqdataset-sequencedatagenerator">4.1 SeqDataset 与 SequenceDataGenerator</h3>
+<p>文件：<code>torch_rechub/utils/data.py</code></p>
 <ul>
-<li><strong>简介</strong>：MetaBalance优化器，用于平衡多任务学习中各任务的梯度。</li>
-<li><strong>参数</strong>：</li>
-<li><code>parameters</code> (list): 模型参数</li>
-<li><code>relax_factor</code> (float): 梯度缩放的松弛因子，默认0.7</li>
-<li><code>beta</code> (float): 移动平均系数，默认0.9</li>
-<li><strong>主要方法</strong>：</li>
-<li><code>step(losses)</code>: 执行优化步骤，更新参数</li>
+<li>近期提交中已<strong>移除旧 3 元组格式的向后兼容逻辑</strong>，统一为 4 元组：</li>
+<li><code>(seq_tokens, seq_positions, seq_time_diffs, targets)</code>；</li>
+<li><code>SeqDataset</code> 负责将 NumPy 数组转换为 PyTorch 张量；</li>
+<li><code>SequenceDataGenerator</code> 根据给定的 train/val/test 划分构造 DataLoader。</li>
 </ul>
-<h3 id="_7">梯度处理函数</h3>
-<h4 id="gradnorm">gradnorm</h4>
+<h3 id="42-seqtrainer">4.2 SeqTrainer：训练与评估</h3>
+<p>文件：<code>torch_rechub/trainers/seq_trainer.py</code></p>
 <ul>
-<li><strong>简介</strong>：实现GradNorm算法，用于动态调整多任务学习中的任务权重。</li>
-<li><strong>参数</strong>：</li>
-<li><code>loss_list</code> (list): 各任务的损失列表</li>
-<li><code>loss_weight</code> (list): 任务权重列表</li>
-<li><code>share_layer</code> (torch.nn.Parameter): 共享层参数</li>
-<li><code>initial_task_loss</code> (list): 初始任务损失列表</li>
-<li><code>alpha</code> (float): GradNorm算法的超参数</li>
+<li><code>train_one_epoch</code>：</li>
+<li>输入 batch 形如：<code>(seq_tokens, seq_positions, seq_time_diffs, targets)</code>；</li>
+<li>将张量移动到设备；</li>
+<li>调用 <code>model(seq_tokens, seq_time_diffs)</code> 得到 <code>(B, L, V)</code> logits；</li>
+<li>只取最后一个位置 <code>logits[:, -1, :]</code> 与 <code>targets</code> 做交叉熵损失；</li>
+<li><code>evaluate</code>：</li>
+<li>与训练阶段类似，同样只使用序列最后一个位置；</li>
+<li>统计平均 loss 与 top-1 准确率，用于早停与模型选择。</li>
+</ul>
+<h3 id="43">4.3 示例脚本与推荐指标</h3>
+<p>文件：<code>examples/generative/run_hstu_movielens.py</code></p>
+<ul>
+<li>负责加载预处理好的 MovieLens 数据（真实数据），构造数据加载器与模型；</li>
+<li>使用 <code>SeqTrainer</code> 进行训练与验证；</li>
+<li><code>evaluate_ranking</code> 函数在测试集上计算 HR@K 与 NDCG@K：</li>
+<li>模型同样使用最后一个位置的 logits；</li>
+<li>对所有候选 item 排序，计算 top-K 命中率与折损累计增益。</li>
+</ul>
+<p>近期在修复时间戳处理逻辑后，测试集指标相比旧实现有显著提升（以 K=10 为例）：</p>
+<ul>
+<li>HR@10：约从 0.17 提升到 0.21+</li>
+<li>NDCG@10：约从 0.08 提升到 0.11+</li>
+</ul>
+<p>这表明时间衰减建模对生成式推荐效果有明显正向作用。</p>
+<hr />
+<h2 id="5-meta">5. 与 Meta 官方实现的一致性与差异</h2>
+<h3 id="51">5.1 主要一致点</h3>
+<p>与 Meta 官方 HSTU / DLRM-HSTU 实现相比，本框架在以下方面保持较高一致性：</p>
+<ul>
+<li><strong>核心层结构</strong>：HSTULayer 采用 Q/K/V/U 四路线性投影、多头注意力、门控机制与两段残差 FFN，结构上与官方实现高度一致；</li>
+<li><strong>因果掩码</strong>：在注意力打分阶段使用严格的 causal mask，保证生成式任务的因果性；</li>
+<li><strong>时间差定义</strong>：使用 <code>query_time - timestamps</code> 形式的时间差，而非相邻事件间隔；</li>
+<li><strong>时间 bucket 化与嵌入</strong>：支持 sqrt/log 两种 bucket 映射，配合时间嵌入表，与官方思路对齐；</li>
+<li><strong>Alpha 缩放</strong>：对 token embedding 乘以 <code>sqrt(d_model)</code>，与官方实现中的缩放策略一致；</li>
+<li><strong>训练目标</strong>：自回归式的 next-item 交叉熵目标，等价于语言模型式训练。</li>
+</ul>
+<h3 id="52">5.2 主要差异与简化</h3>
+<p>目前实现仍有以下差异或有意简化：</p>
+<ol>
+<li><strong>未包含 DLRM 与多任务头</strong></li>
+<li>官方 DLRM-HSTU 实现支持复杂的特征交叉与多任务学习；</li>
+<li>
+<p>本框架专注于单任务的 next-item prediction，未实现 DLRM 部分与多目标头。</p>
+</li>
+<li>
+<p><strong>相对位置偏置为简化版本</strong></p>
+</li>
+<li>当前的 <code>RelPosBias</code> 基于 <code>|i - j|</code> 距离做线性分桶；</li>
+<li>未显式区分方向（正/负距离）、也未使用更复杂的 log-scaling bucket 公式；</li>
+<li>
+<p>这在工程上更简单，但与官方实现存在细节差异。</p>
+</li>
+<li>
+<p><strong>仅提供单步 next-item 预测接口</strong></p>
+</li>
+<li>训练和评估阶段都是“给定完整历史 → 预测下一个 item”；</li>
+<li>尚未封装多步自回归解码接口（如 beam search 生成未来 N 步序列）；</li>
+<li>
+<p>对于大多数推荐 benchmark（只评估下一步）已经足够，但与“通用生成式序列模型”相比功能较少。</p>
+</li>
+<li>
+<p><strong>部分初始化细节不同</strong></p>
+</li>
+<li>当前使用 <code>xavier_uniform_</code> 初始化大部分线性层和嵌入；</li>
+<li>官方实现中某些嵌入可能使用基于维度的 <code>uniform(-sqrt(1/N), sqrt(1/N))</code>；</li>
+<li>这类初始化差异对最终收敛影响有限，但不是 100% bit-level 复现。</li>
+</ol>
+<hr />
+<h2 id="6">6. 近期提交总结</h2>
+<ul>
+<li>引入了 HSTU 模型、HSTULayer/HSTUBlock、SeqTrainer、SeqDataset 等完整骨架；</li>
+<li>实现了基本的生成式 next-item 训练与评估流程；</li>
+<li>
+<p>时间戳处理、时间嵌入与部分细节尚处于初版实现阶段。</p>
+</li>
+<li>
+<p>重构 MovieLens 预处理脚本：</p>
+</li>
+<li>使用滑动窗口策略大幅增加训练样本；</li>
+<li>按用户划分 train/val/test，避免数据泄漏；</li>
+<li>正确使用 <code>query_time - timestamps</code> 形式的时间差；</li>
+<li>修复时间嵌入实现：</li>
+<li>添加秒 → 分钟的时间单位转换；</li>
+<li>增加 <code>alpha = sqrt(d_model)</code> 缩放；</li>
+<li>与官方时间建模逻辑对齐；</li>
+<li>清理向后兼容逻辑：</li>
+<li>移除 3 元组数据格式，统一为 4 元组 <code>(tokens, positions, time_diffs, targets)</code>；</li>
+<li>简化 SeqDataset、SequenceDataGenerator、SeqTrainer 代码结构；</li>
+<li>训练与评估结果显示所有排名指标均有显著提升，验证了时间建模修复的必要性和有效性。</li>
+</ul>
+<hr />
+<h2 id="7">7. 小结</h2>
+<ul>
+<li>当前实现已经在 <strong>HSTU 核心层结构、时间建模与训练目标</strong> 上与 Meta 官方实现高度对齐；</li>
+<li>同时刻意简化了 DLRM、多任务头、复杂特征工程等工程部分，使得该实现更适合作为研究和教学的参考版本；</li>
+<li>如果后续需要进一步逼近“论文级完全复现”，推荐优先完善：</li>
+<li>RelPosBias 的 bucket 公式与方向建模；</li>
+<li>padding mask 的显式支持；</li>
+<li>多步自回归解码接口与更复杂的下游任务场景。</li>
 </ul>
 
 
