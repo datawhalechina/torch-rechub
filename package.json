@@ -1,0 +1,16 @@
+{
+  "name": "torch-rechub-docs",
+  "version": "1.0.0",
+  "description": "Documentation for Torch-RecHub",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "dependencies": {
+    "vitepress-plugin-image-viewer": "^1.1.6"
+  },
+  "devDependencies": {
+    "vitepress": "^2.0.0-alpha.15"
+  }
+}

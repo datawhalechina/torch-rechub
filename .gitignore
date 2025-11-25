@@ -27,10 +27,6 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-*.pt
-*.pth
-*.pkl
-*.dat
 MANIFEST
 
 # PyInstaller
@@ -142,8 +138,10 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# vitepress documentation
+node_modules/
+docs/.vitepress/dist
+docs/.vitepress/cache
 
 # mypy
 .mypy_cache/

@@ -33,7 +33,8 @@
 - `config/CONFIG_GUIDE.md` - 本配置完整指南
 
 #### 文档配置
-- `mkdocs.yml` - MkDocs文档构建配置
+- `docs/.vitepress/config.mts` - VitePress文档构建配置
+- `package.json` - Node.js项目配置（包含VitePress脚本）
 
 ### 🔧 为什么这样组织？
 
@@ -95,9 +96,10 @@ torch-rechub项目采用现代化的CI/CD流程，确保代码质量和自动化
 当docs目录变更时触发：
 
 #### 1. 文档构建和部署
-- 使用MkDocs构建项目文档
+- 使用VitePress构建项目文档
 - 自动部署到GitHub Pages
 - 支持中英文双语文档
+- 输出目录：`docs/.vitepress/dist`
 
 ### 🚀 触发条件
 
@@ -137,14 +139,15 @@ torch-rechub项目采用现代化的CI/CD流程，确保代码质量和自动化
 
 | 文件 | 作用 | 说明 |
 |------|------|------|
-| `mkdocs.yml` | MkDocs文档构建配置 | 文档网站构建配置 |
+| `docs/.vitepress/config.mts` | VitePress文档构建配置 | 文档网站构建配置（TypeScript） |
+| `package.json` | Node.js项目配置 | VitePress脚本和依赖管理 |
 
 ### GitHub Actions配置
 
 | 文件 | 作用 | 说明 |
 |------|------|------|
 | `.github/workflows/ci.yml` | 主CI流程 | 代码检查、测试、构建、发布 |
-| `.github/workflows/deploy.yml` | 文档部署 | MkDocs文档自动部署 |
+| `.github/workflows/deploy.yml` | 文档部署 | VitePress文档自动部署到GitHub Pages |
 | `.github/dependabot.yml` | 自动依赖更新配置 | 每周检查依赖更新 |
 
 ### 模板文件 (双语)
@@ -180,8 +183,14 @@ pre-commit install
 
 ### 文档构建
 ```bash
-# 使用docs目录中的配置
-mkdocs build
+# 开发模式（实时预览）
+npm run docs:dev
+
+# 构建生产版本
+npm run docs:build
+
+# 预览构建结果
+npm run docs:preview
 ```
 
 ### CI/CD工具路径
@@ -615,9 +624,11 @@ git commit -m "fix: resolve code quality issues"
 3. 确保版本号唯一
 
 #### 文档构建失败
-1. 检查MkDocs配置
-2. 验证markdown语法
+1. 检查VitePress配置（`docs/.vitepress/config.mts`）
+2. 验证markdown语法和YAML frontmatter
 3. 确保所有链接有效
+4. 检查Node.js版本（推荐18+）
+5. 运行 `npm install` 确保依赖已安装
 
 ### 配置问题
 

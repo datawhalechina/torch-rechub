@@ -1,3 +1,8 @@
+---
+title: HSTU 模型复现说明
+description: Meta HSTU 模型在 torch-rechub 中的复现说明，包括架构设计和实现细节
+---
+
 ## HSTU 模型在 torch-rechub 中的复现说明
 
 本文件总结 torch-rechub 中对 Meta HSTU（Hierarchical Sequential Transduction Units）模型的复现情况，重点说明：

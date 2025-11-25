@@ -1,85 +1,176 @@
+---
+title: 贡献指南
+description: Torch-RecHub 项目贡献指南，包括 Bug 报告、功能请求和 Pull Request 流程
+---
+
 # 贡献指南
 
-非常感谢您对 Torch-RecHub 项目的兴趣并考虑为其做出贡献！您的帮助对项目的发展至关重要。本指南将详细介绍如何参与贡献。
+感谢您对 Torch-RecHub 的兴趣！我们欢迎各种形式的贡献，包括但不限于：
 
-## 如何贡献
+- 🐛 Bug 报告
+- 💡 功能建议
+- 📝 文档改进
+- 🔧 代码贡献
+- 🧪 测试用例
+- 📖 教程和示例
 
-我们鼓励各种形式的贡献，包括但不限于：
+## 🚀 快速开始
 
-*   报告 Bug
-*   提交功能请求
-*   编写或改进文档
-*   提交代码修复或新功能（通过 Pull Request）
+### 开发环境设置
 
-## 寻找贡献点
+```bash
+# 1. Fork 并克隆仓库
+git clone https://github.com/YOUR_USERNAME/torch-rechub.git
+cd torch-rechub
 
-您可以从以下几个方面入手：
+# 2. 安装依赖并设置环境
+uv sync
 
-1.  **查看 Issues**：浏览 [项目 Issues 列表](https://github.com/datawhalechina/torch-rechub/issues)，寻找标记为 `help wanted` 的问题。
-2.  **改进现有功能**：如果您在使用中发现可以优化的地方，欢迎提出建议或直接提交改进。
-3.  **实现新功能**：如果您有新的想法，建议先创建一个 Issue 进行讨论，以确保其符合项目方向。
+# 3. 以开发模式安装包
+uv pip install -e .
+```
 
-## 贡献流程（代码和文档）
+### 开发工作流
 
-我们使用标准的 GitHub Fork & Pull Request 流程来接受代码和文档的贡献。(下列操作您也可以在Github网页上进行)
+1. **Fork 仓库**：点击右上角的 "Fork" 按钮。
+2. **进行修改**：实现新功能或修复 Bug。
+3. **格式化代码**：在提交前运行代码格式化以确保代码风格一致：
+   ```bash
+   python config/format_code.py
+   ```
+4. **提交更改**：`git commit -m "feat: add new feature"` 或 `git commit -m "fix: fix some issue"`（推荐遵循 [Conventional Commits](https://www.conventionalcommits.org/)）。
+5. **推送到分支**：`git push origin`
+6. **创建 Pull Request**：返回原始仓库页面，点击 "New pull request"，将您的分支与主仓库的 `main` 分支进行比较，然后提交 PR。
 
-1.  **Fork 仓库**
-    访问 Torch-RecHub 的 [GitHub 仓库页面](https://github.com/datawhalechina/torch-rechub) ，点击右上角的 "Fork" 按钮，将项目复制到您自己的 GitHub 账户下。
+## 📋 代码规范
 
-2.  **Clone 您的 Fork**
-    将您 Fork 的仓库克隆到本地：
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/torch-rechub.git
-    cd torch-rechub
-    ```
-    请将 `YOUR_USERNAME` 替换为您的 GitHub 用户名。
+### 分支命名
 
-3.  **设置上游仓库 (Optional but Recommended)**
-    添加原始项目仓库作为上游远程仓库，方便同步更新：
-    ```bash
-    git remote add upstream https://github.com/datawhalechina/torch-rechub.git
-    ```
+- `feature/feature-name` - 新功能
+- `fix/bug-description` - Bug 修复
+- `docs/documentation-update` - 文档更新
+- `test/test-description` - 测试添加
 
-5.  **进行修改**
-    在您的新仓库上进行代码编写、文档修改或其他改进。
+### 提交信息
 
-6.  **确保代码质量**
-    *   **代码风格**：请遵循项目现有的代码风格。
-    *   **文档**：对于用户可见的更改（如新功能、API 变动），请更新相关文档（README、`docs/` 目录下的文件等）。
+我们遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
 
-7.  **提交更改**
-    使用清晰、有意义的 Commit Message 提交您的更改。我们推荐遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范。
-    ```bash
-    git add .
-    git commit -m "feat: 添加 XXX 模型支持"
-    # 或者
-    git commit -m "fix: 修复 README 中的拼写错误"
-    # 或者
-    git commit -m "docs: 更新贡献指南"
-    ```
+- `feat: 添加新的推荐模型`
+- `fix: 解决训练循环中的内存泄漏`
+- `docs: 更新安装指南`
+- `test: 为 DeepFM 模型添加单元测试`
+- `refactor: 优化数据加载管道`
 
-8.  **推送分支**
-    将您的本地代码推送到您 Fork 的 GitHub 仓库：
-    ```bash
-    git push origin main
-    ```
+### Pull Request 流程
 
-9.  **创建 Pull Request (PR)**
-    返回您在 GitHub 上的 Fork 仓库页面，您会看到一个提示，建议您基于新推送的分支创建一个 Pull Request。点击该提示或手动导航到 "Pull requests" 标签页，点击 "New pull request"。
-    *   **选择分支**：确保基础仓库 (Base repository) 是 `datawhale/torch-rechub` 的 `main` 分支，头部仓库 (Head repository) 是您 Fork 的仓库以及您刚刚推送的代码。
-    *   **填写 PR 信息**：
-        *   **标题**：简明扼要地描述 PR 的目的，通常可以基于 Commit Message。
-        *   **描述**：详细说明您所做的更改、解决的问题（可以链接相关的 Issue，例如 `Closes #123`）、以及任何需要评审者注意的事项。如果 PR 包含 UI 更改，请附上截图或录屏。
-    *   **允许维护者修改 (可选)**：勾选 "Allow edits by maintainers" 通常有助于维护者快速修复小问题。
-    *   **提交 PR**：点击 "Create pull request"。
+1. **推送您的分支**
+   ```bash
+   git push origin your-branch-name
+   ```
 
-## Pull Request 评审
+2. **创建 Pull Request**
+   - 访问 GitHub 仓库页面
+   - 点击 "New pull request"
+   - 选择您的分支
+   - 填写 PR 模板
 
-*   提交 PR 后，项目的 CI/CD 流程会自动运行测试和检查。
-*   项目维护者会评审您的代码和文档，并可能提出修改意见。
-*   请及时回应评审意见并进行必要的修改。维护者可能会直接在您的分支上进行小的修订（如果您允许的话），或者您需要自己更新代码并重新推送。
-*   一旦 PR 被批准并通过所有检查，维护者会将其合并到主分支中。
+3. **PR 要求**
+   - 清晰的更改描述
+   - 解释为什么需要这些更改
+   - 列出相关的 Issue（如果有）
+   - 包含测试说明
+   - 添加截图（如适用）
+
+## 🧪 测试指南
+
+### 编写测试
+
+- **单元测试**：测试单个函数或类
+- **集成测试**：测试模块之间的交互
+- **端到端测试**：测试完整的工作流
+
+### 运行测试
+
+```bash
+# 运行所有测试
+uv run pytest
+
+# 运行特定测试文件
+uv run pytest tests/test_models/test_ranking.py
+
+# 运行并生成覆盖率报告
+uv run pytest --cov=torch_rechub
+```
+
+## 📝 文档
+
+### 文档类型
+
+- **API 文档**：代码中的文档字符串
+- **用户指南**：`docs/` 目录中的文件
+- **教程**：`tutorials/` 目录中的 Jupyter 笔记本
+- **README**：项目介绍和快速开始
+
+### 文档规范
+
+- 使用 Markdown 格式
+- 包含代码示例
+- 提供清晰的分步说明
+- 保持英文和中文版本同步
+- 遵循 Google 风格的 Python 文档字符串
+
+## 🎯 贡献想法
+
+### 适合初学者的任务
+
+- 📖 改进文档和注释
+- 🧪 添加测试用例
+- 🐛 修复简单的 Bug
+- 📝 翻译文档
+- 💡 添加示例代码
+- 🔧 代码格式化和风格改进
+
+### 高级贡献
+
+- 🚀 实现新的推荐算法
+- ⚡ 性能优化
+- 🏗️ 架构改进
+- 📊 添加新的评估指标
+- 🛠️ 开发工具和脚本
+- 🔬 研究论文实现
+
+### 模型实现指南
+
+实现新模型时：
+
+1. **遵循现有模式**：查看现有模型的结构
+2. **添加全面的测试**：包括单元测试和集成测试
+3. **提供示例**：在 `examples/` 目录中添加使用示例
+4. **详细文档**：包括文档字符串和 README 更新
+5. **性能基准**：与现有实现进行比较
+
+## 📞 获取帮助
+
+如果您在贡献过程中遇到问题：
+
+1. **查看现有 Issues**：可能有相关讨论
+2. **创建新 Issue**：清楚地描述您的问题
+3. **加入讨论**：在相关 Issues 或 PR 中提问
+4. **联系维护者**：通过 GitHub 或电子邮件
+
+## 🏆 认可
+
+我们重视每一项贡献！所有贡献者将在以下位置获得认可：
+
+- README 中的贡献者列表
+- 发布说明中的致谢
+- 项目文档中的贡献者页面
+- 重大贡献的特别提及
+
+## 📜 行为准则
+
+请遵守我们的 [行为准则](https://github.com/datawhalechina/torch-rechub/blob/main/CODE_OF_CONDUCT.md) 以确保友好和包容的社区环境。
 
 ---
 
-再次感谢您对 Torch-RecHub 的贡献！
+再次感谢您的贡献！每一项贡献都让 Torch-RecHub 变得更好。🎉

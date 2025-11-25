@@ -1,33 +1,37 @@
-name: Deploy MkDocs to GitHub Pages
+name: Deploy VitePress to GitHub Pages
 
 on:
   push:
     branches:
-      - main  # 你的主分支名称
+      - main
     paths:
       - 'docs/**'
-      - 'mkdocs.yml'
+      - 'package.json'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
-          python-version: '3.x'
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          pip install mkdocs mkdocs-material mkdocs-awesome-pages-plugin mkdocstrings mkdocstrings-python mkdocs-static-i18n
+        run: npm ci
 
-      - name: Build site
-        run: mkdocs build
+      - name: Build VitePress site
+        run: npm run docs:build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./docs/.vitepress/dist

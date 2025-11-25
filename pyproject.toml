@@ -67,8 +67,6 @@ dev-dependencies = [
     "toml>=0.10.2",
     "jupyter>=1.0.0",
     "notebook>=6.0.0",
-    "mkdocs>=1.4.0",
-    "mkdocs-material>=8.0.0",
 ]
 
 # 工具配置
