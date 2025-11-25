@@ -1,60 +1,52 @@
 ---
-# template: home.html # 可选，使用 Material for MkDocs 的着陆页模板  <- 删除或注释掉此行
-hide:
-  - navigation # 隐藏左侧导航
-  - toc # 隐藏右侧目录
-title: Welcome to use Torch-RecHub
+layout: home
+
+hero:
+  name: "Torch-RecHub"
+  text: "A Lightweight PyTorch Framework for Recommendation Systems"
+  tagline: "Easy-to-use, extensible, and high-performance recommendation system framework"
+  image:
+    src: /img/logo.png
+    alt: Torch-RecHub
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /manual/getting-started
+    - theme: alt
+      text: View Documentation
+      link: /introduction
+
+features:
+  - icon: 🏗️
+    title: Modular Design
+    details: Easy to add new models, datasets, and evaluation metrics with a clean architecture
+
+  - icon: ⚡
+    title: PyTorch-Based
+    details: Leverages PyTorch's dynamic graph and GPU acceleration capabilities for high performance
+
+  - icon: 📚
+    title: Rich Model Library
+    details: Contains various classic and cutting-edge recommendation algorithms including ranking, matching, and multi-task models
+
+  - icon: 🔄
+    title: Standardized Pipeline
+    details: Provides unified data loading, training, and evaluation workflows for consistent experiments
+
+  - icon: ⚙️
+    title: Easy Configuration
+    details: Adjust experiment settings via config files or command-line arguments without code changes
+
+  - icon: 🎯
+    title: Reproducibility
+    details: Designed to ensure reproducible experimental results with fixed random seeds and deterministic operations
+
+  - icon: 🔧
+    title: Advanced Features
+    details: Supports negative sampling, multi-task learning, and other advanced recommendation techniques
+
+  - icon: 📊
+    title: Multiple Datasets
+    details: Built-in support for MovieLens, Amazon, Criteo, Avazu, and many other popular datasets
 ---
 
-<style>
-  .md-typeset h1, .md-content__button { display: none; } /* 隐藏默认标题和编辑按钮 */
-  .mdx-container {
-    background: 
-      url('../torch-rechub/file/img/homepage.png');
-    background-size: contain;  /* 修改为 contain 保持完整比例 */
-    background-position: center center;
-    background-repeat: no-repeat;
-    min-height: 78vh;
-    width: 100%;
-    position: relative;
-    overflow: hidden;  /* 隐藏溢出部分 */
-  }
-  /* 更新特性项样式以适应卡片 */
-  .feature-card {
-    text-align: center;
-    border: 1px solid var(--md-default-fg-color--lightest); /* 可选：添加边框 */
-    border-radius: 4px; /* 可选：添加圆角 */
-    height: 100%; /* 让卡片等高 */
-    display: flex; /* 使用 flex 布局 */
-    flex-direction: column; /* 垂直排列 */
-    justify-content: flex-start; /* 从顶部开始对齐 */
-  }
-  .feature-card .md-card__content {
-      flex-grow:
-  .feature-item { text-align: center; }
-  .feature-icon { font-size: 3em; margin-bottom: 0.5em; }
-</style>
-
-<!-- Hero Section -->
-<section class="mdx-container">
-  <div class="md-grid md-typeset">
-    <div class="md-grid__cell md-grid__cell--center">
-      <img src="../torch-rechub/file/img/logo.png" alt="Torch-RecHub Logo" width="100">
-      <h1 style="text-align: center; font-size: 3em; margin-top: 1em; margin-bottom: 0.5em;">Torch-RecHub</h1>
-      <p style="text-align: center; font-size: 1.5em; margin-bottom: 1.5em; 
-           text-shadow: 
-             0 0 2.5px #fff, 
-             0 0 2.5px #fff, 
-             0 0 2.5px #fff, 
-             0 0 2.5px #fff;">An easy-to-use, scalable, and high-performance recommendation system framework based on PyTorch</p>
-      <div style="text-align: center;">
-        <a href="getting-started/" class="md-button md-button--primary md-button--lg">
-          Quick Start
-        </a>
-        <a href="https://github.com/datawhalechina/torch-rechub" target="_blank" rel="noopener" class="md-button md-button--lg">
-          View GitHub
-        </a>
-      </div>
-    </div>
-  </div>
-</section>

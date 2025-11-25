@@ -1,3 +1,8 @@
+---
+title: Matching Models Training Guide
+description: Comprehensive guide on loss functions, similarity metrics, and temperature scaling for matching models
+---
+
 ## I. Understanding Different Loss Functions — 3 Training Methods
 
 In recall tasks, there are generally three training methods: point-wise, pair-wise, and list-wise. In RecHub, we use the ***mode*** parameter to specify the training method, with each method corresponding to a different loss function.

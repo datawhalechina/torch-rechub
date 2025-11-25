@@ -1,89 +1,176 @@
+---
+title: Contribution Guide
+description: Guidelines for contributing to Torch-RecHub project including bug reports, features, and pull requests
+---
+
 # Contribution Guide
 
-Thank you very much for your interest in the Torch-RecHub project and for considering contributing! Your help is crucial for the development of the project. This guide will detail how to participate in contributions.
+Thank you for your interest in contributing to Torch-RecHub! We welcome all types of contributions, including but not limited to:
 
-## How to Contribute
+- 🐛 Bug reports
+- 💡 Feature suggestions
+- 📝 Documentation improvements
+- 🔧 Code contributions
+- 🧪 Test cases
+- 📖 Tutorials and examples
 
-You can contribute in the following ways:
+## 🚀 Getting Started
 
-1.  **Report Bugs**: If you find any errors or unexpected behavior while using Torch-RecHub, please submit an Issue detailing the problem, steps to reproduce it, and your environment information.
-2.  **Suggest Enhancements**: If you have ideas for improving existing features or adding new ones, please create an Issue first to discuss.
-3.  **Submit Code Changes**: Fix bugs, implement new features, or improve code quality.
-4.  **Improve Documentation**: Enhance or correct documentation, write tutorials, or provide example use cases.
+### Development Setup
 
-## Finding Contribution Points
+```bash
+# 1. Fork and clone the repository
+git clone https://github.com/YOUR_USERNAME/torch-rechub.git
+cd torch-rechub
 
-You can start from the following aspects:
+# 2. Install dependencies and setup environment
+uv sync
 
-1.  **Check Issues**: Browse the [project Issues list](https://github.com/datawhalechina/torch-rechub/issues), look for issues marked with `help wanted`.
-2.  **Improve Existing Features**: If you find areas for optimization during use, feel free to propose suggestions or submit improvements directly.
-3.  **Implement New Features**: If you have new ideas, it is recommended to create an Issue for discussion first to ensure it aligns with the project direction.
+# 3. Install the package in development mode
+uv pip install -e .
+```
 
-## Contribution Process (Code and Documentation)
+### Development Workflow
 
-We use the standard GitHub Fork & Pull Request workflow to accept code and documentation contributions. (You can also perform the following operations on the GitHub website).
+1. **Fork the repository:** Click the "Fork" button in the upper right corner.
+2. **Make your changes:** Implement new features or fix bugs.
+3. **Format code:** Run code formatting before committing to ensure consistent code style:
+   ```bash
+   python config/format_code.py
+   ```
+4. **Commit changes:** `git commit -m "feat: add new feature"` or `git commit -m "fix: fix some issue"` (Following [Conventional Commits](https://www.conventionalcommits.org/) is preferred).
+5. **Push to branch:** `git push origin`
+6. **Create Pull Request:** Go back to the original repository page, click "New pull request", compare your branch with the `main` branch of the main repository, and submit PR.
 
-1.  **Fork the Repository**
-    Visit the Torch-RecHub [GitHub repository page](https://github.com/datawhalechina/torch-rechub), click the "Fork" button in the top right corner to copy the project to your own GitHub account.
+## 📋 Code Standards
 
-2.  **Clone Your Fork**
-    Clone your forked repository locally:
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/torch-rechub.git
-    cd torch-rechub
-    ```
-    Please replace `YOUR_USERNAME` with your GitHub username.
+### Branch Naming
 
-3.  **Set Upstream Remote (Optional but Recommended)**
-    Add the original project repository as an upstream remote for easy synchronization of updates:
-    ```bash
-    git remote add upstream https://github.com/datawhalechina/torch-rechub.git
-    # Sync updates from upstream main branch if needed
-    # git fetch upstream
-    # git checkout main
-    # git merge upstream/main
-    ```
+- `feature/feature-name` - for new features
+- `fix/bug-description` - for bug fixes
+- `docs/documentation-update` - for documentation changes
+- `test/test-description` - for test additions
 
-4.  **Make Changes**
-    Write code, modify documentation, or make other improvements directly on the `main` branch.
+### Commit Messages
 
-5.  **Ensure Code Quality**
-    *   **Code Style**: Please adhere to the project's existing code style.
-    *   **Documentation**: For user-visible changes (like new features, API changes), please update relevant documentation (README, files under `docs/`, etc.).
+We follow [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
-6.  **Commit Changes**
-    Commit your changes with clear and meaningful commit messages. We recommend following the [Conventional Commits](https://www.conventionalcommits.org/) specification.
-    ```bash
-    git add .
-    git commit -m "feat: Add support for XXX model"
-    # Or
-    git commit -m "fix: Correct typo in README"
-    # Or
-    git commit -m "docs: Update contribution guide"
-    ```
+- `feat: add new recommendation model`
+- `fix: resolve memory leak in training loop`
+- `docs: update installation guide`
+- `test: add unit tests for DeepFM model`
+- `refactor: optimize data loading pipeline`
 
-7.  **Push Branch**
-    Push your local `main` branch to your forked GitHub repository:
-    ```bash
-    git push origin main
-    ```
+### Pull Request Process
 
-8.  **Create a Pull Request (PR)**
-    Return to your forked repository page on GitHub. You should see a prompt suggesting you create a Pull Request based on the recent pushes to `main`. Click that prompt or manually navigate to the "Pull requests" tab and click "New pull request".
-    *   **Choose Branches**: Ensure the Base repository is `datawhalechina/torch-rechub`'s `main` branch, and the Head repository is your fork's `main` branch.
-    *   **Fill in PR Information**:
-        *   **Title**: Concisely describe the purpose of the PR, often based on the commit message.
-        *   **Description**: Detail the changes you've made, the problem solved (you can link related Issues, e.g., `Closes #123`), and any points reviewers should note. If the PR includes UI changes, please attach screenshots or screen recordings.
-    *   **Allow Maintainer Edits (Optional)**: Checking "Allow edits by maintainers" often helps maintainers quickly fix minor issues.
-    *   **Submit PR**: Click "Create pull request".
+1. **Push your branch**
+   ```bash
+   git push origin your-branch-name
+   ```
 
-## Pull Request Review
+2. **Create Pull Request**
+   - Visit the GitHub repository page
+   - Click "New pull request"
+   - Select your branch
+   - Fill out the PR template
 
-*   After submitting the PR, the project's CI/CD workflow will automatically run tests and checks.
-*   Project maintainers will review your code and documentation and may suggest modifications.
-*   Please respond promptly to review comments and make necessary changes. Maintainers might make minor edits directly on your branch (if you allow it), or you might need to update the code yourself and push again.
-*   Once the PR is approved and passes all checks, maintainers will merge it into the main branch.
+3. **PR Requirements**
+   - Clear description of changes
+   - Explanation of why changes are needed
+   - List related issues (if any)
+   - Include testing instructions
+   - Add screenshots (if applicable)
+
+## 🧪 Testing Guidelines
+
+### Writing Tests
+
+- **Unit Tests**: Test individual functions or classes
+- **Integration Tests**: Test interactions between modules
+- **End-to-End Tests**: Test complete workflows
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test file
+uv run pytest tests/test_models/test_ranking.py
+
+# Run with coverage
+uv run pytest --cov=torch_rechub
+```
+
+## 📝 Documentation
+
+### Documentation Types
+
+- **API Documentation**: Docstrings in code
+- **User Guides**: Files in `docs/` directory
+- **Tutorials**: Jupyter notebooks in `tutorials/` directory
+- **README**: Project introduction and quick start
+
+### Documentation Standards
+
+- Use Markdown format
+- Include code examples
+- Provide clear step-by-step instructions
+- Keep both English and Chinese versions synchronized
+- Follow Google-style docstrings for Python code
+
+## 🎯 Contribution Ideas
+
+### Good First Issues
+
+- 📖 Improve documentation and comments
+- 🧪 Add test cases
+- 🐛 Fix simple bugs
+- 📝 Translate documentation
+- 💡 Add example code
+- 🔧 Code formatting and style improvements
+
+### Advanced Contributions
+
+- 🚀 Implement new recommendation algorithms
+- ⚡ Performance optimizations
+- 🏗️ Architecture improvements
+- 📊 Add new evaluation metrics
+- 🛠️ Development tools and scripts
+- 🔬 Research paper implementations
+
+### Model Implementation Guidelines
+
+When implementing new models:
+
+1. **Follow existing patterns**: Look at existing models for structure
+2. **Add comprehensive tests**: Include unit tests and integration tests
+3. **Provide examples**: Add usage examples in `examples/` directory
+4. **Document thoroughly**: Include docstrings and README updates
+5. **Benchmark performance**: Compare with existing implementations
+
+## 📞 Getting Help
+
+If you encounter issues during contribution:
+
+1. **Check existing Issues**: There might be related discussions
+2. **Create new Issue**: Describe your problem clearly
+3. **Join discussions**: Ask questions in relevant Issues or PRs
+4. **Contact maintainers**: Through GitHub or email
+
+## 🏆 Recognition
+
+We value every contribution! All contributors will be recognized in:
+
+- Contributors list in README
+- Release notes acknowledgments
+- Project documentation contributor pages
+- Special mentions for significant contributions
+
+## 📜 Code of Conduct
+
+Please follow our [Code of Conduct](https://github.com/datawhalechina/torch-rechub/blob/main/CODE_OF_CONDUCT.md) to ensure a friendly and inclusive community environment.
 
 ---
 
-Thank you again for your contribution to Torch-RecHub!
+Thank you again for your contribution! Every contribution makes Torch-RecHub better. 🎉

@@ -1,3 +1,8 @@
+---
+title: 召回模型训练指南
+description: 召回模型的损失函数、相似度度量和温度缩放的完整指南
+---
+
 ## 一、乱七八糟的Loss？—— 3种训练方式
 
 召回中，一般的训练方式分为三种：point-wise、pair-wise、list-wise。在RecHub中，用参数***mode***来指定训练方式，每一种不同的训练方式也对应不同的Loss。
