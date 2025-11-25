@@ -15,6 +15,8 @@ on:
       - 'examples/**'
       - 'config/**'
       - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -23,6 +25,8 @@ on:
       - 'examples/**'
       - 'config/**'
       - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/ci.yml'
   release:
     types: [published]
 
@@ -147,9 +151,9 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v4
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
 
