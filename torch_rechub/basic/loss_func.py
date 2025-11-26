@@ -88,5 +88,136 @@ class BPRLoss(torch.nn.Module):
         return loss
 
 
-# loss = -torch.mean(F.logsigmoid(pos_score - torch.max(neg_score,
-# dim=-1))) need v1.10
+class NCELoss(torch.nn.Module):
+    """Noise Contrastive Estimation (NCE) Loss for recommendation systems.
+
+    NCE Loss is more efficient than CrossEntropyLoss for large-scale recommendation
+    scenarios. It uses in-batch negatives to reduce computational complexity.
+
+    Reference:
+        - Noise-contrastive estimation: A new estimation principle for unnormalized
+          statistical models (Gutmann & Hyvärinen, 2010)
+        - HLLM: Hierarchical Large Language Model for Recommendation
+
+    Args:
+        temperature (float): Temperature parameter for scaling logits. Default: 1.0
+        ignore_index (int): Index to ignore in loss computation. Default: 0
+        reduction (str): Specifies the reduction to apply to the output.
+                        Options: 'mean', 'sum', 'none'. Default: 'mean'
+
+    Example:
+        >>> nce_loss = NCELoss(temperature=0.1)
+        >>> logits = torch.randn(32, 1000)  # (batch_size, vocab_size)
+        >>> targets = torch.randint(0, 1000, (32,))
+        >>> loss = nce_loss(logits, targets)
+    """
+
+    def __init__(self, temperature=1.0, ignore_index=0, reduction='mean'):
+        super().__init__()
+        self.temperature = temperature
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+
+    def forward(self, logits, targets):
+        """Compute NCE loss.
+
+        Args:
+            logits (torch.Tensor): Model output logits of shape (batch_size, vocab_size)
+            targets (torch.Tensor): Target indices of shape (batch_size,)
+
+        Returns:
+            torch.Tensor: NCE loss value
+        """
+        # Scale logits by temperature
+        logits = logits / self.temperature
+
+        # Compute log softmax
+        log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+
+        # Get log probability of target class
+        batch_size = targets.shape[0]
+        target_log_probs = log_probs[torch.arange(batch_size), targets]
+
+        # Create mask for ignore_index
+        mask = targets != self.ignore_index
+
+        # Compute loss
+        loss = -target_log_probs
+
+        # Apply mask
+        if mask.any():
+            loss = loss[mask]
+
+        # Apply reduction
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:  # 'none'
+            return loss
+
+
+class InBatchNCELoss(torch.nn.Module):
+    """In-Batch NCE Loss with explicit negative sampling.
+
+    This loss function uses other samples in the batch as negative samples,
+    which is more efficient than sampling random negatives.
+
+    Args:
+        temperature (float): Temperature parameter for scaling logits. Default: 0.1
+        ignore_index (int): Index to ignore in loss computation. Default: 0
+        reduction (str): Specifies the reduction to apply to the output.
+                        Options: 'mean', 'sum', 'none'. Default: 'mean'
+
+    Example:
+        >>> loss_fn = InBatchNCELoss(temperature=0.1)
+        >>> embeddings = torch.randn(32, 256)  # (batch_size, embedding_dim)
+        >>> item_embeddings = torch.randn(1000, 256)  # (vocab_size, embedding_dim)
+        >>> targets = torch.randint(0, 1000, (32,))
+        >>> loss = loss_fn(embeddings, item_embeddings, targets)
+    """
+
+    def __init__(self, temperature=0.1, ignore_index=0, reduction='mean'):
+        super().__init__()
+        self.temperature = temperature
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+
+    def forward(self, embeddings, item_embeddings, targets):
+        """Compute in-batch NCE loss.
+
+        Args:
+            embeddings (torch.Tensor): User/query embeddings of shape (batch_size, embedding_dim)
+            item_embeddings (torch.Tensor): Item embeddings of shape (vocab_size, embedding_dim)
+            targets (torch.Tensor): Target item indices of shape (batch_size,)
+
+        Returns:
+            torch.Tensor: In-batch NCE loss value
+        """
+        # Compute logits: (batch_size, vocab_size)
+        logits = torch.matmul(embeddings, item_embeddings.t()) / self.temperature
+
+        # Compute log softmax
+        log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+
+        # Get log probability of target class
+        batch_size = targets.shape[0]
+        target_log_probs = log_probs[torch.arange(batch_size), targets]
+
+        # Create mask for ignore_index
+        mask = targets != self.ignore_index
+
+        # Compute loss
+        loss = -target_log_probs
+
+        # Apply mask
+        if mask.any():
+            loss = loss[mask]
+
+        # Apply reduction
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:  # 'none'
+            return loss
