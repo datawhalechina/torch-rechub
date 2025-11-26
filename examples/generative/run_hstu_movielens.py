@@ -15,25 +15,46 @@ from torch_rechub.utils.data import SequenceDataGenerator
 
 sys.path.append("../..")
 
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def get_movielens_data(data_dir="./data/ml-1m/processed/"):
+
+def get_movielens_data(data_dir=None):
     """Load preprocessed MovieLens-1M data from disk.
 
     Args:
         data_dir (str): Directory containing preprocessed files.
+                       If None, uses default path relative to script location.
 
     Returns:
         tuple: ``(train_data, val_data, test_data, vocab_size)``.
     """
     print("加载真实数据...")
 
+    # 如果没有指定数据目录，使用脚本所在目录的相对路径
+    if data_dir is None:
+        data_dir = os.path.join(SCRIPT_DIR, "data/ml-1m/processed/")
+    elif not os.path.isabs(data_dir):
+        # 如果是相对路径，相对于脚本所在目录
+        data_dir = os.path.join(SCRIPT_DIR, data_dir)
+
+    # 转换为绝对路径
+    data_dir = os.path.abspath(data_dir)
+
     if not os.path.exists(data_dir):
-        print(f"数据目录不存在: {data_dir}")
-        print("请先运行: python examples/generative/data/ml-1m/preprocess_ml_hstu.py")
+        print(f"❌ 数据目录不存在: {data_dir}")
+        print("\n请先运行数据预处理脚本:")
+        print(f"  cd {os.path.join(SCRIPT_DIR, 'data/ml-1m')}")
+        print("  python preprocess_ml_hstu.py")
         return None
 
     # 加载词表
     vocab_file = os.path.join(data_dir, 'vocab.pkl')
+    if not os.path.exists(vocab_file):
+        print(f"❌ 词表文件不存在: {vocab_file}")
+        print("请先运行数据预处理脚本")
+        return None
+
     with open(vocab_file, 'rb') as f:
         vocab = pickle.load(f)
     vocab_size = len(vocab)
@@ -43,6 +64,13 @@ def get_movielens_data(data_dir="./data/ml-1m/processed/"):
     val_file = os.path.join(data_dir, 'val_data.pkl')
     test_file = os.path.join(data_dir, 'test_data.pkl')
 
+    required_files = [train_file, val_file, test_file]
+    for file_path in required_files:
+        if not os.path.exists(file_path):
+            print(f"❌ 文件不存在: {file_path}")
+            print("请先运行数据预处理脚本")
+            return None
+
     with open(train_file, 'rb') as f:
         train_data = pickle.load(f)
     with open(val_file, 'rb') as f:
@@ -50,7 +78,8 @@ def get_movielens_data(data_dir="./data/ml-1m/processed/"):
     with open(test_file, 'rb') as f:
         test_data = pickle.load(f)
 
-    print(f"数据加载完成: vocab_size={vocab_size}")
+    print(f"✅ 数据加载完成: vocab_size={vocab_size}")
+    print(f"   数据目录: {data_dir}")
     return train_data, val_data, test_data, vocab_size
 
 
@@ -104,7 +133,7 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
     return results
 
 
-def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, max_seq_len):
+def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batch_size=512, weight_decay=1e-5, device='cuda', save_dir='./', seed=2022, max_seq_len=200):
     """Main training and evaluation entry point.
 
     Args:
@@ -218,17 +247,17 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_path', default="./data/ml-1m/processed/")
-    parser.add_argument('--model_name', default='hstu')
-    parser.add_argument('--epoch', type=int, default=5)
-    parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--batch_size', type=int, default=512)
-    parser.add_argument('--weight_decay', type=float, default=1e-5)
-    parser.add_argument('--device', default='cuda')  # cuda:0
-    parser.add_argument('--save_dir', default='./')
-    parser.add_argument('--seed', type=int, default=2022)
-    parser.add_argument('--max_seq_len', type=int, default=200)
+    parser = argparse.ArgumentParser(description='HSTU Model Training on MovieLens-1M Dataset')
+    parser.add_argument('--dataset_path', default=None, help='Path to preprocessed data directory (default: auto-detect relative to script)')
+    parser.add_argument('--model_name', default='hstu', help='Model name')
+    parser.add_argument('--epoch', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--learning_rate', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=512, help='Batch size')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
+    parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
+    parser.add_argument('--save_dir', default='./', help='Directory to save model')
+    parser.add_argument('--seed', type=int, default=2022, help='Random seed')
+    parser.add_argument('--max_seq_len', type=int, default=200, help='Maximum sequence length')
 
     args = parser.parse_args()
     main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len)

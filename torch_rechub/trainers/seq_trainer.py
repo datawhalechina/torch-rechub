@@ -7,6 +7,7 @@ import torch.nn as nn
 import tqdm
 
 from ..basic.callback import EarlyStopper
+from ..basic.loss_func import NCELoss
 
 
 class SeqTrainer(object):
@@ -45,7 +46,7 @@ class SeqTrainer(object):
         ... )
     """
 
-    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./'):
+    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./', loss_type='cross_entropy', loss_params=None):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
@@ -64,7 +65,14 @@ class SeqTrainer(object):
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
 
         # 损失函数
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)
+        if loss_type == 'nce':
+            if loss_params is None:
+                loss_params = {"temperature": 0.1, "ignore_index": 0}
+            self.loss_fn = NCELoss(**loss_params)
+        else:  # default to cross_entropy
+            if loss_params is None:
+                loss_params = {"ignore_index": 0}
+            self.loss_fn = nn.CrossEntropyLoss(**loss_params)
 
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
