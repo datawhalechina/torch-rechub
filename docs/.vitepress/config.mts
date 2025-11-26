@@ -69,7 +69,9 @@ export default defineConfig({
               text: 'Blog',
               items: [
                 { text: 'Matching Training Guide', link: '/blog/match' },
-                { text: 'Ranking Training Guide', link: '/blog/rank' }
+                { text: 'Ranking Training Guide', link: '/blog/rank' },
+                { text: 'HSTU Reproduction', link: '/blog/hstu_reproduction' },
+                { text: 'HLLM Reproduction', link: '/blog/hllm_reproduction' }
               ]
             }
           ]
@@ -133,7 +135,8 @@ export default defineConfig({
               items: [
                 { text: '召回模型训练指南', link: '/zh/blog/match' },
                 { text: '排序模型训练指南', link: '/zh/blog/rank' },
-                { text: 'HSTU 模型复现', link: '/zh/blog/hstu_reproduction' }
+                { text: 'HSTU 模型复现', link: '/zh/blog/hstu_reproduction' },
+                { text: 'HLLM 模型复现', link: '/zh/blog/hllm_reproduction' }
               ]
             }
           ]

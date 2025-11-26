@@ -28,10 +28,12 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "torch>=1.10.0",
+    "accelerate>=1.0.1",
     "numpy>=1.19.0",
     "pandas>=1.2.0",
     "scikit-learn>=0.24.0",
     "tqdm>=4.60.0",
+    "transformers>=4.46.3",
 ]
 
 [project.optional-dependencies]
