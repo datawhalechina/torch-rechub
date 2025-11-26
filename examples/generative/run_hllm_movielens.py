@@ -53,7 +53,7 @@ def check_training_environment(device, model_type, dataset_path):
         required_vram = 6
         if total_memory < required_vram:
             print(f"⚠️  警告：HLLM 训练建议至少 {required_vram}GB 显存，但系统仅有 {total_memory:.2f}GB")
-            print(f"   建议：减小 batch_size（如 --batch_size 256）")
+            print("   建议：减小 batch_size（如 --batch_size 256）")
             response = input("   是否继续？(y/n): ").strip().lower()
             if response != 'y':
                 return False
@@ -66,12 +66,12 @@ def check_training_environment(device, model_type, dataset_path):
     emb_file = os.path.join(dataset_path, f'item_embeddings_{model_type}.pt')
     if not os.path.exists(emb_file):
         print(f"\n❌ 错误：Item embeddings 文件不存在: {emb_file}")
-        print(f"   请先运行以下命令生成 embeddings：")
-        print(f"   cd examples/generative/data/ml-1m")
+        print("   请先运行以下命令生成 embeddings：")
+        print("   cd examples/generative/data/ml-1m")
         print(f"   python generate_item_embeddings_hllm.py --model_type {model_type} --device {device}")
         return False
 
-    print(f"✅ Item embeddings 文件存在")
+    print("✅ Item embeddings 文件存在")
 
     # Check data files
     required_files = ['vocab.pkl', 'train_data.pkl', 'val_data.pkl', 'test_data.pkl']
@@ -79,12 +79,12 @@ def check_training_environment(device, model_type, dataset_path):
         fpath = os.path.join(dataset_path, fname)
         if not os.path.exists(fpath):
             print(f"\n❌ 错误：数据文件不存在: {fpath}")
-            print(f"   请先运行以下命令预处理数据：")
-            print(f"   cd examples/generative/data/ml-1m")
-            print(f"   python preprocess_ml_hstu.py")
+            print("   请先运行以下命令预处理数据：")
+            print("   cd examples/generative/data/ml-1m")
+            print("   python preprocess_ml_hstu.py")
             return False
 
-    print(f"✅ 所有数据文件存在")
+    print("✅ 所有数据文件存在")
     print("✅ 环境检查通过\n")
     return True
 

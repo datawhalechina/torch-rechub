@@ -177,9 +177,9 @@ def main():
     # Step 2: Generate embeddings
     embeddings = generate_embeddings(item_text_map, args.model_type, args.device, args.output_dir)
 
-    print(f"\n✅ Preprocessing complete!")
+    print("\n✅ Preprocessing complete!")
     print(f"   Output directory: {args.output_dir}")
-    print(f"   Item text map: item_text_map.pkl")
+    print("   Item text map: item_text_map.pkl")
     print(f"   Item embeddings: item_embeddings_{args.model_type}.pt")
 
 

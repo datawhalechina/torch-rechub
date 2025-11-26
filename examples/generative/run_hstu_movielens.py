@@ -43,16 +43,16 @@ def get_movielens_data(data_dir=None):
 
     if not os.path.exists(data_dir):
         print(f"❌ 数据目录不存在: {data_dir}")
-        print(f"\n请先运行数据预处理脚本:")
+        print("\n请先运行数据预处理脚本:")
         print(f"  cd {os.path.join(SCRIPT_DIR, 'data/ml-1m')}")
-        print(f"  python preprocess_ml_hstu.py")
+        print("  python preprocess_ml_hstu.py")
         return None
 
     # 加载词表
     vocab_file = os.path.join(data_dir, 'vocab.pkl')
     if not os.path.exists(vocab_file):
         print(f"❌ 词表文件不存在: {vocab_file}")
-        print(f"请先运行数据预处理脚本")
+        print("请先运行数据预处理脚本")
         return None
 
     with open(vocab_file, 'rb') as f:
@@ -68,7 +68,7 @@ def get_movielens_data(data_dir=None):
     for file_path in required_files:
         if not os.path.exists(file_path):
             print(f"❌ 文件不存在: {file_path}")
-            print(f"请先运行数据预处理脚本")
+            print("请先运行数据预处理脚本")
             return None
 
     with open(train_file, 'rb') as f:

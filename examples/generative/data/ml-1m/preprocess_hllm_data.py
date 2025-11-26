@@ -82,7 +82,7 @@ def check_model_exists(model_type):
             print(f"✅ 模型已在缓存中: {cache_path}")
             return True
         else:
-            print(f"⚠️  模型未在缓存中")
+            print("⚠️  模型未在缓存中")
     except Exception as e:
         print(f"   缓存检查异常: {e}")
 
@@ -257,7 +257,7 @@ Examples:
     print("\n" + "=" * 80)
     print("✅ HLLM 数据预处理完成！")
     print("=" * 80)
-    print(f"\n输出文件:")
+    print("\n输出文件:")
     print(f"  - {os.path.join(output_dir, 'movie_text_map.pkl')}")
     print(f"  - {os.path.join(output_dir, f'item_embeddings_{args.model_type}.pt')}")
 

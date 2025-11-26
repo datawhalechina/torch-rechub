@@ -76,12 +76,12 @@ def ensure_file_exists(filename, urls, data_dir, auto_download=True):
     # Show manual download instructions
     print(f"\n⚠️  File not found: {filename}")
     print(f"   Location: {file_path}")
-    print(f"\n📖 Manual download instructions:")
-    print(f"   1. Visit: https://nijianmo.github.io/amazon/index.html")
-    print(f"   2. Select 'Beauty' category")
-    print(f"   3. Fill the form to request access")
+    print("\n📖 Manual download instructions:")
+    print("   1. Visit: https://nijianmo.github.io/amazon/index.html")
+    print("   2. Select 'Beauty' category")
+    print("   3. Fill the form to request access")
     print(f"   4. Download {filename}.gz")
     print(f"   5. Extract to: {data_dir}")
-    print(f"   6. Run this script again")
+    print("   6. Run this script again")
 
     return None

@@ -46,7 +46,7 @@ def check_training_environment(device, model_type, dataset_path):
             if response != 'y':
                 return False
         else:
-            print(f"✅ VRAM sufficient")
+            print("✅ VRAM sufficient")
     else:
         print("✅ Using CPU (will be slow)")
 
@@ -54,12 +54,12 @@ def check_training_environment(device, model_type, dataset_path):
     emb_file = os.path.join(dataset_path, f'item_embeddings_{model_type}.pt')
     if not os.path.exists(emb_file):
         print(f"\n❌ Error: Item embeddings file not found: {emb_file}")
-        print(f"   Please run preprocessing first:")
-        print(f"   cd examples/generative/data/amazon-beauty")
+        print("   Please run preprocessing first:")
+        print("   cd examples/generative/data/amazon-beauty")
         print(f"   python preprocess_amazon_beauty_hllm.py --model_type {model_type} --device {device}")
         return False
 
-    print(f"✅ Item embeddings file exists")
+    print("✅ Item embeddings file exists")
 
     # Check data files
     required_files = ['vocab.pkl', 'train_data.pkl', 'val_data.pkl', 'test_data.pkl']
@@ -69,7 +69,7 @@ def check_training_environment(device, model_type, dataset_path):
             print(f"❌ Error: Required file not found: {fpath}")
             return False
 
-    print(f"✅ All required data files exist")
+    print("✅ All required data files exist")
     return True
 
 
@@ -112,7 +112,7 @@ def main():
         test_data = pickle.load(f)
 
     vocab_size = len(vocab)
-    print(f"✅ Data loaded")
+    print("✅ Data loaded")
     print(f"   Vocab size: {vocab_size}")
     print(f"   Train samples: {len(train_data)}")
     print(f"   Val samples: {len(val_data)}")
@@ -152,7 +152,7 @@ def main():
         temperature=1.0
     )
 
-    print(f"✅ Model created")
+    print("✅ Model created")
     print(f"   Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     print("\n" + "=" * 80)
@@ -225,11 +225,11 @@ def main():
 
     # Calculate metrics
     metrics = topk_metrics(all_targets, all_preds, topKs=[10, 50, 200])
-    print(f"\n✅ Test Results:")
+    print("\n✅ Test Results:")
     for metric_name, metric_value in metrics.items():
         print(f"   {metric_name}: {metric_value:.4f}")
 
-    print(f"\n✅ Training complete!")
+    print("\n✅ Training complete!")
 
 
 if __name__ == "__main__":

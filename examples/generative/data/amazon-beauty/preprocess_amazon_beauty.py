@@ -152,8 +152,6 @@ def split_data(sequences, train_ratio=0.8, val_ratio=0.1):
     - Dictionary with keys: 'seq_tokens', 'seq_positions', 'seq_time_diffs', 'targets'
     - Each value is a numpy array
     """
-    import numpy as np
-
     n = len(sequences)
     train_size = int(n * train_ratio)
     val_size = int(n * val_ratio)
@@ -244,7 +242,7 @@ def main():
     with open(os.path.join(args.output_dir, "test_data.pkl"), 'wb') as f:
         pickle.dump(test_data, f)
 
-    print(f"✅ Preprocessing complete!")
+    print("✅ Preprocessing complete!")
     print(f"   Output directory: {args.output_dir}")
     print(f"   Vocab size: {len(vocab)}")
     print(f"   Total sequences: {len(sequences)}")
