@@ -14,6 +14,8 @@
 
 English | [简体中文](README_zh.md)
 
+**Online Documentation:** https://datawhalechina.github.io/torch-rechub/ (English) | https://datawhalechina.github.io/torch-rechub/zh/ (简体中文)
+
 **Torch-RecHub** is a flexible and extensible recommender system framework built with PyTorch. It aims to simplify research and application of recommendation algorithms by providing common model implementations, data processing tools, and evaluation metrics.
 
 ![Torch-RecHub Banner](docs/public/img/readme_banner_1.png)
@@ -22,7 +24,7 @@ English | [简体中文](README_zh.md)
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
 * **PyTorch-based:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
-* **Rich Model Library:** Contains various classic and cutting-edge recommendation algorithms.
+* **Rich Model Library:** Contains various classic and cutting-edge recommendation algorithms, including matching, ranking, multi-task, and **generative models (HSTU, HLLM)**.
 * **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
 * **Reproducibility:** Designed to ensure reproducible experimental results.
@@ -124,13 +126,13 @@ torch-rechub/             # Root directory
 │       └── mtl.py        # Multi-task utilities
 ├── examples/             # Example scripts
 │   ├── matching/         # Matching task examples
-│   └── ranking/          # Ranking task examples
-├── docs/                 # Documentation
+│   ├── ranking/          # Ranking task examples
+│   └── generative/       # Generative recommendation examples (HSTU, HLLM, etc.)
+├── docs/                 # Documentation (VitePress: multi-language, English & Chinese)
 ├── tutorials/            # Jupyter tutorials
 ├── tests/                # Unit tests
 ├── config/               # Configuration files
-├── scripts/              # Utility scripts
-└── mkdocs.yml            # MkDocs config file
+└── scripts/              # Utility scripts
 ```
 
 ## 💡 Supported Models
@@ -163,10 +165,16 @@ The framework currently supports the following recommendation models:
 **Multi-Task Recommendation:**
 
 * **[ESMM](https://arxiv.org/pdf/1804.07931.pdf):** Entire Space Multi-Task Model
-* **[MMoE](https://dl.acm.org/doi/pdf/10.1145/3219819.3220007):** Multi-Task Multi-Interest Network for Recommendation
+* **[MMoE](https://dl.acm.org/doi/pdf/10.1145/3219819.3220007):** Multi-gate Mixture-of-Experts for Multi-Task Learning
 * **[PLE](https://dl.acm.org/doi/pdf/10.1145/3394486.3403394):** Personalized Learning to Rank
 * **[AITM](https://arxiv.org/pdf/2005.02553.pdf):** Adaptive Interest-Task Matching
 * ... 
+
+**Generative Recommendation:**
+
+* **[HSTU](https://arxiv.org/abs/2402.17152v3):** Hierarchical Sequential Transduction Units based generative sequential recommendation model.
+* **[HLLM](https://arxiv.org/abs/2508.18118v1):** Hierarchical Large Language Model for recommendation with LLM-based item embeddings.
+* ...
 
 ## 📊 Supported Datasets
 
@@ -299,4 +307,4 @@ If you use this framework in your research or work, please consider citing:
 
 ---
 
-*Last updated: [2025-06-30]*
+*Last updated: [2025-11-27]*
