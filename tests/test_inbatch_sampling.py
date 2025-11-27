@@ -6,7 +6,7 @@ from torch_rechub.basic.features import SequenceFeature, SparseFeature
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gather_inbatch_logits, generate_seq_feature_match, gen_model_input, inbatch_negative_sampling
+from torch_rechub.utils.match import gather_inbatch_logits, gen_model_input, generate_seq_feature_match, inbatch_negative_sampling
 
 
 def test_inbatch_negative_sampling_random_and_uniform():
@@ -32,13 +32,15 @@ def test_inbatch_negative_sampling_hard_negative():
 
 def _build_small_match_dataloader():
     n_users, n_items, n_samples = 12, 24, 80
-    data = pd.DataFrame(
-        {
-            "user_id": np.random.randint(0, n_users, n_samples),
-            "item_id": np.random.randint(0, n_items, n_samples),
-            "time": np.arange(n_samples),
-        }
-    )
+    data = pd.DataFrame({
+        "user_id": np.random.randint(0,
+                                     n_users,
+                                     n_samples),
+        "item_id": np.random.randint(0,
+                                     n_items,
+                                     n_samples),
+        "time": np.arange(n_samples),
+    })
     user_profile = pd.DataFrame({"user_id": np.arange(n_users)})
     item_profile = pd.DataFrame({"item_id": np.arange(n_items)})
 
@@ -48,8 +50,14 @@ def _build_small_match_dataloader():
     y_train = np.zeros(len(df_train))
 
     user_features = [
-        SparseFeature("user_id", n_users, embed_dim=8),
-        SequenceFeature("hist_item_id", n_items, embed_dim=8, pooling="mean", shared_with="item_id"),
+        SparseFeature("user_id",
+                      n_users,
+                      embed_dim=8),
+        SequenceFeature("hist_item_id",
+                        n_items,
+                        embed_dim=8,
+                        pooling="mean",
+                        shared_with="item_id"),
     ]
     item_features = [SparseFeature("item_id", n_items, embed_dim=8)]
 

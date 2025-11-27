@@ -115,7 +115,7 @@ class MatchTrainer(object):
                 if user_embedding.dim() != 2 or item_embedding.dim() != 2:
                     raise ValueError(f"In-batch negative sampling requires 2D embeddings, got shapes {user_embedding.shape} and {item_embedding.shape}")
 
-                scores = torch.matmul(user_embedding, item_embedding.t()) # bs x bs
+                scores = torch.matmul(user_embedding, item_embedding.t())  # bs x bs
                 neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
                 logits = gather_inbatch_logits(scores, neg_indices)
                 if self.mode == 1:  # pair_wise

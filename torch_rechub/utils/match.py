@@ -118,13 +118,13 @@ def inbatch_negative_sampling(scores, neg_ratio=None, hard_negative=False, gener
     Returns:
         torch.Tensor: sampled negative indices with shape (batch_size, neg_ratio).
     """
-    if scores.dim() != 2: # must be batch_size x batch_size
+    if scores.dim() != 2:  # must be batch_size x batch_size
         raise ValueError(f"inbatch_negative_sampling expects 2D scores, got shape {tuple(scores.shape)}")
     batch_size = scores.size(0)
     if batch_size <= 1:
         raise ValueError("In-batch negative sampling requires batch_size > 1")
 
-    max_neg = batch_size - 1 # each col can provide at most batch_size-1 negatives
+    max_neg = batch_size - 1  # each col can provide at most batch_size-1 negatives
     if neg_ratio is None or neg_ratio <= 0 or neg_ratio > max_neg:
         neg_ratio = max_neg
 
@@ -140,8 +140,8 @@ def inbatch_negative_sampling(scores, neg_ratio=None, hard_negative=False, gener
             topk = torch.topk(row_scores, k=neg_ratio).indices
             neg_indices[i] = topk
         else:
-            candidates = torch.cat([index_range[:i], index_range[i + 1 :]]) # all except i
-            perm = torch.randperm(candidates.size(0), device=device, generator=generator) # random negative sampling
+            candidates = torch.cat([index_range[:i], index_range[i + 1:]])  # all except i
+            perm = torch.randperm(candidates.size(0), device=device, generator=generator)  # random negative sampling
             neg_indices[i] = candidates[perm[:neg_ratio]]
 
     return neg_indices
@@ -157,8 +157,7 @@ def gather_inbatch_logits(scores, neg_indices):
     # positive: scores[i][i]
     positive_logits = torch.diagonal(scores).reshape(-1, 1)  # (B,1)
     # negatives: scores[i][neg_indices[i, j]]
-    negative_logits = scores[torch.arange(scores.size(0)).unsqueeze(1),
-                             neg_indices]  # (B,K)
+    negative_logits = scores[torch.arange(scores.size(0)).unsqueeze(1), neg_indices]  # (B,K)
     return torch.cat([positive_logits, negative_logits], dim=1)
 
 
