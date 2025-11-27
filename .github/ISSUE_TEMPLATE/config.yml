@@ -1,0 +1,7 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Q&A / 使用咨询
+    url: https://github.com/datawhalechina/torch-rechub/discussions
+    about: 请在 Discussions 中提出一般性问题、使用咨询或非 Bug 报告
+
