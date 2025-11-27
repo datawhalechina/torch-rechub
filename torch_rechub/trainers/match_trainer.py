@@ -6,6 +6,7 @@ from sklearn.metrics import roc_auc_score
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import BPRLoss, RegularizationLoss
+from ..utils.match import gather_inbatch_logits, inbatch_negative_sampling
 
 
 class MatchTrainer(object):
@@ -23,12 +24,20 @@ class MatchTrainer(object):
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+        in_batch_neg (bool): whether to use in-batch negative sampling instead of global negatives.
+        in_batch_neg_ratio (int): number of negatives to draw from the batch per positive sample when in_batch_neg is True.
+        hard_negative (bool): whether to choose hardest negatives within batch (top-k by score) instead of uniform random.
+        sampler_seed (int): optional random seed for in-batch sampler to ease reproducibility/testing.
     """
 
     def __init__(
         self,
         model,
         mode=0,
+        in_batch_neg=False,
+        in_batch_neg_ratio=None,
+        hard_negative=False,
+        sampler_seed=None,
         optimizer_fn=torch.optim.Adam,
         optimizer_params=None,
         regularization_params=None,
@@ -50,13 +59,21 @@ class MatchTrainer(object):
         # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
         self.model.to(self.device)
+        self.in_batch_neg = in_batch_neg
+        self.in_batch_neg_ratio = in_batch_neg_ratio
+        self.hard_negative = hard_negative
+        self._sampler_generator = None
+        if sampler_seed is not None:
+            self._sampler_generator = torch.Generator(device=self.device)
+            self._sampler_generator.manual_seed(sampler_seed)
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         if regularization_params is None:
             regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.mode = mode
         if mode == 0:  # point-wise loss, binary cross_entropy
-            self.criterion = torch.nn.BCELoss()  # default loss binary cross_entropy
+            # With in-batch negatives we treat it as list-wise classification over sampled negatives
+            self.criterion = torch.nn.CrossEntropyLoss() if in_batch_neg else torch.nn.BCELoss()
         elif mode == 1:  # pair-wise loss
             self.criterion = BPRLoss()
         elif mode == 2:  # list-wise loss, softmax
@@ -85,12 +102,34 @@ class MatchTrainer(object):
                 y = y.float()  # torch._C._nn.binary_cross_entropy expected Float
             else:
                 y = y.long()  #
-            if self.mode == 1:  # pair_wise
-                pos_score, neg_score = self.model(x_dict)
-                loss = self.criterion(pos_score, neg_score)
+            if self.in_batch_neg:
+                base_model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
+                user_embedding = base_model.user_tower(x_dict)
+                item_embedding = base_model.item_tower(x_dict)
+                if user_embedding is None or item_embedding is None:
+                    raise ValueError("Model must return user/item embeddings when in_batch_neg is True.")
+                if user_embedding.dim() > 2 and user_embedding.size(1) == 1:
+                    user_embedding = user_embedding.squeeze(1)
+                if item_embedding.dim() > 2 and item_embedding.size(1) == 1:
+                    item_embedding = item_embedding.squeeze(1)
+                if user_embedding.dim() != 2 or item_embedding.dim() != 2:
+                    raise ValueError(f"In-batch negative sampling requires 2D embeddings, got shapes {user_embedding.shape} and {item_embedding.shape}")
+
+                scores = torch.matmul(user_embedding, item_embedding.t()) # bs x bs
+                neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
+                logits = gather_inbatch_logits(scores, neg_indices)
+                if self.mode == 1:  # pair_wise
+                    loss = self.criterion(logits[:, 0], logits[:, 1:], in_batch_neg=True)
+                else:  # point-wise/list-wise -> cross entropy on sampled logits
+                    targets = torch.zeros(logits.size(0), dtype=torch.long, device=self.device)
+                    loss = self.criterion(logits, targets)
             else:
-                y_pred = self.model(x_dict)
-                loss = self.criterion(y_pred, y)
+                if self.mode == 1:  # pair_wise
+                    pos_score, neg_score = self.model(x_dict)
+                    loss = self.criterion(pos_score, neg_score)
+                else:
+                    y_pred = self.model(x_dict)
+                    loss = self.criterion(y_pred, y)
 
             # Add regularization loss
             reg_loss = self.reg_loss_fn(self.model)

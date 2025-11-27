@@ -68,7 +68,8 @@ class HingeLoss(torch.nn.Module):
         self.margin = margin
         self.n_items = num_items
 
-    def forward(self, pos_score, neg_score):
+    def forward(self, pos_score, neg_score, in_batch_neg=False):
+        pos_score = pos_score.view(-1)
         loss = torch.maximum(torch.max(neg_score, dim=-1).values - pos_score + self.margin, torch.tensor([0]).type_as(pos_score))
         if self.n_items is not None:
             impostors = neg_score - pos_score.view(-1, 1) + self.margin > 0
@@ -83,9 +84,14 @@ class BPRLoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, pos_score, neg_score):
-        loss = torch.mean(-(pos_score - neg_score).sigmoid().log(), dim=-1)
-        return loss
+    def forward(self, pos_score, neg_score, in_batch_neg=False):
+        pos_score = pos_score.view(-1)
+        if neg_score.dim() == 1:
+            diff = pos_score - neg_score
+        else:
+            diff = pos_score.view(-1, 1) - neg_score
+        loss = -diff.sigmoid().log()
+        return loss.mean()
 
 
 # loss = -torch.mean(F.logsigmoid(pos_score - torch.max(neg_score,
