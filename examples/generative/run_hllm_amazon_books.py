@@ -1,4 +1,7 @@
-"""HLLM Model Example on Amazon Beauty Dataset."""
+"""HLLM Model Example on Amazon Books Dataset.
+
+This is the default dataset for HLLM, following the ByteDance official implementation.
+"""
 
 import os
 import pickle
@@ -17,7 +20,7 @@ sys.path.append("../..")
 
 # Get the directory where this script is located
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "data", "amazon-beauty", "processed")
+_DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "data", "amazon-books", "processed")
 
 
 def check_training_environment(device, model_type, dataset_path):
@@ -55,8 +58,8 @@ def check_training_environment(device, model_type, dataset_path):
     if not os.path.exists(emb_file):
         print(f"\n❌ Error: Item embeddings file not found: {emb_file}")
         print("   Please run preprocessing first:")
-        print("   cd examples/generative/data/amazon-beauty")
-        print(f"   python preprocess_amazon_beauty_hllm.py --model_type {model_type} --device {device}")
+        print("   cd examples/generative/data/amazon-books")
+        print(f"   python preprocess_amazon_books_hllm.py --model_type {model_type} --device {device}")
         return False
 
     print("✅ Item embeddings file exists")
@@ -76,7 +79,7 @@ def check_training_environment(device, model_type, dataset_path):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="HLLM training on Amazon Beauty dataset")
+    parser = argparse.ArgumentParser(description="HLLM training on Amazon Books dataset (Official)")
     parser.add_argument("--data_dir", default=_DEFAULT_DATA_DIR, help="Data directory")
     parser.add_argument("--model_type", default="tinyllama", choices=["tinyllama", "baichuan2"], help="LLM model type")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"], help="Device")
@@ -86,7 +89,7 @@ def main():
     parser.add_argument("--n_layers", type=int, default=2, help="Number of transformer layers")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
     parser.add_argument("--max_seq_len", type=int, default=200, help="Maximum sequence length")
-    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce"], help="Loss function type: cross_entropy or nce (default: nce)")
+    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce"], help="Loss function type")
 
     args = parser.parse_args()
 
@@ -111,12 +114,15 @@ def main():
     with open(os.path.join(args.data_dir, 'test_data.pkl'), 'rb') as f:
         test_data = pickle.load(f)
 
-    vocab_size = len(vocab)
+    with open(os.path.join(args.data_dir, 'item_text_map.pkl'), 'rb') as f:
+        item_texts = pickle.load(f)
+
+    vocab_size = len(vocab['item_to_idx'])
     print("✅ Data loaded")
     print(f"   Vocab size: {vocab_size}")
-    print(f"   Train samples: {len(train_data)}")
-    print(f"   Val samples: {len(val_data)}")
-    print(f"   Test samples: {len(test_data)}")
+    print(f"   Train samples: {len(train_data['targets'])}")
+    print(f"   Val samples: {len(val_data['targets'])}")
+    print(f"   Test samples: {len(test_data['targets'])}")
 
     # Load item embeddings
     emb_file = os.path.join(args.data_dir, f'item_embeddings_{args.model_type}.pt')
@@ -139,17 +145,17 @@ def main():
     print("=" * 80)
 
     # Create model
+    llm_path = 'TinyLlama/TinyLlama-1.1B-Chat-v1.0' if args.model_type == 'tinyllama' else 'baichuan-inc/Baichuan2-7B-Chat'
+
     model = HLLMModel(
-        item_embeddings=item_embeddings,
-        vocab_size=vocab_size,
-        d_model=d_model,
-        n_heads=n_heads,
-        n_layers=args.n_layers,
-        max_seq_len=args.max_seq_len,
-        dropout=args.dropout,
-        use_rel_pos_bias=True,
-        use_time_embedding=True,
-        temperature=1.0
+        item_embeddings=None,
+        vocab_size=len(item_texts),
+        item_llm_path=llm_path,
+        item_texts=item_texts,
+        user_llm_path=llm_path,
+        item_llm_8bit=True,
+        user_llm_8bit=True,
+        user_llm_gradient_checkpointing=True,
     )
 
     print("✅ Model created")
@@ -159,8 +165,7 @@ def main():
     print("Training")
     print("=" * 80)
 
-    # Create trainer
-    # Configure loss function parameters
+    # Configure loss function
     if args.loss_type == 'nce':
         loss_params = {"temperature": 0.1, "ignore_index": 0}
     else:
@@ -169,21 +174,24 @@ def main():
     trainer = SeqTrainer(
         model=model,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params={
-            'lr': args.learning_rate,
-            'weight_decay': 1e-5
-        },
+        optimizer_params={'lr': args.learning_rate, 'weight_decay': 1e-5},
         device=args.device,
         n_epoch=args.epochs,
         loss_type=args.loss_type,
         loss_params=loss_params,
     )
-    print(f"✅ 使用 {args.loss_type.upper()} Loss 函数")
+    print(f"✅ Using {args.loss_type.upper()} Loss")
 
     # Build data loaders
     print("\nBuilding data loaders...")
-    train_gen = SequenceDataGenerator(train_data['seq_tokens'], train_data['seq_positions'], train_data['targets'], train_data['seq_time_diffs'])
-    val_gen = SequenceDataGenerator(val_data['seq_tokens'], val_data['seq_positions'], val_data['targets'], val_data['seq_time_diffs'])
+    train_gen = SequenceDataGenerator(
+        train_data['seq_tokens'], train_data['seq_positions'],
+        train_data['targets'], train_data['seq_time_diffs']
+    )
+    val_gen = SequenceDataGenerator(
+        val_data['seq_tokens'], val_data['seq_positions'],
+        val_data['targets'], val_data['seq_time_diffs']
+    )
 
     train_dataloader = train_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
     val_dataloader = val_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
@@ -192,10 +200,7 @@ def main():
     print(f"Val size: {len(val_dataloader.dataset)}")
 
     # Train
-    trainer.fit(
-        train_dataloader=train_dataloader,
-        val_dataloader=val_dataloader,
-    )
+    trainer.fit(train_dataloader=train_dataloader, val_dataloader=val_dataloader)
 
     print("\n" + "=" * 80)
     print("Evaluation")

@@ -254,7 +254,33 @@ torch-rechub/
 - `movie_text_map.pkl`：电影文本映射
 - `item_embeddings_tinyllama.pt`：预计算的 item embeddings
 
-**Amazon Beauty 数据集**（可选）：
+**ByteDance 官方数据集（Amazon Books + PixelRec）**：
+
+根据 [ByteDance HLLM 官方仓库](https://github.com/bytedance/HLLM) 的说明，官方实现使用以下数据集：
+
+1. **PixelRec 数据集**：从 [PixelRec](https://github.com/westlake-repl/PixelRec) 下载交互数据和 Item 信息
+2. **Amazon Books 数据集**：
+   - 交互数据：[ratings_Books.csv](http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv)
+   - Item 信息：[meta_Books.json.gz](http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz)
+   - 官方也提供处理后的数据：[Interactions](https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv) 和 [Item Information](https://huggingface.co/ByteDance/HLLM/resolve/main/ItemInformation/amazon_books.csv)
+
+**官方数据目录结构**：
+```bash
+├── dataset                    # 存放交互数据 (data_path)
+│   ├── amazon_books.csv
+│   ├── Pixel1M.csv
+│   ├── Pixel200K.csv
+│   └── Pixel8M.csv
+└── information                # 存放 Item 信息 (text_path)
+    ├── amazon_books.csv
+    ├── Pixel1M.csv
+    ├── Pixel200K.csv
+    └── Pixel8M.csv
+```
+
+> **注意**：本实现使用 **Amazon Beauty** 数据集作为扩展示例，与官方的 Amazon Books 数据集不同。如需完全复现官方结果，请使用上述官方数据集。
+
+**Amazon Beauty 数据集（本实现扩展）**：
 
 1. 访问官方网站：http://jmcauley.ucsd.edu/data/amazon/
 2. 下载以下两个文件：
@@ -276,6 +302,13 @@ torch-rechub/
 - `train_data.pkl`、`val_data.pkl`、`test_data.pkl`：序列数据
 - `item_text_map.pkl`：产品文本映射
 - `item_embeddings_tinyllama.pt`：预计算的 item embeddings
+
+**预训练 LLM 模型**：
+
+官方推荐的 LLM 模型包括：
+- [TinyLlama](https://github.com/jzhang38/TinyLlama)（本实现支持）
+- [Baichuan2](https://huggingface.co/baichuan-inc/Baichuan2-7B-Base)（本实现支持）
+- Llama-2、Qwen 等（可按需扩展）
 
 ### 5.2 快速开始（3 步）- 推荐方式
 
@@ -388,49 +421,58 @@ python examples/generative/run_hllm_movielens.py \
   - `cross_entropy`：标准交叉熵损失
   - `nce`：噪声对比估计损失（推荐，训练效率更高）
 
-### 5.4 Amazon Beauty 数据集（可选）
+### 5.4 Amazon Books 数据集（官方默认）
 
-如果要在 Amazon Beauty 数据集上训练 HLLM，请按以下步骤操作。
+如果要在 Amazon Books 数据集上训练 HLLM，请按以下步骤操作。这是 ByteDance 官方 HLLM 使用的默认数据集。
 
 #### 数据集概述
 
-Amazon Beauty 数据集包含美妆类产品的用户评论和元数据，是推荐系统研究中常用的基准数据集。
+Amazon Books 数据集包含书籍产品的用户评分和元数据，是 HLLM 论文中使用的官方基准数据集。
 
-**数据集统计**：
-- 评论数：~500K
-- 产品数：~250K
-- 用户数：~150K
-- 时间跨度：1995-2014
+**数据集统计**（过滤后）：
+- 交互数：~8M
+- 产品数：~370K
+- 用户数：~600K
+- 时间跨度：1996-2014
 
 #### 步骤 1：下载数据
 
-访问官方网站：http://jmcauley.ucsd.edu/data/amazon/
-
-需要下载两个文件：
-1. `reviews_Beauty_5.json.gz` - 用户评论记录（~200MB）
-2. `meta_Beauty.json.gz` - 产品元数据（~50MB）
+**方式 1：下载原始数据**
 
 ```bash
-# 下载后解压到 examples/generative/data/amazon-beauty/
-cd examples/generative/data/amazon-beauty
-gunzip reviews_Beauty_5.json.gz
-gunzip meta_Beauty.json.gz
+cd examples/generative/data/amazon-books
+
+# 下载交互数据
+wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv
+
+# 下载元数据
+wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz
+```
+
+**方式 2：下载 ByteDance 处理后的数据**
+
+```bash
+# 交互数据
+wget https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv
+
+# Item 信息
+wget https://huggingface.co/ByteDance/HLLM/resolve/main/ItemInformation/amazon_books.csv
 ```
 
 **文件说明**：
-- `reviews_Beauty_5.json`：每行是一个 JSON 对象，包含用户ID、产品ID、评分、时间戳等
-- `meta_Beauty.json`：每行是一个 JSON 对象，包含产品ID、标题、描述、类别等
+- `ratings_Books.csv`：CSV 格式，包含 user_id, item_id, rating, timestamp
+- `meta_Books.json.gz`：JSON Lines 格式，包含 asin, title, description
 
 #### 步骤 2：预处理数据
 
 **2.1 生成 HSTU 格式的序列数据**
 
 ```bash
-python preprocess_amazon_beauty.py \
+python preprocess_amazon_books.py \
     --data_dir . \
     --output_dir ./processed \
     --max_seq_len 200 \
-    --min_seq_len 2
+    --min_seq_len 5
 ```
 
 **输出文件**：
@@ -439,18 +481,16 @@ python preprocess_amazon_beauty.py \
 - `val_data.pkl` - 验证序列
 - `test_data.pkl` - 测试序列
 
-**数据格式**：每个数据文件包含一个字典，包含以下 numpy 数组：
-- `seq_tokens`：形状 (N, L)，序列中的产品 ID
-- `seq_positions`：形状 (N, L)，位置索引
-- `seq_time_diffs`：形状 (N, L)，与查询时间的时间差（秒）
-- `targets`：形状 (N,)，目标产品 ID
-
-其中 N 是样本数，L 是最大序列长度（自动填充）
+**数据格式**：每个数据文件包含一个字典，包含以下列表：
+- `seq_tokens`：序列中的产品 ID
+- `seq_positions`：位置索引
+- `seq_time_diffs`：与查询时间的时间差（秒）
+- `targets`：目标产品 ID
 
 **2.2 生成 HLLM 数据（文本提取 + embedding 生成）**
 
 ```bash
-python preprocess_amazon_beauty_hllm.py \
+python preprocess_amazon_books_hllm.py \
     --data_dir . \
     --output_dir ./processed \
     --model_type tinyllama \
@@ -465,16 +505,16 @@ python preprocess_amazon_beauty_hllm.py \
 - `item_text_map.pkl` - 产品 ID 到文本描述的映射
 - `item_embeddings_tinyllama.pt` 或 `item_embeddings_baichuan2.pt` - 预计算的 item embeddings
 
-**Item 文本格式**（遵循 HLLM 论文）：
+**Item 文本格式**（遵循 HLLM 论文，Books 数据集不使用 tag 字段）：
 ```
-"Title: {title}. Description: {description}. Category: {category}"
+"Title: {title}. Description: {description}"
 ```
 
 #### 步骤 3：训练模型
 
 ```bash
 cd ../../../
-python examples/generative/run_hllm_amazon_beauty.py \
+python examples/generative/run_hllm_amazon_books.py \
     --model_type tinyllama \
     --batch_size 64 \
     --epochs 5 \
@@ -484,7 +524,7 @@ python examples/generative/run_hllm_amazon_beauty.py \
 **高级选项**：
 
 ```bash
-python examples/generative/run_hllm_amazon_beauty.py \
+python examples/generative/run_hllm_amazon_books.py \
     --model_type baichuan2 \
     --batch_size 32 \
     --epochs 10 \
@@ -506,16 +546,16 @@ python examples/generative/run_hllm_amazon_beauty.py \
 - `--device`：计算设备（cuda 或 cpu）
 
 **预期时间**：
-- 数据预处理：~40-70 分钟
-- 模型训练（5 个 epoch）：~100-150 分钟
-- 总计：~2-3 小时
+- 数据预处理：~60-120 分钟（数据量较大）
+- 模型训练（5 个 epoch）：~150-200 分钟
+- 总计：~3-5 小时
 
 **性能参考**：
-- HSTU 预处理：~5-10 分钟
-- HLLM 预处理（TinyLlama）：~30-60 分钟
-- HLLM 预处理（Baichuan2）：~60-120 分钟
-- 训练时间（TinyLlama）：~20-30 分钟/epoch
-- 训练时间（Baichuan2）：~40-60 分钟/epoch
+- HSTU 预处理：~10-20 分钟
+- HLLM 预处理（TinyLlama）：~60-90 分钟
+- HLLM 预处理（Baichuan2）：~120-180 分钟
+- 训练时间（TinyLlama）：~30-40 分钟/epoch
+- 训练时间（Baichuan2）：~60-80 分钟/epoch
 
 ### 5.5 常见问题与解决方案
 

@@ -292,7 +292,33 @@ torch-rechub/
 - `movie_text_map.pkl`: Movie text mapping
 - `item_embeddings_tinyllama.pt`: Pre-computed item embeddings
 
-**Amazon Beauty Dataset** (Optional):
+**ByteDance Official Datasets (Amazon Books + PixelRec)**:
+
+According to the [ByteDance HLLM official repository](https://github.com/bytedance/HLLM), the official implementation uses the following datasets:
+
+1. **PixelRec Dataset**: Download interactions and item information from [PixelRec](https://github.com/westlake-repl/PixelRec)
+2. **Amazon Books Dataset**:
+   - Interactions: [ratings_Books.csv](http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv)
+   - Item Information: [meta_Books.json.gz](http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz)
+   - Official also provides processed data: [Interactions](https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv) and [Item Information](https://huggingface.co/ByteDance/HLLM/resolve/main/ItemInformation/amazon_books.csv)
+
+**Official Data Directory Structure**:
+```bash
+├── dataset                    # Store Interactions (data_path)
+│   ├── amazon_books.csv
+│   ├── Pixel1M.csv
+│   ├── Pixel200K.csv
+│   └── Pixel8M.csv
+└── information                # Store Item Information (text_path)
+    ├── amazon_books.csv
+    ├── Pixel1M.csv
+    ├── Pixel200K.csv
+    └── Pixel8M.csv
+```
+
+> **Note**: This implementation uses **Amazon Beauty** dataset as an extended example, which is different from the official Amazon Books dataset. To fully reproduce official results, please use the official datasets mentioned above.
+
+**Amazon Beauty Dataset (This Implementation's Extension)**:
 
 1. Visit official website: http://jmcauley.ucsd.edu/data/amazon/
 2. Download the following files:
@@ -314,6 +340,13 @@ torch-rechub/
 - `train_data.pkl`, `val_data.pkl`, `test_data.pkl`: Sequence data
 - `item_text_map.pkl`: Product text mapping
 - `item_embeddings_tinyllama.pt`: Pre-computed item embeddings
+
+**Pre-trained LLM Models**:
+
+Official recommended LLM models include:
+- [TinyLlama](https://github.com/jzhang38/TinyLlama) (supported by this implementation)
+- [Baichuan2](https://huggingface.co/baichuan-inc/Baichuan2-7B-Base) (supported by this implementation)
+- Llama-2, Qwen, etc. (can be extended as needed)
 
 #### Step 1: Data Preprocessing (HSTU Format)
 
@@ -395,49 +428,58 @@ python examples/generative/run_hllm_movielens.py \
   - `cross_entropy`: Standard cross-entropy loss
   - `nce`: Noise Contrastive Estimation loss (recommended, more efficient)
 
-### 5.4 Amazon Beauty Dataset (Optional)
+### 5.4 Amazon Books Dataset (Official Default)
 
-To train HLLM on the Amazon Beauty dataset, follow these steps.
+To train HLLM on the Amazon Books dataset, follow these steps. This is the default dataset used by ByteDance's official HLLM implementation.
 
 #### Dataset Overview
 
-The Amazon Beauty dataset contains user reviews and metadata for beauty products, and is a commonly used benchmark dataset in recommendation system research.
+The Amazon Books dataset contains user ratings and metadata for book products, and is the official benchmark dataset used in the HLLM paper.
 
-**Dataset Statistics**:
-- Reviews: ~500K
-- Products: ~250K
-- Users: ~150K
-- Time span: 1995-2014
+**Dataset Statistics** (after filtering):
+- Interactions: ~8M
+- Products: ~370K
+- Users: ~600K
+- Time span: 1996-2014
 
 #### Step 1: Download Data
 
-Visit the official website: http://jmcauley.ucsd.edu/data/amazon/
-
-You need to download two files:
-1. `reviews_Beauty_5.json.gz` - User review records (~200MB)
-2. `meta_Beauty.json.gz` - Product metadata (~50MB)
+**Option 1: Download Raw Data**
 
 ```bash
-# Extract to examples/generative/data/amazon-beauty/
-cd examples/generative/data/amazon-beauty
-gunzip reviews_Beauty_5.json.gz
-gunzip meta_Beauty.json.gz
+cd examples/generative/data/amazon-books
+
+# Download interactions
+wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv
+
+# Download metadata
+wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz
+```
+
+**Option 2: Download ByteDance Processed Data**
+
+```bash
+# Interactions
+wget https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv
+
+# Item Information
+wget https://huggingface.co/ByteDance/HLLM/resolve/main/ItemInformation/amazon_books.csv
 ```
 
 **File Descriptions**:
-- `reviews_Beauty_5.json`: Each line is a JSON object containing user ID, product ID, rating, timestamp, etc.
-- `meta_Beauty.json`: Each line is a JSON object containing product ID, title, description, category, etc.
+- `ratings_Books.csv`: CSV format, contains user_id, item_id, rating, timestamp
+- `meta_Books.json.gz`: JSON Lines format, contains asin, title, description
 
 #### Step 2: Preprocess Data
 
 **2.1 Generate HSTU Format Sequence Data**
 
 ```bash
-python preprocess_amazon_beauty.py \
+python preprocess_amazon_books.py \
     --data_dir . \
     --output_dir ./processed \
     --max_seq_len 200 \
-    --min_seq_len 2
+    --min_seq_len 5
 ```
 
 **Output Files**:
@@ -446,18 +488,16 @@ python preprocess_amazon_beauty.py \
 - `val_data.pkl` - Validation sequences
 - `test_data.pkl` - Test sequences
 
-**Data Format**: Each data file contains a dictionary with the following numpy arrays:
-- `seq_tokens`: Shape (N, L), product IDs in sequences
-- `seq_positions`: Shape (N, L), position indices
-- `seq_time_diffs`: Shape (N, L), time differences from query time (in seconds)
-- `targets`: Shape (N,), target product IDs
-
-Where N is the number of samples and L is the maximum sequence length (auto-padded)
+**Data Format**: Each data file contains a dictionary with the following lists:
+- `seq_tokens`: Product IDs in sequences
+- `seq_positions`: Position indices
+- `seq_time_diffs`: Time differences from query time (in seconds)
+- `targets`: Target product IDs
 
 **2.2 Generate HLLM Data (Text Extraction + Embedding Generation)**
 
 ```bash
-python preprocess_amazon_beauty_hllm.py \
+python preprocess_amazon_books_hllm.py \
     --data_dir . \
     --output_dir ./processed \
     --model_type tinyllama \
@@ -472,16 +512,16 @@ python preprocess_amazon_beauty_hllm.py \
 - `item_text_map.pkl` - Mapping from product ID to text description
 - `item_embeddings_tinyllama.pt` or `item_embeddings_baichuan2.pt` - Pre-computed item embeddings
 
-**Item Text Format** (following HLLM paper):
+**Item Text Format** (following HLLM paper, Books dataset doesn't use tag field):
 ```
-"Title: {title}. Description: {description}. Category: {category}"
+"Title: {title}. Description: {description}"
 ```
 
 #### Step 3: Train Model
 
 ```bash
 cd ../../../
-python examples/generative/run_hllm_amazon_beauty.py \
+python examples/generative/run_hllm_amazon_books.py \
     --model_type tinyllama \
     --batch_size 64 \
     --epochs 5 \
@@ -491,7 +531,7 @@ python examples/generative/run_hllm_amazon_beauty.py \
 **Advanced Options**:
 
 ```bash
-python examples/generative/run_hllm_amazon_beauty.py \
+python examples/generative/run_hllm_amazon_books.py \
     --model_type baichuan2 \
     --batch_size 32 \
     --epochs 10 \
@@ -513,16 +553,16 @@ python examples/generative/run_hllm_amazon_beauty.py \
 - `--device`: Compute device (cuda or cpu)
 
 **Expected Time**:
-- Data preprocessing: ~40-70 minutes
-- Model training (5 epochs): ~100-150 minutes
-- Total: ~2-3 hours
+- Data preprocessing: ~60-120 minutes (larger dataset)
+- Model training (5 epochs): ~150-200 minutes
+- Total: ~3-5 hours
 
 **Performance Reference**:
-- HSTU preprocessing: ~5-10 minutes
-- HLLM preprocessing (TinyLlama): ~30-60 minutes
-- HLLM preprocessing (Baichuan2): ~60-120 minutes
-- Training time (TinyLlama): ~20-30 minutes/epoch
-- Training time (Baichuan2): ~40-60 minutes/epoch
+- HSTU preprocessing: ~10-20 minutes
+- HLLM preprocessing (TinyLlama): ~60-90 minutes
+- HLLM preprocessing (Baichuan2): ~120-180 minutes
+- Training time (TinyLlama): ~30-40 minutes/epoch
+- Training time (Baichuan2): ~60-80 minutes/epoch
 
 ### 5.5 Troubleshooting
 

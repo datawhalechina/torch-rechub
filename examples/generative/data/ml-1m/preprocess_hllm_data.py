@@ -25,6 +25,9 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_DATA_DIR = _SCRIPT_DIR
 _DEFAULT_OUTPUT_DIR = os.path.join(_SCRIPT_DIR, "processed")
 
+# Official ByteDance HLLM item prompt
+ITEM_PROMPT = "Compress the following sentence into embedding: "
+
 
 def check_environment(model_type, device):
     """Check GPU, CUDA, and VRAM availability."""
@@ -124,7 +127,10 @@ def extract_movie_text(data_dir, output_dir):
         movie_id = int(row['movie_id'])
         title = str(row['title']).strip()
         genres = str(row['genres']).strip()
-        text = f"Title: {title}. Genres: {genres}"
+        # Official ByteDance HLLM format:
+        # "{item_prompt}title: {title}genres: {genres}"
+        # Note: Using 'genres' instead of 'tag' for MovieLens dataset
+        text = f"{ITEM_PROMPT}title: {title}genres: {genres}"
         movie_text_map[movie_id] = text
 
         if (idx + 1) % 1000 == 0:
@@ -165,12 +171,9 @@ def generate_item_embeddings(model_type, movie_text_map, output_dir, device):
     model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16 if device == 'cuda' else torch.float32, device_map=device, trust_remote_code=True)
     model.eval()
 
-    # Add special token [ITEM]
-    special_tokens_dict = {'additional_special_tokens': ['[ITEM]']}
-    tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
-    item_token_id = tokenizer.convert_tokens_to_ids('[ITEM]')
-    print(f"✅ 添加特殊token [ITEM]，token_id={item_token_id}")
+    # Official ByteDance HLLM approach: No special [ITEM] token needed
+    # Uses last token's hidden state as item embedding
+    print("✅ 使用官方 ByteDance HLLM 格式（最后一个 token 的隐藏状态）")
 
     # Generate embeddings
     print(f"\n生成 {len(movie_text_map)} 个 item embeddings...")
@@ -182,22 +185,17 @@ def generate_item_embeddings(model_type, movie_text_map, output_dir, device):
     with torch.no_grad():
         for movie_id in tqdm.tqdm(sorted(movie_text_map.keys()), desc="Generating embeddings"):
             text = movie_text_map[movie_id]
-            prompt = f"{text} [ITEM]"
+            # Text already contains ITEM_PROMPT prefix from extract_movie_text()
 
-            inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=512)
+            inputs = tokenizer(text, return_tensors='pt', truncation=True, max_length=512)
             inputs = {k: v.to(device) for k, v in inputs.items()}
 
             outputs = model(**inputs, output_hidden_states=True)
             hidden_states = outputs.hidden_states[-1]
 
-            input_ids = inputs['input_ids'][0]
-            item_positions = (input_ids == item_token_id).nonzero(as_tuple=True)[0]
-
-            if len(item_positions) > 0:
-                item_pos = item_positions[-1].item()
-                item_emb = hidden_states[0, item_pos, :].cpu().numpy()
-            else:
-                item_emb = hidden_states[0, -1, :].cpu().numpy()
+            # Use last token's hidden state as item embedding
+            # This matches official implementation where item_emb_token_n=1
+            item_emb = hidden_states[0, -1, :].cpu().numpy()
 
             embeddings_array[movie_id] = item_emb
 
