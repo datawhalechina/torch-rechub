@@ -32,7 +32,7 @@ on:
 
 # 环境变量
 env:
-  PYTHON_VERSION: '3.8'
+  PYTHON_VERSION: '3.9'
   TORCH_INDEX_URL: 'https://download.pytorch.org/whl/cpu'
 
 jobs:
@@ -98,13 +98,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         exclude:
           # 排除一些不必要的组合以加速CI
           - os: windows-latest
-            python-version: '3.9'
+            python-version: '3.10'
           - os: macos-latest
-            python-version: '3.9'
+            python-version: '3.10'
 
     steps:
       - name: Checkout code
@@ -138,6 +138,7 @@ jobs:
           # Install CPU-only PyTorch for faster CI
           pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
           # Install the package with dev and onnx dependencies
+          # Note: ONNX may have DLL loading issues on Windows + Python 3.9
           pip install -e ".[dev,onnx]" || pip install -r requirements-dev.txt && pip install -e .
 
       - name: Run tests

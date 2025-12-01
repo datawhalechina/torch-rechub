@@ -11,7 +11,7 @@ description: Torch-RecHub 详细安装说明，包括稳定版和最新版安装
 
 在安装 Torch-RecHub 之前，请确保您的系统满足以下要求：
 
-- **Python 3.8+**
+- **Python 3.9+**
 - **PyTorch 1.7+**（推荐使用 CUDA 版本以获得 GPU 加速）
 - **NumPy**
 - **Pandas**

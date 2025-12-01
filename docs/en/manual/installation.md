@@ -11,7 +11,7 @@ This document provides detailed installation instructions for Torch-RecHub, incl
 
 Before installing Torch-RecHub, ensure you have the following prerequisites:
 
-- **Python 3.8+**
+- **Python 3.9+**
 - **PyTorch 1.7+** (CUDA-enabled version recommended for GPU acceleration)
 - **NumPy**
 - **Pandas**

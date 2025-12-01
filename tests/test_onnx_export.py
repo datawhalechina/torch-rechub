@@ -3,9 +3,13 @@ Tests for ONNX export functionality.
 
 This module tests the ONNX export capabilities for various recommendation models.
 It includes validation helpers to verify that ONNX model outputs match PyTorch outputs.
+
+Note: These tests require the optional 'onnx' dependencies to be installed.
+Tests will be skipped if the onnx package is not available or fails to load.
 """
 
 import os
+import platform
 import sys
 import tempfile
 from pathlib import Path
@@ -17,6 +21,44 @@ import torch
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# ============================================================================
+# Module-level ONNX availability check
+# Skip all tests if onnx package is not available or fails to load
+# ============================================================================
+
+ONNX_AVAILABLE = False
+ONNX_SKIP_REASON = "onnx package not installed"
+
+try:
+    import onnx
+    # Try to actually use onnx to verify it loads correctly
+    _ = onnx.__version__
+    ONNX_AVAILABLE = True
+except ImportError as e:
+    ONNX_SKIP_REASON = f"onnx package not installed: {e}"
+except OSError as e:
+    ONNX_SKIP_REASON = f"onnx package failed to load: {e}"
+except Exception as e:
+    ONNX_SKIP_REASON = f"onnx package failed to initialize: {e}"
+
+# Also check onnxruntime availability
+ONNXRUNTIME_AVAILABLE = False
+ONNXRUNTIME_SKIP_REASON = "onnxruntime package not installed"
+
+try:
+    import onnxruntime as ort
+    _ = ort.__version__
+    ONNXRUNTIME_AVAILABLE = True
+except ImportError as e:
+    ONNXRUNTIME_SKIP_REASON = f"onnxruntime package not installed: {e}"
+except OSError as e:
+    ONNXRUNTIME_SKIP_REASON = f"onnxruntime package failed to load: {e}"
+except Exception as e:
+    ONNXRUNTIME_SKIP_REASON = f"onnxruntime package failed to initialize: {e}"
+
+# Skip entire module if onnx is not available
+pytestmark = pytest.mark.skipif(not ONNX_AVAILABLE, reason=ONNX_SKIP_REASON)
 
 from torch_rechub.basic.features import DenseFeature, SequenceFeature, SparseFeature
 from torch_rechub.utils.onnx_export import ONNXExporter, ONNXWrapper, extract_feature_info, generate_dummy_input
@@ -40,11 +82,11 @@ def validate_onnx_output(onnx_path: str, pytorch_model: torch.nn.Module, input_d
     Returns:
         True if outputs match within tolerance.
     """
-    try:
-        import onnxruntime as ort
-    except ImportError:
-        pytest.skip("onnxruntime not installed - skipping ONNX validation")
+    if not ONNXRUNTIME_AVAILABLE:
+        pytest.skip(ONNXRUNTIME_SKIP_REASON)
         return True
+
+    import onnxruntime as ort
 
     # Get PyTorch output
     pytorch_model.eval()
@@ -69,16 +111,13 @@ def check_onnx_model_valid(onnx_path: str) -> bool:
     Returns:
         True if model is valid.
     """
-    try:
-        import onnx
-        model = onnx.load(onnx_path)
-        onnx.checker.check_model(model)
+    if not ONNX_AVAILABLE:
+        pytest.skip(ONNX_SKIP_REASON)
         return True
-    except ImportError:
-        pytest.skip("onnx package not installed - skipping model validation")
-        return True
-    except Exception:
-        return False
+
+    model = onnx.load(onnx_path)
+    onnx.checker.check_model(model)
+    return True
 
 
 # ============================================================================
