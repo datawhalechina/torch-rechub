@@ -48,12 +48,7 @@ def load_ratings(data_dir):
     print(f"\n📖 Loading ratings from {ratings_file}...")
 
     # Load ratings (format: user_id, item_id, rating, timestamp)
-    ratings = pd.read_csv(
-        ratings_file,
-        sep=",",
-        names=["user_id", "item_id", "rating", "timestamp"],
-        header=None
-    )
+    ratings = pd.read_csv(ratings_file, sep=",", names=["user_id", "item_id", "rating", "timestamp"], header=None)
 
     # Check if file has header
     if ratings.iloc[0]['user_id'] == 'user_id':
@@ -127,11 +122,7 @@ def build_sequences(ratings, max_seq_len=200, min_seq_len=5):
             item_indices = item_indices[-max_seq_len:]
             timestamps = timestamps[-max_seq_len:]
 
-        sequences.append({
-            'user_id': user_id,
-            'item_indices': item_indices,
-            'timestamps': timestamps
-        })
+        sequences.append({'user_id': user_id, 'item_indices': item_indices, 'timestamps': timestamps})
 
     print(f"  Generated {len(sequences)} user sequences")
 

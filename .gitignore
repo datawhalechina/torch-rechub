@@ -169,3 +169,4 @@ cython_debug/
 *.pt
 *.dat
 *.pth
+*.csv

@@ -108,10 +108,7 @@ def extract_item_text(metadata):
 
 def generate_embeddings(item_text_map, model_type, device, output_dir):
     """Generate item embeddings using LLM."""
-    model_configs = {
-        'tinyllama': {'model_name': 'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'embedding_dim': 2048},
-        'baichuan2': {'model_name': 'baichuan-inc/Baichuan2-7B-Chat', 'embedding_dim': 4096}
-    }
+    model_configs = {'tinyllama': {'model_name': 'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'embedding_dim': 2048}, 'baichuan2': {'model_name': 'baichuan-inc/Baichuan2-7B-Chat', 'embedding_dim': 4096}}
 
     if model_type not in model_configs:
         raise ValueError(f"Unsupported model type: {model_type}")
@@ -121,12 +118,7 @@ def generate_embeddings(item_text_map, model_type, device, output_dir):
 
     print(f"\nLoading model: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16 if device == 'cuda' else torch.float32,
-        device_map=device,
-        trust_remote_code=True
-    )
+    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16 if device == 'cuda' else torch.float32, device_map=device, trust_remote_code=True)
     model.eval()
 
     # Generate embeddings using official ByteDance HLLM approach
