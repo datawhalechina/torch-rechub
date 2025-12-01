@@ -44,7 +44,7 @@ def load_metadata(data_dir):
         open_func = open
         file_path = meta_file
     else:
-        print(f"❌ Error: Metadata file not found")
+        print("❌ Error: Metadata file not found")
         print("\nPlease download from:")
         print("  http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz")
         print("Or use the processed version from ByteDance:")
@@ -128,7 +128,7 @@ def generate_embeddings(item_text_map, model_type, device, output_dir):
     product_ids = list(item_text_map.keys())
 
     print(f"Generating embeddings for {len(product_ids)} products...")
-    print(f"Using official ByteDance HLLM format (last token hidden state)")
+    print("Using official ByteDance HLLM format (last token hidden state)")
 
     with torch.no_grad():
         for product_id in tqdm.tqdm(product_ids, desc="Generating embeddings"):
