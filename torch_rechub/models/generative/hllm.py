@@ -103,24 +103,40 @@ class HLLMTransformerBlock(nn.Module):
 
 class HLLMModel(nn.Module):
     """HLLM: Hierarchical Large Language Model for Recommendation.
-    
-    This model uses pre-computed item embeddings (from a large language model)
-    as input, and learns to model user sequences using these embeddings.
-    
+
+    This is a lightweight implementation of HLLM that uses pre-computed item
+    embeddings as input. The original ByteDance HLLM uses end-to-end training
+    with both Item LLM and User LLM, but this implementation focuses on the
+    User LLM component for resource efficiency.
+
+    Architecture:
+        - Item Embeddings: Pre-computed using LLM (offline, frozen)
+          Format: "{item_prompt}title: {title}description: {description}"
+          where item_prompt = "Compress the following sentence into embedding: "
+        - User LLM: Transformer blocks that model user sequences (trainable)
+        - Scoring Head: Dot product between user representation and item embeddings
+
+    Reference:
+        ByteDance HLLM: https://github.com/bytedance/HLLM
+
     Args:
         item_embeddings (Tensor or str): Pre-computed item embeddings of shape
             (vocab_size, d_model), or path to a .pt file containing embeddings.
+            Generated using the last token's hidden state from an LLM.
         vocab_size (int): Vocabulary size (number of items).
-        d_model (int): Hidden dimension. Default: 512.
+        d_model (int): Hidden dimension. Should match item embedding dimension.
+            Default: 512. TinyLlama uses 2048, Baichuan2 uses 4096.
         n_heads (int): Number of attention heads. Default: 8.
         n_layers (int): Number of transformer blocks. Default: 4.
         max_seq_len (int): Maximum sequence length. Default: 256.
+            Official uses MAX_ITEM_LIST_LENGTH=50.
         dropout (float): Dropout rate. Default: 0.1.
         use_rel_pos_bias (bool): Whether to use relative position bias. Default: True.
         use_time_embedding (bool): Whether to use time embeddings. Default: True.
         num_time_buckets (int): Number of time buckets. Default: 2048.
         time_bucket_fn (str): Time bucketization function ('sqrt' or 'log'). Default: 'sqrt'.
-        temperature (float): Temperature for scoring head. Default: 1.0.
+        temperature (float): Temperature for NCE scoring. Default: 1.0.
+            Official uses logit_scale = log(1/0.07) ≈ 2.66.
     """
 
     def __init__(self, item_embeddings, vocab_size, d_model=512, n_heads=8, n_layers=4, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt', temperature=1.0):

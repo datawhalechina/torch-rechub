@@ -1,4 +1,13 @@
-"""HLLM Model Example on MovieLens Dataset."""
+"""HLLM Model Example on MovieLens Dataset.
+
+Architecture Overview:
+- Item Embeddings: Pre-computed using LLM (offline)
+- User LLM: Transformer blocks that model user sequences (trainable)
+- Loss: NCE Loss with temperature scaling
+
+This is a lightweight implementation that uses pre-computed item embeddings
+instead of the full end-to-end training with Item LLM.
+"""
 
 import os
 import pickle
@@ -18,6 +27,18 @@ sys.path.append("../..")
 # Get the directory where this script is located
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "data", "ml-1m", "processed")
+
+# Official ByteDance HLLM default configurations
+DEFAULT_CONFIG = {
+    'MAX_ITEM_LIST_LENGTH': 50,
+    'MAX_TEXT_LENGTH': 256,
+    'item_emb_token_n': 1,
+    'loss': 'nce',
+    'num_negatives': 512,
+    'learning_rate': 1e-4,
+    'weight_decay': 0.01,
+    'epochs': 5,
+}
 
 
 def check_training_environment(device, model_type, dataset_path):

@@ -1,4 +1,15 @@
-"""HLLM Model Example on Amazon Beauty Dataset."""
+"""HLLM Model Example on Amazon Books Dataset.
+
+This is the default dataset for HLLM, following the ByteDance official implementation.
+
+Architecture Overview:
+- Item Embeddings: Pre-computed using LLM (offline)
+- User LLM: Transformer blocks that model user sequences (trainable)
+- Loss: NCE Loss with temperature scaling
+
+This is a lightweight implementation that uses pre-computed item embeddings
+instead of the full end-to-end training with Item LLM.
+"""
 
 import os
 import pickle
@@ -17,7 +28,19 @@ sys.path.append("../..")
 
 # Get the directory where this script is located
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "data", "amazon-beauty", "processed")
+_DEFAULT_DATA_DIR = os.path.join(_SCRIPT_DIR, "data", "amazon-books", "processed")
+
+# Official ByteDance HLLM default configurations
+DEFAULT_CONFIG = {
+    'MAX_ITEM_LIST_LENGTH': 50,
+    'MAX_TEXT_LENGTH': 256,
+    'item_emb_token_n': 1,
+    'loss': 'nce',
+    'num_negatives': 512,
+    'learning_rate': 1e-4,
+    'weight_decay': 0.01,
+    'epochs': 5,
+}
 
 
 def check_training_environment(device, model_type, dataset_path):
@@ -55,8 +78,8 @@ def check_training_environment(device, model_type, dataset_path):
     if not os.path.exists(emb_file):
         print(f"\n❌ Error: Item embeddings file not found: {emb_file}")
         print("   Please run preprocessing first:")
-        print("   cd examples/generative/data/amazon-beauty")
-        print(f"   python preprocess_amazon_beauty_hllm.py --model_type {model_type} --device {device}")
+        print("   cd examples/generative/data/amazon-books")
+        print(f"   python preprocess_amazon_books_hllm.py --model_type {model_type} --device {device}")
         return False
 
     print("✅ Item embeddings file exists")
@@ -76,7 +99,7 @@ def check_training_environment(device, model_type, dataset_path):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="HLLM training on Amazon Beauty dataset")
+    parser = argparse.ArgumentParser(description="HLLM training on Amazon Books dataset (Official)")
     parser.add_argument("--data_dir", default=_DEFAULT_DATA_DIR, help="Data directory")
     parser.add_argument("--model_type", default="tinyllama", choices=["tinyllama", "baichuan2"], help="LLM model type")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"], help="Device")
@@ -86,7 +109,7 @@ def main():
     parser.add_argument("--n_layers", type=int, default=2, help="Number of transformer layers")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
     parser.add_argument("--max_seq_len", type=int, default=200, help="Maximum sequence length")
-    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce"], help="Loss function type: cross_entropy or nce (default: nce)")
+    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce"], help="Loss function type")
 
     args = parser.parse_args()
 
@@ -111,12 +134,15 @@ def main():
     with open(os.path.join(args.data_dir, 'test_data.pkl'), 'rb') as f:
         test_data = pickle.load(f)
 
-    vocab_size = len(vocab)
+    with open(os.path.join(args.data_dir, 'item_text_map.pkl'), 'rb') as f:
+        item_texts = pickle.load(f)
+
+    vocab_size = len(vocab['item_to_idx'])
     print("✅ Data loaded")
     print(f"   Vocab size: {vocab_size}")
-    print(f"   Train samples: {len(train_data)}")
-    print(f"   Val samples: {len(val_data)}")
-    print(f"   Test samples: {len(test_data)}")
+    print(f"   Train samples: {len(train_data['targets'])}")
+    print(f"   Val samples: {len(val_data['targets'])}")
+    print(f"   Test samples: {len(test_data['targets'])}")
 
     # Load item embeddings
     emb_file = os.path.join(args.data_dir, f'item_embeddings_{args.model_type}.pt')
@@ -138,7 +164,8 @@ def main():
     print("Creating Model")
     print("=" * 80)
 
-    # Create model
+    # Create model using pre-computed item embeddings
+    # This is a lightweight implementation compared to official end-to-end training
     model = HLLMModel(
         item_embeddings=item_embeddings,
         vocab_size=vocab_size,
@@ -149,18 +176,17 @@ def main():
         dropout=args.dropout,
         use_rel_pos_bias=True,
         use_time_embedding=True,
-        temperature=1.0
     )
 
     print("✅ Model created")
     print(f"   Parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"   n_layers: {args.n_layers}, n_heads: {n_heads}")
 
     print("\n" + "=" * 80)
     print("Training")
     print("=" * 80)
 
-    # Create trainer
-    # Configure loss function parameters
+    # Configure loss function
     if args.loss_type == 'nce':
         loss_params = {"temperature": 0.1, "ignore_index": 0}
     else:
@@ -178,7 +204,7 @@ def main():
         loss_type=args.loss_type,
         loss_params=loss_params,
     )
-    print(f"✅ 使用 {args.loss_type.upper()} Loss 函数")
+    print(f"✅ Using {args.loss_type.upper()} Loss")
 
     # Build data loaders
     print("\nBuilding data loaders...")
@@ -192,42 +218,50 @@ def main():
     print(f"Val size: {len(val_dataloader.dataset)}")
 
     # Train
-    trainer.fit(
-        train_dataloader=train_dataloader,
-        val_dataloader=val_dataloader,
-    )
+    trainer.fit(train_dataloader=train_dataloader, val_dataloader=val_dataloader)
 
     print("\n" + "=" * 80)
     print("Evaluation")
     print("=" * 80)
 
     # Evaluate on test set
+    model.to(args.device)
     model.eval()
-    test_loader = SequenceDataGenerator(test_data, batch_size=args.batch_size, use_time_embedding=True)
 
-    all_preds = []
-    all_targets = []
+    test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
+    test_dataloader = test_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
+
+    y_true = {}
+    y_pred = {}
+    user_idx = 0
 
     with torch.no_grad():
-        for batch in tqdm.tqdm(test_loader, desc="Evaluating"):
-            seq_tokens = torch.LongTensor(batch['seq_tokens']).to(args.device)
-            seq_time_diffs = torch.LongTensor(batch['seq_time_diffs']).to(args.device)
-            targets = batch['targets']
+        for seq_tokens, _, seq_time_diffs, targets in tqdm.tqdm(test_dataloader, desc="Evaluating"):
+            seq_tokens = seq_tokens.to(args.device)
+            seq_time_diffs = seq_time_diffs.to(args.device)
+            targets = targets.cpu().numpy()
 
             logits = model(seq_tokens, seq_time_diffs)
-            preds = logits[:, -1, :].cpu().numpy()
+            last_logits = logits[:, -1, :]  # (B, V)
 
-            all_preds.append(preds)
-            all_targets.extend(targets)
+            # Get top-200 predictions
+            _, top_items = torch.topk(last_logits, k=200, dim=-1)
+            top_items = top_items.cpu().numpy()
 
-    all_preds = np.concatenate(all_preds, axis=0)
-    all_targets = np.array(all_targets)
+            for i in range(len(targets)):
+                user_id = str(user_idx)
+                y_true[user_id] = [int(targets[i])]
+                y_pred[user_id] = top_items[i].tolist()
+                user_idx += 1
 
     # Calculate metrics
-    metrics = topk_metrics(all_targets, all_preds, topKs=[10, 50, 200])
+    results = topk_metrics(y_true, y_pred, topKs=[10, 50, 200])
     print("\n✅ Test Results:")
-    for metric_name, metric_value in metrics.items():
-        print(f"   {metric_name}: {metric_value:.4f}")
+    print("=" * 50)
+    for metric_name in ["Hit", "NDCG"]:
+        for result_str in results[metric_name]:
+            print(f"   {result_str}")
+    print("=" * 50)
 
     print("\n✅ Training complete!")
 
