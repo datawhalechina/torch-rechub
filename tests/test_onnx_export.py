@@ -32,6 +32,7 @@ ONNX_SKIP_REASON = "onnx package not installed"
 
 try:
     import onnx
+
     # Try to actually use onnx to verify it loads correctly
     _ = onnx.__version__
     ONNX_AVAILABLE = True
