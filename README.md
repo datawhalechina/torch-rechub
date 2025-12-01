@@ -4,7 +4,7 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
-[![Python Version](https://img.shields.io/badge/python-3.8%2B-orange?style=for-the-badge)](https://www.python.org/) 
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/)
 [![PyTorch Version](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/) 
 [![annoy Version](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://pytorch.org/) 
 [![pandas Version](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/) 
@@ -55,7 +55,7 @@ English | [简体中文](README_zh.md)
 
 ### Requirements
 
-* Python 3.8+
+* Python 3.9+
 * PyTorch 1.7+ (CUDA-enabled version recommended for GPU acceleration)
 * NumPy
 * Pandas

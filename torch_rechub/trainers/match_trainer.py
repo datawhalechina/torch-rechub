@@ -176,3 +176,64 @@ class MatchTrainer(object):
                 y_pred = model(x_dict)
                 predicts.append(y_pred.data)
         return torch.cat(predicts, dim=0)
+
+    def export_onnx(self, output_path, mode=None, dummy_input=None, batch_size=2, seq_length=10, opset_version=14, dynamic_batch=True, device=None, verbose=False):
+        """Export the trained matching model to ONNX format.
+
+        This method exports matching/retrieval models (e.g., DSSM, YoutubeDNN, MIND)
+        to ONNX format. For dual-tower models, you can export user tower and item
+        tower separately for efficient online serving.
+
+        Args:
+            output_path (str): Path to save the ONNX model file.
+            mode (str, optional): Export mode for dual-tower models:
+                - "user": Export only the user tower (for user embedding inference)
+                - "item": Export only the item tower (for item embedding inference)
+                - None: Export the full model (default)
+            dummy_input (dict, optional): Example input dict {feature_name: tensor}.
+                If not provided, dummy inputs will be generated automatically.
+            batch_size (int): Batch size for auto-generated dummy input (default: 2).
+            seq_length (int): Sequence length for SequenceFeature (default: 10).
+            opset_version (int): ONNX opset version (default: 14).
+            dynamic_batch (bool): Enable dynamic batch size (default: True).
+            device (str, optional): Device for export ('cpu', 'cuda', etc.).
+                If None, defaults to 'cpu' for maximum compatibility.
+            verbose (bool): Print export details (default: False).
+
+        Returns:
+            bool: True if export succeeded, False otherwise.
+
+        Example:
+            >>> trainer = MatchTrainer(dssm_model, mode=0, ...)
+            >>> trainer.fit(train_dl)
+
+            >>> # Export user tower for user embedding inference
+            >>> trainer.export_onnx("user_tower.onnx", mode="user")
+
+            >>> # Export item tower for item embedding inference
+            >>> trainer.export_onnx("item_tower.onnx", mode="item")
+
+            >>> # Export full model (for online similarity computation)
+            >>> trainer.export_onnx("full_model.onnx")
+
+            >>> # Export on specific device
+            >>> trainer.export_onnx("user_tower.onnx", mode="user", device="cpu")
+        """
+        from ..utils.onnx_export import ONNXExporter
+
+        # Handle DataParallel wrapped model
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+
+        # Store original mode
+        original_mode = getattr(model, 'mode', None)
+
+        # Use provided device or default to 'cpu'
+        export_device = device if device is not None else 'cpu'
+
+        try:
+            exporter = ONNXExporter(model, device=export_device)
+            return exporter.export(output_path=output_path, mode=mode, dummy_input=dummy_input, batch_size=batch_size, seq_length=seq_length, opset_version=opset_version, dynamic_batch=dynamic_batch, verbose=verbose)
+        finally:
+            # Restore original mode
+            if hasattr(model, 'mode'):
+                model.mode = original_mode

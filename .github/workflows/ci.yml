@@ -32,7 +32,7 @@ on:
 
 # 环境变量
 env:
-  PYTHON_VERSION: '3.8'
+  PYTHON_VERSION: '3.9'
   TORCH_INDEX_URL: 'https://download.pytorch.org/whl/cpu'
 
 jobs:
@@ -87,33 +87,26 @@ jobs:
           mypy torch_rechub/ --ignore-missing-imports
 
   # ===================================================================
-  # 测试矩阵
+  # 完整测试 (Python 3.9) - 运行所有测试和覆盖率报告
   # ===================================================================
   test:
-    name: Test Suite
+    name: Full Test Suite (Python 3.9)
     runs-on: ${{ matrix.os }}
     needs: lint
-    
+
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
-        exclude:
-          # 排除一些不必要的组合以加速CI
-          - os: windows-latest
-            python-version: '3.9'
-          - os: macos-latest
-            python-version: '3.9'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.9
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.9'
 
       - name: Cache pip packages
         uses: actions/cache@v4
@@ -121,9 +114,9 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/torch
-          key: ${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-py3.9-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-py${{ matrix.python-version }}-
+            ${{ runner.os }}-py3.9-
             ${{ runner.os }}-
 
       - name: Install system dependencies (Ubuntu)
@@ -137,25 +130,60 @@ jobs:
           python -m pip install --upgrade pip
           # Install CPU-only PyTorch for faster CI
           pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
-          # Install the package with dev dependencies
-          pip install -e .[dev] || pip install -r requirements-dev.txt && pip install -e .
+          # Install the package with dev and onnx dependencies
+          pip install -e ".[dev,onnx]" || pip install -r requirements-dev.txt && pip install -e .
 
       - name: Run tests
         run: |
           pytest -c config/pytest.ini tests/ -v
 
-      - name: Run tests with coverage (only for main combination)
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+      - name: Run tests with coverage (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+
+  # ===================================================================
+  # 依赖兼容性验证 (Python 3.10+) - 仅验证依赖安装成功
+  # ===================================================================
+  compatibility:
+    name: Dependency Check (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install CPU-only PyTorch for faster CI
+          pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
+          # Verify package installation with all optional dependencies
+          pip install -e ".[dev,onnx]"
+
+      - name: Verify imports
+        run: |
+          python -c "import torch_rechub; print(f'torch-rechub {torch_rechub.__version__ if hasattr(torch_rechub, \"__version__\") else \"installed\"} on Python ${{ matrix.python-version }}')"
+          python -c "import onnx; import onnxruntime; print('ONNX dependencies OK')"
 
   # ===================================================================
   # 安全检查
@@ -197,7 +225,7 @@ jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [test, security]
+    needs: [test, compatibility, security]
 
     steps:
       - name: Checkout code

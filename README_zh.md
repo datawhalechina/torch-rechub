@@ -4,7 +4,7 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
-[![Python 版本](https://img.shields.io/badge/python-3.8%2B-orange?style=for-the-badge)](https://www.python.org/) 
+[![Python 版本](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/) 
 [![PyTorch 版本](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/) 
 [![annoy 版本](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://pytorch.org/) 
 [![pandas 版本](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/) 
@@ -46,16 +46,18 @@
     - [精排（CTR预测）](#精排ctr预测)
     - [多任务排序](#多任务排序)
     - [召回模型](#召回模型)
+  - [👨‍💻‍ 贡献者](#-贡献者)
   - [🤝 贡献指南](#-贡献指南)
   - [📜 许可证](#-许可证)
   - [📚 引用](#-引用)
   - [📫 联系方式](#-联系方式)
+  - [⭐️ 项目 star 历史](#️-项目-star-历史)
 
 ## 🔧 安装
 
 ### 环境要求
 
-* Python 3.8+
+* Python 3.9+
 * PyTorch 1.7+ (建议使用支持 CUDA 的版本以获得 GPU 加速)
 * NumPy
 * Pandas

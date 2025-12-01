@@ -75,7 +75,7 @@ torch-rechub项目采用现代化的CI/CD流程，确保代码质量和自动化
 - **Flake8**: 代码风格和语法检查
 
 #### 2. 测试矩阵 (test)
-- 支持Python 3.8-3.12版本
+- 支持Python 3.9-3.12版本
 - 支持Ubuntu、Windows、macOS操作系统
 - 运行pytest测试套件
 - 生成测试覆盖率报告
@@ -120,35 +120,35 @@ torch-rechub项目采用现代化的CI/CD流程，确保代码质量和自动化
 
 ### 根目录配置文件
 
-| 文件 | 作用 | 说明 |
-|------|------|------|
-| `pyproject.toml` | 项目构建和工具配置 | Python工具配置和包构建 |
-| `.pre-commit-config.yaml` | Git钩子配置 | 提交前自动代码检查 |
+| 文件                      | 作用               | 说明                   |
+| ------------------------- | ------------------ | ---------------------- |
+| `pyproject.toml`          | 项目构建和工具配置 | Python工具配置和包构建 |
+| `.pre-commit-config.yaml` | Git钩子配置        | 提交前自动代码检查     |
 
 ### config目录配置文件
 
-| 文件 | 作用 | 说明 |
-|------|------|------|
-| `config/.style.yapf` | YAPF代码格式化配置 | Google风格的详细配置 |
-| `config/.flake8` | 代码质量检查配置 | 与Google风格兼容的检查规则 |
-| `config/pytest.ini` | 测试框架配置 | 测试发现、覆盖率和标记 |
-| `config/format_code.py` | 代码格式化脚本 | 一键格式化所有代码 |
-| `config/yapf_config.py` | YAPF配置说明 | 详细的配置选项解释 |
+| 文件                    | 作用               | 说明                       |
+| ----------------------- | ------------------ | -------------------------- |
+| `config/.style.yapf`    | YAPF代码格式化配置 | Google风格的详细配置       |
+| `config/.flake8`        | 代码质量检查配置   | 与Google风格兼容的检查规则 |
+| `config/pytest.ini`     | 测试框架配置       | 测试发现、覆盖率和标记     |
+| `config/format_code.py` | 代码格式化脚本     | 一键格式化所有代码         |
+| `config/yapf_config.py` | YAPF配置说明       | 详细的配置选项解释         |
 
 ### docs目录配置文件
 
-| 文件 | 作用 | 说明 |
-|------|------|------|
+| 文件                         | 作用                  | 说明                           |
+| ---------------------------- | --------------------- | ------------------------------ |
 | `docs/.vitepress/config.mts` | VitePress文档构建配置 | 文档网站构建配置（TypeScript） |
-| `package.json` | Node.js项目配置 | VitePress脚本和依赖管理 |
+| `package.json`               | Node.js项目配置       | VitePress脚本和依赖管理        |
 
 ### GitHub Actions配置
 
-| 文件 | 作用 | 说明 |
-|------|------|------|
-| `.github/workflows/ci.yml` | 主CI流程 | 代码检查、测试、构建、发布 |
-| `.github/workflows/deploy.yml` | 文档部署 | VitePress文档自动部署到GitHub Pages |
-| `.github/dependabot.yml` | 自动依赖更新配置 | 每周检查依赖更新 |
+| 文件                           | 作用             | 说明                                |
+| ------------------------------ | ---------------- | ----------------------------------- |
+| `.github/workflows/ci.yml`     | 主CI流程         | 代码检查、测试、构建、发布          |
+| `.github/workflows/deploy.yml` | 文档部署         | VitePress文档自动部署到GitHub Pages |
+| `.github/dependabot.yml`       | 自动依赖更新配置 | 每周检查依赖更新                    |
 
 ### 模板文件 (双语)
 - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug报告模板

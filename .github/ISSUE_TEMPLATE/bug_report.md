@@ -13,7 +13,7 @@ Describe the bug you encountered / 描述您遇到的Bug
 ## Environment / 环境信息
 
 - OS / 操作系统: [e.g. Ubuntu 20.04, Windows 10]
-- Python: [e.g. 3.8]
+- Python: [e.g. 3.9]
 - PyTorch: [e.g. 1.12.0]
 - torch-rechub: [e.g. 0.0.4]
 
