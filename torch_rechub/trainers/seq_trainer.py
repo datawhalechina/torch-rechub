@@ -197,3 +197,97 @@ class SeqTrainer(object):
         accuracy = total_correct / total_samples
 
         return avg_loss, accuracy
+
+    def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False):
+        """Export the trained sequence generation model to ONNX format.
+
+        This method exports sequence generation models (e.g., HSTU) to ONNX format.
+        Unlike other trainers, sequence models use positional arguments (seq_tokens, seq_time_diffs)
+        instead of dict input, making ONNX export more straightforward.
+
+        Args:
+            output_path (str): Path to save the ONNX model file.
+            batch_size (int): Batch size for dummy input (default: 2).
+            seq_length (int): Sequence length for dummy input (default: 50).
+            vocab_size (int, optional): Vocabulary size for generating dummy tokens.
+                If None, will try to get from model.vocab_size.
+            opset_version (int): ONNX opset version (default: 14).
+            dynamic_batch (bool): Enable dynamic batch size (default: True).
+            device (str, optional): Device for export ('cpu', 'cuda', etc.).
+                If None, defaults to 'cpu' for maximum compatibility.
+            verbose (bool): Print export details (default: False).
+
+        Returns:
+            bool: True if export succeeded, False otherwise.
+
+        Example:
+            >>> trainer = SeqTrainer(hstu_model, ...)
+            >>> trainer.fit(train_dl, val_dl)
+            >>> trainer.export_onnx("hstu.onnx", vocab_size=10000)
+
+            >>> # Export on specific device
+            >>> trainer.export_onnx("hstu.onnx", vocab_size=10000, device="cpu")
+        """
+        import warnings
+
+        # Use provided device or default to 'cpu'
+        export_device = device if device is not None else 'cpu'
+
+        # Handle DataParallel wrapped model
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+        model.eval()
+        model.to(export_device)
+
+        # Get vocab_size from model if not provided
+        if vocab_size is None:
+            if hasattr(model, 'vocab_size'):
+                vocab_size = model.vocab_size
+            elif hasattr(model, 'item_num'):
+                vocab_size = model.item_num
+            else:
+                raise ValueError("vocab_size must be provided or model must have 'vocab_size' or 'item_num' attribute")
+
+        # Generate dummy inputs on the export device
+        dummy_seq_tokens = torch.randint(0, vocab_size, (batch_size, seq_length), device=export_device)
+        dummy_seq_time_diffs = torch.zeros(batch_size, seq_length, dtype=torch.float32, device=export_device)
+
+        # Configure dynamic axes
+        dynamic_axes = None
+        if dynamic_batch:
+            dynamic_axes = {"seq_tokens": {0: "batch_size", 1: "seq_length"}, "seq_time_diffs": {0: "batch_size", 1: "seq_length"}, "output": {0: "batch_size", 1: "seq_length"}}
+
+        # Ensure output directory exists
+        import os
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        try:
+            with torch.no_grad():
+                torch.onnx.export(
+                    model,
+                    (dummy_seq_tokens,
+                     dummy_seq_time_diffs),
+                    output_path,
+                    input_names=["seq_tokens",
+                                 "seq_time_diffs"],
+                    output_names=["output"],
+                    dynamic_axes=dynamic_axes,
+                    opset_version=opset_version,
+                    do_constant_folding=True,
+                    verbose=verbose,
+                    dynamo=False  # Use legacy exporter for dynamic_axes support
+                )
+
+            if verbose:
+                print(f"Successfully exported ONNX model to: {output_path}")
+                print("  Input names: ['seq_tokens', 'seq_time_diffs']")
+                print(f"  Vocab size: {vocab_size}")
+                print(f"  Opset version: {opset_version}")
+                print(f"  Dynamic batch: {dynamic_batch}")
+
+            return True
+
+        except Exception as e:
+            warnings.warn(f"ONNX export failed: {str(e)}")
+            raise RuntimeError(f"Failed to export ONNX model: {str(e)}") from e

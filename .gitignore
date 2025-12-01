@@ -170,3 +170,7 @@ cython_debug/
 *.dat
 *.pth
 *.csv
+*.npy
+
+# onnx model
+*.onnx
