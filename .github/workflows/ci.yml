@@ -102,9 +102,9 @@ jobs:
         exclude:
           # 排除一些不必要的组合以加速CI
           - os: windows-latest
-            python-version: '3.10'
+            python-version: ['3.10', '3.11', '3.12']
           - os: macos-latest
-            python-version: '3.10'
+            python-version: ['3.10', '3.11', '3.12']
 
     steps:
       - name: Checkout code
