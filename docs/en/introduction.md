@@ -9,7 +9,7 @@ description: Overview of Torch-RecHub project architecture, features, and design
 
 **Torch-RecHub** is a flexible and easily extensible recommendation system framework built using PyTorch. It aims to simplify the research and application of recommendation algorithms, providing common model implementations, data processing tools, and evaluation metrics.
 
-![Torch-RecHub Banner](/img/docs_banner.png "Torch-RecHub Banner")
+![Torch-RecHub Banner](/img/banner.png "Torch-RecHub Banner")
 
 ## Features
 
