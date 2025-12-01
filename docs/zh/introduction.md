@@ -9,7 +9,7 @@ description: Torch-RecHub 项目架构、特性和设计原理概览
 
 **Torch-RecHub** 是一个使用 PyTorch 构建的、灵活且易于扩展的推荐系统框架。它旨在简化推荐算法的研究和应用，提供常见的模型实现、数据处理工具和评估指标。
 
-![Torch-RecHub 横幅](/img/docs_banner.png "Torch-RecHub 横幅")
+![Torch-RecHub 横幅](/img/banner.png "Torch-RecHub 横幅")
 
 ## 特性
 

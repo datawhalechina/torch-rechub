@@ -18,7 +18,7 @@ English | [简体中文](README_zh.md)
 
 **Torch-RecHub** is a flexible and extensible recommender system framework built with PyTorch. It aims to simplify research and application of recommendation algorithms by providing common model implementations, data processing tools, and evaluation metrics.
 
-![Torch-RecHub Banner](docs/public/img/readme_banner_1.png)
+![Torch-RecHub Banner](docs/public/img/banner.png)
 
 ## ✨ Features
 
@@ -46,10 +46,12 @@ English | [简体中文](README_zh.md)
     - [Ranking (CTR Prediction)](#ranking-ctr-prediction)
     - [Multi-Task Ranking](#multi-task-ranking)
     - [Matching Model](#matching-model)
+  - [👨‍💻‍ Contributors](#-contributors)
   - [🤝 Contributing](#-contributing)
   - [📜 License](#-license)
   - [📚 Citation](#-citation)
   - [📫 Contact](#-contact)
+  - [⭐️ Star History](#️-star-history)
 
 ## 🔧 Installation
 
