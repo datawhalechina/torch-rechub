@@ -24,13 +24,13 @@
 
 ## 🎯 为什么选择 Torch-RecHub？
 
-| 特性 | Torch-RecHub | 其他框架 |
-|------|-------------|---------|
-| 代码行数 | **10行** 完成训练+评估+部署 | 100+ 行 |
-| 模型覆盖 | **30+** 主流模型 | 有限 |
-| 生成式推荐 | ✅ HSTU/HLLM (Meta 2024) | ❌ |
-| ONNX 一键导出 | ✅ 内置支持 | 需手动适配 |
-| 学习曲线 | 极低 | 陡峭 |
+| 特性          | Torch-RecHub                | 其他框架   |
+| ------------- | --------------------------- | ---------- |
+| 代码行数      | **10行** 完成训练+评估+部署 | 100+ 行    |
+| 模型覆盖      | **30+** 主流模型            | 有限       |
+| 生成式推荐    | ✅ HSTU/HLLM (Meta 2024)     | ❌          |
+| ONNX 一键导出 | ✅ 内置支持                  | 需手动适配 |
+| 学习曲线      | 极低                        | 陡峭       |
 
 ## ✨ 特性
 
@@ -160,52 +160,52 @@ torch-rechub/             # 根目录
 
 ### 排序模型 (Ranking Models) - 13个
 
-| 模型 | 论文 | 简介 |
-|------|------|------|
-| **DeepFM** | [IJCAI 2017](https://arxiv.org/abs/1703.04247) | FM + Deep 联合训练 |
-| **Wide&Deep** | [DLRS 2016](https://arxiv.org/abs/1606.07792) | 记忆 + 泛化能力结合 |
-| **DCN** | [KDD 2017](https://arxiv.org/abs/1708.05123) | 显式特征交叉网络 |
-| **DCN-v2** | [WWW 2021](https://arxiv.org/abs/2008.13535) | 增强版交叉网络 |
-| **DIN** | [KDD 2018](https://arxiv.org/abs/1706.06978) | 注意力机制捕捉用户兴趣 |
-| **DIEN** | [AAAI 2019](https://arxiv.org/abs/1809.03672) | 兴趣演化建模 |
-| **BST** | [DLP-KDD 2019](https://arxiv.org/abs/1905.06874) | Transformer 序列建模 |
-| **AFM** | [IJCAI 2017](https://arxiv.org/abs/1708.04617) | 注意力因子分解机 |
-| **AutoInt** | [CIKM 2019](https://arxiv.org/abs/1810.11921) | 自动特征交互学习 |
-| **FiBiNET** | [RecSys 2019](https://arxiv.org/abs/1905.09433) | 特征重要性 + 双线性交互 |
-| **DeepFFM** | [RecSys 2019](https://arxiv.org/abs/1611.00144) | 场感知因子分解机 |
-| **EDCN** | [KDD 2021](https://arxiv.org/abs/2106.03032) | 增强型交叉网络 |
+| 模型          | 论文                                             | 简介                    |
+| ------------- | ------------------------------------------------ | ----------------------- |
+| **DeepFM**    | [IJCAI 2017](https://arxiv.org/abs/1703.04247)   | FM + Deep 联合训练      |
+| **Wide&Deep** | [DLRS 2016](https://arxiv.org/abs/1606.07792)    | 记忆 + 泛化能力结合     |
+| **DCN**       | [KDD 2017](https://arxiv.org/abs/1708.05123)     | 显式特征交叉网络        |
+| **DCN-v2**    | [WWW 2021](https://arxiv.org/abs/2008.13535)     | 增强版交叉网络          |
+| **DIN**       | [KDD 2018](https://arxiv.org/abs/1706.06978)     | 注意力机制捕捉用户兴趣  |
+| **DIEN**      | [AAAI 2019](https://arxiv.org/abs/1809.03672)    | 兴趣演化建模            |
+| **BST**       | [DLP-KDD 2019](https://arxiv.org/abs/1905.06874) | Transformer 序列建模    |
+| **AFM**       | [IJCAI 2017](https://arxiv.org/abs/1708.04617)   | 注意力因子分解机        |
+| **AutoInt**   | [CIKM 2019](https://arxiv.org/abs/1810.11921)    | 自动特征交互学习        |
+| **FiBiNET**   | [RecSys 2019](https://arxiv.org/abs/1905.09433)  | 特征重要性 + 双线性交互 |
+| **DeepFFM**   | [RecSys 2019](https://arxiv.org/abs/1611.00144)  | 场感知因子分解机        |
+| **EDCN**      | [KDD 2021](https://arxiv.org/abs/2106.03032)     | 增强型交叉网络          |
 
 ### 召回模型 (Matching Models) - 12个
 
-| 模型 | 论文 | 简介 |
-|------|------|------|
-| **DSSM** | [CIKM 2013](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf) | 经典双塔召回模型 |
-| **YoutubeDNN** | [RecSys 2016](https://dl.acm.org/doi/10.1145/2959100.2959190) | YouTube 深度召回 |
-| **YoutubeSBC** | [RecSys 2019](https://dl.acm.org/doi/10.1145/3298689.3346997) | 采样偏差校正版本 |
-| **MIND** | [CIKM 2019](https://arxiv.org/abs/1904.08030) | 多兴趣动态路由 |
-| **SINE** | [WSDM 2021](https://arxiv.org/abs/2103.06920) | 稀疏兴趣网络 |
-| **GRU4Rec** | [ICLR 2016](https://arxiv.org/abs/1511.06939) | GRU 序列推荐 |
-| **SASRec** | [ICDM 2018](https://arxiv.org/abs/1808.09781) | 自注意力序列推荐 |
-| **NARM** | [CIKM 2017](https://arxiv.org/abs/1711.04725) | 神经注意力会话推荐 |
-| **STAMP** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895) | 短期注意力记忆优先 |
-| **ComiRec** | [KDD 2020](https://arxiv.org/abs/2005.09347) | 可控多兴趣推荐 |
+| 模型           | 论文                                                                           | 简介               |
+| -------------- | ------------------------------------------------------------------------------ | ------------------ |
+| **DSSM**       | [CIKM 2013](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf) | 经典双塔召回模型   |
+| **YoutubeDNN** | [RecSys 2016](https://dl.acm.org/doi/10.1145/2959100.2959190)                  | YouTube 深度召回   |
+| **YoutubeSBC** | [RecSys 2019](https://dl.acm.org/doi/10.1145/3298689.3346997)                  | 采样偏差校正版本   |
+| **MIND**       | [CIKM 2019](https://arxiv.org/abs/1904.08030)                                  | 多兴趣动态路由     |
+| **SINE**       | [WSDM 2021](https://arxiv.org/abs/2103.06920)                                  | 稀疏兴趣网络       |
+| **GRU4Rec**    | [ICLR 2016](https://arxiv.org/abs/1511.06939)                                  | GRU 序列推荐       |
+| **SASRec**     | [ICDM 2018](https://arxiv.org/abs/1808.09781)                                  | 自注意力序列推荐   |
+| **NARM**       | [CIKM 2017](https://arxiv.org/abs/1711.04725)                                  | 神经注意力会话推荐 |
+| **STAMP**      | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895)                     | 短期注意力记忆优先 |
+| **ComiRec**    | [KDD 2020](https://arxiv.org/abs/2005.09347)                                   | 可控多兴趣推荐     |
 
 ### 多任务模型 (Multi-Task Models) - 5个
 
-| 模型 | 论文 | 简介 |
-|------|------|------|
-| **ESMM** | [SIGIR 2018](https://arxiv.org/abs/1804.07931) | 全空间多任务建模 |
-| **MMoE** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3220007) | 多门控专家混合 |
-| **PLE** | [RecSys 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) | 渐进式分层提取 |
-| **AITM** | [KDD 2021](https://arxiv.org/abs/2105.08489) | 自适应信息迁移 |
-| **SharedBottom** | - | 经典多任务共享底层 |
+| 模型             | 论文                                                          | 简介               |
+| ---------------- | ------------------------------------------------------------- | ------------------ |
+| **ESMM**         | [SIGIR 2018](https://arxiv.org/abs/1804.07931)                | 全空间多任务建模   |
+| **MMoE**         | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3220007)    | 多门控专家混合     |
+| **PLE**          | [RecSys 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) | 渐进式分层提取     |
+| **AITM**         | [KDD 2021](https://arxiv.org/abs/2105.08489)                  | 自适应信息迁移     |
+| **SharedBottom** | -                                                             | 经典多任务共享底层 |
 
 ### 生成式推荐 (Generative Recommendation) - 2个
 
-| 模型 | 论文 | 简介 |
-|------|------|------|
+| 模型     | 论文                                          | 简介                                         |
+| -------- | --------------------------------------------- | -------------------------------------------- |
 | **HSTU** | [Meta 2024](https://arxiv.org/abs/2402.17152) | 层级序列转换单元，支撑 Meta 万亿参数推荐系统 |
-| **HLLM** | [2024](https://arxiv.org/abs/2409.12740) | 层级大语言模型推荐，融合 LLM 语义理解能力 |
+| **HLLM** | [2024](https://arxiv.org/abs/2409.12740)      | 层级大语言模型推荐，融合 LLM 语义理解能力    |
 
 ## 📊 支持的数据集
 
@@ -293,9 +293,17 @@ model = DSSM(user_features, item_features, temperature=0.02,
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
 match_trainer.export_onnx("dssm.onnx")
-# 双塔模型可分别导出用户塔和物品塔: 
+# 双塔模型可分别导出用户塔和物品塔:
 # match_trainer.export_onnx("user_tower.onnx", mode="user")
 # match_trainer.export_onnx("dssm_item.onnx", tower="item")
+```
+
+### 模型可视化
+
+```python
+# 可视化模型架构（需要安装: pip install torch-rechub[visualization]）
+graph = ctr_trainer.visualization(depth=4)  # 生成计算图
+ctr_trainer.visualization(save_path="model.pdf", dpi=300)  # 保存为高清 PDF
 ```
 
 ## 👨‍💻‍ 贡献者
