@@ -1,8 +1,9 @@
 # ===================================================================
 # CI/CD 流程配置 - 代码质量检查、测试、构建、发布
 # ===================================================================
-# 这个workflow在代码文件变更时触发，运行完整的CI/CD流程
-# 排除docs目录和markdown文件的变更
+# 触发条件：
+# - push/pull_request: 运行完整 CI 检查（lint, test, security, build）
+# - release: 仅运行发布流程（跳过已执行的检查）
 
 name: CI/CD Pipeline
 
@@ -37,11 +38,13 @@ env:
 
 jobs:
   # ===================================================================
-  # 代码质量检查
+  # 代码质量检查 (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   lint:
     name: Code Quality Checks
     runs-on: ubuntu-latest
+    # 跳过 release 事件，因为代码已在合并时检查过
+    if: github.event_name != 'release'
     
     steps:
       - name: Checkout code
@@ -88,11 +91,13 @@ jobs:
 
   # ===================================================================
   # 完整测试 (Python 3.9) - 运行所有测试和覆盖率报告
+  # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   test:
     name: Full Test Suite (Python 3.9)
     runs-on: ${{ matrix.os }}
     needs: lint
+    if: github.event_name != 'release'
 
     strategy:
       fail-fast: false
@@ -152,11 +157,13 @@ jobs:
 
   # ===================================================================
   # 依赖兼容性验证 (Python 3.10+) - 仅验证依赖安装成功
+  # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   compatibility:
     name: Dependency Check (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     needs: lint
+    if: github.event_name != 'release'
 
     strategy:
       fail-fast: false
@@ -186,12 +193,13 @@ jobs:
           python -c "import onnx; import onnxruntime; print('ONNX dependencies OK')"
 
   # ===================================================================
-  # 安全检查
+  # 安全检查 (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: lint
+    if: github.event_name != 'release'
 
     steps:
       - name: Checkout code
@@ -220,12 +228,13 @@ jobs:
           path: bandit-report.json
 
   # ===================================================================
-  # 构建检查
+  # 构建检查 (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   build:
     name: Build Package
     runs-on: ubuntu-latest
     needs: [test, compatibility, security]
+    if: github.event_name != 'release'
 
     steps:
       - name: Checkout code
@@ -256,18 +265,23 @@ jobs:
           path: dist/
 
   # ===================================================================
-  # 自动发布到PyPI (使用 uv)
-  # 功能：从 GitHub Release 自动同步版本号、更新 CHANGELOG、发布到 PyPI
+  # 自动发布到 PyPI 和 GitHub Release (使用 uv)
+  # 功能：
+  # - 从 GitHub Release 自动同步版本号
+  # - 更新 CHANGELOG.md
+  # - 构建并发布到 PyPI
+  # - 上传构建产物到 GitHub Release 页面
+  # 注意：此 job 仅在 release 事件时运行，不依赖其他 job（代码已在合并时检查过）
   # ===================================================================
   publish:
-    name: Publish to PyPI
+    name: Publish to PyPI & GitHub Release
     runs-on: ubuntu-latest
-    needs: build
+    # 不再依赖 build job，直接运行（代码质量已在 PR 合并时验证）
     if: github.event_name == 'release' && github.event.action == 'published'
     environment: pypi
     permissions:
       id-token: write   # Required for trusted publishing
-      contents: write   # Required for pushing changes back to repo
+      contents: write   # Required for pushing changes and uploading release assets
 
     steps:
       - name: Checkout code
@@ -342,10 +356,14 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Build package with uv
+        id: build
         run: |
           uv build
           echo "✅ Package built successfully"
           ls -la dist/
+          # 输出构建产物文件名供后续步骤使用
+          echo "WHEEL_FILE=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
+          echo "SDIST_FILE=$(ls dist/*.tar.gz)" >> $GITHUB_OUTPUT
 
       - name: Publish to PyPI
         env:
@@ -353,3 +371,13 @@ jobs:
         run: |
           uv publish
           echo "🚀 Published to PyPI successfully!"
+
+      - name: Upload release assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
