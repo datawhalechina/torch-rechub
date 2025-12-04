@@ -1,186 +1,215 @@
-# [Torch-RecHub] - Lightweight Recommender System Framework based on PyTorch
+# 🔥 Torch-RecHub - 轻量、高效、易用的 PyTorch 推荐系统框架
 
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE) 
+> 🚀 **30+ 主流推荐模型** | 🎯 **开箱即用** | 📦 **一键部署 ONNX** | 🤖 **支持生成式推荐 (HSTU/HLLM)**
+
+[![许可证](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/)
-[![PyTorch Version](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/) 
-[![annoy Version](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://pytorch.org/) 
-[![pandas Version](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/) 
-[![numpy Version](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/) 
-[![scikit-learn Version](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
-[![torch-rechub Version](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
+[![Python 版本](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/)
+[![PyTorch 版本](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/)
+[![annoy 版本](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://github.com/spotify/annoy)
+[![pandas 版本](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/)
+[![numpy 版本](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/)
+[![scikit-learn 版本](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
+[![torch-rechub 版本](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
 
-English | [简体中文](README_zh.md)
+[English](README_en.md) | 简体中文
 
-**Online Documentation:** https://datawhalechina.github.io/torch-rechub/ (English) | https://datawhalechina.github.io/torch-rechub/zh/ (简体中文)
+**在线文档：** https://datawhalechina.github.io/torch-rechub/ （英文）| https://datawhalechina.github.io/torch-rechub/zh/ （简体中文）
 
-**Torch-RecHub** is a flexible and extensible recommender system framework built with PyTorch. It aims to simplify research and application of recommendation algorithms by providing common model implementations, data processing tools, and evaluation metrics.
+**Torch-RecHub** —— **10 行代码实现工业级推荐系统**。30+ 主流模型开箱即用，支持一键 ONNX 部署，让你专注于业务而非工程。
 
-![Torch-RecHub Banner](docs/public/img/banner.png)
+![Torch-RecHub 横幅](docs/public/img/banner.png)
 
-## ✨ Features
+## 🎯 为什么选择 Torch-RecHub？
 
-* **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **PyTorch-based:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
-* **Rich Model Library:** Contains various classic and cutting-edge recommendation algorithms, including matching, ranking, multi-task, and **generative models (HSTU, HLLM)**.
-* **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
-* **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
-* **Reproducibility:** Designed to ensure reproducible experimental results.
-* **Additional Features:** Negative sampling, multi-task learning, etc.
+| 特性 | Torch-RecHub | 其他框架 |
+|------|-------------|---------|
+| 代码行数 | **10行** 完成训练+评估+部署 | 100+ 行 |
+| 模型覆盖 | **30+** 主流模型 | 有限 |
+| 生成式推荐 | ✅ HSTU/HLLM (Meta 2024) | ❌ |
+| ONNX 一键导出 | ✅ 内置支持 | 需手动适配 |
+| 学习曲线 | 极低 | 陡峭 |
 
-## 📖 Table of Contents
+## ✨ 特性
 
-- [\[Torch-RecHub\] - Lightweight Recommender System Framework based on PyTorch](#torch-rechub---lightweight-recommender-system-framework-based-on-pytorch)
-  - [✨ Features](#-features)
-  - [📖 Table of Contents](#-table-of-contents)
-  - [🔧 Installation](#-installation)
-    - [Requirements](#requirements)
-    - [Installation Steps](#installation-steps)
-  - [🚀 Quick Start](#-quick-start)
-  - [📂 Project Structure](#-project-structure)
-  - [💡 Supported Models](#-supported-models)
-  - [📊 Supported Datasets](#-supported-datasets)
-  - [🧪 Examples](#-examples)
-    - [Ranking (CTR Prediction)](#ranking-ctr-prediction)
-    - [Multi-Task Ranking](#multi-task-ranking)
-    - [Matching Model](#matching-model)
-  - [👨‍💻‍ Contributors](#-contributors)
-  - [🤝 Contributing](#-contributing)
-  - [📜 License](#-license)
-  - [📚 Citation](#-citation)
-  - [📫 Contact](#-contact)
-  - [⭐️ Star History](#️-star-history)
+* **模块化设计:** 易于添加新的模型、数据集和评估指标。
+* **基于 PyTorch:** 利用 PyTorch 的动态图和 GPU 加速能力。
+* **丰富的模型库:** 涵盖 **30+** 经典和前沿推荐算法（召回、排序、多任务、生成式推荐等）。
+* **标准化流程:** 提供统一的数据加载、训练和评估流程。
+* **易于配置:** 通过配置文件或命令行参数轻松调整实验设置。
+* **可复现性:** 旨在确保实验结果的可复现性。
+* **ONNX 导出:** 支持将训练好的模型导出为 ONNX 格式，便于部署到生产环境。
+* **其他特性:** 例如，支持负采样、多任务学习等。
 
-## 🔧 Installation
+## 📖 目录
 
-### Requirements
+- [🔥 Torch-RecHub - 轻量、高效、易用的 PyTorch 推荐系统框架](#-torch-rechub---轻量高效易用的-pytorch-推荐系统框架)
+  - [🎯 为什么选择 Torch-RecHub？](#-为什么选择-torch-rechub)
+  - [✨ 特性](#-特性)
+  - [📖 目录](#-目录)
+  - [🔧 安装](#-安装)
+    - [环境要求](#环境要求)
+    - [安装步骤](#安装步骤)
+  - [🚀 快速开始](#-快速开始)
+  - [📂 项目结构](#-项目结构)
+  - [💡 支持的模型](#-支持的模型)
+  - [📊 支持的数据集](#-支持的数据集)
+  - [🧪 示例](#-示例)
+    - [精排（CTR预测）](#精排ctr预测)
+    - [多任务排序](#多任务排序)
+    - [召回模型](#召回模型)
+  - [👨‍💻‍ 贡献者](#-贡献者)
+  - [🤝 贡献指南](#-贡献指南)
+  - [📜 许可证](#-许可证)
+  - [📚 引用](#-引用)
+  - [📫 联系方式](#-联系方式)
+  - [⭐️ 项目 star 历史](#️-项目-star-历史)
+
+## 🔧 安装
+
+### 环境要求
 
 * Python 3.9+
-* PyTorch 1.7+ (CUDA-enabled version recommended for GPU acceleration)
+* PyTorch 1.7+ (建议使用支持 CUDA 的版本以获得 GPU 加速)
 * NumPy
 * Pandas
 * SciPy
 * Scikit-learn
 
-### Installation Steps
+### 安装步骤
 
-**Stable Version (Recommended for Users):**
+**稳定版（推荐用户使用）：**
 ```bash
 pip install torch-rechub
 ```
 
-**Latest Version:**
+**最新版：**
 ```bash
-# Install uv first (if not already installed)
+# 首先安装 uv（如果尚未安装）
 pip install uv
 
-# Clone and install
+# 克隆并安装
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 ```
 
-## 🚀 Quick Start
 
-Here's a simple example of training a model (e.g., DSSM) on the MovieLens dataset:
+
+## 🚀 快速开始
+
+以下是一个简单的示例，展示如何在 MovieLens 数据集上训练模型（例如 DSSM）：
 
 ```bash
-# Clone the repository (if using latest version)
+# 克隆仓库（如果使用最新版）
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 
-# Run example
+# 运行示例
 python examples/matching/run_ml_dssm.py
 
-# Or with custom parameters:
+# 或使用自定义参数：
 python examples/matching/run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
 ```
 
-After training, model files will be saved in the `saved/dssm_ml-100k` directory (or your configured directory).
+训练完成后，模型文件将保存在 `saved/dssm_ml-100k` 目录下（或你配置的其他目录）。
 
-## 📂 Project Structure
+## 📂 项目结构
 
 ```
-torch-rechub/             # Root directory
-├── README.md             # Project documentation
-├── pyproject.toml        # Project configuration and dependencies
-├── torch_rechub/         # Core library
-│   ├── basic/            # Basic components
-│   │   ├── activation.py # Activation functions
-│   │   ├── features.py   # Feature engineering
-│   │   ├── layers.py     # Neural network layers
-│   │   ├── loss_func.py  # Loss functions
-│   │   └── metric.py     # Evaluation metrics
-│   ├── models/           # Recommendation model implementations
-│   │   ├── matching/     # Matching models (DSSM/MIND/GRU4Rec etc.)
-│   │   ├── ranking/      # Ranking models (WideDeep/DeepFM/DIN etc.)
-│   │   └── multi_task/   # Multi-task models (MMoE/ESMM etc.)
-│   ├── trainers/         # Training frameworks
-│   │   ├── ctr_trainer.py    # CTR prediction trainer
-│   │   ├── match_trainer.py  # Matching model trainer
-│   │   └── mtl_trainer.py    # Multi-task learning trainer
-│   └── utils/            # Utility functions
-│       ├── data.py       # Data processing utilities
-│       ├── match.py      # Matching utilities
-│       └── mtl.py        # Multi-task utilities
-├── examples/             # Example scripts
-│   ├── matching/         # Matching task examples
-│   ├── ranking/          # Ranking task examples
-│   └── generative/       # Generative recommendation examples (HSTU, HLLM, etc.)
-├── docs/                 # Documentation (VitePress: multi-language, English & Chinese)
-├── tutorials/            # Jupyter tutorials
-├── tests/                # Unit tests
-├── config/               # Configuration files
-└── scripts/              # Utility scripts
+torch-rechub/             # 根目录
+├── README.md             # 项目文档
+├── pyproject.toml        # 项目配置和依赖
+├── torch_rechub/         # 核心代码库
+│   ├── basic/            # 基础组件
+│   │   ├── activation.py # 激活函数
+│   │   ├── features.py   # 特征工程
+│   │   ├── layers.py     # 神经网络层
+│   │   ├── loss_func.py  # 损失函数
+│   │   └── metric.py     # 评估指标
+│   ├── models/           # 推荐模型实现
+│   │   ├── matching/     # 召回模型（DSSM/MIND/GRU4Rec等）
+│   │   ├── ranking/      # 排序模型（WideDeep/DeepFM/DIN等）
+│   │   └── multi_task/   # 多任务模型（MMoE/ESMM等）
+│   ├── trainers/         # 训练框架
+│   │   ├── ctr_trainer.py    # CTR预测训练器
+│   │   ├── match_trainer.py  # 召回模型训练器
+│   │   └── mtl_trainer.py    # 多任务学习训练器
+│   └── utils/            # 工具函数
+│       ├── data.py       # 数据处理工具
+│       ├── match.py      # 召回工具
+│       ├── mtl.py        # 多任务工具
+│       └── onnx_export.py # ONNX 导出工具
+├── examples/             # 示例脚本
+│   ├── matching/         # 召回任务示例
+│   ├── ranking/          # 排序任务示例
+│   └── generative/       # 生成式推荐示例（HSTU、HLLM 等）
+├── docs/                 # 文档（VitePress，多语言）
+├── tutorials/            # Jupyter教程
+├── tests/                # 单元测试
+├── config/               # 配置文件
+└── scripts/              # 工具脚本
 ```
 
-## 💡 Supported Models
+## 💡 支持的模型
 
-The framework currently supports the following recommendation models:
+本框架目前支持 **30+** 主流推荐模型：
 
-**General Recommendation:**
+### 排序模型 (Ranking Models) - 13个
 
-* **[DSSM](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf):** Deep Structured Semantic Model
-* **[Wide&Deep](https://arxiv.org/abs/1606.07792):** Wide & Deep Learning for Recommender Systems
-* **[FM](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf):** Factorization Machines
-* **[DeepFM](https://arxiv.org/abs/1703.04247):** Deep Factorization Machine
-* ... 
+| 模型 | 论文 | 简介 |
+|------|------|------|
+| **DeepFM** | [IJCAI 2017](https://arxiv.org/abs/1703.04247) | FM + Deep 联合训练 |
+| **Wide&Deep** | [DLRS 2016](https://arxiv.org/abs/1606.07792) | 记忆 + 泛化能力结合 |
+| **DCN** | [KDD 2017](https://arxiv.org/abs/1708.05123) | 显式特征交叉网络 |
+| **DCN-v2** | [WWW 2021](https://arxiv.org/abs/2008.13535) | 增强版交叉网络 |
+| **DIN** | [KDD 2018](https://arxiv.org/abs/1706.06978) | 注意力机制捕捉用户兴趣 |
+| **DIEN** | [AAAI 2019](https://arxiv.org/abs/1809.03672) | 兴趣演化建模 |
+| **BST** | [DLP-KDD 2019](https://arxiv.org/abs/1905.06874) | Transformer 序列建模 |
+| **AFM** | [IJCAI 2017](https://arxiv.org/abs/1708.04617) | 注意力因子分解机 |
+| **AutoInt** | [CIKM 2019](https://arxiv.org/abs/1810.11921) | 自动特征交互学习 |
+| **FiBiNET** | [RecSys 2019](https://arxiv.org/abs/1905.09433) | 特征重要性 + 双线性交互 |
+| **DeepFFM** | [RecSys 2019](https://arxiv.org/abs/1611.00144) | 场感知因子分解机 |
+| **EDCN** | [KDD 2021](https://arxiv.org/abs/2106.03032) | 增强型交叉网络 |
 
-**Sequential Recommendation:**
+### 召回模型 (Matching Models) - 12个
 
-* **[DIN](https://arxiv.org/pdf/1706.06978.pdf):** Deep Interest Network
-* **[DIEN](https://arxiv.org/pdf/1809.03672.pdf):** Deep Interest Evolution Network
-* **[BST](https://arxiv.org/pdf/1905.06874.pdf):** Behavior Sequence Transformer
-* **[GRU4Rec](https://arxiv.org/pdf/1511.06939.pdf):** Gated Recurrent Unit for Recommendation
-* **[SASRec](https://arxiv.org/pdf/1808.09781.pdf):** Self-Attentive Sequential Recommendation
-* ... 
+| 模型 | 论文 | 简介 |
+|------|------|------|
+| **DSSM** | [CIKM 2013](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf) | 经典双塔召回模型 |
+| **YoutubeDNN** | [RecSys 2016](https://dl.acm.org/doi/10.1145/2959100.2959190) | YouTube 深度召回 |
+| **YoutubeSBC** | [RecSys 2019](https://dl.acm.org/doi/10.1145/3298689.3346997) | 采样偏差校正版本 |
+| **MIND** | [CIKM 2019](https://arxiv.org/abs/1904.08030) | 多兴趣动态路由 |
+| **SINE** | [WSDM 2021](https://arxiv.org/abs/2103.06920) | 稀疏兴趣网络 |
+| **GRU4Rec** | [ICLR 2016](https://arxiv.org/abs/1511.06939) | GRU 序列推荐 |
+| **SASRec** | [ICDM 2018](https://arxiv.org/abs/1808.09781) | 自注意力序列推荐 |
+| **NARM** | [CIKM 2017](https://arxiv.org/abs/1711.04725) | 神经注意力会话推荐 |
+| **STAMP** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895) | 短期注意力记忆优先 |
+| **ComiRec** | [KDD 2020](https://arxiv.org/abs/2005.09347) | 可控多兴趣推荐 |
 
-**Multi-Interest Recommendation:**
+### 多任务模型 (Multi-Task Models) - 5个
 
-* **[MIND](https://arxiv.org/pdf/1904.08030.pdf):** Multi-Interest Network with Dynamic Routing
-* **[SINE](https://arxiv.org/pdf/2103.06920.pdf):** Self-Interested Network for Recommendation
-* ... 
+| 模型 | 论文 | 简介 |
+|------|------|------|
+| **ESMM** | [SIGIR 2018](https://arxiv.org/abs/1804.07931) | 全空间多任务建模 |
+| **MMoE** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3220007) | 多门控专家混合 |
+| **PLE** | [RecSys 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) | 渐进式分层提取 |
+| **AITM** | [KDD 2021](https://arxiv.org/abs/2105.08489) | 自适应信息迁移 |
+| **SharedBottom** | - | 经典多任务共享底层 |
 
-**Multi-Task Recommendation:**
+### 生成式推荐 (Generative Recommendation) - 2个
 
-* **[ESMM](https://arxiv.org/pdf/1804.07931.pdf):** Entire Space Multi-Task Model
-* **[MMoE](https://dl.acm.org/doi/pdf/10.1145/3219819.3220007):** Multi-gate Mixture-of-Experts for Multi-Task Learning
-* **[PLE](https://dl.acm.org/doi/pdf/10.1145/3394486.3403394):** Personalized Learning to Rank
-* **[AITM](https://arxiv.org/pdf/2005.02553.pdf):** Adaptive Interest-Task Matching
-* ... 
+| 模型 | 论文 | 简介 |
+|------|------|------|
+| **HSTU** | [Meta 2024](https://arxiv.org/abs/2402.17152) | 层级序列转换单元，支撑 Meta 万亿参数推荐系统 |
+| **HLLM** | [2024](https://arxiv.org/abs/2409.12740) | 层级大语言模型推荐，融合 LLM 语义理解能力 |
 
-**Generative Recommendation:**
+## 📊 支持的数据集
 
-* **[HSTU](https://arxiv.org/abs/2402.17152v3):** Hierarchical Sequential Transduction Units based generative sequential recommendation model.
-* **[HLLM](https://arxiv.org/abs/2508.18118v1):** Hierarchical Large Language Model for recommendation with LLM-based item embeddings.
-* ...
-
-## 📊 Supported Datasets
-
-The framework provides built-in support or preprocessing scripts for the following common datasets:
+框架内置了对以下常见数据集格式的支持或提供了处理脚本：
 
 * **MovieLens**
 * **Amazon**
@@ -190,24 +219,25 @@ The framework provides built-in support or preprocessing scripts for the followi
 * **BookCrossing**
 * **Ali-ccp**
 * **Yidian**
-* ...
+* ... 
 
-The expected data format is typically an interaction file containing:
-- User ID
-- Item ID 
-- Rating (optional)
-- Timestamp (optional)
+我们期望的数据格式通常是包含以下字段的交互文件：
+- 用户 ID
+- 物品 ID 
+- 评分（可选）
+- 时间戳（可选）
 
-For specific format requirements, please refer to the example code in the `tutorials` directory.
+具体格式要求请参考 `tutorials` 目录下的示例代码。
 
-You can easily integrate your own datasets by ensuring they conform to the framework's data format requirements or by writing custom data loaders.
+你可以方便地集成你自己的数据集，只需确保它符合框架要求的数据格式，或编写自定义的数据加载器。
 
 
-## 🧪 Examples
+## 🧪 示例
 
-All model usage examples can be found in `/examples`
+所有模型使用案例参考 `/examples`
 
-### Ranking (CTR Prediction)
+
+### 精排（CTR预测）
 
 ```python
 from torch_rechub.models.ranking import DeepFM
@@ -222,9 +252,10 @@ model = DeepFM(deep_features=deep_features, fm_features=fm_features, mlp_params=
 ctr_trainer = CTRTrainer(model)
 ctr_trainer.fit(train_dataloader, val_dataloader)
 auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+ctr_trainer.export_onnx("deepfm.onnx")
 ```
 
-### Multi-Task Ranking
+### 多任务排序
 
 ```python
 from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
@@ -236,16 +267,17 @@ model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_par
 mtl_trainer = MTLTrainer(model)
 mtl_trainer.fit(train_dataloader, val_dataloader)
 auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+mtl_trainer.export_onnx("mmoe.onnx")
 ```
 
-### Matching Model
+### 召回模型
 
 ```python
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator
 
-dg = MatchDataGenerator(x y)
+dg = MatchDataGenerator(x, y)
 train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=256)
 
 model = DSSM(user_features, item_features, temperature=0.02,
@@ -260,35 +292,39 @@ model = DSSM(user_features, item_features, temperature=0.02,
 
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
+match_trainer.export_onnx("dssm.onnx")
+# 双塔模型可分别导出用户塔和物品塔: 
+# match_trainer.export_onnx("user_tower.onnx", mode="user")
+# match_trainer.export_onnx("dssm_item.onnx", tower="item")
 ```
 
-## 👨‍💻‍ Contributors
+## 👨‍💻‍ 贡献者
 
-Thanks to all contributors!
+感谢所有的贡献者！
 
 ![GitHub contributors](https://img.shields.io/github/contributors/datawhalechina/torch-rechub?color=32A9C3&labelColor=1B3C4A&logo=contributorcovenant)
 
 [![contributors](https://contrib.rocks/image?repo=datawhalechina/torch-rechub)](https://github.com/datawhalechina/torch-rechub/graphs/contributors)
 
-## 🤝 Contributing
+## 🤝 贡献指南
 
-We welcome contributions in all forms! Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+我们欢迎各种形式的贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细的贡献指南。
 
-We also welcome bug reports and feature suggestions through [Issues](https://github.com/datawhalechina/torch-rechub/issues).
+我们也欢迎通过 [Issues](https://github.com/datawhalechina/torch-rechub/issues) 报告 Bug 或提出功能建议。
 
-## 📜 License
+## 📜 许可证
 
-This project is licensed under the [MIT License](LICENSE).
+本项目采用 [MIT 许可证](LICENSE)。
 
-## 📚 Citation
+## 📚 引用
 
-If you use this framework in your research or work, please consider citing:
+如果你在研究或工作中使用了本框架，请考虑引用：
 
 ```bibtex
 @misc{torch_rechub,
     title = {Torch-RecHub},
     author = {Datawhale},
-    year = {2024},
+    year = {2022},
     publisher = {GitHub},
     journal = {GitHub repository},
     howpublished = {\url{https://github.com/datawhalechina/torch-rechub}},
@@ -296,17 +332,15 @@ If you use this framework in your research or work, please consider citing:
 }
 ```
 
-## 📫 Contact
+## 📫 联系方式
 
-* **Project Lead:** [morningsky](https://github.com/morningsky) 
-* [**GitHub Issues**](https://github.com/datawhalechina/torch-rechub/issues)
+* **项目负责人:** [1985312383](https://github.com/1985312383) 
+* [**GitHub Disscussions**](https://github.com/datawhalechina/torch-rechub/discussions)
 
-
-
-## ⭐️ Star History
+## ⭐️ 项目 star 历史
 
 [![Star History Chart](https://api.star-history.com/svg?repos=datawhalechina/torch-rechub&type=Date)](https://www.star-history.com/#datawhalechina/torch-rechub&Date)
 
 ---
 
-*Last updated: [2025-11-27]*
+*最后更新: [2025-12-04]*

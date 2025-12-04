@@ -1,0 +1,51 @@
+# GitHub 自动生成 Release Notes 的配置
+# 当你点击 "Generate release notes" 按钮时，会根据此配置生成内容
+# 文档: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - duplicate
+      - invalid
+    authors:
+      - dependabot
+      - dependabot[bot]
+
+  categories:
+    - title: "✨ 新特性 / Features"
+      labels:
+        - enhancement
+        - feature
+        - feat
+
+    - title: "🐛 Bug 修复 / Bug Fixes"
+      labels:
+        - bug
+        - fix
+        - bugfix
+
+    - title: "⚡ 性能优化 / Performance"
+      labels:
+        - performance
+        - perf
+
+    - title: "📝 文档更新 / Documentation"
+      labels:
+        - documentation
+        - docs
+
+    - title: "🔧 维护更新 / Maintenance"
+      labels:
+        - maintenance
+        - chore
+        - refactor
+
+    - title: "📦 依赖更新 / Dependencies"
+      labels:
+        - dependencies
+
+    - title: "🔄 其他变更 / Other Changes"
+      labels:
+        - "*"
+
