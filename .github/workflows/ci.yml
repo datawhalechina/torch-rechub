@@ -256,7 +256,8 @@ jobs:
           path: dist/
 
   # ===================================================================
-  # 自动发布到PyPI
+  # 自动发布到PyPI (使用 uv)
+  # 功能：从 GitHub Release 自动同步版本号、更新 CHANGELOG、发布到 PyPI
   # ===================================================================
   publish:
     name: Publish to PyPI
@@ -265,17 +266,90 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     environment: pypi
     permissions:
-      id-token: write  # Required for trusted publishing
+      id-token: write   # Required for trusted publishing
+      contents: write   # Required for pushing changes back to repo
 
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
-          name: dist-packages
-          path: dist/
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          # 从 tag 提取版本号 (去掉 v 前缀)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      - name: Update version in pyproject.toml
+        run: |
+          # 更新 pyproject.toml 中的版本号
+          sed -i "s/^version = \".*\"/version = \"${{ steps.get_version.outputs.VERSION }}\"/" pyproject.toml
+          echo "✅ Updated pyproject.toml version to ${{ steps.get_version.outputs.VERSION }}"
+          grep "^version" pyproject.toml
+
+      - name: Update CHANGELOG.md
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          DATE=$(date +%Y-%m-%d)
+
+          # 创建新的 changelog 条目
+          NEW_ENTRY="## [${VERSION}] - ${DATE}
+
+          ${RELEASE_BODY}
+
+          ---
+
+          "
+
+          # 在第一个 --- 分隔符之后插入新版本记录
+          awk -v entry="$NEW_ENTRY" '
+            !found && /^---$/ { print; print ""; print entry; found=1; next }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+
+          echo "✅ Updated CHANGELOG.md with version $VERSION"
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add pyproject.toml CHANGELOG.md
+
+          # 检查是否有变更
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(release): v${{ steps.get_version.outputs.VERSION }} [skip ci]"
+            git push origin main
+            echo "✅ Pushed version changes to main branch"
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Build package with uv
+        run: |
+          uv build
+          echo "✅ Package built successfully"
+          ls -la dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          repository-url: https://upload.pypi.org/legacy/
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          uv publish
+          echo "🚀 Published to PyPI successfully!"
