@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.5] - 2025-12-05
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Add torchview to Support Model Visualization && Update CI/CD and release workflows by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/141
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.0.4...v0.0.5
+
+---
+
+
+
 ## [0.0.4] - 2025-12-04
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
