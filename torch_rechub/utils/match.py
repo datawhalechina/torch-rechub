@@ -4,6 +4,7 @@ from collections import Counter, OrderedDict
 
 import numpy as np
 import pandas as pd
+import torch
 import tqdm
 
 from .data import df_to_dict, pad_sequences
@@ -16,7 +17,6 @@ except ImportError:
     ANNOY_AVAILABLE = False
 
 try:
-    import torch
     from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
     MILVUS_AVAILABLE = True
 except ImportError:
@@ -99,6 +99,66 @@ def negative_sample(items_cnt_order, ratio, method_id=0):
     else:
         raise ValueError("method id should in (0,1,2,3)")
     return neg_items
+
+
+def inbatch_negative_sampling(scores, neg_ratio=None, hard_negative=False, generator=None):
+    """Generate in-batch negative indices from a similarity matrix.
+
+    This mirrors the offline ``negative_sample`` API by only returning sampled
+    indices; score gathering is handled separately to keep responsibilities clear.
+
+    Args:
+        scores (torch.Tensor): similarity matrix with shape (batch_size, batch_size).
+        neg_ratio (int, optional): number of negatives for each positive sample.
+            Defaults to batch_size-1 when omitted or out of range.
+        hard_negative (bool, optional): whether to pick top-k highest scores as negatives
+            instead of uniform random sampling. Defaults to False.
+        generator (torch.Generator, optional): generator to control randomness for tests/reproducibility.
+
+    Returns:
+        torch.Tensor: sampled negative indices with shape (batch_size, neg_ratio).
+    """
+    if scores.dim() != 2:  # must be batch_size x batch_size
+        raise ValueError(f"inbatch_negative_sampling expects 2D scores, got shape {tuple(scores.shape)}")
+    batch_size = scores.size(0)
+    if batch_size <= 1:
+        raise ValueError("In-batch negative sampling requires batch_size > 1")
+
+    max_neg = batch_size - 1  # each col can provide at most batch_size-1 negatives
+    if neg_ratio is None or neg_ratio <= 0 or neg_ratio > max_neg:
+        neg_ratio = max_neg
+
+    device = scores.device
+    index_range = torch.arange(batch_size, device=device)
+    neg_indices = torch.empty((batch_size, neg_ratio), dtype=torch.long, device=device)
+
+    # for each sample, pick neg_ratio negatives
+    for i in range(batch_size):
+        if hard_negative:
+            row_scores = scores[i].clone()
+            row_scores[i] = float("-inf")  # mask positive
+            topk = torch.topk(row_scores, k=neg_ratio).indices
+            neg_indices[i] = topk
+        else:
+            candidates = torch.cat([index_range[:i], index_range[i + 1:]])  # all except i
+            perm = torch.randperm(candidates.size(0), device=device, generator=generator)  # random negative sampling
+            neg_indices[i] = candidates[perm[:neg_ratio]]
+
+    return neg_indices
+
+
+def gather_inbatch_logits(scores, neg_indices):
+    """
+    scores: (B, B)
+        scores[i][j] = user_i ⋅ item_j
+    neg_indices: (B, K)
+        neg_indices[i] = the K negative items for user_i
+    """
+    # positive: scores[i][i]
+    positive_logits = torch.diagonal(scores).reshape(-1, 1)  # (B,1)
+    # negatives: scores[i][neg_indices[i, j]]
+    negative_logits = scores[torch.arange(scores.size(0)).unsqueeze(1), neg_indices]  # (B,K)
+    return torch.cat([positive_logits, negative_logits], dim=1)
 
 
 def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols=None, sample_method=0, mode=0, neg_ratio=0, min_item=0):
