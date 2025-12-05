@@ -147,11 +147,8 @@ def generate_dummy_input(features: List[Any], batch_size: int = 2, seq_length: i
             # Sparse features have shape [batch_size]
             tensor = torch.randint(0, feat.vocab_size, (batch_size,), device=device)
         elif isinstance(feat, DenseFeature):
-            # Dense features: [batch_size] for embed_dim=1, [batch_size, embed_dim] otherwise
-            if feat.embed_dim == 1:
-                tensor = torch.randn(batch_size, device=device)
-            else:
-                tensor = torch.randn(batch_size, feat.embed_dim, device=device)
+            # Dense features always have shape [batch_size, embed_dim]
+            tensor = torch.randn(batch_size, feat.embed_dim, device=device)
         else:
             raise TypeError(f"Unsupported feature type: {type(feat)}")
         inputs.append(tensor)
