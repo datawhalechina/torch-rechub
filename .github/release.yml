@@ -8,6 +8,7 @@ changelog:
       - ignore-for-release
       - duplicate
       - invalid
+      - wontfix
     authors:
       - dependabot
       - dependabot[bot]
@@ -16,30 +17,22 @@ changelog:
     - title: "✨ 新特性 / Features"
       labels:
         - enhancement
-        - feature
-        - feat
 
     - title: "🐛 Bug 修复 / Bug Fixes"
       labels:
         - bug
-        - fix
-        - bugfix
 
     - title: "⚡ 性能优化 / Performance"
       labels:
         - performance
-        - perf
 
     - title: "📝 文档更新 / Documentation"
       labels:
         - documentation
-        - docs
 
-    - title: "🔧 维护更新 / Maintenance"
+    - title: "🔧 模型更新 / Models"
       labels:
-        - maintenance
-        - chore
-        - refactor
+        - model
 
     - title: "📦 依赖更新 / Dependencies"
       labels:
@@ -48,4 +41,3 @@ changelog:
     - title: "🔄 其他变更 / Other Changes"
       labels:
         - "*"
-

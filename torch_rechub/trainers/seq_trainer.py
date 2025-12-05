@@ -291,3 +291,137 @@ class SeqTrainer(object):
         except Exception as e:
             warnings.warn(f"ONNX export failed: {str(e)}")
             raise RuntimeError(f"Failed to export ONNX model: {str(e)}") from e
+
+    def visualization(self, seq_length=50, vocab_size=None, batch_size=2, depth=3, show_shapes=True, expand_nested=True, save_path=None, graph_name="model", device=None, dpi=300, **kwargs):
+        """Visualize the model's computation graph.
+
+        This method generates a visual representation of the sequence model
+        architecture, showing layer connections, tensor shapes, and nested
+        module structures.
+
+        Parameters
+        ----------
+        seq_length : int, default=50
+            Sequence length for dummy input.
+        vocab_size : int, optional
+            Vocabulary size for generating dummy tokens.
+            If None, will try to get from model.vocab_size or model.item_num.
+        batch_size : int, default=2
+            Batch size for dummy input.
+        depth : int, default=3
+            Visualization depth, higher values show more detail.
+            Set to -1 to show all layers.
+        show_shapes : bool, default=True
+            Whether to display tensor shapes.
+        expand_nested : bool, default=True
+            Whether to expand nested modules.
+        save_path : str, optional
+            Path to save the graph image (.pdf, .svg, .png).
+            If None, displays in Jupyter or opens system viewer.
+        graph_name : str, default="model"
+            Name for the graph.
+        device : str, optional
+            Device for model execution. If None, defaults to 'cpu'.
+        dpi : int, default=300
+            Resolution in dots per inch for output image.
+            Higher values produce sharper images suitable for papers.
+        **kwargs : dict
+            Additional arguments passed to torchview.draw_graph().
+
+        Returns
+        -------
+        ComputationGraph
+            A torchview ComputationGraph object.
+
+        Raises
+        ------
+        ImportError
+            If torchview or graphviz is not installed.
+        ValueError
+            If vocab_size is not provided and cannot be inferred from model.
+
+        Notes
+        -----
+        Default Display Behavior:
+            When `save_path` is None (default):
+            - In Jupyter/IPython: automatically displays the graph inline
+            - In Python script: opens the graph with system default viewer
+
+        Examples
+        --------
+        >>> trainer = SeqTrainer(hstu_model, ...)
+        >>> trainer.fit(train_dl, val_dl)
+        >>>
+        >>> # Auto-display in Jupyter (no save_path needed)
+        >>> trainer.visualization(depth=4, vocab_size=10000)
+        >>>
+        >>> # Save to high-DPI PNG for papers
+        >>> trainer.visualization(save_path="model.png", dpi=300)
+        """
+        try:
+            from torchview import draw_graph
+            TORCHVIEW_AVAILABLE = True
+        except ImportError:
+            TORCHVIEW_AVAILABLE = False
+
+        if not TORCHVIEW_AVAILABLE:
+            raise ImportError(
+                "Visualization requires torchview. "
+                "Install with: pip install torch-rechub[visualization]\n"
+                "Also ensure graphviz is installed on your system:\n"
+                "  - Ubuntu/Debian: sudo apt-get install graphviz\n"
+                "  - macOS: brew install graphviz\n"
+                "  - Windows: choco install graphviz"
+            )
+
+        from ..utils.visualization import _is_jupyter_environment, display_graph
+
+        # Handle DataParallel wrapped model
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+
+        # Use provided device or default to 'cpu'
+        viz_device = device if device is not None else 'cpu'
+
+        # Get vocab_size from model if not provided
+        if vocab_size is None:
+            if hasattr(model, 'vocab_size'):
+                vocab_size = model.vocab_size
+            elif hasattr(model, 'item_num'):
+                vocab_size = model.item_num
+            else:
+                raise ValueError("vocab_size must be provided or model must have "
+                                 "'vocab_size' or 'item_num' attribute")
+
+        # Generate dummy inputs for sequence model
+        dummy_seq_tokens = torch.randint(0, vocab_size, (batch_size, seq_length), device=viz_device)
+        dummy_seq_time_diffs = torch.zeros(batch_size, seq_length, dtype=torch.float32, device=viz_device)
+
+        # Move model to device
+        model = model.to(viz_device)
+        model.eval()
+
+        # Call torchview.draw_graph
+        graph = draw_graph(model, input_data=(dummy_seq_tokens, dummy_seq_time_diffs), graph_name=graph_name, depth=depth, device=viz_device, expand_nested=expand_nested, show_shapes=show_shapes, save_graph=False, **kwargs)
+
+        # Set DPI for high-quality output
+        graph.visual_graph.graph_attr['dpi'] = str(dpi)
+
+        # Handle save_path: manually save with DPI applied
+        if save_path:
+            import os
+            directory = os.path.dirname(save_path) or "."
+            filename = os.path.splitext(os.path.basename(save_path))[0]
+            ext = os.path.splitext(save_path)[1].lstrip('.')
+            output_format = ext if ext else 'pdf'
+            if directory != "." and not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
+            graph.visual_graph.render(filename=filename, directory=directory, format=output_format, cleanup=True)
+
+        # Handle default display behavior when save_path is None
+        if save_path is None:
+            if _is_jupyter_environment():
+                display_graph(graph)
+            else:
+                graph.visual_graph.view(cleanup=True)
+
+        return graph
