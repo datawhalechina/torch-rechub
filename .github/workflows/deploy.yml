@@ -30,6 +30,8 @@ jobs:
 
       - name: Sync CHANGELOG to docs
         run: |
+          mkdir -p docs/zh/api
+          mkdir -p docs/en/api
           # 复制 CHANGELOG.md 到中英文文档目录
           cp CHANGELOG.md docs/zh/api/changelog.md
           cp CHANGELOG.md docs/en/api/changelog.md
