@@ -91,5 +91,5 @@ python examples/matching/run_ml_dssm.py
 如果您遇到任何安装问题，请：
 1. 查看 [GitHub Issues](https://github.com/datawhalechina/torch-rechub/issues)
 2. 创建新的 Issue，并提供详细的错误信息和系统信息
-3. 参考 [常见问题解答](/zh/manual/faq) 部分
+3. 参考 常见问题解答 部分
 

@@ -7,6 +7,7 @@ on:
     paths:
       - 'docs/**'
       - 'package.json'
+      - 'CHANGELOG.md'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -26,6 +27,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync CHANGELOG to docs
+        run: |
+          # 复制 CHANGELOG.md 到中英文文档目录
+          cp CHANGELOG.md docs/zh/api/changelog.md
+          cp CHANGELOG.md docs/en/api/changelog.md
+          echo "✅ CHANGELOG.md synced to docs directories"
 
       - name: Build VitePress site
         run: npm run docs:build
