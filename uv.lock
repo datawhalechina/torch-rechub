@@ -2338,6 +2338,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pyarrow-stubs"
+version = "20.0.0.20251107"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyarrow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/f1/40fa277fe20dfc6253f8e11edb96120050174209afc84019cd52386c5769/pyarrow_stubs-20.0.0.20251107.tar.gz", hash = "sha256:c0885c09f63e2be51bacb6b0e20b39083f43da1cb214d31e406f982e874bcb5a", size = 236584, upload-time = "2025-11-07T03:46:59.872Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/fa/a8ebb2cc3a301604f5ca2628e399232ba2d53c1590c1a9b7f8695667db4e/pyarrow_stubs-20.0.0.20251107-py3-none-any.whl", hash = "sha256:09da6809f37cc6dbbbf59c9c8e42269290d19ac09f65d2b3456c671f1c3a8765", size = 235744, upload-time = "2025-11-07T03:47:00.868Z" },
+]
+
+[[package]]
 name = "pycodestyle"
 version = "2.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3566,6 +3578,7 @@ dev = [
     { name = "isort" },
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "pyarrow-stubs" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "toml" },
@@ -3610,6 +3623,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=1.2.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=2.20.0" },
     { name = "pyarrow", marker = "extra == 'bigdata'", specifier = "~=21.0" },
+    { name = "pyarrow-stubs", marker = "extra == 'dev'", specifier = ">=20.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=2.0" },
     { name = "scikit-learn", specifier = ">=0.24.0" },
