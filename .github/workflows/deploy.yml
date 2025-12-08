@@ -33,8 +33,8 @@ jobs:
           mkdir -p docs/zh/api
           mkdir -p docs/en/api
           # 复制 CHANGELOG.md 到中英文文档目录
-          cp CHANGELOG.md docs/zh/api/changelog.md
-          cp CHANGELOG.md docs/en/api/changelog.md
+          cp CHANGELOG.md docs/zh/community/changelog.md
+          cp CHANGELOG.md docs/en/community/changelog.md
           echo "✅ CHANGELOG.md synced to docs directories"
 
       - name: Build VitePress site

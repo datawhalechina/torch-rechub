@@ -31,13 +31,15 @@ export default defineConfig({
       lang: 'en',
       themeConfig: {
         nav: [
+          { text: '🏠 Home', link: '/' },
           { text: '🚀 Getting Started', link: '/guide/intro' },
           { text: '⚙️ Core', link: '/core/intro' },
           { text: '🏰 Models', link: '/models/intro' },
           { text: '🛠️ Tools', link: '/tools/intro' },
           { text: '🚀 Serving', link: '/serving/intro' },
           { text: '📖 Tutorials', link: '/tutorials/intro' },
-          { text: 'ℹ️ API & Misc', link: '/api/api' }
+          { text: 'ℹ️ API', link: '/api/api' },
+          { text: '👥 Community', link: '/community/faq' }
         ],
 
         sidebar: {
@@ -62,9 +64,9 @@ export default defineConfig({
           '/models/': [{
             text: '🏰 Model Zoo', items: [
               { text: 'Overview', link: '/models/intro' },
-              { text: 'Ranking Models', link: '/models/ranking/' },
-              { text: 'Matching Models', link: '/models/matching/' },
-              { text: 'Multi-Task Models', link: '/models/mtl/' }
+              { text: 'Ranking Models', link: '/models/ranking' },
+              { text: 'Matching Models', link: '/models/matching' },
+              { text: 'Multi-Task Models', link: '/models/mtl' }
             ]
           }],
           '/tools/': [{
@@ -92,22 +94,21 @@ export default defineConfig({
             ]
           }],
 
-          // 逻辑调整：所有 API 和杂项都在这里
-          // 建议：将 faq.md, contributing.md 物理移动到 docs/en/api/ 目录下
           '/api/': [
             {
               text: 'ℹ️ API Reference',
               items: [
-                // Quartodoc 生成的主索引通常命名为 index.md 或 objects.md
                 { text: 'Main API', link: '/api/api' },
               ]
-            },
+            }
+          ],
+          '/community/': [
             {
-              text: '📘 Project Info',
+              text: '📘 Community',
               items: [
-                { text: 'FAQ', link: '/api/faq' },
-                { text: 'Contributing', link: '/api/contributing' },
-                { text: 'Changelog', link: '/api/changelog' }
+                { text: 'FAQ', link: '/community/faq' },
+                { text: 'Contributing', link: '/community/contributing' },
+                { text: 'Changelog', link: '/community/changelog' }
               ]
             }
           ]
@@ -124,13 +125,15 @@ export default defineConfig({
       link: '/zh/',
       themeConfig: {
         nav: [
+          { text: '🏠 首页', link: '/zh/' },
           { text: '🚀 快速入门', link: '/zh/guide/intro' },
           { text: '⚙️ 核心组件', link: '/zh/core/intro' },
           { text: '🏰 模型库', link: '/zh/models/intro' },
           { text: '🛠️ 研发工具', link: '/zh/tools/intro' },
           { text: '🚀 生产部署', link: '/zh/serving/intro' },
           { text: '📖 场景教程', link: '/zh/tutorials/intro' },
-          { text: 'ℹ️ API & 其他', link: '/zh/api/api' }
+          { text: 'ℹ️ API', link: '/zh/api/api' },
+          { text: '👥 社区', link: '/zh/community/faq' }
         ],
 
         sidebar: {
@@ -155,9 +158,9 @@ export default defineConfig({
           '/zh/models/': [{
             text: '🏰 模型库', items: [
               { text: '导览 (Overview)', link: '/zh/models/intro' },
-              { text: '排序模型 (Ranking)', link: '/zh/models/ranking/' },
-              { text: '召回模型 (Matching)', link: '/zh/models/matching/' },
-              { text: '多任务模型 (MTL)', link: '/zh/models/mtl/' }
+              { text: '排序模型 (Ranking)', link: '/zh/models/ranking' },
+              { text: '召回模型 (Matching)', link: '/zh/models/matching' },
+              { text: '多任务模型 (MTL)', link: '/zh/models/mtl' }
             ]
           }],
           '/zh/tools/': [{
@@ -188,16 +191,17 @@ export default defineConfig({
             {
               text: 'ℹ️ API Reference',
               items: [
-                // 注意：通常 API 文档不一定有中文版，可以复用英文链接，或者这里链接到中文 API 索引
                 { text: 'API 参考', link: '/zh/api/api' },
               ]
-            },
+            }
+          ],
+          '/zh/community/': [
             {
-              text: '📘 其他信息',
+              text: '📘 社区信息',
               items: [
-                { text: '常见问题 (FAQ)', link: '/zh/api/faq' },
-                { text: '贡献指南 (Contributing)', link: '/zh/api/contributing' },
-                { text: '版本日志 (Changelog)', link: '/zh/api/changelog' }
+                { text: '常见问题 (FAQ)', link: '/zh/community/faq' },
+                { text: '贡献指南 (Contributing)', link: '/zh/community/contributing' },
+                { text: '版本日志 (Changelog)', link: '/zh/community/changelog' }
               ]
             }
           ]
