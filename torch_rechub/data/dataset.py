@@ -3,15 +3,18 @@
 import os
 import typing as ty
 
+import pyarrow as pa
 import pyarrow.dataset as pd
 import torch
 from torch.utils.data import IterableDataset, get_worker_info
 
 from .convert import pa_array_to_tensor
-from .type import FilePath, SupportedPythonDType
+
+# Type for path to a file
+_FilePath = ty.Union[str, os.PathLike]
 
 # The default batch size when reading a Parquet dataset
-DEFAULT_BATCH_SIZE = 1024
+_DEFAULT_BATCH_SIZE = 1024
 
 
 class ParquetIterableDataset(IterableDataset):
@@ -20,15 +23,12 @@ class ParquetIterableDataset(IterableDataset):
 
     Parameters
     ----------
-    file_paths : list[FilePath]
+    file_paths : list[_FilePath]
         Paths to Parquet files.
     columns : list[str], optional
         Column names to select. If ``None``, all columns are read.
     batch_size : int, default DEFAULT_BATCH_SIZE
         Number of rows per streamed batch.
-    null_replace : bool, float, int, or None
-        A global value to replace nulls. If ``None``, nulls will not be replaced and it
-        will raise when there are nulls because PyTorch tensor does not support nulls.
 
     Notes
     -----
@@ -54,17 +54,15 @@ class ParquetIterableDataset(IterableDataset):
 
     def __init__(
         self,
-        file_paths: ty.Sequence[FilePath],
+        file_paths: ty.Sequence[_FilePath],
         /,
         columns: ty.Optional[ty.Sequence[str]] = None,
-        batch_size: int = DEFAULT_BATCH_SIZE,
-        null_replace: ty.Optional[SupportedPythonDType] = None,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
     ) -> None:
         """Initialize this instance."""
         self._file_paths = tuple(map(str, file_paths))
         self._columns = None if columns is None else tuple(columns)
         self._batch_size = batch_size
-        self._null_replace = null_replace
 
     def __iter__(self) -> ty.Iterator[dict[str, torch.Tensor]]:
         """
@@ -92,7 +90,7 @@ class ParquetIterableDataset(IterableDataset):
         for batch in scanner.to_batches():
             data_dict: dict[str, torch.Tensor] = {}
             for name, array in zip(batch.column_names, batch.columns):
-                data_dict[name] = pa_array_to_tensor(array, self._null_replace)
+                data_dict[name] = pa_array_to_tensor(array)
             yield data_dict
 
     # private interfaces
