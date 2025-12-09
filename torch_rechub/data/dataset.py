@@ -3,7 +3,6 @@
 import os
 import typing as ty
 
-import pyarrow as pa
 import pyarrow.dataset as pd
 import torch
 from torch.utils.data import IterableDataset, get_worker_info

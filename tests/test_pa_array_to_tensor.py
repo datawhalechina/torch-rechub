@@ -5,6 +5,23 @@ import torch
 
 from torch_rechub.data.convert import pa_array_to_tensor
 
+###############
+# scalar arrays
+###############
+
+
+def test_scalar_empty_array() -> None:
+    # Given
+    array = pa.array([], type=pa.null())
+
+    # When
+    tensor = pa_array_to_tensor(array)
+
+    # Then
+    assert isinstance(tensor, torch.Tensor)
+    assert tensor.dtype == torch.float32
+    assert tensor.tolist() == []
+
 
 def test_scalar_bool_arrays() -> None:
     # Given
@@ -80,6 +97,24 @@ def test_scalar_int_arrays(dtype: pa.DataType) -> None:
     assert np.allclose(tensor.tolist(), [np.nan, np.nan, 3.0], equal_nan=True)
 
 
+###############
+# nested arrays
+###############
+
+
+def test_nested_empty_array() -> None:
+    # Given
+    array = pa.array([[]], type=pa.list_(pa.null()))
+
+    # When
+    tensor = pa_array_to_tensor(array)
+
+    # Then
+    assert isinstance(tensor, torch.Tensor)
+    assert tensor.dtype == torch.float32
+    assert tensor.tolist() == [[]]
+
+
 def test_nested_bool_arrays() -> None:
     # Given
     array = pa.array([[True], [True]], type=pa.list_(pa.bool_()))
@@ -152,6 +187,11 @@ def test_nested_int_arrays(dtype: pa.DataType) -> None:
     assert isinstance(tensor, torch.Tensor)
     assert tensor.dtype == torch.float32
     assert np.allclose(tensor.tolist(), [[np.nan], [np.nan]], equal_nan=True)
+
+
+################
+# invalid arrays
+################
 
 
 def test_unsupported_scalar_array() -> None:
