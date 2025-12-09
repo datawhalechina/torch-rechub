@@ -66,7 +66,8 @@ export default defineConfig({
               { text: 'Overview', link: '/models/intro' },
               { text: 'Ranking Models', link: '/models/ranking' },
               { text: 'Matching Models', link: '/models/matching' },
-              { text: 'Multi-Task Models', link: '/models/mtl' }
+              { text: 'Multi-Task Models', link: '/models/mtl' },
+              { text: 'Generative Models', link: '/models/generative' }
             ]
           }],
           '/tools/': [{
@@ -160,7 +161,8 @@ export default defineConfig({
               { text: '导览 (Overview)', link: '/zh/models/intro' },
               { text: '排序模型 (Ranking)', link: '/zh/models/ranking' },
               { text: '召回模型 (Matching)', link: '/zh/models/matching' },
-              { text: '多任务模型 (MTL)', link: '/zh/models/mtl' }
+              { text: '多任务模型 (MTL)', link: '/zh/models/mtl' },
+              { text: '生成式模型 (Generative)', link: '/zh/models/generative' }
             ]
           }],
           '/zh/tools/': [{
