@@ -11,10 +11,10 @@ hero:
   actions:
     - theme: brand
       text: 快速开始
-      link: /zh/manual/getting-started
+      link: /zh/guide/quick_start
     - theme: alt
       text: 查看文档
-      link: /zh/introduction
+      link: /zh/guide/intro
 
 features:
   - icon: 🏗️

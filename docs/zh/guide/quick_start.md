@@ -65,6 +65,3 @@ model = DSSM(user_features, item_features, temperature=0.02,
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
 ```
-
-更多详细示例和模型实现，请参考 [API 参考](/zh/manual/api-reference/basic) 部分。
-
