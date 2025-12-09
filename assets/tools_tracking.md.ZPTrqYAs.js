@@ -1,0 +1,1 @@
+import{_ as t,c as e,o as a}from"./chunks/framework.BiSKXDrp.js";const l=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"tools/tracking.md","filePath":"en/tools/tracking.md"}'),o={name:"tools/tracking.md"};function r(n,c,s,i,p,_){return a(),e("div")}const m=t(o,[["render",r]]);export{l as __pageData,m as default};

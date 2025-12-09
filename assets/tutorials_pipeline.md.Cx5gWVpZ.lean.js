@@ -1,0 +1,1 @@
+import{_ as e,c as t,o as a}from"./chunks/framework.BiSKXDrp.js";const d=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"tutorials/pipeline.md","filePath":"en/tutorials/pipeline.md"}'),i={name:"tutorials/pipeline.md"};function r(n,o,p,s,c,l){return a(),t("div")}const m=e(i,[["render",r]]);export{d as __pageData,m as default};

@@ -1,0 +1,1 @@
+import{_ as e,c as t,o as a}from"./chunks/framework.BiSKXDrp.js";const _=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"guide/install.md","filePath":"en/guide/install.md"}'),n={name:"guide/install.md"};function s(r,i,o,c,l,d){return a(),t("div")}const m=e(n,[["render",s]]);export{_ as __pageData,m as default};
