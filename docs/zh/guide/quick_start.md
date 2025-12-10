@@ -49,7 +49,7 @@ from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator
 
-dg = MatchDataGenerator(x y)
+dg = MatchDataGenerator(x, y)
 train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=256)
 
 model = DSSM(user_features, item_features, temperature=0.02,
@@ -64,4 +64,8 @@ model = DSSM(user_features, item_features, temperature=0.02,
 
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
+match_trainer.export_onnx("dssm.onnx")  # 添加：ONNX导出示例
+# 双塔模型可分别导出用户塔和物品塔:
+# match_trainer.export_onnx("user_tower.onnx", mode="user")
+# match_trainer.export_onnx("item_tower.onnx", mode="item")
 ```

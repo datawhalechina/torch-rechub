@@ -43,6 +43,7 @@ class CTRTrainer(object):
         gpus=None,
         loss_mode=True,
         model_path="./",
+        model_logger=None,
     ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
@@ -70,10 +71,13 @@ class CTRTrainer(object):
         self.model_path = model_path
         # Initialize regularization loss
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
+        self.model_logger = model_logger
 
     def train_one_epoch(self, data_loader, log_interval=10):
         self.model.train()
         total_loss = 0
+        epoch_loss = 0
+        batch_count = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (x_dict, y) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
@@ -93,26 +97,62 @@ class CTRTrainer(object):
             loss.backward()
             self.optimizer.step()
             total_loss += loss.item()
+            epoch_loss += loss.item()
+            batch_count += 1
             if (i + 1) % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
+        
+        # Return average epoch loss
+        return epoch_loss / batch_count if batch_count > 0 else 0
 
     def fit(self, train_dataloader, val_dataloader=None):
+        for logger in self._iter_loggers():
+            logger.log_hyperparams({
+                'n_epoch': self.n_epoch,
+                'learning_rate': self.optimizer.param_groups[0]['lr'],
+                'loss_mode': self.loss_mode
+            })
+
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
-            self.train_one_epoch(train_dataloader)
+            train_loss = self.train_one_epoch(train_dataloader)
+            
+            for logger in self._iter_loggers():
+                logger.log_metrics({
+                    'train/loss': train_loss,
+                    'learning_rate': self.optimizer.param_groups[0]['lr']
+                }, step=epoch_i)
+
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  # update lr in epoch level by scheduler
+                
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
+                
+                for logger in self._iter_loggers():
+                    logger.log_metrics({'val/auc': auc}, step=epoch_i)
+                
                 if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
+                
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
+        
+        for logger in self._iter_loggers():
+            logger.finish()
+
+    def _iter_loggers(self):
+        """Return a list of active loggers (empty if none)."""
+        if self.model_logger is None:
+            return []
+        if isinstance(self.model_logger, (list, tuple)):
+            return list(self.model_logger)
+        return [self.model_logger]
 
     def evaluate(self, model, data_loader):
         model.eval()

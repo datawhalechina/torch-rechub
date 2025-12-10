@@ -46,7 +46,7 @@ class SeqTrainer(object):
         ... )
     """
 
-    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./', loss_type='cross_entropy', loss_params=None):
+    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./', loss_type='cross_entropy', loss_params=None, model_logger=None):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
@@ -74,9 +74,11 @@ class SeqTrainer(object):
                 loss_params = {"ignore_index": 0}
             self.loss_fn = nn.CrossEntropyLoss(**loss_params)
 
+        self.loss_type = loss_type
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
         self.model_path = model_path
+        self.model_logger = model_logger
 
     def fit(self, train_dataloader, val_dataloader=None):
         """训练模型.
@@ -90,10 +92,25 @@ class SeqTrainer(object):
         """
         history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
 
+        for logger in self._iter_loggers():
+            logger.log_hyperparams({
+                'n_epoch': self.n_epoch,
+                'learning_rate': self.optimizer.param_groups[0]['lr'],
+                'loss_type': self.loss_type
+            })
+
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
             # 训练阶段
-            self.train_one_epoch(train_dataloader)
+            train_loss = self.train_one_epoch(train_dataloader)
+            history['train_loss'].append(train_loss)
+            
+            # Collect metrics
+            logs = {
+                'train/loss': train_loss,
+                'learning_rate': self.optimizer.param_groups[0]['lr']
+            }
+            
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
@@ -104,6 +121,10 @@ class SeqTrainer(object):
                 val_loss, val_accuracy = self.evaluate(val_dataloader)
                 history['val_loss'].append(val_loss)
                 history['val_accuracy'].append(val_accuracy)
+                
+                logs['val/loss'] = val_loss
+                logs['val/accuracy'] = val_accuracy
+                logs['auc'] = val_accuracy  # For compatibility with EarlyStopper
 
                 print(f"epoch: {epoch_i}, validation: loss: {val_loss:.4f}, accuracy: {val_accuracy:.4f}")
 
@@ -113,8 +134,22 @@ class SeqTrainer(object):
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
 
+            for logger in self._iter_loggers():
+                logger.log_metrics(logs, step=epoch_i)
+
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best model
+
+        for logger in self._iter_loggers():
+            logger.finish()
+
         return history
+
+    def _iter_loggers(self):
+        if self.model_logger is None:
+            return []
+        if isinstance(self.model_logger, (list, tuple)):
+            return list(self.model_logger)
+        return [self.model_logger]
 
     def train_one_epoch(self, data_loader, log_interval=10):
         """Train the model for a single epoch.
@@ -128,6 +163,8 @@ class SeqTrainer(object):
         """
         self.model.train()
         total_loss = 0
+        epoch_loss = 0
+        batch_count = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (seq_tokens, seq_positions, seq_time_diffs, targets) in enumerate(tk0):
             # Move tensors to the target device
@@ -152,9 +189,14 @@ class SeqTrainer(object):
             self.optimizer.step()
 
             total_loss += loss.item()
+            epoch_loss += loss.item()
+            batch_count += 1
             if (i + 1) % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
+        
+        # Return average epoch loss
+        return epoch_loss / batch_count if batch_count > 0 else 0
 
     def evaluate(self, data_loader):
         """Evaluate the model on a validation/test data loader.

@@ -47,6 +47,7 @@ class MTLTrainer(object):
         device="cpu",
         gpus=None,
         model_path="./",
+        model_logger=None,
     ):
         self.model = model
         if gpus is None:
@@ -104,6 +105,7 @@ class MTLTrainer(object):
         self.model_path = model_path
         # Initialize regularization loss
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
+        self.model_logger = model_logger
 
     def train_one_epoch(self, data_loader):
         self.model.train()
@@ -163,20 +165,45 @@ class MTLTrainer(object):
     def fit(self, train_dataloader, val_dataloader, mode='base', seed=0):
         total_log = []
 
+        # Log hyperparameters once
+        for logger in self._iter_loggers():
+            logger.log_hyperparams({
+                'n_epoch': self.n_epoch,
+                'learning_rate': self._current_lr(),
+                'adaptive_method': self.adaptive_method
+            })
+
         for epoch_i in range(self.n_epoch):
             _log_per_epoch = self.train_one_epoch(train_dataloader)
+
+            # Collect metrics
+            logs = {f'train/task_{task_id}_loss': loss_val for task_id, loss_val in enumerate(_log_per_epoch)}
+            lr_value = self._current_lr()
+            if lr_value is not None:
+                logs['learning_rate'] = lr_value
 
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  # update lr in epoch level by scheduler
+                
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
-            for score in scores:
+            for task_id, score in enumerate(scores):
+                logs[f'val/task_{task_id}_score'] = score
                 _log_per_epoch.append(score)
+            logs['auc'] = scores[self.earlystop_taskid]
+
+            if self.loss_weight:
+                for task_id, weight in enumerate(self.loss_weight):
+                    logs[f'loss_weight/task_{task_id}'] = weight.item()
 
             total_log.append(_log_per_epoch)
+
+            # Log metrics once per epoch
+            for logger in self._iter_loggers():
+                logger.log_metrics(logs, step=epoch_i)
 
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
                 print('validation best auc of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
@@ -185,7 +212,25 @@ class MTLTrainer(object):
 
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  # save best auc model
 
+        for logger in self._iter_loggers():
+            logger.finish()
+
         return total_log
+
+    def _iter_loggers(self):
+        if self.model_logger is None:
+            return []
+        if isinstance(self.model_logger, (list, tuple)):
+            return list(self.model_logger)
+        return [self.model_logger]
+
+    def _current_lr(self):
+        """Fetch current learning rate regardless of adaptive method."""
+        if self.adaptive_method == "metabalance":
+            return self.share_optimizer.param_groups[0]['lr'] if hasattr(self, 'share_optimizer') else None
+        if hasattr(self, 'optimizer'):
+            return self.optimizer.param_groups[0]['lr']
+        return None
 
     def evaluate(self, model, data_loader):
         model.eval()
