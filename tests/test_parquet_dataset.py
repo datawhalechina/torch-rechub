@@ -17,17 +17,25 @@ _ParquetCreator = ty.Callable[[list[_ParquetSpec]], list[str]]
 
 @pytest.fixture(scope="function")
 def parquet_files() -> ty.Generator[_ParquetCreator, None, None]:
-    """
-    Yield a func that creates multiple temporary Parquet files given specs.
+    """Yield a helper that creates temporary Parquet files from specs.
 
-    Example
-    -------
+    Parameters
+    ----------
+    None
+
+    Yields
+    ------
+    Callable[[list[dict[str, ty.Iterable]]], list[str]]
+        A function that takes a list of column specs and returns file paths.
+
+    Examples
+    --------
     >>> def test_something(parquet_files):
-    >>>     paths = parquet_files([
-    >>>         {"id": range(10)},        # file 1
-    >>>         {"id": range(10, 20)},    # file 2
-    >>>     ])
-    >>>     ...
+    ...     paths = parquet_files([
+    ...         {"id": range(10)},        # file 1
+    ...         {"id": range(10, 20)},    # file 2
+    ...     ])
+    ...     ...
     """
     with tempfile.TemporaryDirectory() as tmpdir:
 

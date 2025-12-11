@@ -26,32 +26,30 @@ except ImportError:
 
 
 def extract_feature_info(model: nn.Module) -> Dict[str, Any]:
-    """Extract feature information from a torch-rechub model using reflection.
-
-    This function inspects model attributes to find feature lists without
-    modifying the model code. Supports various model architectures.
+    """Extract feature information from a torch-rechub model via reflection.
 
     Parameters
     ----------
     model : nn.Module
-        The recommendation model to inspect.
+        Model to inspect.
 
     Returns
     -------
     dict
-        Dictionary containing:
-        - 'features': List of unique Feature objects
-        - 'input_names': List of feature names in order
-        - 'input_types': Dict mapping feature name to feature type
-        - 'user_features': List of user-side features (for dual-tower models)
-        - 'item_features': List of item-side features (for dual-tower models)
+        {
+            'features': list of unique Feature objects,
+            'input_names': ordered feature names,
+            'input_types': map name -> feature type,
+            'user_features': user-side features (dual-tower),
+            'item_features': item-side features (dual-tower),
+        }
 
     Examples
     --------
     >>> from torch_rechub.models.ranking import DeepFM
     >>> model = DeepFM(deep_features, fm_features, mlp_params)
     >>> info = extract_feature_info(model)
-    >>> print(info['input_names'])  # ['user_id', 'item_id', ...]
+    >>> info['input_names']  # ['user_id', 'item_id', ...]
     """
     # Common feature attribute names across different model types
     feature_attrs = [

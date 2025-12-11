@@ -10,39 +10,54 @@ from torch_rechub.utils.hstu_utils import RelPosBias
 
 
 class HSTUModel(nn.Module):
-    """HSTU: Hierarchical Sequential Transduction Units model.
+    """HSTU: Hierarchical Sequential Transduction Units.
 
-    Autoregressive generative recommendation model for sequential data.
-    This module stacks multiple ``HSTUBlock`` layers to capture long-range
-    dependencies in user interaction sequences and predicts the next item.
+    Autoregressive generative recommender that stacks ``HSTUBlock`` layers to
+    capture long-range dependencies and predict the next item.
 
-    Args:
-        vocab_size (int): Vocabulary size (number of distinct items, including PAD).
-        d_model (int): Hidden dimension of the model. Default: 512.
-        n_heads (int): Number of attention heads. Default: 8.
-        n_layers (int): Number of stacked HSTU layers. Default: 4.
-        dqk (int): Dimension of query/key vectors per head. Default: 64.
-        dv (int): Dimension of value vectors per head. Default: 64.
-        max_seq_len (int): Maximum sequence length. Default: 256.
-        dropout (float): Dropout rate applied in the model. Default: 0.1.
-        use_rel_pos_bias (bool): Whether to use relative position bias. Default: True.
-        use_time_embedding (bool): Whether to use time-difference embeddings. Default: True.
-        num_time_buckets (int): Number of time buckets for time embeddings. Default: 2048.
-        time_bucket_fn (str): Function used to bucketize time differences, ``"sqrt"``
-            or ``"log"``. Default: ``"sqrt"``.
+    Parameters
+    ----------
+    vocab_size : int
+        Vocabulary size (items incl. PAD).
+    d_model : int, default=512
+        Hidden dimension.
+    n_heads : int, default=8
+        Attention heads.
+    n_layers : int, default=4
+        Number of stacked HSTU layers.
+    dqk : int, default=64
+        Query/key dim per head.
+    dv : int, default=64
+        Value dim per head.
+    max_seq_len : int, default=256
+        Maximum sequence length.
+    dropout : float, default=0.1
+        Dropout rate.
+    use_rel_pos_bias : bool, default=True
+        Use relative position bias.
+    use_time_embedding : bool, default=True
+        Use time-difference embeddings.
+    num_time_buckets : int, default=2048
+        Number of time buckets for time embeddings.
+    time_bucket_fn : {'sqrt', 'log'}, default='sqrt'
+        Bucketization function for time differences.
 
-    Shape:
-        - Input: ``x`` of shape ``(batch_size, seq_len)``; optional ``time_diffs``
-          of shape ``(batch_size, seq_len)`` representing time differences in seconds.
-        - Output: Logits of shape ``(batch_size, seq_len, vocab_size)``.
+    Shape
+    -----
+    Input
+        x : ``(batch_size, seq_len)``
+        time_diffs : ``(batch_size, seq_len)``, optional (seconds).
+    Output
+        logits : ``(batch_size, seq_len, vocab_size)``
 
-    Example:
-        >>> model = HSTUModel(vocab_size=100000, d_model=512)
-        >>> x = torch.randint(0, 100000, (32, 256))
-        >>> time_diffs = torch.randint(0, 86400, (32, 256))
-        >>> logits = model(x, time_diffs)
-        >>> logits.shape
-        torch.Size([32, 256, 100000])
+    Examples
+    --------
+    >>> model = HSTUModel(vocab_size=100000, d_model=512)
+    >>> x = torch.randint(0, 100000, (32, 256))
+    >>> time_diffs = torch.randint(0, 86400, (32, 256))
+    >>> logits = model(x, time_diffs)
+    >>> logits.shape
+    torch.Size([32, 256, 100000])
     """
 
     def __init__(self, vocab_size, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt'):

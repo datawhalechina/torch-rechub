@@ -82,57 +82,67 @@ class DataGenerator(object):
 
 
 def get_auto_embedding_dim(num_classes):
-    """ Calculate the dim of embedding vector according to number of classes in the category
-    emb_dim = [6 * (num_classes)^(1/4)]
-    reference: Deep & Cross Network for Ad Click Predictions.(ADKDD'17)
-    Args:
-        num_classes: number of classes in the category
+    """Calculate embedding dim by category size.
 
-    Returns:
-        the dim of embedding vector
+    Uses ``emb_dim = floor(6 * num_classes**0.25)`` from DCN (ADKDD'17).
+
+    Parameters
+    ----------
+    num_classes : int
+        Number of categorical classes.
+
+    Returns
+    -------
+    int
+        Recommended embedding dimension.
     """
     return int(np.floor(6 * np.pow(num_classes, 0.25)))
 
 
 def get_loss_func(task_type="classification"):
+    """Return default loss by task type."""
     if task_type == "classification":
         return torch.nn.BCELoss()
-    elif task_type == "regression":
+    if task_type == "regression":
         return torch.nn.MSELoss()
-    else:
-        raise ValueError("task_type must be classification or regression")
+    raise ValueError("task_type must be classification or regression")
 
 
 def get_metric_func(task_type="classification"):
+    """Return default metric by task type."""
     if task_type == "classification":
         return roc_auc_score
-    elif task_type == "regression":
+    if task_type == "regression":
         return mean_squared_error
-    else:
-        raise ValueError("task_type must be classification or regression")
+    raise ValueError("task_type must be classification or regression")
 
 
 def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols=[], min_item=0, shuffle=True, max_len=50):
-    """generate sequence feature and negative sample for ranking.
+    """Generate sequence features and negatives for ranking.
 
-    Args:
-        data (pd.DataFrame): the raw data.
-        user_col (str): the col name of user_id
-        item_col (str): the col name of item_id
-        time_col (str): the col name of timestamp
-        item_attribute_cols (list[str], optional): the other attribute cols of item which you want to generate sequence feature. Defaults to `[]`.
-        sample_method (int, optional): the negative sample method `{
-            0: "random sampling",
-            1: "popularity sampling method used in word2vec",
-            2: "popularity sampling method by `log(count+1)+1e-6`",
-            3: "tencent RALM sampling"}`.
-            Defaults to 0.
-        min_item (int, optional): the min item each user must have. Defaults to 0.
-        shuffle (bool, optional): shulle if True
-        max_len (int, optional): the max length of a user history sequence.
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Raw interaction data.
+    user_col : str
+        User id column name.
+    item_col : str
+        Item id column name.
+    time_col : str
+        Timestamp column name.
+    item_attribute_cols : list[str], optional
+        Additional item attribute columns to include in sequences.
+    min_item : int, default=0
+        Minimum items per user; users below are dropped.
+    shuffle : bool, default=True
+        Shuffle train/val/test.
+    max_len : int, default=50
+        Max history length.
 
-    Returns:
-        pd.DataFrame: split train, val and test data with sequence features by time.
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        Train, validation, and test data with sequence features.
     """
     for feat in data:
         le = LabelEncoder()
@@ -205,12 +215,17 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
 
 
 def df_to_dict(data):
-    """
-    Convert the DataFrame to a dict type input that the network can accept
-    Args:
-        data (pd.DataFrame): datasets of type DataFrame
-    Returns:
-        The converted dict, which can be used directly into the input network
+    """Convert DataFrame to dict inputs accepted by models.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input dataframe.
+
+    Returns
+    -------
+    dict
+        Mapping of column name to numpy array.
     """
     data_dict = data.to_dict('list')
     for key in data.keys():
@@ -226,20 +241,28 @@ def neg_sample(click_hist, item_size):
 
 
 def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncating='pre', value=0.):
-    """ Pads sequences (list of list) to the ndarray of same length.
-        This is an equivalent implementation of tf.keras.preprocessing.sequence.pad_sequences
-        reference: https://github.com/huawei-noah/benchmark/tree/main/FuxiCTR/fuxictr
+    """Pad list-of-lists sequences to equal length.
 
-    Args:
-        sequences (pd.DataFrame): data that needs to pad or truncate
-        maxlen (int): maximum sequence length. Defaults to None.
-        dtype (str, optional): Defaults to 'int32'.
-        padding (str, optional): if len(sequences) less than maxlen, padding style, {'pre', 'post'}. Defaults to 'pre'.
-        truncating (str, optional): if len(sequences) more than maxlen, truncate style, {'pre', 'post'}. Defaults to 'pre'.
-        value (_type_, optional): Defaults to 0..
+    Equivalent to ``tf.keras.preprocessing.sequence.pad_sequences``.
 
-    Returns:
-        _type_: _description_
+    Parameters
+    ----------
+    sequences : Sequence[Sequence]
+        Input sequences.
+    maxlen : int, optional
+        Maximum length; computed if None.
+    dtype : str, default='int32'
+    padding : {'pre', 'post'}, default='pre'
+        Padding direction.
+    truncating : {'pre', 'post'}, default='pre'
+        Truncation direction.
+    value : float, default=0.0
+        Padding value.
+
+    Returns
+    -------
+    np.ndarray
+        Padded array of shape (n_samples, maxlen).
     """
 
     assert padding in ["pre", "post"], "Invalid padding={}.".format(padding)
@@ -265,13 +288,19 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='pre', truncati
 
 
 def array_replace_with_dict(array, dic):
-    """Replace values in NumPy array based on dictionary.
-    Args:
-        array (np.array): a numpy array
-        dic (dict): a map dict
+    """Replace values in numpy array using a mapping dict.
 
-    Returns:
-        np.array: array with replace
+    Parameters
+    ----------
+    array : np.ndarray
+        Input array.
+    dic : dict
+        Mapping from old to new values.
+
+    Returns
+    -------
+    np.ndarray
+        Array with values replaced.
     """
     # Extract out keys and values
     k = np.array(list(dic.keys()))
@@ -284,19 +313,25 @@ def array_replace_with_dict(array, dic):
 
 # Temporarily reserved for testing purposes(1985312383@qq.com)
 def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50, drop_short=3, shuffle=True):
-    """Build a sequence of user's history by time.
+    """Build user history sequences by time.
 
-    Args:
-        data (pd.DataFrame): must contain keys: `user_id, item_id, cate_id, time`.
-        seq_feature_col (list): specify the column name that needs to generate sequence features, and its sequence features will be generated according to userid.
-        max_len (int): the max length of a user history sequence.
-        drop_short (int): remove some inactive user who's sequence length < drop_short.
-        shuffle (bool): shuffle data if true.
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Must contain ``user_id, item_id, cate_id, time``.
+    seq_feature_col : list, default ['item_id', 'cate_id']
+        Columns to generate sequence features.
+    max_len : int, default=50
+        Max history length.
+    drop_short : int, default=3
+        Drop users with sequence length < drop_short.
+    shuffle : bool, default=True
+        Shuffle outputs.
 
-    Returns:
-        train (pd.DataFrame): target item will be each item before last two items.
-        val (pd.DataFrame): target item is the second to last item of user's history sequence.
-        test (pd.DataFrame): target item is the last item of user's history sequence.
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        Train/val/test splits with sequence features.
     """
     for feat in data:
         le = LabelEncoder()
@@ -357,30 +392,32 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
 
 
 class SeqDataset(Dataset):
-    """Sequence dataset for HSTU-style generative models.
+    """Sequence dataset for HSTU-style next-item prediction.
 
-    This class wraps precomputed sequence features for next-item prediction
-    tasks, including tokens, positions, time differences and targets.
+    Parameters
+    ----------
+    seq_tokens : np.ndarray
+        Token ids, shape ``(num_samples, seq_len)``.
+    seq_positions : np.ndarray
+        Position indices, shape ``(num_samples, seq_len)``.
+    targets : np.ndarray
+        Target token ids, shape ``(num_samples,)``.
+    seq_time_diffs : np.ndarray
+        Time-difference features, shape ``(num_samples, seq_len)``.
 
-    Args:
-        seq_tokens (np.ndarray): Token ids of shape ``(num_samples, seq_len)``.
-        seq_positions (np.ndarray): Position indices of shape
-            ``(num_samples, seq_len)``.
-        targets (np.ndarray): Target token ids of shape ``(num_samples,)``.
-        seq_time_diffs (np.ndarray): Time-difference features of shape
-            ``(num_samples, seq_len)``.
+    Shape
+    -----
+    Output tuple: ``(seq_tokens, seq_positions, seq_time_diffs, target)``
 
-    Shape:
-        - Output: A tuple ``(seq_tokens, seq_positions, seq_time_diffs, target)``.
-
-    Example:
-        >>> seq_tokens = np.random.randint(0, 1000, (100, 256))
-        >>> seq_positions = np.arange(256)[np.newaxis, :].repeat(100, axis=0)
-        >>> seq_time_diffs = np.random.randint(0, 86400, (100, 256))
-        >>> targets = np.random.randint(0, 1000, (100,))
-        >>> dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
-        >>> len(dataset)
-        100
+    Examples
+    --------
+    >>> seq_tokens = np.random.randint(0, 1000, (100, 256))
+    >>> seq_positions = np.arange(256)[np.newaxis, :].repeat(100, axis=0)
+    >>> seq_time_diffs = np.random.randint(0, 86400, (100, 256))
+    >>> targets = np.random.randint(0, 1000, (100,))
+    >>> dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
+    >>> len(dataset)
+    100
     """
 
     def __init__(self, seq_tokens, seq_positions, targets, seq_time_diffs):
@@ -414,29 +451,25 @@ class SeqDataset(Dataset):
 
 
 class SequenceDataGenerator(object):
-    """Sequence data generator used for HSTU-style models.
+    """Sequence data generator for HSTU-style models.
 
-    This helper wraps a :class:`SeqDataset` and provides convenient utilities
-    to construct train/val/test ``DataLoader`` objects.
+    Wraps :class:`SeqDataset` and builds train/val/test loaders.
 
-    Args:
-        seq_tokens (np.ndarray): Token ids of shape ``(num_samples, seq_len)``.
-        seq_positions (np.ndarray): Position indices of shape
-            ``(num_samples, seq_len)``.
-        targets (np.ndarray): Target token ids of shape ``(num_samples,)``.
-        seq_time_diffs (np.ndarray): Time-difference features of shape
-            ``(num_samples, seq_len)``.
+    Parameters
+    ----------
+    seq_tokens : np.ndarray
+        Token ids, shape ``(num_samples, seq_len)``.
+    seq_positions : np.ndarray
+        Position indices, shape ``(num_samples, seq_len)``.
+    targets : np.ndarray
+        Target token ids, shape ``(num_samples,)``.
+    seq_time_diffs : np.ndarray
+        Time-difference features, shape ``(num_samples, seq_len)``.
 
-    Methods:
-        generate_dataloader: Build train/val/test data loaders.
-
-    Example:
-        >>> seq_tokens = np.random.randint(0, 1000, (1000, 256))
-        >>> seq_positions = np.arange(256)[np.newaxis, :].repeat(1000, axis=0)
-        >>> seq_time_diffs = np.random.randint(0, 86400, (1000, 256))
-        >>> targets = np.random.randint(0, 1000, (1000,))
-        >>> gen = SequenceDataGenerator(seq_tokens, seq_positions, targets, seq_time_diffs)
-        >>> train_loader, val_loader, test_loader = gen.generate_dataloader(batch_size=32)
+    Examples
+    --------
+    >>> gen = SequenceDataGenerator(seq_tokens, seq_positions, targets, seq_time_diffs)
+    >>> train_loader, val_loader, test_loader = gen.generate_dataloader(batch_size=32)
     """
 
     def __init__(self, seq_tokens, seq_positions, targets, seq_time_diffs):
@@ -450,22 +483,19 @@ class SequenceDataGenerator(object):
         self.dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
 
     def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None):
-        """生成数据加载器.
+        """Generate train/val/test dataloaders.
 
-        Args:
-            batch_size (int): 批大小，默认32
-            num_workers (int): 数据加载线程数，默认0
-            split_ratio (tuple): 分割比例 (train, val, test)，默认(0.7, 0.1, 0.2)
+        Parameters
+        ----------
+        batch_size : int, default=32
+        num_workers : int, default=0
+        split_ratio : tuple, default (0.7, 0.1, 0.2)
+            Train/val/test split.
 
-        Returns:
-            tuple: (train_loader, val_loader, test_loader)
-
-        Example:
-            >>> train_loader, val_loader, test_loader = gen.generate_dataloader(
-            ...     batch_size=32,
-            ...     num_workers=4,
-            ...     split_ratio=(0.7, 0.1, 0.2)
-            ... )
+        Returns
+        -------
+        tuple
+            (train_loader, val_loader, test_loader)
         """
         if split_ratio is None:
             split_ratio = (0.7, 0.1, 0.2)
