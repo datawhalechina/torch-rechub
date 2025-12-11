@@ -143,7 +143,7 @@ def test_deepfm_forward():
 - Include code examples
 - Provide clear step-by-step instructions
 - Keep both English and Chinese versions synchronized
-- Follow Google-style docstrings for Python code
+- Follow scikit-learn style docstrings (NumPy/SciPy convention) for Python code
 
 ### Docstring Example
 
