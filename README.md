@@ -352,4 +352,4 @@ ctr_trainer.visualization(save_path="model.pdf", dpi=300)  # 保存为高清 PDF
 
 ---
 
-*最后更新: [2025-12-04]*
+*最后更新: [2025-12-11]*

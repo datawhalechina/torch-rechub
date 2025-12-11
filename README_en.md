@@ -41,6 +41,8 @@ English | [简体中文](README.md)
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
 * **Reproducibility:** Designed to ensure reproducible experimental results.
 * **ONNX Export:** Export trained models to ONNX format for production deployment.
+* **Cross-engine data processing:** PySpark-based data processing and conversion supported for large-scale pipelines.
+* **Experiment visualization & tracking:** Unified integration of WandB, SwanLab, and TensorBoardX.
 * **Additional Features:** Negative sampling, multi-task learning, etc.
 
 ## 📖 Table of Contents
@@ -342,4 +344,4 @@ If you use this framework in your research or work, please consider citing:
 
 ---
 
-*Last updated: [2025-12-04]*
+*Last updated: [2025-12-11]*
