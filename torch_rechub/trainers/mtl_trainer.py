@@ -167,11 +167,7 @@ class MTLTrainer(object):
 
         # Log hyperparameters once
         for logger in self._iter_loggers():
-            logger.log_hyperparams({
-                'n_epoch': self.n_epoch,
-                'learning_rate': self._current_lr(),
-                'adaptive_method': self.adaptive_method
-            })
+            logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self._current_lr(), 'adaptive_method': self.adaptive_method})
 
         for epoch_i in range(self.n_epoch):
             _log_per_epoch = self.train_one_epoch(train_dataloader)
@@ -186,7 +182,7 @@ class MTLTrainer(object):
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  # update lr in epoch level by scheduler
-                
+
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
@@ -218,6 +214,13 @@ class MTLTrainer(object):
         return total_log
 
     def _iter_loggers(self):
+        """Return logger instances as a list.
+
+        Returns
+        -------
+        list
+            Active logger instances. Empty when ``model_logger`` is ``None``.
+        """
         if self.model_logger is None:
             return []
         if isinstance(self.model_logger, (list, tuple)):

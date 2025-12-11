@@ -46,7 +46,22 @@ class SeqTrainer(object):
         ... )
     """
 
-    def __init__(self, model, optimizer_fn=torch.optim.Adam, optimizer_params=None, scheduler_fn=None, scheduler_params=None, n_epoch=10, earlystop_patience=10, device='cpu', gpus=None, model_path='./', loss_type='cross_entropy', loss_params=None, model_logger=None):
+    def __init__(
+        self,
+        model,
+        optimizer_fn=torch.optim.Adam,
+        optimizer_params=None,
+        scheduler_fn=None,
+        scheduler_params=None,
+        n_epoch=10,
+        earlystop_patience=10,
+        device='cpu',
+        gpus=None,
+        model_path='./',
+        loss_type='cross_entropy',
+        loss_params=None,
+        model_logger=None
+    ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
@@ -93,24 +108,17 @@ class SeqTrainer(object):
         history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
 
         for logger in self._iter_loggers():
-            logger.log_hyperparams({
-                'n_epoch': self.n_epoch,
-                'learning_rate': self.optimizer.param_groups[0]['lr'],
-                'loss_type': self.loss_type
-            })
+            logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_type': self.loss_type})
 
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
             # 训练阶段
             train_loss = self.train_one_epoch(train_dataloader)
             history['train_loss'].append(train_loss)
-            
+
             # Collect metrics
-            logs = {
-                'train/loss': train_loss,
-                'learning_rate': self.optimizer.param_groups[0]['lr']
-            }
-            
+            logs = {'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}
+
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
@@ -121,7 +129,7 @@ class SeqTrainer(object):
                 val_loss, val_accuracy = self.evaluate(val_dataloader)
                 history['val_loss'].append(val_loss)
                 history['val_accuracy'].append(val_accuracy)
-                
+
                 logs['val/loss'] = val_loss
                 logs['val/accuracy'] = val_accuracy
                 logs['auc'] = val_accuracy  # For compatibility with EarlyStopper
@@ -145,6 +153,13 @@ class SeqTrainer(object):
         return history
 
     def _iter_loggers(self):
+        """Return logger instances as a list.
+
+        Returns
+        -------
+        list
+            Active logger instances. Empty when ``model_logger`` is ``None``.
+        """
         if self.model_logger is None:
             return []
         if isinstance(self.model_logger, (list, tuple)):
@@ -194,7 +209,7 @@ class SeqTrainer(object):
             if (i + 1) % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
-        
+
         # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 

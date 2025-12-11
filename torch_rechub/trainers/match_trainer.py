@@ -123,28 +123,21 @@ class MatchTrainer(object):
             if (i + 1) % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
-        
+
         # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
     def fit(self, train_dataloader, val_dataloader=None):
         for logger in self._iter_loggers():
-            logger.log_hyperparams({
-                'n_epoch': self.n_epoch,
-                'learning_rate': self.optimizer.param_groups[0]['lr'],
-                'loss_mode': self.mode
-            })
+            logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.mode})
 
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
             train_loss = self.train_one_epoch(train_dataloader)
-            
+
             for logger in self._iter_loggers():
-                logger.log_metrics({
-                    'train/loss': train_loss,
-                    'learning_rate': self.optimizer.param_groups[0]['lr']
-                }, step=epoch_i)
-            
+                logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
+
             if self.scheduler is not None:
                 if epoch_i % self.scheduler.step_size == 0:
                     print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
@@ -153,22 +146,28 @@ class MatchTrainer(object):
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
-                
+
                 for logger in self._iter_loggers():
                     logger.log_metrics({'val/auc': auc}, step=epoch_i)
-                
+
                 if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
-                
+
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
-        
+
         for logger in self._iter_loggers():
             logger.finish()
 
     def _iter_loggers(self):
-        """Return a list of active loggers (empty if none)."""
+        """Return logger instances as a list.
+
+        Returns
+        -------
+        list
+            Active logger instances. Empty when ``model_logger`` is ``None``.
+        """
         if self.model_logger is None:
             return []
         if isinstance(self.model_logger, (list, tuple)):
