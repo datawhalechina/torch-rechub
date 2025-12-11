@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.6] - 2025-12-11
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* FEATURE: Support Streaming Parquet Dataset by @ywuenthought in https://github.com/datawhalechina/torch-rechub/pull/143
+* Docs & tracking polish: logger docstrings, README refresh, dependency tweak by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/146
+### 📝 文档更新 / Documentation
+* Refator Chinese documentation structure by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/145
+
+## New Contributors
+* @ywuenthought made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/143
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.0.5...v0.0.6
+
+---
+
+
+
 ## [0.0.5] - 2025-12-05
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
