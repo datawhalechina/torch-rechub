@@ -40,8 +40,8 @@ bigdata = [
     "pyarrow~=21.0",
 ]
 onnx = [
-    "onnx>=1.20.0",
-    "onnxruntime>=1.20.0",
+    "onnx>=1.14.0",
+    "onnxruntime>=1.14.0",
 ]
 visualization = [
     "torchview>=0.2.6",
