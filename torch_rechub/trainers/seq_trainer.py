@@ -255,7 +255,7 @@ class SeqTrainer(object):
 
         return avg_loss, accuracy
 
-    def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False):
+    def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False, onnx_export_kwargs=None):
         """Export the trained sequence generation model to ONNX format.
 
         This method exports sequence generation models (e.g., HSTU) to ONNX format.
@@ -273,6 +273,7 @@ class SeqTrainer(object):
             device (str, optional): Device for export ('cpu', 'cuda', etc.).
                 If None, defaults to 'cpu' for maximum compatibility.
             verbose (bool): Print export details (default: False).
+            onnx_export_kwargs (dict, optional): Extra kwargs forwarded to ``torch.onnx.export``.
 
         Returns:
             bool: True if export succeeded, False otherwise.
@@ -321,20 +322,38 @@ class SeqTrainer(object):
 
         try:
             with torch.no_grad():
-                torch.onnx.export(
-                    model,
-                    (dummy_seq_tokens,
-                     dummy_seq_time_diffs),
-                    output_path,
-                    input_names=["seq_tokens",
-                                 "seq_time_diffs"],
-                    output_names=["output"],
-                    dynamic_axes=dynamic_axes,
-                    opset_version=opset_version,
-                    do_constant_folding=True,
-                    verbose=verbose,
-                    dynamo=False  # Use legacy exporter for dynamic_axes support
-                )
+                import inspect
+
+                export_kwargs = {
+                    "f": output_path,
+                    "input_names": ["seq_tokens",
+                                    "seq_time_diffs"],
+                    "output_names": ["output"],
+                    "dynamic_axes": dynamic_axes,
+                    "opset_version": opset_version,
+                    "do_constant_folding": True,
+                    "verbose": verbose,
+                }
+
+                if onnx_export_kwargs:
+                    overlap = set(export_kwargs.keys()) & set(onnx_export_kwargs.keys())
+                    overlap.discard("dynamo")
+                    if overlap:
+                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
+                                         f"{sorted(overlap)}. Please set them via export_onnx() parameters instead.")
+                    export_kwargs.update(onnx_export_kwargs)
+
+                # Auto-pick exporter:
+                # - dynamic_axes present => prefer legacy exporter (dynamo=False) for dynamic batch/seq
+                # - otherwise prefer dynamo exporter (dynamo=True) on newer torch
+                sig = inspect.signature(torch.onnx.export)
+                if "dynamo" in sig.parameters:
+                    if "dynamo" not in export_kwargs:
+                        export_kwargs["dynamo"] = False if dynamic_axes is not None else True
+                else:
+                    export_kwargs.pop("dynamo", None)
+
+                torch.onnx.export(model, (dummy_seq_tokens, dummy_seq_time_diffs), **export_kwargs)
 
             if verbose:
                 print(f"Successfully exported ONNX model to: {output_path}")
