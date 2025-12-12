@@ -150,18 +150,25 @@ def test_deepfm_forward():
 ```python
 def train_model(model, data_loader, optimizer):
     """Train a recommendation model.
-    
-    Args:
-        model (torch.nn.Module): The model to train
-        data_loader (DataLoader): Training data loader
-        optimizer (torch.optim.Optimizer): Optimizer for training
-        
-    Returns:
-        float: Training loss
-        
-    Example:
-        >>> model = DeepFM(features, mlp_params)
-        >>> loss = train_model(model, train_loader, optimizer)
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        Model to train.
+    data_loader : DataLoader
+        Training data loader.
+    optimizer : torch.optim.Optimizer
+        Optimizer for training.
+
+    Returns
+    -------
+    float
+        Training loss.
+
+    Examples
+    --------
+    >>> model = DeepFM(features, mlp_params)
+    >>> loss = train_model(model, train_loader, optimizer)
     """
     # Implementation here
 ```

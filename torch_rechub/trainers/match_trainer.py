@@ -215,7 +215,7 @@ class MatchTrainer(object):
                 predicts.append(y_pred.data)
         return torch.cat(predicts, dim=0)
 
-    def export_onnx(self, output_path, mode=None, dummy_input=None, batch_size=2, seq_length=10, opset_version=14, dynamic_batch=True, device=None, verbose=False):
+    def export_onnx(self, output_path, mode=None, dummy_input=None, batch_size=2, seq_length=10, opset_version=14, dynamic_batch=True, device=None, verbose=False, onnx_export_kwargs=None):
         """Export the trained matching model to ONNX format.
 
         This method exports matching/retrieval models (e.g., DSSM, YoutubeDNN, MIND)
@@ -237,6 +237,7 @@ class MatchTrainer(object):
             device (str, optional): Device for export ('cpu', 'cuda', etc.).
                 If None, defaults to 'cpu' for maximum compatibility.
             verbose (bool): Print export details (default: False).
+            onnx_export_kwargs (dict, optional): Extra kwargs forwarded to ``torch.onnx.export``.
 
         Returns:
             bool: True if export succeeded, False otherwise.
@@ -270,7 +271,17 @@ class MatchTrainer(object):
 
         try:
             exporter = ONNXExporter(model, device=export_device)
-            return exporter.export(output_path=output_path, mode=mode, dummy_input=dummy_input, batch_size=batch_size, seq_length=seq_length, opset_version=opset_version, dynamic_batch=dynamic_batch, verbose=verbose)
+            return exporter.export(
+                output_path=output_path,
+                mode=mode,
+                dummy_input=dummy_input,
+                batch_size=batch_size,
+                seq_length=seq_length,
+                opset_version=opset_version,
+                dynamic_batch=dynamic_batch,
+                verbose=verbose,
+                onnx_export_kwargs=onnx_export_kwargs,
+            )
         finally:
             # Restore original mode
             if hasattr(model, 'mode'):

@@ -42,6 +42,7 @@ bigdata = [
 onnx = [
     "onnx>=1.14.0",
     "onnxruntime>=1.14.0",
+    "onnxconverter-common>=1.14.0",
 ]
 visualization = [
     "torchview>=0.2.6",

@@ -17,24 +17,21 @@ _DEFAULT_BATCH_SIZE = 1024
 
 
 class ParquetIterableDataset(IterableDataset):
-    """
-    IterableDataset that streams data from one or more Parquet files.
+    """Stream Parquet data as PyTorch tensors.
 
     Parameters
     ----------
     file_paths : list[_FilePath]
         Paths to Parquet files.
     columns : list[str], optional
-        Column names to select. If ``None``, all columns are read.
-    batch_size : int, default DEFAULT_BATCH_SIZE
-        Number of rows per streamed batch.
+        Columns to select; if ``None``, read all columns.
+    batch_size : int, default _DEFAULT_BATCH_SIZE
+        Rows per streamed batch.
 
     Notes
     -----
-    This dataset reads data lazily and never loads the entire Parquet dataset to memory.
-    The current worker receives a partition of ``file_paths`` and builds its own PyArrow
-    Dataset and Scanner. Iteration yields dictionaries mapping column names to PyTorch
-    tensors created via NumPy, one batch at a time.
+    Reads lazily; no full Parquet load. Each worker gets a partition, builds its
+    own PyArrow Dataset/Scanner, and yields dicts of column tensors batch by batch.
 
     Examples
     --------
@@ -44,10 +41,8 @@ class ParquetIterableDataset(IterableDataset):
     ...     batch_size=1024,
     ... )
     >>> loader = DataLoader(ds, batch_size=None)
-    >>> # Now iterate over batches.
     >>> for batch in loader:
     ...     x, y, label = batch["x"], batch["y"], batch["label"]
-    ...     # Do some work.
     ...     ...
     """
 
@@ -64,17 +59,15 @@ class ParquetIterableDataset(IterableDataset):
         self._batch_size = batch_size
 
     def __iter__(self) -> ty.Iterator[dict[str, torch.Tensor]]:
-        """
-        Stream Parquet data as mapped PyTorch tensors.
+        """Stream Parquet data as mapped PyTorch tensors.
 
-        Build a PyArrow Dataset from the current worker's assigned file partition, then
-        create a Scanner to lazily read batches of the selected columns. Each batch is
-        converted to a dict mapping column names to PyTorch tensors (via NumPy).
+        Builds a PyArrow Dataset from the current worker's file partition, then
+        lazily scans selected columns. Each batch becomes a dict of Torch tensors.
 
         Returns
         -------
         Iterator[dict[str, torch.Tensor]]
-            An iterator that yields one converted batch at a time.
+            One converted batch at a time.
         """
         if not (partition := self._get_partition()):
             return
@@ -95,19 +88,15 @@ class ParquetIterableDataset(IterableDataset):
     # private interfaces
 
     def _get_partition(self) -> tuple[str, ...]:
-        """
-        Get the partition of file paths for the current worker.
+        """Get file partition for the current worker.
 
-        This method splits the full list of file paths into contiguous partitions with
-        a nearly equal size by the total number of workers and the current worker ID.
-
-        If running in the main process (i.e., no worker information is available), the
-        entire list of file paths is returned.
+        Splits file paths into contiguous partitions by number of workers and worker ID.
+        In the main process (no worker info), returns all paths.
 
         Returns
         -------
         tuple[str, ...]
-            The partition of file paths for the current worker.
+            Partition of file paths for this worker.
         """
         if (info := get_worker_info()) is None:
             return self._file_paths

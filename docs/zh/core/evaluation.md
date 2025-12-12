@@ -5,7 +5,24 @@ description: Torch-RecHub 模型训练与评估
 
 # 训练与评估
 
-Torch-RecHub提供了多种训练器，用于训练不同类型的推荐模型，包括排序模型、召回模型和多任务模型。所有训练器均提供统一的接口，包括训练、评估、预测和ONNX导出功能。
+Torch-RecHub提供了多种训练器，用于训练不同类型的推荐模型，包括排序模型、召回模型和多任务模型。所有训练器均提供统一的接口，包括训练、评估、预测、ONNX导出，以及可选的实验跟踪与可视化能力。
+
+## 实验跟踪与可视化
+
+- 支持 **WandB / SwanLab / TensorBoardX** 作为 `model_logger`，可传入单个实例或列表。
+- 自动记录训练/验证指标与超参数：`train/loss`、`learning_rate`、`val/auc`（CTR/Match）、`val/task_i_score`（MTL）、`val/accuracy`（Seq）。
+- 不需要记录时传 `model_logger=None`（默认）即可零开销。
+
+```python
+from torch_rechub.basic.tracking import WandbLogger, TensorBoardXLogger
+from torch_rechub.trainers import CTRTrainer
+
+wb = WandbLogger(project="rechub-demo", name="deepfm")
+tb = TensorBoardXLogger(log_dir="./runs/deepfm")
+
+trainer = CTRTrainer(model, model_logger=[wb, tb])
+trainer.fit(train_dataloader, val_dataloader)
+```
 
 ## 训练器
 

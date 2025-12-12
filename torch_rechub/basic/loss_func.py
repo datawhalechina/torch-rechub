@@ -4,13 +4,24 @@ import torch.nn as nn
 
 
 class RegularizationLoss(nn.Module):
-    """Unified L1/L2 Regularization Loss for embedding and dense parameters.
-    
-    Example:
-        >>> reg_loss_fn = RegularizationLoss(embedding_l2=1e-5, dense_l2=1e-5)
-        >>> # In model's forward or trainer
-        >>> reg_loss = reg_loss_fn(model)
-        >>> total_loss = task_loss + reg_loss
+    """Unified L1/L2 regularization for embedding and dense parameters.
+
+    Parameters
+    ----------
+    embedding_l1 : float, default=0.0
+        L1 coefficient for embedding parameters.
+    embedding_l2 : float, default=0.0
+        L2 coefficient for embedding parameters.
+    dense_l1 : float, default=0.0
+        L1 coefficient for dense (non-embedding) parameters.
+    dense_l2 : float, default=0.0
+        L2 coefficient for dense (non-embedding) parameters.
+
+    Examples
+    --------
+    >>> reg_loss_fn = RegularizationLoss(embedding_l2=1e-5, dense_l2=1e-5)
+    >>> reg_loss = reg_loss_fn(model)
+    >>> total_loss = task_loss + reg_loss
     """
 
     def __init__(self, embedding_l1=0.0, embedding_l2=0.0, dense_l1=0.0, dense_l2=0.0):
@@ -58,9 +69,11 @@ class RegularizationLoss(nn.Module):
 
 
 class HingeLoss(torch.nn.Module):
-    """Hinge Loss for pairwise learning.
-    reference: https://github.com/ustcml/RecStudio/blob/main/recstudio/model/loss_func.py
+    """Hinge loss for pairwise learning.
 
+    Notes
+    -----
+    Reference: https://github.com/ustcml/RecStudio/blob/main/recstudio/model/loss_func.py
     """
 
     def __init__(self, margin=2, num_items=None):
@@ -89,27 +102,28 @@ class BPRLoss(torch.nn.Module):
 
 
 class NCELoss(torch.nn.Module):
-    """Noise Contrastive Estimation (NCE) Loss for recommendation systems.
+    """Noise Contrastive Estimation (NCE) loss for recommender systems.
 
-    NCE Loss is more efficient than CrossEntropyLoss for large-scale recommendation
-    scenarios. It uses in-batch negatives to reduce computational complexity.
+    Parameters
+    ----------
+    temperature : float, default=1.0
+        Temperature for scaling logits.
+    ignore_index : int, default=0
+        Target index to ignore.
+    reduction : {'mean', 'sum', 'none'}, default='mean'
+        Reduction applied to the output.
 
-    Reference:
-        - Noise-contrastive estimation: A new estimation principle for unnormalized
-          statistical models (Gutmann & Hyvärinen, 2010)
-        - HLLM: Hierarchical Large Language Model for Recommendation
+    Notes
+    -----
+    - Gutmann & Hyvärinen (2010), Noise-contrastive estimation.
+    - HLLM: Hierarchical Large Language Model for Recommendation.
 
-    Args:
-        temperature (float): Temperature parameter for scaling logits. Default: 1.0
-        ignore_index (int): Index to ignore in loss computation. Default: 0
-        reduction (str): Specifies the reduction to apply to the output.
-                        Options: 'mean', 'sum', 'none'. Default: 'mean'
-
-    Example:
-        >>> nce_loss = NCELoss(temperature=0.1)
-        >>> logits = torch.randn(32, 1000)  # (batch_size, vocab_size)
-        >>> targets = torch.randint(0, 1000, (32,))
-        >>> loss = nce_loss(logits, targets)
+    Examples
+    --------
+    >>> nce_loss = NCELoss(temperature=0.1)
+    >>> logits = torch.randn(32, 1000)
+    >>> targets = torch.randint(0, 1000, (32,))
+    >>> loss = nce_loss(logits, targets)
     """
 
     def __init__(self, temperature=1.0, ignore_index=0, reduction='mean'):
@@ -158,23 +172,24 @@ class NCELoss(torch.nn.Module):
 
 
 class InBatchNCELoss(torch.nn.Module):
-    """In-Batch NCE Loss with explicit negative sampling.
+    """In-batch NCE loss with explicit negatives.
 
-    This loss function uses other samples in the batch as negative samples,
-    which is more efficient than sampling random negatives.
+    Parameters
+    ----------
+    temperature : float, default=0.1
+        Temperature for scaling logits.
+    ignore_index : int, default=0
+        Target index to ignore.
+    reduction : {'mean', 'sum', 'none'}, default='mean'
+        Reduction applied to the output.
 
-    Args:
-        temperature (float): Temperature parameter for scaling logits. Default: 0.1
-        ignore_index (int): Index to ignore in loss computation. Default: 0
-        reduction (str): Specifies the reduction to apply to the output.
-                        Options: 'mean', 'sum', 'none'. Default: 'mean'
-
-    Example:
-        >>> loss_fn = InBatchNCELoss(temperature=0.1)
-        >>> embeddings = torch.randn(32, 256)  # (batch_size, embedding_dim)
-        >>> item_embeddings = torch.randn(1000, 256)  # (vocab_size, embedding_dim)
-        >>> targets = torch.randint(0, 1000, (32,))
-        >>> loss = loss_fn(embeddings, item_embeddings, targets)
+    Examples
+    --------
+    >>> loss_fn = InBatchNCELoss(temperature=0.1)
+    >>> embeddings = torch.randn(32, 256)
+    >>> item_embeddings = torch.randn(1000, 256)
+    >>> targets = torch.randint(0, 1000, (32,))
+    >>> loss = loss_fn(embeddings, item_embeddings, targets)
     """
 
     def __init__(self, temperature=0.1, ignore_index=0, reduction='mean'):

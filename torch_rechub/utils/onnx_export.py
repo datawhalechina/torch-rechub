@@ -12,6 +12,7 @@ References:
 Authors: Torch-RecHub Contributors
 """
 
+import inspect
 import os
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -23,19 +24,24 @@ from ..basic.features import DenseFeature, SequenceFeature, SparseFeature
 
 
 class ONNXWrapper(nn.Module):
-    """Wraps a dict-input model to accept positional arguments for ONNX compatibility.
+    """Wrap a dict-input model to accept positional args for ONNX.
 
-    ONNX does not support dict as input, so this wrapper converts positional arguments
-    back to dict format before passing to the original model.
+    ONNX disallows dict inputs; this wrapper maps positional args back to dict
+    before calling the original model.
 
-    Args:
-        model: The original PyTorch model that accepts dict input.
-        input_names: Ordered list of feature names corresponding to input positions.
-        mode: Optional mode for dual-tower models ("user" or "item").
+    Parameters
+    ----------
+    model : nn.Module
+        Original dict-input model.
+    input_names : list[str]
+        Ordered feature names matching positional inputs.
+    mode : {'user', 'item'}, optional
+        For dual-tower models, set tower mode.
 
-    Example:
-        >>> wrapper = ONNXWrapper(dssm_model, ["user_id", "movie_id", "hist_movie_id"])
-        >>> # Now can call: wrapper(user_id_tensor, movie_id_tensor, hist_tensor)
+    Examples
+    --------
+    >>> wrapper = ONNXWrapper(dssm_model, ["user_id", "movie_id", "hist_movie_id"])
+    >>> wrapper(user_id_tensor, movie_id_tensor, hist_tensor)
     """
 
     def __init__(self, model: nn.Module, input_names: List[str], mode: Optional[str] = None):
@@ -102,27 +108,49 @@ class ONNXExporter:
         seq_length: int = 10,
         opset_version: int = 14,
         dynamic_batch: bool = True,
-        verbose: bool = False
+        verbose: bool = False,
+        onnx_export_kwargs: Optional[Dict[str,
+                                          Any]] = None,
     ) -> bool:
-        """Export the model to ONNX format.
+        """Export model to ONNX format.
 
-        Args:
-            output_path: Path to save the ONNX model.
-            mode: For dual-tower models, specify "user" or "item" to export
-                  only that tower. None exports the full model.
-            dummy_input: Optional dict of example inputs. If not provided,
-                         dummy inputs will be generated automatically.
-            batch_size: Batch size for generated dummy input (default: 2).
-            seq_length: Sequence length for SequenceFeature (default: 10).
-            opset_version: ONNX opset version (default: 14).
-            dynamic_batch: Whether to enable dynamic batch size (default: True).
-            verbose: Whether to print export details (default: False).
+        Parameters
+        ----------
+        output_path : str
+            Destination path.
+        mode : {'user', 'item'}, optional
+            For dual-tower, export specific tower; None exports full model.
+        dummy_input : dict[str, Tensor], optional
+            Example inputs; auto-generated if None.
+        batch_size : int, default=2
+            Batch size for dummy input generation.
+        seq_length : int, default=10
+            Sequence length for SequenceFeature.
+        opset_version : int, default=14
+            ONNX opset.
+        dynamic_batch : bool, default=True
+            Enable dynamic batch axes.
+        verbose : bool, default=False
+            Print export details.
+        onnx_export_kwargs : dict, optional
+            Extra keyword args forwarded to ``torch.onnx.export`` (e.g. ``operator_export_type``,
+            ``keep_initializers_as_inputs``, ``do_constant_folding``).
+            Notes:
+              - If you pass keys that overlap with the explicit parameters above
+                (like ``opset_version`` / ``dynamic_axes`` / ``input_names``), this function
+                will raise a ``ValueError`` to avoid ambiguous behavior.
+              - Some kwargs (like ``dynamo``) are only available in newer PyTorch; unsupported
+                keys will be ignored for compatibility.
 
-        Returns:
-            True if export succeeded, False otherwise.
+        Returns
+        -------
+        bool
+            True if export succeeds.
 
-        Raises:
-            RuntimeError: If ONNX export fails.
+        Raises
+        ------
+        RuntimeError
+            If ONNX export fails.
         """
         self.model.eval()
         self.model.to(self.device)
@@ -164,18 +192,43 @@ class ONNXExporter:
 
         try:
             with torch.no_grad():
-                torch.onnx.export(
-                    wrapper,
-                    dummy_tuple,
-                    output_path,
-                    input_names=input_names,
-                    output_names=["output"],
-                    dynamic_axes=dynamic_axes,
-                    opset_version=opset_version,
-                    do_constant_folding=True,
-                    verbose=verbose,
-                    dynamo=False  # Use legacy exporter for dynamic_axes support
-                )
+                export_kwargs: Dict[str,
+                                    Any] = {
+                                        "f": output_path,
+                                        "input_names": input_names,
+                                        "output_names": ["output"],
+                                        "dynamic_axes": dynamic_axes,
+                                        "opset_version": opset_version,
+                                        "do_constant_folding": True,
+                                        "verbose": verbose,
+                                    }
+
+                if onnx_export_kwargs:
+                    # Prevent silent conflicts with explicit arguments
+                    overlap = set(export_kwargs.keys()) & set(onnx_export_kwargs.keys())
+                    # allow user to set 'dynamo' even if we inject it later
+                    overlap.discard("dynamo")
+                    if overlap:
+                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
+                                         f"{sorted(overlap)}. Please set them via export() parameters instead.")
+                    export_kwargs.update(onnx_export_kwargs)
+
+                # Auto-pick exporter:
+                # - When dynamic axes are requested, prefer legacy exporter (dynamo=False),
+                #   because the dynamo exporter may not honor `dynamic_axes` consistently
+                #   across torch versions.
+                # - When no dynamic axes are requested, prefer dynamo exporter (dynamo=True)
+                #   for better operator coverage in newer torch.
+                #
+                # In older torch versions, 'dynamo' kwarg does not exist.
+                sig = inspect.signature(torch.onnx.export)
+                if "dynamo" in sig.parameters:
+                    if "dynamo" not in export_kwargs:
+                        export_kwargs["dynamo"] = False if dynamic_axes is not None else True
+                else:
+                    export_kwargs.pop("dynamo", None)
+
+                torch.onnx.export(wrapper, dummy_tuple, **export_kwargs)
 
             if verbose:
                 print(f"Successfully exported ONNX model to: {output_path}")

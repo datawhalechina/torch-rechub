@@ -9,11 +9,12 @@ from .features import DenseFeature, SequenceFeature, SparseFeature
 
 
 class PredictionLayer(nn.Module):
-    """Prediction Layer.
+    """Prediction layer.
 
-    Args:
-        task_type (str): if `task_type='classification'`, then return sigmoid(x),
-                    change the input logits to probability. if`task_type='regression'`, then return x.
+    Parameters
+    ----------
+    task_type : {'classification', 'regression'}
+        Classification applies sigmoid to logits; regression returns logits.
     """
 
     def __init__(self, task_type='classification'):
@@ -29,24 +30,30 @@ class PredictionLayer(nn.Module):
 
 
 class EmbeddingLayer(nn.Module):
-    """General Embedding Layer.
-    We save all the feature embeddings in embed_dict: `{feature_name : embedding table}`.
+    """General embedding layer.
 
+    Stores per-feature embedding tables in ``embed_dict``.
 
-    Args:
-        features (list): the list of `Feature Class`. It is means all the features which we want to create a embedding table.
+    Parameters
+    ----------
+    features : list
+        Feature objects to create embedding tables for.
 
-    Shape:
-        - Input:
-            x (dict): {feature_name: feature_value}, sequence feature value is a 2D tensor with shape:`(batch_size, seq_len)`,\
-                      sparse/dense feature value is a 1D tensor with shape `(batch_size)`.
-            features (list): the list of `Feature Class`. It is means the current features which we want to do embedding lookup.
-            squeeze_dim (bool): whether to squeeze dim of output (default = `False`).
-        - Output:
-            - if input Dense: `(batch_size, num_features_dense)`.
-            - if input Sparse: `(batch_size, num_features, embed_dim)` or  `(batch_size, num_features * embed_dim)`.
-            - if input Sequence: same with input sparse or `(batch_size, num_features_seq, seq_length, embed_dim)` when `pooling=="concat"`.
-            - if input Dense and Sparse/Sequence: `(batch_size, num_features_sparse * embed_dim)`. Note we must squeeze_dim for concat dense value with sparse embedding.
+    Shape
+    -----
+    Input
+        x : dict
+            ``{feature_name: feature_value}``; sequence values shape ``(B, L)``,
+            sparse/dense values shape ``(B,)``.
+        features : list
+            Feature list for lookup.
+        squeeze_dim : bool, default False
+            Whether to flatten embeddings.
+    Output
+        - Dense only: ``(B, num_dense)``.
+        - Sparse: ``(B, num_features, embed_dim)`` or flattened.
+        - Sequence: same as sparse or ``(B, num_seq, L, embed_dim)`` when ``pooling="concat"``.
+        - Mixed: flattened sparse plus dense when ``squeeze_dim=True``.
     """
 
     def __init__(self, features):
@@ -119,16 +126,18 @@ class EmbeddingLayer(nn.Module):
 
 
 class InputMask(nn.Module):
-    """Return inputs mask from given features
+    """Return input masks from features.
 
-    Shape:
-        - Input:
-            x (dict): {feature_name: feature_value}, sequence feature value is a 2D tensor with shape:`(batch_size, seq_len)`,\
-                      sparse/dense feature value is a 1D tensor with shape `(batch_size)`.
-            features (list or SparseFeature or SequenceFeature): Note that the elements in features are either all instances of SparseFeature or all instances of SequenceFeature.
-        - Output:
-            - if input Sparse: `(batch_size, num_features)`
-            - if input Sequence: `(batch_size, num_features_seq, seq_length)`
+    Shape
+    -----
+    Input
+        x : dict
+            ``{feature_name: feature_value}``; sequence ``(B, L)``, sparse/dense ``(B,)``.
+        features : list or SparseFeature or SequenceFeature
+            All elements must be sparse or sequence features.
+    Output
+        - Sparse: ``(B, num_features)``
+        - Sequence: ``(B, num_seq, seq_length)``
     """
 
     def __init__(self):
@@ -151,16 +160,19 @@ class InputMask(nn.Module):
 
 
 class LR(nn.Module):
-    """Logistic Regression Module. It is the one Non-linear
-    transformation for input feature.
+    """Logistic regression module.
 
-    Args:
-        input_dim (int): input size of Linear module.
-        sigmoid (bool): whether to add sigmoid function before output.
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    sigmoid : bool, default False
+        Apply sigmoid to output when True.
 
-    Shape:
-        - Input: `(batch_size, input_dim)`
-        - Output: `(batch_size, 1)`
+    Shape
+    -----
+    Input: ``(B, input_dim)``
+    Output: ``(B, 1)``
     """
 
     def __init__(self, input_dim, sigmoid=False):
@@ -176,11 +188,12 @@ class LR(nn.Module):
 
 
 class ConcatPooling(nn.Module):
-    """Keep the origin sequence embedding shape
+    """Keep original sequence embedding shape.
 
-    Shape:
-    - Input: `(batch_size, seq_length, embed_dim)`
-    - Output: `(batch_size, seq_length, embed_dim)`
+    Shape
+    -----
+    Input: ``(B, L, D)``  
+    Output: ``(B, L, D)``
     """
 
     def __init__(self):
@@ -191,13 +204,15 @@ class ConcatPooling(nn.Module):
 
 
 class AveragePooling(nn.Module):
-    """Pooling the sequence embedding matrix by `mean`.
+    """Mean pooling over sequence embeddings.
 
-    Shape:
-        - Input
-            x: `(batch_size, seq_length, embed_dim)`
-            mask: `(batch_size, 1, seq_length)`
-        - Output: `(batch_size, embed_dim)`
+    Shape
+    -----
+    Input
+        x : ``(B, L, D)``
+        mask : ``(B, 1, L)``
+    Output
+        ``(B, D)``
     """
 
     def __init__(self):
@@ -213,13 +228,15 @@ class AveragePooling(nn.Module):
 
 
 class SumPooling(nn.Module):
-    """Pooling the sequence embedding matrix by `sum`.
+    """Sum pooling over sequence embeddings.
 
-    Shape:
-        - Input
-            x: `(batch_size, seq_length, embed_dim)`
-            mask: `(batch_size, 1, seq_length)`
-        - Output: `(batch_size, embed_dim)`
+    Shape
+    -----
+    Input
+        x : ``(B, L, D)``
+        mask : ``(B, 1, L)``
+    Output
+        ``(B, D)``
     """
 
     def __init__(self):
@@ -233,20 +250,25 @@ class SumPooling(nn.Module):
 
 
 class MLP(nn.Module):
-    """Multi Layer Perceptron Module, it is the most widely used module for
-    learning feature. Note we default add `BatchNorm1d` and `Activation`
-    `Dropout` for each `Linear` Module.
+    """Multi-layer perceptron with BN/activation/dropout per linear layer.
 
-    Args:
-        input dim (int): input size of the first Linear Layer.
-        output_layer (bool): whether this MLP module is the output layer. If `True`, then append one Linear(*,1) module.
-        dims (list): output size of Linear Layer (default=[]).
-        dropout (float): probability of an element to be zeroed (default = 0.5).
-        activation (str): the activation function, support `[sigmoid, relu, prelu, dice, softmax]` (default='relu').
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension of the first linear layer.
+    output_layer : bool, default True
+        If True, append a final Linear(*,1).
+    dims : list, default []
+        Hidden layer sizes.
+    dropout : float, default 0
+        Dropout probability.
+    activation : str, default 'relu'
+        Activation function (sigmoid, relu, prelu, dice, softmax).
 
-    Shape:
-        - Input: `(batch_size, input_dim)`
-        - Output: `(batch_size, 1)` or `(batch_size, dims[-1])`
+    Shape
+    -----
+    Input: ``(B, input_dim)``  
+    Output: ``(B, 1)`` or ``(B, dims[-1])``
     """
 
     def __init__(self, input_dim, output_layer=True, dims=None, dropout=0, activation="relu"):
@@ -269,16 +291,17 @@ class MLP(nn.Module):
 
 
 class FM(nn.Module):
-    """The Factorization Machine module, mentioned in the `DeepFM paper
-    <https://arxiv.org/pdf/1703.04247.pdf>`. It is used to learn 2nd-order
-    feature interactions.
+    """Factorization Machine for 2nd-order interactions.
 
-    Args:
-        reduce_sum (bool): whether to sum in embed_dim (default = `True`).
+    Parameters
+    ----------
+    reduce_sum : bool, default True
+        Sum over embed dim (inner product) when True; otherwise keep dim.
 
-    Shape:
-        - Input: `(batch_size, num_features, embed_dim)`
-        - Output: `(batch_size, 1)`` or ``(batch_size, embed_dim)`
+    Shape
+    -----
+    Input: ``(B, num_features, embed_dim)``  
+    Output: ``(B, 1)`` or ``(B, embed_dim)``
     """
 
     def __init__(self, reduce_sum=True):
@@ -295,15 +318,21 @@ class FM(nn.Module):
 
 
 class CIN(nn.Module):
-    """Compressed Interaction Network
+    """Compressed Interaction Network.
 
-    Args:
-        input_dim (int): input dim of input tensor.
-        cin_size (list[int]): out channels of Conv1d.
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    cin_size : list[int]
+        Output channels per Conv1d layer.
+    split_half : bool, default True
+        Split channels except last layer.
 
-    Shape:
-        - Input: `(batch_size, num_features, embed_dim)`
-        - Output: `(batch_size, 1)`
+    Shape
+    -----
+    Input: ``(B, num_features, embed_dim)``  
+    Output: ``(B, 1)``
     """
 
     def __init__(self, input_dim, cin_size, split_half=True):
@@ -338,10 +367,12 @@ class CIN(nn.Module):
 
 
 class CrossLayer(nn.Module):
-    """
-        Cross layer.
-    Args:
-        input_dim (int): input dim of input tensor
+    """Cross layer.
+
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
     """
 
     def __init__(self, input_dim):
@@ -355,15 +386,19 @@ class CrossLayer(nn.Module):
 
 
 class CrossNetwork(nn.Module):
-    """CrossNetwork  mentioned in the DCN paper.
+    """CrossNetwork from DCN.
 
-    Args:
-        input_dim (int): input dim of input tensor
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    num_layers : int
+        Number of cross layers.
 
-    Shape:
-        - Input: `(batch_size, *)`
-        - Output: `(batch_size, *)`
-
+    Shape
+    -----
+    Input: ``(B, *)``  
+    Output: ``(B, *)``
     """
 
     def __init__(self, input_dim, num_layers):
@@ -384,6 +419,15 @@ class CrossNetwork(nn.Module):
 
 
 class CrossNetV2(nn.Module):
+    """DCNv2-style cross network.
+
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    num_layers : int
+        Number of cross layers.
+    """
 
     def __init__(self, input_dim, num_layers):
         super().__init__()
@@ -399,10 +443,11 @@ class CrossNetV2(nn.Module):
 
 
 class CrossNetMix(nn.Module):
-    """ CrossNetMix improves CrossNetwork by:
-        1. add MOE to learn feature interactions in different subspaces
-        2. add nonlinear transformations in low-dimensional space
-        :param x: Float tensor of size ``(batch_size, num_fields, embed_dim)``
+    """CrossNetMix with MOE and nonlinear low-rank transforms.
+
+    Notes
+    -----
+    Input: float tensor ``(B, num_fields, embed_dim)``.
     """
 
     def __init__(self, input_dim, num_layers=2, low_rank=32, num_experts=4):
@@ -460,14 +505,14 @@ class CrossNetMix(nn.Module):
 
 
 class SENETLayer(nn.Module):
-    """
-    A weighted feature gating system in the SENet paper
-    Args:
-        num_fields (int): number of feature fields
+    """SENet-style feature gating.
 
-    Shape:
-        - num_fields: `(batch_size, *)`
-        - Output: `(batch_size, *)`
+    Parameters
+    ----------
+    num_fields : int
+        Number of feature fields.
+    reduction_ratio : int, default=3
+        Reduction ratio for the bottleneck MLP.
     """
 
     def __init__(self, num_fields, reduction_ratio=3):
@@ -483,14 +528,16 @@ class SENETLayer(nn.Module):
 
 
 class BiLinearInteractionLayer(nn.Module):
-    """
-    Bilinear feature interaction module, which is an improved model of the FFM model
-     Args:
-        num_fields (int): number of feature fields
-        bilinear_type(str): the type bilinear interaction function
-    Shape:
-        - num_fields: `(batch_size, *)`
-        - Output: `(batch_size, *)`
+    """Bilinear feature interaction (FFM-style).
+
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    num_fields : int
+        Number of feature fields.
+    bilinear_type : {'field_all', 'field_each', 'field_interaction'}, default 'field_interaction'
+        Bilinear interaction variant.
     """
 
     def __init__(self, input_dim, num_fields, bilinear_type="field_interaction"):
@@ -517,18 +564,24 @@ class BiLinearInteractionLayer(nn.Module):
 
 
 class MultiInterestSA(nn.Module):
-    """MultiInterest Attention mentioned in the Comirec paper.
+    """Self-attention multi-interest module (Comirec).
 
-    Args:
-        embedding_dim (int): embedding dim of item embedding
-        interest_num (int): num of interest
-        hidden_dim (int): hidden dim
+    Parameters
+    ----------
+    embedding_dim : int
+        Item embedding dimension.
+    interest_num : int
+        Number of interests.
+    hidden_dim : int, optional
+        Hidden dimension; defaults to ``4 * embedding_dim`` if None.
 
-    Shape:
-        - Input: seq_emb : (batch,seq,emb)
-                 mask : (batch,seq,1)
-        - Output: `(batch_size, interest_num, embedding_dim)`
-
+    Shape
+    -----
+    Input
+        seq_emb : ``(B, L, D)``
+        mask : ``(B, L, 1)``
+    Output
+        ``(B, interest_num, D)``
     """
 
     def __init__(self, embedding_dim, interest_num, hidden_dim=None):
@@ -555,20 +608,30 @@ class MultiInterestSA(nn.Module):
 
 
 class CapsuleNetwork(nn.Module):
-    """CapsuleNetwork mentioned in the Comirec and MIND paper.
+    """Capsule network for multi-interest (MIND/Comirec).
 
-    Args:
-        hidden_size (int): embedding dim of item embedding
-        seq_len (int): length of the item sequence
-        bilinear_type (int): 0 for MIND, 2 for ComirecDR
-        interest_num (int): num of interest
-        routing_times (int): routing times
+    Parameters
+    ----------
+    embedding_dim : int
+        Item embedding dimension.
+    seq_len : int
+        Sequence length.
+    bilinear_type : {0, 1, 2}, default 2
+        0 for MIND, 2 for ComirecDR.
+    interest_num : int, default 4
+        Number of interests.
+    routing_times : int, default 3
+        Routing iterations.
+    relu_layer : bool, default False
+        Whether to apply ReLU after routing.
 
-    Shape:
-        - Input: seq_emb : (batch,seq,emb)
-                 mask : (batch,seq,1)
-        - Output: `(batch_size, interest_num, embedding_dim)`
-
+    Shape
+    -----
+    Input
+        seq_emb : ``(B, L, D)``
+        mask : ``(B, L, 1)``
+    Output
+        ``(B, interest_num, D)``
     """
 
     def __init__(self, embedding_dim, seq_len, bilinear_type=2, interest_num=4, routing_times=3, relu_layer=False):

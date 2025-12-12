@@ -44,27 +44,19 @@ def _is_jupyter_environment() -> bool:
 
 
 def display_graph(graph: Any, format: str = 'png') -> Any:
-    """Display a torchview ComputationGraph in Jupyter Notebook.
-
-    This function provides a reliable way to display visualization graphs
-    in Jupyter environments, especially VSCode Jupyter.
+    """Display a torchview ComputationGraph in Jupyter.
 
     Parameters
     ----------
     graph : ComputationGraph
-        A torchview ComputationGraph object returned by visualize_model().
+        Returned by :func:`visualize_model`.
     format : str, default='png'
-        Output format, 'png' recommended for VSCode.
+        Output format; 'png' recommended for VSCode.
 
     Returns
     -------
     graphviz.Digraph or None
-        The displayed graph object, or None if display fails.
-
-    Examples
-    --------
-    >>> graph = visualize_model(model, depth=4)
-    >>> display_graph(graph)  # Works in VSCode Jupyter
+        Displayed graph object, or None if display fails.
     """
     if not TORCHVIEW_AVAILABLE:
         raise ImportError(f"Visualization requires torchview. {TORCHVIEW_SKIP_REASON}\n"
