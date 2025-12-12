@@ -1,1 +1,0 @@
-import{_ as e,c as t,o as r}from"./chunks/framework.BiSKXDrp.js";const m=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"core/intro.md","filePath":"en/core/intro.md"}'),o={name:"core/intro.md"};function a(n,c,s,i,p,_){return r(),t("div")}const f=e(o,[["render",a]]);export{m as __pageData,f as default};
