@@ -64,10 +64,6 @@ class BaseBuilder(abc.ABC):
             A context manager that yields a fully initialized ``BaseIndexer``.
         """
 
-    @abc.abstractmethod
-    def dispose(self) -> None:
-        """Dispose of the indexer and release used resources."""
-
 
 class BaseIndexer(abc.ABC):
     """Abstract base class for vector indexers in the retrieval stage."""

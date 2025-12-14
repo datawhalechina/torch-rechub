@@ -11,7 +11,7 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for distance metrics for the ANNOY index.
-_AnnoyMetric = ty.Literal["angular", "euclidean", "manhattan", "hamming", "dot"]
+_AnnoyMetric = ty.Literal["angular", "euclidean", "dot"]
 
 # Default distance metric used by ANNOY.
 _DEFAULT_METRIC: _AnnoyMetric = "angular"
@@ -39,12 +39,12 @@ class AnnoyBuilder(BaseBuilder):
         searchk: int = _DEFAULT_SEARCHK,
     ) -> None:
         """
-        Initialize a FAISS builder.
+        Initialize a ANNOY builder.
 
         Parameters
         ----------
         d : int
-            The indexing method.
+            The dimension of embeddings.
         metric : _AnnoyMetric, optional
             The indexing metric. Default to ``"angular"``.
         n_trees : int, optional
@@ -79,7 +79,7 @@ class AnnoyBuilder(BaseBuilder):
         try:
             yield AnnoyIndexer(index, self._searchk)
         finally:
-            self.dispose()
+            index.unload()
 
     @contextlib.contextmanager
     def from_index_file(
@@ -95,10 +95,7 @@ class AnnoyBuilder(BaseBuilder):
         try:
             yield AnnoyIndexer(index, searchk=self._searchk)
         finally:
-            self.dispose()
-
-    def dispose(self) -> None:
-        """Adhere to ``BaseBuilder.dispose``."""
+            index.unload()
 
 
 class AnnoyIndexer(BaseIndexer):

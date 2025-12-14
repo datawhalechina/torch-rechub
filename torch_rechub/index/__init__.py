@@ -1,7 +1,5 @@
 import typing as ty
 
-from torch_rechub.types import FilePath
-
 from .annoy import AnnoyBuilder
 from .base import BaseBuilder
 from .faiss import FaissBuilder
@@ -10,11 +8,7 @@ from .faiss import FaissBuilder
 _RetrievalModel = ty.Literal["annoy", "faiss"]
 
 
-def builder_factory(
-    model: _RetrievalModel,
-    builder_config: ty.Optional[dict[str,
-                                     ty.Any]] = None,
-) -> BaseBuilder:
+def builder_factory(model: _RetrievalModel, **builder_config) -> BaseBuilder:
     """
     Factory function for creating a vector index builder.
 
@@ -27,7 +21,7 @@ def builder_factory(
     ----------
     model : _RetrievalModel
         The retrieval backend to use.
-    builder_config : dict[str, Any], optional
+    **builder_config
         Keyword arguments passed directly to the selected builder constructor.
 
     Returns
@@ -51,7 +45,6 @@ def builder_factory(
     if builder_factory is None:
         raise NotImplementedError(f"{model=} is not implemented yet!")
 
-    builder_config = {} if builder_config is None else builder_config
     return builder_factory(**builder_config)
 
 

@@ -11,13 +11,13 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for indexing methods.
-_FaissMethod = ty.Literal["flat", "hnsw", "ivf"]
+_FaissIndexType = ty.Literal["Flat", "HNSW", "IVF"]
 
 # Type for indexing metrics.
 _FaissMetric = ty.Union[faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2]
 
 # Default indexing method.
-_DEFAULT_FAISS_METHOD: _FaissMethod = "flat"
+_DEFAULT_FAISS_INDEX_TYPE: _FaissIndexType = "Flat"
 
 # Default indexing metric.
 _DEFAULT_FAISS_METRIC: _FaissMetric = faiss.METRIC_L2
@@ -34,7 +34,7 @@ class FaissBuilder(BaseBuilder):
 
     def __init__(
         self,
-        method: _FaissMethod = _DEFAULT_FAISS_METHOD,
+        index_type: _FaissIndexType = _DEFAULT_FAISS_INDEX_TYPE,
         metric: _FaissMetric = _DEFAULT_FAISS_METRIC,
         *,
         m: int = _DEFAULT_M,
@@ -47,8 +47,8 @@ class FaissBuilder(BaseBuilder):
 
         Parameters
         ----------
-        method : _FaissMethod, optional
-            The indexing method. Default to ``"flat"``.
+        index_type : _FaissIndexType, optional
+            The indexing index_type. Default to ``"Flat"``.
         metric : _FaissMetric, optional
             The indexing metric. Default to ``faiss.METRIC_L2``.
         m : int, optional
@@ -60,7 +60,7 @@ class FaissBuilder(BaseBuilder):
         nprobe : int or None, optional
             Number of clusters during an IVF search.
         """
-        self._method = method
+        self._index_type = index_type
         self._metric = metric
 
         self._m = m
@@ -78,17 +78,19 @@ class FaissBuilder(BaseBuilder):
         """Adhere to ``BaseBuilder.from_embeddings``."""
         index: faiss.Index = faiss.index_factory(
             embeddings.shape[1],
-            _build_method_dsl(self._method,
-                              m=self._m,
-                              nlists=self._nlists),
+            _build_index_type_dsl(
+                self._index_type,
+                m=self._m,
+                nlists=self._nlists,
+            ),
             self._metric,
         )
 
-        if isinstance(index, faiss.IndexHNSW):
-            index.hnsw.efSearch = self._efSearch or index.hnsw.efSearch
+        if isinstance(index, faiss.IndexHNSW) and self._efSearch is not None:
+            index.hnsw.efSearch = self._efSearch
 
-        if isinstance(index, faiss.IndexIVF):
-            index.nprobe = self._nprobe or index.nprobe
+        if isinstance(index, faiss.IndexIVF) and self._nprobe is not None:
+            index.nprobe = self._nprobe
 
         index.train(embeddings)
         index.add(embeddings)
@@ -96,7 +98,7 @@ class FaissBuilder(BaseBuilder):
         try:
             yield FaissIndexer(index)
         finally:
-            self.dispose()
+            pass
 
     @contextlib.contextmanager
     def from_index_file(
@@ -111,10 +113,7 @@ class FaissBuilder(BaseBuilder):
         try:
             yield FaissIndexer(index)
         finally:
-            self.dispose()
-
-    def dispose(self) -> None:
-        """Adhere to ``BaseBuilder.dispose``."""
+            pass
 
 
 class FaissIndexer(BaseIndexer):
@@ -146,12 +145,12 @@ class FaissIndexer(BaseIndexer):
 # helper functions
 
 
-def _build_method_dsl(method: _FaissMethod, *, m: int, nlists: int) -> str:
-    """Build the method DSL passed to ``faiss.index_factory``."""
-    if method == "hnsw":
-        return f"HNSW{m},Flat"
+def _build_index_type_dsl(index_type: _FaissIndexType, *, m: int, nlists: int) -> str:
+    """Build the index_type DSL passed to ``faiss.index_factory``."""
+    if index_type == "HNSW":
+        return f"{index_type}{m},Flat"
 
-    if method == "ivf":
-        return f"IVF{nlists},Flat"
+    if index_type == "IVF":
+        return f"{index_type}{nlists},Flat"
 
     return "Flat"
