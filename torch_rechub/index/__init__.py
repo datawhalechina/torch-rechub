@@ -1,63 +1,44 @@
-import contextlib
 import typing as ty
-
-import torch
 
 from torch_rechub.types import FilePath
 
 from .annoy import AnnoyBuilder
-from .base import BaseBuilder, BaseIndexer
+from .base import BaseBuilder
 from .faiss import FaissBuilder
 
 # Type for supported retrieval models.
 _RetrievalModel = ty.Literal["annoy", "faiss"]
 
 
-@contextlib.contextmanager
-def indexer_factory(
+def builder_factory(
     model: _RetrievalModel,
-    *,
-    embeddings: ty.Optional[torch.Tensor] = None,
-    index_file: ty.Optional[FilePath] = None,
     builder_config: ty.Optional[dict[str,
                                      ty.Any]] = None,
-) -> ty.Generator[BaseIndexer,
-                  None,
-                  None]:
+) -> BaseBuilder:
     """
-    Context manager factory for creating a vector indexer.
+    Factory function for creating a vector index builder.
 
-    This function instantiates an index builder (ANNOY, FAISS, or Milvus) based on the
-    specified retrieval model, and yields a ready-to-use ``BaseIndexer`` instance. The
-    ndexer can be constructed either from in-memory embeddings or by loading a prebuilt
-    index file.
-
-    Exactly one of ``embeddings`` or ``index_file`` must be provided.
+    This function instantiates and returns a concrete implementation of ``BaseBuilder``
+    based on the specified retrieval backend. The returned builder is responsible for
+    constructing or loading the underlying ANN index via its own ``from_embeddings`` or
+    ``from_index_file`` method.
 
     Parameters
     ----------
     model : _RetrievalModel
-        The retrieval backend to use. Determines which index builder to use.
-    embeddings : torch.Tensor, optional
-        A tensor of embeddings used to build a new index in memory.
-        Must not be provided together with ``index_file``.
-    index_file : FilePath, optional
-        Path to a serialized index file to load.
-        Must not be provided together with ``embeddings``.
+        The retrieval backend to use.
     builder_config : dict[str, Any], optional
-        Keyword arguments passed directly to the underlying index builder constructor.
+        Keyword arguments passed directly to the selected builder constructor.
 
-    Yields
-    ------
-    BaseIndexer
-        An initialized indexer instance, ready for similarity search.
+    Returns
+    -------
+    BaseBuilder
+        A concrete builder instance corresponding to the specified retrieval backend.
 
     Raises
     ------
     NotImplementedError
         if the specified retrieval model is not supported.
-    ValueError
-        if neither or both of ``embeddings`` and ``index_file`` are provided.
     """
     builder_factory: ty.Optional[type[BaseBuilder]] = None
 
@@ -70,22 +51,8 @@ def indexer_factory(
     if builder_factory is None:
         raise NotImplementedError(f"{model=} is not implemented yet!")
 
-    if embeddings is None and index_file is None:
-        raise ValueError("Either embeddings or index_file must be provided!")
-
-    if embeddings is not None and index_file is not None:
-        raise ValueError("Can only provide either embeddings or index_file!")
-
     builder_config = {} if builder_config is None else builder_config
-    builder = builder_factory(**builder_config)
-
-    if embeddings is not None:
-        with builder.from_embeddings(embeddings) as indexer:
-            yield indexer
-
-    if index_file is not None:
-        with builder.from_index_file(index_file) as indexer:
-            yield indexer
+    return builder_factory(**builder_config)
 
 
-__all__ = ["indexer_factory"]
+__all__ = ["builder_factory"]
