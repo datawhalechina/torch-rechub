@@ -104,6 +104,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
+    env:
+      SKIP_MILVUS_TESTS: ${{ matrix.os != 'ubuntu-latest' && '1' || '0' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -136,11 +139,35 @@ jobs:
           # Install CPU-only PyTorch for faster CI
           pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
           # Install the package with dev and onnx dependencies
-          pip install -e ".[dev,onnx]" || pip install -r requirements-dev.txt && pip install -e .
+          pip install -e ".[dev,annoy,faiss,milvus,onnx]" || pip install -r requirements-dev.txt && pip install -e .
+
+      - name: Start Milvus
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Download the installation script
+          curl -sfL https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/standalone_embed.sh -o standalone_embed.sh
+
+          # Start the Docker container
+          bash standalone_embed.sh start
+
+      - name: Wait for Milvus
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:9091/healthz >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
 
       - name: Run tests
+        if: matrix.os != 'macos-latest'
         run: |
           pytest -c config/pytest.ini tests/ -v
+
+      - name: Run tests (skip indexing tests)
+        if: matrix.os == 'macos-latest'
+        run: |
+          pytest -c config/pytest.ini tests/ -v --ignore=tests/test_serving.py
 
       - name: Run tests with coverage (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
@@ -154,6 +181,16 @@ jobs:
           files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+
+      - name: Shutdown Milvus
+        if: always() && matrix.os == 'ubuntu-latest'
+        run: |
+          # Stop Milvus
+          bash standalone_embed.sh stop
+
+          # Delete Milvus data
+          bash standalone_embed.sh delete
+
 
   # ===================================================================
   # 依赖兼容性验证 (Python 3.10+) - 仅验证依赖安装成功
