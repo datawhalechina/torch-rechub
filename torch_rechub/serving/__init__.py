@@ -3,9 +3,10 @@ import typing as ty
 from .annoy import AnnoyBuilder
 from .base import BaseBuilder
 from .faiss import FaissBuilder
+from .milvus import MilvusBuilder
 
 # Type for supported retrieval models.
-_RetrievalModel = ty.Literal["annoy", "faiss"]
+_RetrievalModel = ty.Literal["annoy", "faiss", "milvus"]
 
 
 def builder_factory(model: _RetrievalModel, **builder_config) -> BaseBuilder:
@@ -19,7 +20,7 @@ def builder_factory(model: _RetrievalModel, **builder_config) -> BaseBuilder:
 
     Parameters
     ----------
-    model : _RetrievalModel
+    model : "annoy", "faiss", or "milvus"
         The retrieval backend to use.
     **builder_config
         Keyword arguments passed directly to the selected builder constructor.
@@ -34,18 +35,16 @@ def builder_factory(model: _RetrievalModel, **builder_config) -> BaseBuilder:
     NotImplementedError
         if the specified retrieval model is not supported.
     """
-    builder_factory: ty.Optional[type[BaseBuilder]] = None
-
     if model == "annoy":
-        builder_factory = AnnoyBuilder
+        return AnnoyBuilder(**builder_config)
 
     if model == "faiss":
-        builder_factory = FaissBuilder
+        return FaissBuilder(**builder_config)
 
-    if builder_factory is None:
-        raise NotImplementedError(f"{model=} is not implemented yet!")
+    if model == "milvus":
+        return MilvusBuilder(**builder_config)
 
-    return builder_factory(**builder_config)
+    raise NotImplementedError(f"{model=} is not implemented yet!")
 
 
 __all__ = ["builder_factory"]

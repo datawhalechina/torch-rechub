@@ -194,9 +194,9 @@ class MilvusIndexer(BaseIndexer):
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
         results = self._collection.search(
-            data=embeddings,
+            data=embeddings.numpy(),
             anns_field=_EMBEDDING_COLUMN,
-            search_params=self._query_params,
+            param=self._query_params,
             limit=top_k,
         )
 
