@@ -11,16 +11,16 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for indexing methods.
-FaissIndexType = ty.Literal["Flat", "HNSW", "IVF"]
+_FaissIndexType = ty.Literal["Flat", "HNSW", "IVF"]
 
 # Type for indexing metrics.
-FaissMetric = ty.Union[faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2]
+_FaissMetric = ty.Literal["IP", "L2"]
 
 # Default indexing method.
-_DEFAULT_FAISS_INDEX_TYPE: FaissIndexType = "Flat"
+_DEFAULT_FAISS_INDEX_TYPE: _FaissIndexType = "Flat"
 
 # Default indexing metric.
-_DEFAULT_FAISS_METRIC: FaissMetric = faiss.METRIC_L2
+_DEFAULT_FAISS_METRIC: _FaissMetric = "L2"
 
 # Default number of clusters to build an IVF index.
 _DEFAULT_N_LISTS = 100
@@ -34,8 +34,8 @@ class FaissBuilder(BaseBuilder):
 
     def __init__(
         self,
-        index_type: FaissIndexType = _DEFAULT_FAISS_INDEX_TYPE,
-        metric: FaissMetric = _DEFAULT_FAISS_METRIC,
+        index_type: _FaissIndexType = _DEFAULT_FAISS_INDEX_TYPE,
+        metric: _FaissMetric = _DEFAULT_FAISS_METRIC,
         *,
         m: int = _DEFAULT_M,
         nlists: int = _DEFAULT_N_LISTS,
@@ -47,10 +47,10 @@ class FaissBuilder(BaseBuilder):
 
         Parameters
         ----------
-        index_type : FaissIndexType, optional
+        index_type : ``"Flat"``, ``"HNSW"``, or ``"IVF"``, optional
             The indexing index_type. Default to ``"Flat"``.
-        metric : FaissMetric, optional
-            The indexing metric. Default to ``faiss.METRIC_L2``.
+        metric : ``"IP"``, ``"L2"``, optional
+            The indexing metric. Default to ``"L2"``.
         m : int, optional
             Max number of neighbors to build an HNSW index.
         nlists : int, optional
@@ -60,11 +60,9 @@ class FaissBuilder(BaseBuilder):
         nprobe : int or None, optional
             Number of clusters during an IVF search.
         """
-        self._index_type = index_type
-        self._metric = metric
+        self._index_type_dsl = _build_index_type_dsl(index_type, m=m, nlists=nlists)
+        self._metric = _resolve_metric_type(metric)
 
-        self._m = m
-        self._nlists = nlists
         self._efSearch = efSearch
         self._nprobe = nprobe
 
@@ -78,11 +76,7 @@ class FaissBuilder(BaseBuilder):
         """Adhere to ``BaseBuilder.from_embeddings``."""
         index: faiss.Index = faiss.index_factory(
             embeddings.shape[1],
-            _build_index_type_dsl(
-                self._index_type,
-                m=self._m,
-                nlists=self._nlists,
-            ),
+            self._index_type_dsl,
             self._metric,
         )
 
@@ -141,7 +135,7 @@ class FaissIndexer(BaseIndexer):
 # helper functions
 
 
-def _build_index_type_dsl(index_type: FaissIndexType, *, m: int, nlists: int) -> str:
+def _build_index_type_dsl(index_type: _FaissIndexType, *, m: int, nlists: int) -> str:
     """Build the index_type DSL passed to ``faiss.index_factory``."""
     if index_type == "HNSW":
         return f"{index_type}{m},Flat"
@@ -150,3 +144,11 @@ def _build_index_type_dsl(index_type: FaissIndexType, *, m: int, nlists: int) ->
         return f"{index_type}{nlists},Flat"
 
     return "Flat"
+
+
+def _resolve_metric_type(metric: _FaissMetric) -> int:
+    """Resolve the metric type from a string literal to an integer."""
+    if metric == "L2":
+        return ty.cast(int, faiss.METRIC_L2)
+
+    return ty.cast(int, faiss.METRIC_INNER_PRODUCT)

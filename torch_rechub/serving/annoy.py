@@ -12,10 +12,10 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for distance metrics for the ANNOY index.
-AnnoyMetric = ty.Literal["angular", "euclidean", "dot"]
+_AnnoyMetric = ty.Literal["angular", "euclidean", "dot"]
 
 # Default distance metric used by ANNOY.
-_DEFAULT_METRIC: AnnoyMetric = "angular"
+_DEFAULT_METRIC: _AnnoyMetric = "angular"
 
 # Default number of trees to build in the ANNOY index.
 _DEFAULT_N_TREES = 10
@@ -33,7 +33,7 @@ class AnnoyBuilder(BaseBuilder):
     def __init__(
         self,
         d: int,
-        metric: AnnoyMetric = _DEFAULT_METRIC,
+        metric: _AnnoyMetric = _DEFAULT_METRIC,
         *,
         n_trees: int = _DEFAULT_N_TREES,
         threads: int = _DEFAULT_THREADS,
@@ -46,7 +46,7 @@ class AnnoyBuilder(BaseBuilder):
         ----------
         d : int
             The dimension of embeddings.
-        metric : AnnoyMetric, optional
+        metric : ``"angular"``, ``"euclidean"``, or ``"dot"``, optional
             The indexing metric. Default to ``"angular"``.
         n_trees : int, optional
             Number of trees to build an ANNOY index.

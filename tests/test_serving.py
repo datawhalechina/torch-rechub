@@ -1,14 +1,10 @@
 import pathlib
 import typing as ty
 
-import faiss
 import pytest
 import torch
 
 from torch_rechub.serving import builder_factory
-from torch_rechub.serving.annoy import AnnoyMetric
-from torch_rechub.serving.faiss import FaissMetric
-from torch_rechub.serving.milvus import MilvusMetric
 
 
 @pytest.mark.parametrize("metric", ["angular", "euclidean", "dot"])
@@ -16,7 +12,7 @@ from torch_rechub.serving.milvus import MilvusMetric
 @pytest.mark.parametrize("threads", [-1, 2])
 @pytest.mark.parametrize("searchk", [-1, 100])
 def test_annoy_indexing(
-    metric: AnnoyMetric,
+    metric: str,
     n_trees: int,
     threads: int,
     searchk: int,
@@ -68,8 +64,8 @@ def test_annoy_indexing(
     assert distances.dtype == torch.float32
 
 
-@pytest.mark.parametrize("metric", [faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2])
-def test_faiss_flat_indexing(metric: FaissMetric, tmp_path: pathlib.Path) -> None:
+@pytest.mark.parametrize("metric", ["IP", "L2"])
+def test_faiss_flat_indexing(metric: str, tmp_path: pathlib.Path) -> None:
     # Given
     n = 100
     d = 5
@@ -109,11 +105,11 @@ def test_faiss_flat_indexing(metric: FaissMetric, tmp_path: pathlib.Path) -> Non
     assert distances.dtype == torch.float32
 
 
-@pytest.mark.parametrize("metric", [faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2])
+@pytest.mark.parametrize("metric", ["IP", "L2"])
 @pytest.mark.parametrize("m", [16, 32])
 @pytest.mark.parametrize("efSearch", [None, 50])
 def test_faiss_hnsw_indexing(
-    metric: FaissMetric,
+    metric: str,
     m: int,
     efSearch: ty.Optional[int],
     tmp_path: pathlib.Path,
@@ -163,11 +159,11 @@ def test_faiss_hnsw_indexing(
     assert distances.dtype == torch.float32
 
 
-@pytest.mark.parametrize("metric", [faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2])
+@pytest.mark.parametrize("metric", ["IP", "L2"])
 @pytest.mark.parametrize("nlists", [1, 2])
 @pytest.mark.parametrize("nprobe", [None, 5])
 def test_faiss_ivf_indexing(
-    metric: FaissMetric,
+    metric: str,
     nlists: int,
     nprobe: ty.Optional[int],
     tmp_path: pathlib.Path,
@@ -218,7 +214,7 @@ def test_faiss_ivf_indexing(
 
 
 @pytest.mark.parametrize("metric", ["COSINE", "IP", "L2"])
-def test_milvus_flat_indexing(metric: MilvusMetric) -> None:
+def test_milvus_flat_indexing(metric: str) -> None:
     # Given
     n = 100
     d = 5
@@ -247,7 +243,7 @@ def test_milvus_flat_indexing(metric: MilvusMetric) -> None:
 @pytest.mark.parametrize("m", [16, 32])
 @pytest.mark.parametrize("ef", [None, 50])
 def test_milvus_hnsw_indexing(
-    metric: MilvusMetric,
+    metric: str,
     m: int,
     ef: ty.Optional[int],
 ) -> None:
@@ -286,7 +282,7 @@ def test_milvus_hnsw_indexing(
 @pytest.mark.parametrize("nlist", [1, 2])
 @pytest.mark.parametrize("nprobe", [None, 5])
 def test_milvus_ivf_indexing(
-    metric: MilvusMetric,
+    metric: str,
     nlist: int,
     nprobe: ty.Optional[int],
 ) -> None:
