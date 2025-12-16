@@ -56,7 +56,6 @@ def test_annoy_indexing(
     # When
     with builder.from_index_file(index_file) as indexer:
         ids, distances = indexer.query(user_embeddings, top_k)
-        indexer.save(tmp_path / index_file)
 
     # Then
     assert isinstance(ids, torch.Tensor)
@@ -98,7 +97,6 @@ def test_faiss_flat_indexing(metric: FaissMetric, tmp_path: pathlib.Path) -> Non
     # When
     with builder.from_index_file(index_file) as indexer:
         ids, distances = indexer.query(user_embeddings, top_k)
-        indexer.save(tmp_path / index_file)
 
     # Then
     assert isinstance(ids, torch.Tensor)
@@ -153,7 +151,6 @@ def test_faiss_hnsw_indexing(
     # When
     with builder.from_index_file(index_file) as indexer:
         ids, distances = indexer.query(user_embeddings, top_k)
-        indexer.save(tmp_path / index_file)
 
     # Then
     assert isinstance(ids, torch.Tensor)
@@ -208,7 +205,6 @@ def test_faiss_ivf_indexing(
     # When
     with builder.from_index_file(index_file) as indexer:
         ids, distances = indexer.query(user_embeddings, top_k)
-        indexer.save(tmp_path / index_file)
 
     # Then
     assert isinstance(ids, torch.Tensor)
