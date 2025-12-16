@@ -76,8 +76,8 @@ Repository = "https://github.com/datawhalechina/torch-rechub.git"
 Issues = "https://github.com/datawhalechina/torch-rechub/issues"
 
 # UV 工具配置
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
     "flake8>=3.8.0",
