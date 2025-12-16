@@ -1,16 +1,14 @@
 """Dataset implementations providing streaming, batch-wise data access for PyTorch."""
 
-import os
 import typing as ty
 
 import pyarrow.dataset as pd
 import torch
 from torch.utils.data import IterableDataset, get_worker_info
 
-from .convert import pa_array_to_tensor
+from torch_rechub.types import FilePath
 
-# Type for path to a file
-_FilePath = ty.Union[str, os.PathLike]
+from .convert import pa_array_to_tensor
 
 # The default batch size when reading a Parquet dataset
 _DEFAULT_BATCH_SIZE = 1024
@@ -21,7 +19,7 @@ class ParquetIterableDataset(IterableDataset):
 
     Parameters
     ----------
-    file_paths : list[_FilePath]
+    file_paths : list[FilePath]
         Paths to Parquet files.
     columns : list[str], optional
         Columns to select; if ``None``, read all columns.
@@ -48,7 +46,7 @@ class ParquetIterableDataset(IterableDataset):
 
     def __init__(
         self,
-        file_paths: ty.Sequence[_FilePath],
+        file_paths: ty.Sequence[FilePath],
         /,
         columns: ty.Optional[ty.Sequence[str]] = None,
         batch_size: int = _DEFAULT_BATCH_SIZE,
