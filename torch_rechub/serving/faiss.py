@@ -131,11 +131,7 @@ class FaissIndexer(BaseIndexer):
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
         dists, ids = self._index.search(embeddings.numpy(), top_k)
-
-        nn_ids = torch.from_numpy(ids)
-        nn_distances = torch.from_numpy(dists)
-
-        return nn_ids, nn_distances
+        return torch.from_numpy(ids), torch.from_numpy(dists)
 
     def save(self, file_path: FilePath) -> None:
         """Adhere to ``BaseIndexer.save``."""

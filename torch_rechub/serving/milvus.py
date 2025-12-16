@@ -201,14 +201,14 @@ class MilvusIndexer(BaseIndexer):
         )
 
         n, _ = embeddings.shape
-        nn_ids = torch.zeros(n, top_k, dtype=torch.int64)
-        nn_distances = torch.zeros(n, top_k, dtype=torch.float32)
+        nn_ids = np.zeros((n, top_k), dtype=np.int64)
+        nn_distances = np.zeros((n, top_k), dtype=np.float32)
 
         for i, result in enumerate(results):
-            nn_ids[i] = torch.tensor(result.ids, dtype=torch.int64)
-            nn_distances[i] = torch.tensor(result.distances, dtype=torch.float32)
+            nn_ids[i] = result.ids
+            nn_distances[i] = result.distances
 
-        return nn_ids, nn_distances
+        return torch.from_numpy(nn_ids), torch.from_numpy(nn_distances)
 
     def save(self, file_path: FilePath) -> None:
         """Adhere to ``BaseIndexer.save``."""

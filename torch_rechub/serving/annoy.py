@@ -4,6 +4,7 @@ import contextlib
 import typing as ty
 
 import annoy
+import numpy as np
 import torch
 
 from torch_rechub.types import FilePath
@@ -114,22 +115,18 @@ class AnnoyIndexer(BaseIndexer):
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
         n, _ = embeddings.shape
-
-        nn_ids = torch.zeros(n, top_k, dtype=torch.int64)
-        nn_distances = torch.zeros(n, top_k, dtype=torch.float32)
+        nn_ids = np.zeros((n, top_k), dtype=np.int64)
+        nn_distances = np.zeros((n, top_k), dtype=np.float32)
 
         for idx, emb in enumerate(embeddings):
-            ids, distances = self._index.get_nns_by_vector(
+            nn_ids[idx], nn_distances[idx] = self._index.get_nns_by_vector(
                 emb.numpy(),
                 top_k,
                 search_k=self._searchk,
                 include_distances=True,
             )
 
-            nn_ids[idx] = torch.tensor(ids, dtype=torch.int64)
-            nn_distances[idx] = torch.tensor(distances, dtype=torch.float32)
-
-        return nn_ids, nn_distances
+        return torch.from_numpy(nn_ids), torch.from_numpy(nn_distances)
 
     def save(self, file_path: FilePath) -> None:
         """Adhere to ``BaseIndexer.save``."""
