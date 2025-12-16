@@ -5,9 +5,9 @@ import faiss
 import pytest
 import torch
 
-from torch_rechub.index import builder_factory
-from torch_rechub.index.annoy import AnnoyMetric
-from torch_rechub.index.faiss import FaissIndexType, FaissMetric
+from torch_rechub.serving import builder_factory
+from torch_rechub.serving.annoy import AnnoyMetric
+from torch_rechub.serving.faiss import FaissMetric
 
 
 @pytest.mark.parametrize("metric", ["angular", "euclidean", "dot"])
