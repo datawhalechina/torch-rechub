@@ -166,7 +166,7 @@ class MilvusBuilder(BaseBuilder):
         )
 
         n, _ = embeddings.shape
-        collection.insert([np.arange(n, dtype=np.int64), embeddings.numpy()])
+        collection.insert([np.arange(n, dtype=np.int64), embeddings.cpu().numpy()])
         collection.create_index(_EMBEDDING_COLUMN, index_params=self._build_params)
         collection.load()
 
@@ -194,7 +194,7 @@ class MilvusIndexer(BaseIndexer):
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
         results = self._collection.search(
-            data=embeddings.numpy(),
+            data=embeddings.cpu().numpy(),
             anns_field=_EMBEDDING_COLUMN,
             param=self._query_params,
             limit=top_k,

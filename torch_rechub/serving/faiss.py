@@ -124,7 +124,7 @@ class FaissIndexer(BaseIndexer):
     ) -> tuple[torch.Tensor,
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
-        dists, ids = self._index.search(embeddings.numpy(), top_k)
+        dists, ids = self._index.search(embeddings.cpu().numpy(), top_k)
         return torch.from_numpy(ids), torch.from_numpy(dists)
 
     def save(self, file_path: FilePath) -> None:

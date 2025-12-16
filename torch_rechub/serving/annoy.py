@@ -120,7 +120,7 @@ class AnnoyIndexer(BaseIndexer):
 
         for idx, emb in enumerate(embeddings):
             nn_ids[idx], nn_distances[idx] = self._index.get_nns_by_vector(
-                emb.numpy(),
+                emb.cpu().numpy(),
                 top_k,
                 search_k=self._searchk,
                 include_distances=True,
