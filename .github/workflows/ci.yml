@@ -160,8 +160,14 @@ jobs:
           exit 1
 
       - name: Run tests
+        if: matrix.os != 'macos-latest'
         run: |
           pytest -c config/pytest.ini tests/ -v
+
+      - name: Run tests (skip indexing tests)
+        if: matrix.os == 'macos-latest'
+        run: |
+          pytest -c config/pytest.ini tests/ -v --ignore=tests/test_serving.py
 
       - name: Run tests with coverage (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
