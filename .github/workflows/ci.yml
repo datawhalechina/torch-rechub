@@ -104,6 +104,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
+    env:
+      SKIP_MILVUS_TESTS: ${{ matrix.os != 'ubuntu-latest' && '1' || '0' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

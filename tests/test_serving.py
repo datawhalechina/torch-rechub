@@ -1,3 +1,4 @@
+import os
 import pathlib
 import typing as ty
 
@@ -5,6 +6,9 @@ import pytest
 import torch
 
 from torch_rechub.serving import builder_factory
+
+# Skip the Milvus tests by the envvar boolean flag.
+SKIP_MILVUS_TESTS = os.getenv("SKIP_MILVUS_TESTS") == "1"
 
 
 @pytest.mark.parametrize("metric", ["angular", "euclidean", "dot"])
@@ -213,6 +217,7 @@ def test_faiss_ivf_indexing(
     assert distances.dtype == torch.float32
 
 
+@pytest.mark.skipif(SKIP_MILVUS_TESTS)
 @pytest.mark.parametrize("metric", ["COSINE", "IP", "L2"])
 def test_milvus_flat_indexing(metric: str) -> None:
     # Given
@@ -239,6 +244,7 @@ def test_milvus_flat_indexing(metric: str) -> None:
     assert distances.dtype == torch.float32
 
 
+@pytest.mark.skipif(SKIP_MILVUS_TESTS)
 @pytest.mark.parametrize("metric", ["COSINE", "IP", "L2"])
 @pytest.mark.parametrize("m", [16, 32])
 @pytest.mark.parametrize("ef", [None, 50])
@@ -278,6 +284,7 @@ def test_milvus_hnsw_indexing(
     assert distances.dtype == torch.float32
 
 
+@pytest.mark.skipif(SKIP_MILVUS_TESTS)
 @pytest.mark.parametrize("metric", ["COSINE", "IP", "L2"])
 @pytest.mark.parametrize("nlist", [1, 2])
 @pytest.mark.parametrize("nprobe", [None, 5])
