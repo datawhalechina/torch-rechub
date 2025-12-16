@@ -11,16 +11,16 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for indexing methods.
-_FaissIndexType = ty.Literal["Flat", "HNSW", "IVF"]
+FaissIndexType = ty.Literal["Flat", "HNSW", "IVF"]
 
 # Type for indexing metrics.
-_FaissMetric = ty.Union[faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2]
+FaissMetric = ty.Union[faiss.METRIC_INNER_PRODUCT, faiss.METRIC_L2]
 
 # Default indexing method.
-_DEFAULT_FAISS_INDEX_TYPE: _FaissIndexType = "Flat"
+_DEFAULT_FAISS_INDEX_TYPE: FaissIndexType = "Flat"
 
 # Default indexing metric.
-_DEFAULT_FAISS_METRIC: _FaissMetric = faiss.METRIC_L2
+_DEFAULT_FAISS_METRIC: FaissMetric = faiss.METRIC_L2
 
 # Default number of clusters to build an IVF index.
 _DEFAULT_N_LISTS = 100
@@ -34,8 +34,8 @@ class FaissBuilder(BaseBuilder):
 
     def __init__(
         self,
-        index_type: _FaissIndexType = _DEFAULT_FAISS_INDEX_TYPE,
-        metric: _FaissMetric = _DEFAULT_FAISS_METRIC,
+        index_type: FaissIndexType = _DEFAULT_FAISS_INDEX_TYPE,
+        metric: FaissMetric = _DEFAULT_FAISS_METRIC,
         *,
         m: int = _DEFAULT_M,
         nlists: int = _DEFAULT_N_LISTS,
@@ -47,9 +47,9 @@ class FaissBuilder(BaseBuilder):
 
         Parameters
         ----------
-        index_type : _FaissIndexType, optional
+        index_type : FaissIndexType, optional
             The indexing index_type. Default to ``"Flat"``.
-        metric : _FaissMetric, optional
+        metric : FaissMetric, optional
             The indexing metric. Default to ``faiss.METRIC_L2``.
         m : int, optional
             Max number of neighbors to build an HNSW index.
@@ -130,7 +130,7 @@ class FaissIndexer(BaseIndexer):
     ) -> tuple[torch.Tensor,
                torch.Tensor]:
         """Adhere to ``BaseIndexer.query``."""
-        dists, ids = self._index.search(embeddings, top_k)
+        dists, ids = self._index.search(embeddings.numpy(), top_k)
 
         nn_ids = torch.from_numpy(ids)
         nn_distances = torch.from_numpy(dists)
@@ -145,7 +145,7 @@ class FaissIndexer(BaseIndexer):
 # helper functions
 
 
-def _build_index_type_dsl(index_type: _FaissIndexType, *, m: int, nlists: int) -> str:
+def _build_index_type_dsl(index_type: FaissIndexType, *, m: int, nlists: int) -> str:
     """Build the index_type DSL passed to ``faiss.index_factory``."""
     if index_type == "HNSW":
         return f"{index_type}{m},Flat"

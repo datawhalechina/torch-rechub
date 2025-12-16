@@ -13,16 +13,16 @@ from torch_rechub.types import FilePath
 from .base import BaseBuilder, BaseIndexer
 
 # Type for indexing methods.
-_MilvusIndexType = ty.Literal["FLAT", "HNSW", "IVF_FLAT"]
+MilvusIndexType = ty.Literal["FLAT", "HNSW", "IVF_FLAT"]
 
 # Type for indexing metrics.
-_MilvusMetric = ty.Literal["COSINE", "IP", "L2"]
+MilvusMetric = ty.Literal["COSINE", "IP", "L2"]
 
 # Default indexing method.
-_DEFAULT_MILVUS_INDEX_TYPE: _MilvusIndexType = "FLAT"
+_DEFAULT_MILVUS_INDEX_TYPE: MilvusIndexType = "FLAT"
 
 # Default indexing metric.
-_DEFAULT_MILVUS_METRIC: _MilvusMetric = "COSINE"
+_DEFAULT_MILVUS_METRIC: MilvusMetric = "COSINE"
 
 # Default number of clusters to build an IVF index.
 _DEFAULT_N_LIST = 128
@@ -49,8 +49,8 @@ class MilvusBuilder(BaseBuilder):
     def __init__(
         self,
         d: int,
-        index_type: _MilvusIndexType = _DEFAULT_MILVUS_INDEX_TYPE,
-        metric: _MilvusMetric = _DEFAULT_MILVUS_METRIC,
+        index_type: MilvusIndexType = _DEFAULT_MILVUS_INDEX_TYPE,
+        metric: MilvusMetric = _DEFAULT_MILVUS_METRIC,
         *,
         m: int = _DEFAULT_M,
         nlist: int = _DEFAULT_N_LIST,
@@ -69,7 +69,7 @@ class MilvusBuilder(BaseBuilder):
             The dimension of embeddings.
         index_type : MilvusIndexType, optional
             The indexing index_type. Default to ``"FLAT"``.
-        metric : _MilvusMetric, optional
+        metric : MilvusMetric, optional
             The indexing metric. Default to ``"COSINE"``.
         m : int, optional
             Max number of neighbors to build an HNSW index.
