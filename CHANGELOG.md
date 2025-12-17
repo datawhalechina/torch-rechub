@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0] - 2025-12-17
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Update docs and tutorials && Add ONNX quantization utilities and enhance export  by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/150
+* REFACTOR+FEATURE: Standardize retrieval backends (ANNOY/FAISS/Milvus) by @ywuenthought in https://github.com/datawhalechina/torch-rechub/pull/151
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.0.6...v0.1.0
+
+---
+
+
+
 ## [0.0.6] - 2025-12-11
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
