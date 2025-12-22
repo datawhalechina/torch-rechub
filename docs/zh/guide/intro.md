@@ -26,7 +26,7 @@ description: Torch-RecHub 项目架构、特性和设计原理概览
 
 ## 整体架构
 
-![架构设计图](/img/project_framework.jpg "架构设计图")
+![架构设计图](/img/project_framework.png "架构设计图")
 
 ## 核心组件
 
