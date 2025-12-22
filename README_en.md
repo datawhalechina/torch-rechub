@@ -1,6 +1,8 @@
-# 🔥 Torch-RecHub - Lightweight, Efficient & Easy-to-use PyTorch Recommender Framework
+<div align="center">
 
-> 🚀 **30+ Mainstream Models** | 🎯 **Out-of-the-box** | 📦 **One-click ONNX Export** | 🤖 **Generative RecSys (HSTU/HLLM)**
+![Torch-RecHub Banner](docs/public/img/banner.png)
+
+# Torch-RecHub: A Lightweight, Efficient, and Easy-to-use PyTorch Recommender Framework
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
@@ -16,39 +18,29 @@
 
 English | [简体中文](README.md)
 
-**Online Documentation:** https://datawhalechina.github.io/torch-rechub/ (English) | https://datawhalechina.github.io/torch-rechub/zh/ (简体中文)
+![Project Framework](docs/public/img/project_framework.png)
 
-**Torch-RecHub** — **Build production-grade recommender systems in 10 lines of code**. 30+ mainstream models out-of-the-box, one-click ONNX deployment, letting you focus on business instead of engineering.
+</div>
 
-![Torch-RecHub Banner](docs/public/img/banner.png)
+**Online Documentation:** https://datawhalechina.github.io/torch-rechub/
 
-## 🎯 Why Torch-RecHub?
-
-| Feature | Torch-RecHub | Other Frameworks |
-|---------|-------------|------------------|
-| Lines of Code | **10 lines** for train+eval+deploy | 100+ lines |
-| Model Coverage | **30+** mainstream models | Limited |
-| Generative RecSys | ✅ HSTU/HLLM (Meta 2024) | ❌ |
-| ONNX Export | ✅ Built-in support | Manual adaptation |
-| Learning Curve | Very Low | Steep |
+**Torch-RecHub** —— **Build production-grade recommender systems in 10 lines of code**. 30+ mainstream models out-of-the-box, one-click ONNX deployment, letting you focus on business instead of engineering.
 
 ## ✨ Features
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **PyTorch-based:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
-* **Rich Model Library:** Covers **30+** classic and cutting-edge recommendation algorithms (matching, ranking, multi-task, generative).
+* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
+* **Rich Model Library:** Covers **30+** classic and cutting-edge recommendation algorithms (Matching, Ranking, Multi-task, Generative Recommendation, etc.).
 * **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
 * **Reproducibility:** Designed to ensure reproducible experimental results.
-* **ONNX Export:** Export trained models to ONNX format for production deployment.
-* **Cross-engine data processing:** PySpark-based data processing and conversion supported for large-scale pipelines.
-* **Experiment visualization & tracking:** Unified integration of WandB, SwanLab, and TensorBoardX.
-* **Additional Features:** Negative sampling, multi-task learning, etc.
+* **ONNX Export:** Export trained models to ONNX format for seamless production deployment.
+* **Cross-engine Data Processing:** Support for PySpark-based data processing and transformation, facilitating deployment in big data pipelines.
+* **Experiment Visualization & Tracking:** Built-in unified integration for WandB, SwanLab, and TensorBoardX.
 
 ## 📖 Table of Contents
 
-- [🔥 Torch-RecHub - Lightweight, Efficient \& Easy-to-use PyTorch Recommender Framework](#-torch-rechub---lightweight-efficient--easy-to-use-pytorch-recommender-framework)
-  - [🎯 Why Torch-RecHub?](#-why-torch-rechub)
+- [🔥 Torch-RecHub - A Lightweight, Efficient, and Easy-to-use PyTorch Recommender Framework](#-torch-rechub---a-lightweight-efficient-and-easy-to-use-pytorch-recommender-framework)
   - [✨ Features](#-features)
   - [📖 Table of Contents](#-table-of-contents)
   - [🔧 Installation](#-installation)
@@ -61,7 +53,8 @@ English | [简体中文](README.md)
   - [🧪 Examples](#-examples)
     - [Ranking (CTR Prediction)](#ranking-ctr-prediction)
     - [Multi-Task Ranking](#multi-task-ranking)
-    - [Matching Model](#matching-model)
+    - [Matching Models](#matching-models)
+    - [Model Visualization](#model-visualization)
   - [👨‍💻‍ Contributors](#-contributors)
   - [🤝 Contributing](#-contributing)
   - [📜 License](#-license)
@@ -82,7 +75,7 @@ English | [简体中文](README.md)
 
 ### Installation Steps
 
-**Stable Version (Recommended for Users):**
+**Stable Version (Recommended):**
 ```bash
 pip install torch-rechub
 ```
@@ -147,7 +140,7 @@ torch-rechub/             # Root directory
 │   ├── matching/         # Matching task examples
 │   ├── ranking/          # Ranking task examples
 │   └── generative/       # Generative recommendation examples (HSTU, HLLM, etc.)
-├── docs/                 # Documentation (VitePress: multi-language, English & Chinese)
+├── docs/                 # Documentation (VitePress, multi-language)
 ├── tutorials/            # Jupyter tutorials
 ├── tests/                # Unit tests
 ├── config/               # Configuration files
@@ -158,54 +151,70 @@ torch-rechub/             # Root directory
 
 The framework currently supports **30+** mainstream recommendation models:
 
+<details>
+
 ### Ranking Models - 13
 
-| Model | Paper | Description |
-|-------|-------|-------------|
-| **DeepFM** | [IJCAI 2017](https://arxiv.org/abs/1703.04247) | FM + Deep joint training |
-| **Wide&Deep** | [DLRS 2016](https://arxiv.org/abs/1606.07792) | Memorization + Generalization |
-| **DCN** | [KDD 2017](https://arxiv.org/abs/1708.05123) | Explicit feature crossing |
-| **DCN-v2** | [WWW 2021](https://arxiv.org/abs/2008.13535) | Enhanced cross network |
-| **DIN** | [KDD 2018](https://arxiv.org/abs/1706.06978) | Attention for user interest |
-| **DIEN** | [AAAI 2019](https://arxiv.org/abs/1809.03672) | Interest evolution modeling |
-| **BST** | [DLP-KDD 2019](https://arxiv.org/abs/1905.06874) | Transformer for sequences |
-| **AFM** | [IJCAI 2017](https://arxiv.org/abs/1708.04617) | Attentional FM |
-| **AutoInt** | [CIKM 2019](https://arxiv.org/abs/1810.11921) | Auto feature interaction |
-| **FiBiNET** | [RecSys 2019](https://arxiv.org/abs/1905.09433) | Feature importance + Bilinear |
-| **DeepFFM** | [RecSys 2019](https://arxiv.org/abs/1611.00144) | Field-aware FM |
-| **EDCN** | [KDD 2021](https://arxiv.org/abs/2106.03032) | Enhanced DCN |
+| Model          | Paper                                             | Description                     |
+| -------------- | ------------------------------------------------- | ------------------------------- |
+| **DeepFM**    | [IJCAI 2017](https://arxiv.org/abs/1703.04247)   | FM + Deep joint training        |
+| **Wide&Deep** | [DLRS 2016](https://arxiv.org/abs/1606.07792)    | Memorization + Generalization   |
+| **DCN**       | [KDD 2017](https://arxiv.org/abs/1708.05123)     | Explicit feature crossing       |
+| **DCN-v2**    | [WWW 2021](https://arxiv.org/abs/2008.13535)     | Enhanced cross network          |
+| **DIN**       | [KDD 2018](https://arxiv.org/abs/1706.06978)     | Attention for user interest     |
+| **DIEN**      | [AAAI 2019](https://arxiv.org/abs/1809.03672)    | Interest evolution modeling     |
+| **BST**       | [DLP-KDD 2019](https://arxiv.org/abs/1905.06874) | Transformer for sequences       |
+| **AFM**       | [IJCAI 2017](https://arxiv.org/abs/1708.04617)   | Attentional FM                  |
+| **AutoInt**   | [CIKM 2019](https://arxiv.org/abs/1810.11921)    | Auto feature interaction learning |
+| **FiBiNET**   | [RecSys 2019](https://arxiv.org/abs/1905.09433)  | Feature importance + Bilinear   |
+| **DeepFFM**   | [RecSys 2019](https://arxiv.org/abs/1611.00144)  | Field-aware FM                  |
+| **EDCN**      | [KDD 2021](https://arxiv.org/abs/2106.03032)     | Enhanced DCN                    |
+
+</details>
+
+<details>
 
 ### Matching Models - 12
 
-| Model | Paper | Description |
-|-------|-------|-------------|
-| **DSSM** | [CIKM 2013](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf) | Classic two-tower model |
-| **YoutubeDNN** | [RecSys 2016](https://dl.acm.org/doi/10.1145/2959100.2959190) | YouTube deep retrieval |
-| **YoutubeSBC** | [RecSys 2019](https://dl.acm.org/doi/10.1145/3298689.3346997) | Sampling bias correction |
-| **MIND** | [CIKM 2019](https://arxiv.org/abs/1904.08030) | Multi-interest dynamic routing |
-| **SINE** | [WSDM 2021](https://arxiv.org/abs/2103.06920) | Sparse interest network |
-| **GRU4Rec** | [ICLR 2016](https://arxiv.org/abs/1511.06939) | GRU for sequences |
-| **SASRec** | [ICDM 2018](https://arxiv.org/abs/1808.09781) | Self-attentive sequential |
-| **NARM** | [CIKM 2017](https://arxiv.org/abs/1711.04725) | Neural attentive session |
-| **STAMP** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895) | Short-term attention memory |
-| **ComiRec** | [KDD 2020](https://arxiv.org/abs/2005.09347) | Controllable multi-interest |
+| Model           | Paper                                                                           | Description               |
+| --------------- | ------------------------------------------------------------------------------- | ------------------------- |
+| **DSSM**       | [CIKM 2013](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf) | Classic two-tower model   |
+| **YoutubeDNN** | [RecSys 2016](https://dl.acm.org/doi/10.1145/2959100.2959190)                  | YouTube deep retrieval    |
+| **YoutubeSBC** | [RecSys 2019](https://dl.acm.org/doi/10.1145/3298689.3346997)                  | Sampling bias correction  |
+| **MIND**       | [CIKM 2019](https://arxiv.org/abs/1904.08030)                                  | Multi-interest dynamic routing |
+| **SINE**       | [WSDM 2021](https://arxiv.org/abs/2103.06920)                                  | Sparse interest network   |
+| **GRU4Rec**    | [ICLR 2016](https://arxiv.org/abs/1511.06939)                                  | GRU for sequences         |
+| **SASRec**     | [ICDM 2018](https://arxiv.org/abs/1808.09781)                                  | Self-attentive sequential |
+| **NARM**       | [CIKM 2017](https://arxiv.org/abs/1711.04725)                                  | Neural attentive session  |
+| **STAMP**      | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895)                     | Short-term attention memory priority |
+| **ComiRec**    | [KDD 2020](https://arxiv.org/abs/2005.09347)                                   | Controllable multi-interest |
+
+</details>
+
+<details>
 
 ### Multi-Task Models - 5
 
-| Model | Paper | Description |
-|-------|-------|-------------|
-| **ESMM** | [SIGIR 2018](https://arxiv.org/abs/1804.07931) | Entire space multi-task |
-| **MMoE** | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3220007) | Multi-gate mixture-of-experts |
-| **PLE** | [RecSys 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) | Progressive layered extraction |
-| **AITM** | [KDD 2021](https://arxiv.org/abs/2105.08489) | Adaptive information transfer |
-| **SharedBottom** | - | Classic shared bottom |
+| Model             | Paper                                                          | Description               |
+| ----------------- | -------------------------------------------------------------- | ------------------------- |
+| **ESMM**         | [SIGIR 2018](https://arxiv.org/abs/1804.07931)                | Entire space multi-task   |
+| **MMoE**         | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3220007)    | Multi-gate Mixture-of-Experts |
+| **PLE**          | [RecSys 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) | Progressive Layered Extraction |
+| **AITM**         | [KDD 2021](https://arxiv.org/abs/2105.08489)                  | Adaptive Information Transfer |
+| **SharedBottom** | -                                                             | Classic shared bottom     |
+
+</details>
+
+<details>
 
 ### Generative Recommendation - 2
 
-| Model | Paper | Description |
-|-------|-------|-------------|
+| Model     | Paper                                          | Description                                              |
+| --------- | ---------------------------------------------- | -------------------------------------------------------- |
 | **HSTU** | [Meta 2024](https://arxiv.org/abs/2402.17152) | Hierarchical Sequential Transduction Units, powering Meta's trillion-parameter RecSys |
-| **HLLM** | [2024](https://arxiv.org/abs/2409.12740) | Hierarchical LLM for recommendation, combining LLM semantic understanding |
+| **HLLM** | [2024](https://arxiv.org/abs/2409.12740)      | Hierarchical LLM for recommendation, combining LLM semantic understanding |
+
+</details>
 
 ## 📊 Supported Datasets
 
@@ -219,7 +228,7 @@ The framework provides built-in support or preprocessing scripts for the followi
 * **BookCrossing**
 * **Ali-ccp**
 * **Yidian**
-* ...
+* ... 
 
 The expected data format is typically an interaction file containing:
 - User ID
@@ -230,7 +239,6 @@ The expected data format is typically an interaction file containing:
 For specific format requirements, please refer to the example code in the `tutorials` directory.
 
 You can easily integrate your own datasets by ensuring they conform to the framework's data format requirements or by writing custom data loaders.
-
 
 ## 🧪 Examples
 
@@ -260,7 +268,7 @@ ctr_trainer.export_onnx("deepfm.onnx")
 from torch_rechub.models.multi_task import SharedBottom, ESMM, MMOE, PLE, AITM
 from torch_rechub.trainers import MTLTrainer
 
-task_types = ["classification", "classification"]
+task_types = ["classification", "classification"] 
 model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_params_list=[{"dims": [32, 16]}, {"dims": [32, 16]}])
 
 mtl_trainer = MTLTrainer(model)
@@ -269,7 +277,7 @@ auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
 mtl_trainer.export_onnx("mmoe.onnx")
 ```
 
-### Matching Model
+### Matching Models
 
 ```python
 from torch_rechub.models.matching import DSSM
@@ -282,19 +290,27 @@ train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_s
 model = DSSM(user_features, item_features, temperature=0.02,
              user_params={
                  "dims": [256, 128, 64],
-                 "activation": 'prelu',
+                 "activation": 'prelu',  
              },
              item_params={
                  "dims": [256, 128, 64],
-                 "activation": 'prelu',
+                 "activation": 'prelu', 
              })
 
 match_trainer = MatchTrainer(model)
 match_trainer.fit(train_dl)
 match_trainer.export_onnx("dssm.onnx")
-# For two-tower models, you can also export user and item towers separately:
-# match_trainer.export_onnx("dssm_user.onnx", tower="user")
-# match_trainer.export_onnx("dssm_item.onnx", tower="item")
+# For two-tower models, you can export user and item towers separately:
+# match_trainer.export_onnx("user_tower.onnx", mode="user")
+# match_trainer.export_onnx("item_tower.onnx", mode="item")
+```
+
+### Model Visualization
+
+```python
+# Visualize model architecture (Requires: pip install torch-rechub[visualization])
+graph = ctr_trainer.visualization(depth=4)  # Generate computation graph
+ctr_trainer.visualization(save_path="model.pdf", dpi=300)  # Save as high-resolution PDF
 ```
 
 ## 👨‍💻‍ Contributors
@@ -333,10 +349,8 @@ If you use this framework in your research or work, please consider citing:
 
 ## 📫 Contact
 
-* **Project Lead:** [1985312383](https://github.com/1985312383)
+* **Project Lead:** [1985312383](https://github.com/1985312383) 
 * [**GitHub Discussions**](https://github.com/datawhalechina/torch-rechub/discussions)
-
-
 
 ## ⭐️ Star History
 
