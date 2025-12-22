@@ -1,0 +1,1 @@
+import{_ as a,c as t,o as e}from"./chunks/framework.CFr_S-Bc.js";const i=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"tools/callbacks.md","filePath":"en/tools/callbacks.md"}'),c={name:"tools/callbacks.md"};function o(s,l,r,n,p,_){return e(),t("div")}const m=a(c,[["render",o]]);export{i as __pageData,m as default};

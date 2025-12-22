@@ -1,0 +1,1 @@
+import{_ as t,c as e,o as a}from"./chunks/framework.CFr_S-Bc.js";const _=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"community/faq.md","filePath":"en/community/faq.md"}'),o={name:"community/faq.md"};function n(c,r,s,m,i,f){return a(),e("div")}const d=t(o,[["render",n]]);export{_ as __pageData,d as default};

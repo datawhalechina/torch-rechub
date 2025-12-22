@@ -1,0 +1,1 @@
+import{_ as t,c as e,o as a}from"./chunks/framework.CFr_S-Bc.js";const u=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"guide/quick_start.md","filePath":"en/guide/quick_start.md"}'),r={name:"guide/quick_start.md"};function s(c,i,o,n,_,d){return a(),e("div")}const m=t(r,[["render",s]]);export{u as __pageData,m as default};

@@ -1,1 +1,0 @@
-import{_ as e,c as t,o as r}from"./chunks/framework.BiSKXDrp.js";const m=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"serving/vector_index.md","filePath":"en/serving/vector_index.md"}'),n={name:"serving/vector_index.md"};function o(a,c,s,i,_,d){return r(),t("div")}const v=e(n,[["render",o]]);export{m as __pageData,v as default};
