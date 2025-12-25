@@ -22,7 +22,7 @@ import tqdm
 from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hllm import HLLMModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
-from torch_rechub.utils.data import SequenceDataGenerator
+from torch_rechub.utils.data import SequenceDataGenerator, pad_sequences
 
 sys.path.append("../..")
 
@@ -143,6 +143,14 @@ def main():
     print(f"   Train samples: {len(train_data['targets'])}")
     print(f"   Val samples: {len(val_data['targets'])}")
     print(f"   Test samples: {len(test_data['targets'])}")
+
+    # Pad sequences to numpy arrays for SequenceDataGenerator
+    print("\nProcessing sequences...")
+    for data in [train_data, val_data, test_data]:
+        data['seq_tokens'] = pad_sequences(data['seq_tokens'], maxlen=args.max_seq_len, padding='pre', truncating='pre', value=0)
+        data['seq_positions'] = pad_sequences(data['seq_positions'], maxlen=args.max_seq_len, padding='pre', truncating='pre', value=0)
+        data['seq_time_diffs'] = pad_sequences(data['seq_time_diffs'], maxlen=args.max_seq_len, padding='pre', truncating='pre', value=0)
+        data['targets'] = np.array(data['targets'])
 
     # Load item embeddings
     emb_file = os.path.join(args.data_dir, f'item_embeddings_{args.model_type}.pt')

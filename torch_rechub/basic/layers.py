@@ -846,7 +846,7 @@ class HSTULayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # Scaling factor for attention scores
-        self.scale = 1.0 / (dqk**0.5)
+        # self.scale = 1.0 / (dqk**0.5)  # Removed in favor of L2 norm + SiLU
 
     def forward(self, x, rel_pos_bias=None):
         """Forward pass of a single HSTU layer.
@@ -878,6 +878,10 @@ class HSTULayer(nn.Module):
         u = proj_out[..., 2 * self.n_heads * self.dqk:2 * self.n_heads * self.dqk + self.n_heads * self.dv].reshape(batch_size, seq_len, self.n_heads, self.dv)
         v = proj_out[..., 2 * self.n_heads * self.dqk + self.n_heads * self.dv:].reshape(batch_size, seq_len, self.n_heads, self.dv)
 
+        # Apply L2 normalization to Q and K (HSTU specific)
+        q = F.normalize(q, p=2, dim=-1)
+        k = F.normalize(k, p=2, dim=-1)
+
         # Transpose to (B, H, L, dqk/dv)
         q = q.transpose(1, 2)  # (B, H, L, dqk)
         k = k.transpose(1, 2)  # (B, H, L, dqk)
@@ -885,20 +889,22 @@ class HSTULayer(nn.Module):
         v = v.transpose(1, 2)  # (B, H, L, dv)
 
         # Compute attention scores: (B, H, L, L)
-        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        # Note: No scaling factor here as we use L2 norm + SiLU
+        scores = torch.matmul(q, k.transpose(-2, -1))
+
+        # Add relative position bias if provided (before masking/activation)
+        if rel_pos_bias is not None:
+            scores = scores + rel_pos_bias
 
         # Add causal mask (prevent attending to future positions)
         # For generative models this is required so that position i only attends
         # to positions <= i.
         causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
-        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+        # Use a large negative number for masking compatible with SiLU
+        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), -1e4)
 
-        # Add relative position bias if provided
-        if rel_pos_bias is not None:
-            scores = scores + rel_pos_bias
-
-        # Softmax over attention scores
-        attn_weights = F.softmax(scores, dim=-1)
+        # SiLU activation over attention scores (HSTU specific)
+        attn_weights = F.silu(scores)
         attn_weights = self.dropout(attn_weights)
 
         # Attention output: (B, H, L, dv)
