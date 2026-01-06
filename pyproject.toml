@@ -37,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 annoy = ["annoy>=1.17.2"]
-faiss = ["faiss-cpu==1.13.0"]
+faiss = ["faiss-cpu==1.13.2"]
 milvus = ["pymilvus>=2.6.5"]
 bigdata = [
     "pyarrow>=21,<23",
