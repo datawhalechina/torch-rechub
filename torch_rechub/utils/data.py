@@ -482,41 +482,57 @@ class SequenceDataGenerator(object):
         # Underlying dataset
         self.dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
 
-    def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None):
-        """Generate train/val/test dataloaders.
+    def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None, shuffle=True):
+        """Generate dataloader(s) from the dataset.
 
         Parameters
         ----------
         batch_size : int, default=32
+            Batch size for DataLoader.
         num_workers : int, default=0
-        split_ratio : tuple, default (0.7, 0.1, 0.2)
-            Train/val/test split.
+            Number of workers for DataLoader.
+        split_ratio : tuple or None, default=None
+            If None, returns a single DataLoader without splitting the data.
+            If tuple (e.g., (0.7, 0.1, 0.2)), splits dataset and returns
+            (train_loader, val_loader, test_loader).
+        shuffle : bool, default=True
+            Whether to shuffle data. Only applies when split_ratio is None.
+            When split_ratio is provided, train data is always shuffled.
 
         Returns
         -------
         tuple
-            (train_loader, val_loader, test_loader)
+            If split_ratio is None: returns (dataloader,)
+            If split_ratio is provided: returns (train_loader, val_loader, test_loader)
+
+        Examples
+        --------
+        # Case 1: Data already split, just create loader
+        >>> train_gen = SequenceDataGenerator(train_data['seq_tokens'], ...)
+        >>> train_loader = train_gen.generate_dataloader(batch_size=32)[0]
+
+        # Case 2: Auto-split data into train/val/test
+        >>> all_gen = SequenceDataGenerator(all_data['seq_tokens'], ...)
+        >>> train_loader, val_loader, test_loader = all_gen.generate_dataloader(
+        ...     batch_size=32, split_ratio=(0.7, 0.1, 0.2))
         """
         if split_ratio is None:
-            split_ratio = (0.7, 0.1, 0.2)
+            # No split - data is already divided, just create a single DataLoader
+            dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+            return (dataloader,)
 
-        # 验证分割比例
+        # Split data into train/val/test
         assert abs(sum(split_ratio) - 1.0) < 1e-6, "split_ratio must sum to 1.0"
 
-        # 计算分割大小
         total_size = len(self.dataset)
         train_size = int(total_size * split_ratio[0])
         val_size = int(total_size * split_ratio[1])
         test_size = total_size - train_size - val_size
 
-        # 分割数据集
         train_dataset, val_dataset, test_dataset = random_split(self.dataset, [train_size, val_size, test_size])
 
-        # 创建数据加载器
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         return train_loader, val_loader, test_loader
