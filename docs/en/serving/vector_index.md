@@ -46,10 +46,10 @@ from torch_rechub.serving import builder_factory
 builder = builder_factory(model, **builder_config)
 ```
 
-| Parameter          | Type   | Description                                            |
-| ------------------ | ------ | ------------------------------------------------------ |
+| Parameter          | Type   | Description                                                 |
+| ------------------ | ------ | ----------------------------------------------------------- |
 | `model`            | `str`  | Retrieval backend name: `"annoy"`, `"faiss"`, or `"milvus"` |
-| `**builder_config` | `dict` | Configuration parameters passed to the specific Builder |
+| `**builder_config` | `dict` | Configuration parameters passed to the specific Builder     |
 
 ---
 
@@ -87,13 +87,13 @@ builder = builder_factory(
 )
 ```
 
-| Parameter | Type  | Default     | Description                                                               |
-| --------- | ----- | ----------- | ------------------------------------------------------------------------- |
-| `d`       | `int` | Required    | Vector dimension                                                          |
+| Parameter | Type  | Default     | Description                                                                 |
+| --------- | ----- | ----------- | --------------------------------------------------------------------------- |
+| `d`       | `int` | Required    | Vector dimension                                                            |
 | `metric`  | `str` | `"angular"` | Distance metric: `"angular"` (cosine), `"euclidean"`, `"dot"` (dot product) |
-| `n_trees` | `int` | `10`        | Number of trees to build; more trees = higher accuracy but slower build   |
-| `threads` | `int` | `-1`        | Number of build threads; `-1` uses all available cores                    |
-| `searchk` | `int` | `-1`        | Nodes to inspect during search; `-1` means `n_trees * top_k`              |
+| `n_trees` | `int` | `10`        | Number of trees to build; more trees = higher accuracy but slower build     |
+| `threads` | `int` | `-1`        | Number of build threads; `-1` uses all available cores                      |
+| `searchk` | `int` | `-1`        | Nodes to inspect during search; `-1` means `n_trees * top_k`                |
 
 ### Usage Example
 
@@ -139,11 +139,11 @@ pip install faiss-gpu
 
 ### Supported Index Types
 
-| Index Type | Description                    | Use Case                      |
-| ---------- | ------------------------------ | ----------------------------- |
-| `Flat`     | Brute-force search, exact results | Small-scale data (< 100K)    |
-| `HNSW`     | Graph-based approximate search | Medium-scale, high recall     |
-| `IVF`      | Inverted index, cluster-based  | Large-scale data              |
+| Index Type | Description                       | Use Case                  |
+| ---------- | --------------------------------- | ------------------------- |
+| `Flat`     | Brute-force search, exact results | Small-scale data (< 100K) |
+| `HNSW`     | Graph-based approximate search    | Medium-scale, high recall |
+| `IVF`      | Inverted index, cluster-based     | Large-scale data          |
 
 ### Parameters
 
@@ -157,9 +157,9 @@ builder = builder_factory(
 )
 ```
 
-| Parameter    | Type  | Default  | Description                                       |
-| ------------ | ----- | -------- | ------------------------------------------------- |
-| `index_type` | `str` | `"Flat"` | Index type                                        |
+| Parameter    | Type  | Default  | Description                                                 |
+| ------------ | ----- | -------- | ----------------------------------------------------------- |
+| `index_type` | `str` | `"Flat"` | Index type                                                  |
 | `metric`     | `str` | `"L2"`   | Distance metric: `"L2"` (Euclidean), `"IP"` (Inner Product) |
 
 #### HNSW Index
@@ -174,9 +174,9 @@ builder = builder_factory(
 )
 ```
 
-| Parameter  | Type  | Default | Description                                          |
-| ---------- | ----- | ------- | ---------------------------------------------------- |
-| `m`        | `int` | `32`    | Maximum neighbors per node; higher = more accurate   |
+| Parameter  | Type  | Default | Description                                                      |
+| ---------- | ----- | ------- | ---------------------------------------------------------------- |
+| `m`        | `int` | `32`    | Maximum neighbors per node; higher = more accurate               |
 | `efSearch` | `int` | `None`  | Candidate nodes during search; higher = more accurate but slower |
 
 #### IVF Index
@@ -191,9 +191,9 @@ builder = builder_factory(
 )
 ```
 
-| Parameter | Type  | Default | Description                                              |
-| --------- | ----- | ------- | -------------------------------------------------------- |
-| `nlists`  | `int` | `100`   | Number of cluster centers; recommended `sqrt(n)` to `4*sqrt(n)` |
+| Parameter | Type  | Default | Description                                                        |
+| --------- | ----- | ------- | ------------------------------------------------------------------ |
+| `nlists`  | `int` | `100`   | Number of cluster centers; recommended `sqrt(n)` to `4*sqrt(n)`    |
 | `nprobe`  | `int` | `None`  | Clusters to visit during search; higher = more accurate but slower |
 
 ### Usage Example
@@ -238,11 +238,11 @@ pip install pymilvus
 
 ### Supported Index Types
 
-| Index Type | Description      | Use Case                    |
-| ---------- | ---------------- | --------------------------- |
+| Index Type | Description        | Use Case                   |
+| ---------- | ------------------ | -------------------------- |
 | `FLAT`     | Brute-force search | Small-scale, exact results |
-| `HNSW`     | Graph-based index | Medium-scale, high recall  |
-| `IVF_FLAT` | Inverted index   | Large-scale data            |
+| `HNSW`     | Graph-based index  | Medium-scale, high recall  |
+| `IVF_FLAT` | Inverted index     | Large-scale data           |
 
 ### Parameters
 
@@ -257,10 +257,10 @@ builder = builder_factory(
 )
 ```
 
-| Parameter | Type  | Default | Description                                    |
-| --------- | ----- | ------- | ---------------------------------------------- |
-| `d`       | `int` | Required | Vector dimension                              |
-| `metric`  | `str` | `"L2"`  | Distance metric: `"L2"`, `"IP"`, `"COSINE"`   |
+| Parameter | Type  | Default  | Description                                 |
+| --------- | ----- | -------- | ------------------------------------------- |
+| `d`       | `int` | Required | Vector dimension                            |
+| `metric`  | `str` | `"L2"`   | Distance metric: `"L2"`, `"IP"`, `"COSINE"` |
 
 #### HNSW Index
 
@@ -275,10 +275,10 @@ builder = builder_factory(
 )
 ```
 
-| Parameter | Type  | Default | Description                    |
-| --------- | ----- | ------- | ------------------------------ |
-| `m`       | `int` | `16`    | Maximum neighbors per node     |
-| `ef`      | `int` | `None`  | Candidate nodes during search  |
+| Parameter | Type  | Default | Description                   |
+| --------- | ----- | ------- | ----------------------------- |
+| `m`       | `int` | `16`    | Maximum neighbors per node    |
+| `ef`      | `int` | `None`  | Candidate nodes during search |
 
 #### IVF_FLAT Index
 
@@ -293,10 +293,10 @@ builder = builder_factory(
 )
 ```
 
-| Parameter | Type  | Default | Description                      |
-| --------- | ----- | ------- | -------------------------------- |
-| `nlist`   | `int` | `128`   | Number of cluster centers        |
-| `nprobe`  | `int` | `None`  | Clusters to visit during search  |
+| Parameter | Type  | Default | Description                     |
+| --------- | ----- | ------- | ------------------------------- |
+| `nlist`   | `int` | `128`   | Number of cluster centers       |
+| `nprobe`  | `int` | `None`  | Clusters to visit during search |
 
 ### Usage Example
 
@@ -422,15 +422,15 @@ def match_evaluation(
 
 ## Performance Comparison & Selection Guide
 
-| Feature              | Annoy              | FAISS          | Milvus                |
-| -------------------- | ------------------ | -------------- | --------------------- |
-| **Installation**     | Easy               | Medium         | Requires service      |
-| **Memory Usage**     | Low                | Medium         | Depends on config     |
-| **Build Speed**      | Slow               | Fast           | Fast                  |
-| **Query Speed**      | Medium             | Fast           | Fast                  |
-| **GPU Support**      | ❌                  | ✅              | ✅                     |
-| **Distributed**      | ❌                  | ❌              | ✅                     |
-| **Best For**         | Small-scale offline | Medium-large scale | Production environments |
+| Feature          | Annoy               | FAISS              | Milvus                  |
+| ---------------- | ------------------- | ------------------ | ----------------------- |
+| **Installation** | Easy                | Medium             | Requires service        |
+| **Memory Usage** | Low                 | Medium             | Depends on config       |
+| **Build Speed**  | Slow                | Fast               | Fast                    |
+| **Query Speed**  | Medium              | Fast               | Fast                    |
+| **GPU Support**  | ❌                   | ✅                  | ✅                       |
+| **Distributed**  | ❌                   | ❌                  | ✅                       |
+| **Best For**     | Small-scale offline | Medium-large scale | Production environments |
 
 ### Selection Recommendations
 
