@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-01-11
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* Update HSTULayer with L2 norm and SiLU attention by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/157
+* Add ONNX quantization scripts and tests, improve dataloader split  by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/161
+### 📝 文档更新 / Documentation
+* Update docs and README with new architecture image by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/154
+* Add comprehensive vector index docs (EN & ZH) by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/162
+* Update quick start and tracking docs in EN and ZH by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/163
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.1.0...v0.2.0
+
+---
+
+
+
 ## [0.1.0] - 2025-12-17
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
