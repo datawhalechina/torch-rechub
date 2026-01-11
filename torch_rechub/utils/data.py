@@ -518,14 +518,9 @@ class SequenceDataGenerator(object):
         """
         if split_ratio is None:
             # No split - data is already divided, just create a single DataLoader
-            dataloader = DataLoader(
-                self.dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                num_workers=num_workers
-            )
+            dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
             return (dataloader,)
-        
+
         # Split data into train/val/test
         assert abs(sum(split_ratio) - 1.0) < 1e-6, "split_ratio must sum to 1.0"
 
@@ -534,18 +529,10 @@ class SequenceDataGenerator(object):
         val_size = int(total_size * split_ratio[1])
         test_size = total_size - train_size - val_size
 
-        train_dataset, val_dataset, test_dataset = random_split(
-            self.dataset, [train_size, val_size, test_size]
-        )
+        train_dataset, val_dataset, test_dataset = random_split(self.dataset, [train_size, val_size, test_size])
 
-        train_loader = DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
-        )
-        val_loader = DataLoader(
-            val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-        )
-        test_loader = DataLoader(
-            test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-        )
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         return train_loader, val_loader, test_loader
