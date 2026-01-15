@@ -4,6 +4,8 @@
 
 # Torch-RecHub: 轻量、高效、易用的 PyTorch 推荐系统框架
 
+【⚠️ Alpha内测版本警告：此为早期内部构建版本，尚不完整且可能存在错误，欢迎大家提Issue反馈问题或建议。】
+
 [![许可证](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
 ![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
