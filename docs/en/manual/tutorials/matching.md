@@ -14,9 +14,9 @@ First, we need to prepare the data. The MovieLens dataset contains user ratings 
 ```python
 import pandas as pd
 import numpy as np
-from rechub.utils import DataGenerator
-from rechub.models import *
-from rechub.trainers import *
+from torch_rechub.utils import DataGenerator
+from torch_rechub.models import *
+from torch_rechub.trainers import *
 
 # Load data
 df = pd.read_csv("movielens.csv")
@@ -106,7 +106,7 @@ The trained model can be used to generate vector representations of users and it
 
 ```python
 # Use Annoy for vector retrieval
-from rechub.utils import Annoy
+from torch_rechub.utils import Annoy
 
 # Build index
 item_vectors = model.get_item_vectors()
@@ -129,7 +129,7 @@ trainer = MatchTrainer(model=model,
 
 2. Negative Sampling
 ```python
-from rechub.utils import negative_sample
+from torch_rechub.utils import negative_sample
 
 neg_samples = negative_sample(items_cnt_order,
                             ratio=5,
