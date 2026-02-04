@@ -132,6 +132,82 @@ loss_func = get_loss_func(task_type="regression")
 **返回值：**
 - 对应的损失函数实例
 
+## Parquet 流式数据加载
+
+在工业界场景中，特征工程通常由 **PySpark** 在大数据集群上完成，数据量可达 GB 到 TB 级别。直接使用 `spark_df.toPandas()` 会导致 Driver OOM。
+
+Torch-RecHub 提供 `ParquetIterableDataset`，支持从 Spark 生成的 Parquet 文件目录流式读取数据，无需将全部数据加载到内存。
+
+### 安装依赖
+
+Parquet 数据加载需要 `pyarrow`：
+
+```bash
+pip install pyarrow
+```
+
+### ParquetIterableDataset
+
+继承自 `torch.utils.data.IterableDataset`，支持多进程数据加载。
+
+```python
+from torch.utils.data import DataLoader
+from torch_rechub.data import ParquetIterableDataset
+
+# 创建流式数据集
+dataset = ParquetIterableDataset(
+    ["/data/train1.parquet", "/data/train2.parquet"],
+    columns=["user_id", "item_id", "label"],  # 可选，指定读取的列
+    batch_size=1024,  # 每批次读取的行数
+)
+
+# 创建 DataLoader（注意 batch_size=None）
+loader = DataLoader(dataset, batch_size=None, num_workers=4)
+
+# 迭代数据
+for batch in loader:
+    user_id = batch["user_id"]  # torch.Tensor
+    item_id = batch["item_id"]  # torch.Tensor
+    label = batch["label"]      # torch.Tensor
+```
+
+**参数说明：**
+- `file_paths`：Parquet 文件路径列表
+- `columns`：要读取的列名列表，`None` 表示读取所有列
+- `batch_size`：每批次读取的行数，默认 1024
+
+**特性：**
+- **流式读取**：使用 PyArrow Scanner 逐批读取，内存占用恒定
+- **多进程支持**：自动将文件分配给不同 worker，避免重复读取
+- **类型转换**：自动将 PyArrow 数组转换为 PyTorch Tensor
+- **嵌套数组支持**：支持 Spark 的 `Array` 类型列，自动转换为 2D Tensor
+
+### 与 Spark 配合使用
+
+```python
+# ========== Spark 端 ==========
+# df.write.parquet("/data/train.parquet")
+
+# ========== PyTorch 端 ==========
+import glob
+from torch_rechub.data import ParquetIterableDataset
+
+file_paths = glob.glob("/data/train.parquet/*.parquet")
+dataset = ParquetIterableDataset(file_paths, batch_size=2048)
+loader = DataLoader(dataset, batch_size=None, num_workers=8)
+```
+
+### 支持的数据类型
+
+| Parquet/Arrow 类型 | 转换结果 |
+|-------------------|---------|
+| int8/16/32/64 | torch.float32 |
+| float32/64 | torch.float32 |
+| boolean | torch.float32 |
+| list/array | torch.Tensor (2D) |
+
+> **注意**：嵌套数组（如 Spark 的 `Array<Float>`）要求每行长度相同，否则会抛出 `ValueError`。
+
 ## 数据处理流程
 
 1. **特征定义**：使用DenseFeature、SparseFeature、SequenceFeature定义特征
