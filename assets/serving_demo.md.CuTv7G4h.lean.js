@@ -1,1 +1,0 @@
-import{_ as e,c as t,o}from"./chunks/framework.CFr_S-Bc.js";const _=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"serving/demo.md","filePath":"en/serving/demo.md"}'),r={name:"serving/demo.md"};function a(n,s,c,d,i,m){return o(),t("div")}const f=e(r,[["render",a]]);export{_ as __pageData,f as default};
