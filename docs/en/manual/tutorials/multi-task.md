@@ -14,9 +14,9 @@ First, we need to prepare data for multi-task learning:
 ```python
 import pandas as pd
 import numpy as np
-from rechub.utils import DataGenerator
-from rechub.models import *
-from rechub.trainers import *
+from torch_rechub.utils import DataGenerator
+from torch_rechub.models import *
+from torch_rechub.trainers import *
 
 # Load data
 df = pd.read_csv("ali_ccp_data.csv")
@@ -134,7 +134,7 @@ trainer = MTLTrainer(
 Use MetaBalance optimizer to balance task gradients:
 
 ```python
-from rechub.utils import MetaBalance
+from torch_rechub.utils import MetaBalance
 
 # Configure MetaBalance optimizer
 optimizer = MetaBalance(
@@ -171,7 +171,7 @@ trainer = MTLTrainer(
 
 2. Get Shared and Task-Specific Layers
 ```python
-from rechub.utils import shared_task_layers
+from torch_rechub.utils import shared_task_layers
 
 shared_params, task_params = shared_task_layers(model)
 ```

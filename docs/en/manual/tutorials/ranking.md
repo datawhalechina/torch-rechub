@@ -14,9 +14,9 @@ First, we need to prepare the data and process features:
 ```python
 import pandas as pd
 import numpy as np
-from rechub.utils import DataGenerator
-from rechub.models import *
-from rechub.trainers import *
+from torch_rechub.utils import DataGenerator
+from torch_rechub.models import *
+from torch_rechub.trainers import *
 
 # Load data
 df = pd.read_csv("criteo_sample.csv")

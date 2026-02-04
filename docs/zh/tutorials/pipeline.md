@@ -14,9 +14,9 @@ description: Torch-RecHub 多任务学习模型教程，包括 SharedBottom、ES
 ```python
 import pandas as pd
 import numpy as np
-from rechub.utils import DataGenerator
-from rechub.models import *
-from rechub.trainers import *
+from torch_rechub.utils import DataGenerator
+from torch_rechub.models import *
+from torch_rechub.trainers import *
 
 # 加载数据
 df = pd.read_csv("ali_ccp_data.csv")
@@ -134,7 +134,7 @@ trainer = MTLTrainer(
 使用 MetaBalance 优化器平衡任务梯度：
 
 ```python
-from rechub.utils import MetaBalance
+from torch_rechub.utils import MetaBalance
 
 # 配置 MetaBalance 优化器
 optimizer = MetaBalance(
@@ -171,7 +171,7 @@ trainer = MTLTrainer(
 
 2. 获取共享层和任务特定层
 ```python
-from rechub.utils import shared_task_layers
+from torch_rechub.utils import shared_task_layers
 
 shared_params, task_params = shared_task_layers(model)
 ```
