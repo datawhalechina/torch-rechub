@@ -100,3 +100,7 @@ trainer = MatchTrainer(model, mode=0, optimizer_params={"lr": 0.001}, device="cu
 trainer.fit(train_dataloader)
 ```
 
+## Contributing New Models
+
+If you want to contribute new models, please refer to the [Contributing Guide](/en/community/contributing) and follow the project's coding standards and documentation requirements.
+
