@@ -15,6 +15,7 @@
 [![numpy Version](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/)
 [![scikit-learn Version](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
 [![torch-rechub Version](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
+[![torchview](https://img.shields.io/badge/torchview-0.2%2B-green?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 English | [简体中文](README.md)
 
