@@ -66,6 +66,15 @@ class MatchTrainer(object):
         if sampler_seed is not None:
             self._sampler_generator = torch.Generator(device=self.device)
             self._sampler_generator.manual_seed(sampler_seed)
+        # Check model compatibility for in-batch negative sampling
+        if in_batch_neg:
+            base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+            if not hasattr(base_model, 'user_tower') or not hasattr(base_model, 'item_tower'):
+                raise ValueError(
+                    f"Model {type(base_model).__name__} does not support in-batch negative sampling. "
+                    "Only two-tower models with user_tower() and item_tower() methods are supported, "
+                    "such as DSSM, YoutubeDNN, MIND, GRU4Rec, SINE, ComiRec, etc."
+                )
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         if regularization_params is None:
