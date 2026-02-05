@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-02-05
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Inbatchsample by @zerolovesea in https://github.com/datawhalechina/torch-rechub/pull/128
+### 📝 文档更新 / Documentation
+* Enhance docs: ONNX, serving, tools, tutorials by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/165
+* Expand docs: community, guides, models, data by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/166
+### 🔄 其他变更 / Other Changes
+* Update favicon and logo images by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/164
+* Update docs imports to torch_rechub by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/167
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.2.0...v0.3.0
+
+---
+
+
+
 ## [0.2.0] - 2026-01-11
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
