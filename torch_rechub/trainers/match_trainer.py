@@ -73,7 +73,7 @@ class MatchTrainer(object):
                 raise ValueError(
                     f"Model {type(base_model).__name__} does not support in-batch negative sampling. "
                     "Only two-tower models with user_tower() and item_tower() methods are supported, "
-                    "such as DSSM, YoutubeDNN, MIND, GRU4Rec, SINE, ComiRec, etc."
+                    "such as DSSM, YoutubeDNN, MIND, GRU4Rec, SINE, ComiRec, SASRec, NARM, STAMP, etc."
                 )
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}

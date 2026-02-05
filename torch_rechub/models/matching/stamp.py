@@ -14,13 +14,15 @@ import torch.nn.functional as F
 
 class STAMP(nn.Module):
 
-    def __init__(self, item_history_feature, weight_std, emb_std):
+    def __init__(self, item_history_feature, weight_std, emb_std, item_feature=None):
         super(STAMP, self).__init__()
 
         # item embedding layer
         self.item_history_feature = item_history_feature
+        self.item_feature = item_feature  # Optional: for in-batch negative sampling
         n_items, item_emb_dim, = item_history_feature.vocab_size, item_history_feature.embed_dim
         self.item_emb = nn.Embedding(n_items, item_emb_dim, padding_idx=0)
+        self.mode = None  # For inference: "user" or "item"
 
         # weights and biases for attention computation
         self.w_0 = nn.Parameter(torch.zeros(item_emb_dim, 1))
@@ -50,32 +52,58 @@ class STAMP(nn.Module):
         elif isinstance(module, nn.Embedding):
             module.weight.data.normal_(std=self.emb_std)
 
-    def forward(self, input_dict):
-        # Index the embeddings for the items in the session
+    def _compute_user_repr(self, input_dict):
+        """Compute user representation (h_s * h_t)."""
         input = input_dict[self.item_history_feature.name]
         value_mask = (input != 0).unsqueeze(-1)
         value_counts = value_mask.sum(dim=1, keepdim=True).squeeze(-1)
         item_emb_batch = self.item_emb(input) * value_mask
 
-        # Index the embeddings of the latest clicked items
         x_t = self.item_emb(torch.gather(input, 1, value_counts - 1))
-
-        # Eq. 2, user's general interest in the current session
         m_s = ((item_emb_batch).sum(1) / value_counts).unsqueeze(1)
 
-        # Eq. 7, compute attention coefficient
         a = F.normalize(torch.exp(torch.sigmoid(item_emb_batch @ self.w_1_t + x_t @ self.w_2_t + m_s @ self.w_3_t + self.b_a) @ self.w_0) * value_mask, p=1, dim=1)
-
-        # Eq. 8, compute user's attention-based interests
         m_a = (a * item_emb_batch).sum(1) + m_s.squeeze(1)
 
-        # Eq. 3, compute the output state of the general interest
         h_s = self.f_s(m_a)
-
-        # Eq. 9, compute the output state of the short-term interest
         h_t = self.f_t(x_t).squeeze(1)
+        return h_s * h_t  # [batch_size, embed_dim]
 
-        # Eq. 4, compute candidate scores
-        z = h_s * h_t @ self.item_emb.weight.T
+    def user_tower(self, x):
+        """Compute user embedding for in-batch negative sampling."""
+        if self.mode == "item":
+            return None
+        user_emb = self._compute_user_repr(x)
+        if self.mode == "user":
+            return user_emb
+        return user_emb.unsqueeze(1)  # [batch_size, 1, embed_dim]
 
+    def item_tower(self, x):
+        """Compute item embedding for in-batch negative sampling."""
+        if self.mode == "user":
+            return None
+        if self.item_feature is not None:
+            item_ids = x[self.item_feature.name]
+            item_emb = self.item_emb(item_ids)  # [batch_size, embed_dim]
+            if self.mode == "item":
+                return item_emb
+            return item_emb.unsqueeze(1)  # [batch_size, 1, embed_dim]
+        return None
+
+    def forward(self, input_dict):
+        # Support inference mode
+        if self.mode == "user":
+            return self.user_tower(input_dict)
+        if self.mode == "item":
+            return self.item_tower(input_dict)
+
+        # In-batch negative sampling mode
+        if self.item_feature is not None:
+            user_emb = self.user_tower(input_dict)  # [batch_size, 1, embed_dim]
+            item_emb = self.item_tower(input_dict)  # [batch_size, 1, embed_dim]
+            return torch.mul(user_emb, item_emb).sum(dim=-1).squeeze()
+
+        # Original behavior: compute scores for all items
+        user_repr = self._compute_user_repr(input_dict)
+        z = user_repr @ self.item_emb.weight.T
         return z
