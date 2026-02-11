@@ -47,7 +47,7 @@ dense_features = [f"I{i}" for i in range(1, 14)]
 sparse_features = [f"C{i}" for i in range(1, 27)]
 
 # 填充缺失值
-data[sparse_features] = data[sparse_features].fillna("__missing__")
+data[sparse_features] = data[sparse_features].fillna("-996")
 data[dense_features] = data[dense_features].fillna(0)
 
 # 数值特征归一化
@@ -62,7 +62,7 @@ for feat in sparse_features:
 # ========== 3. 定义特征类型 ==========
 dense_feas = [DenseFeature(name) for name in dense_features]
 sparse_feas = [
-    SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=8)
+    SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
     for name in sparse_features
 ]
 
@@ -72,15 +72,15 @@ y = data["label"]
 
 dg = DataGenerator(x, y)
 train_dl, val_dl, test_dl = dg.generate_dataloader(
-    split_ratio=[0.7, 0.15],
-    batch_size=64
+    split_ratio=[0.7, 0.1],
+    batch_size=256
 )
 
 # ========== 5. 定义模型 ==========
 model = DeepFM(
-    deep_features=dense_feas,
+    deep_features=dense_feas + sparse_feas,
     fm_features=sparse_feas,
-    mlp_params={"dims": [128, 64], "dropout": 0.2, "activation": "relu"}
+    mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"}
 )
 
 # ========== 6. 训练模型 ==========
@@ -101,13 +101,26 @@ print(f"测试集 AUC: {auc:.4f}")
 **预期输出：**
 
 ```
-数据集大小: 116 条记录
-epoch: 0
-train: 100%|██████████| 2/2 [00:00<00:00, 10.00it/s]
-validation: 100%|██████████| 1/1 [00:00<00:00, 50.00it/s]
-epoch: 0 validation: auc: 0.65
-...
-测试集 AUC: 0.6xxx
+train: 100%|██████████| 1/1 [00:00<00:00,  4.47it/s]
+validation: 100%|██████████| 1/1 [00:00<00:00, 333.15it/s]
+epoch: 0 validation: auc: 0.3666666666666667
+epoch: 1
+train: 100%|██████████| 1/1 [00:00<00:00, 111.11it/s]
+validation: 100%|██████████| 1/1 [00:00<00:00, 399.08it/s]
+epoch: 1 validation: auc: 0.3666666666666667
+epoch: 2
+train: 100%|██████████| 1/1 [00:00<00:00, 95.60it/s]
+validation: 100%|██████████| 1/1 [00:00<00:00, 492.75it/s]
+epoch: 2 validation: auc: 0.33333333333333337
+epoch: 3
+train: 100%|██████████| 1/1 [00:00<00:00, 90.90it/s]
+validation: 100%|██████████| 1/1 [00:00<00:00, 499.20it/s]
+epoch: 3 validation: auc: 0.3
+epoch: 4
+train: 100%|██████████| 1/1 [00:00<00:00, 79.91it/s]
+validation: 100%|██████████| 1/1 [00:00<00:00, 500.27it/s]
+epoch: 4 validation: auc: 0.3333333333333333
+validation: 100%|██████████| 1/1 [00:00<00:00, 249.71it/s]测试集 AUC: 0.9545
 ```
 
 ---
@@ -171,6 +184,7 @@ df_train, df_test = generate_seq_feature_match(
 
 x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 y_train = x_train["label"]
+x_train = {k: v for k, v in x_train.items() if k != "label"}
 x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 
 # ========== 5. 定义特征类型 ==========
@@ -205,8 +219,8 @@ model = DSSM(
     user_features,
     item_features,
     temperature=0.02,
-    user_params={"dims": [128, 64, 32], "activation": "prelu"},
-    item_params={"dims": [128, 64, 32], "activation": "prelu"},
+    user_params={"dims": [128, 64], "activation": "prelu"},
+    item_params={"dims": [128, 64], "activation": "prelu"},
 )
 
 # ========== 8. 训练模型 ==========
@@ -214,8 +228,9 @@ trainer = MatchTrainer(
     model,
     mode=0,  # point-wise
     optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-    n_epoch=3,
+    n_epoch=2,
     device="cpu",
+    model_path="./",
 )
 
 trainer.fit(train_dl)
@@ -231,16 +246,15 @@ print(f"物品嵌入维度: {item_embedding.shape}")
 **预期输出：**
 
 ```
-数据集大小: 100 条记录
-preprocess data
-generate sequence features: 100%|██████████| 2/2 [00:00<?, ?it/s]
 n_train: 384, n_test: 2
-0 cold start user dropped
+0 cold start user dropped 
 epoch: 0
-train: 100%|██████████| 2/2 [00:15<00:00, 7.50s/it]
-...
-用户嵌入维度: torch.Size([2, 32])
-物品嵌入维度: torch.Size([93, 32])
+train: 100%|██████████| 2/2 [00:19<00:00,  9.81s/it]
+epoch: 1
+train: 100%|██████████| 2/2 [00:19<00:00,  9.65s/it]
+user inference: 100%|██████████| 1/1 [00:04<00:00,  4.90s/it]
+item inference: 100%|██████████| 1/1 [00:05<00:00,  5.23s/it]用户嵌入维度: torch.Size([2, 64])
+物品嵌入维度: torch.Size([93, 64])
 ```
 
 ---
