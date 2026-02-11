@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "torch-rechub"
-version = "0.3.0"
+version = "0.4.0"
 description = "A lightweight, efficient, and easy-to-use PyTorch recommendation system framework."
 readme = "README.md"
 license = { text = "MIT" }

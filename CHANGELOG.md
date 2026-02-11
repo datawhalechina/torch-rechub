@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-02-11
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 📝 文档更新 / Documentation
+* Update quick_start docs: params and outputs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/171
+### 📦 依赖更新 / Dependencies
+* Fix the version of this package by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/170
+### 🔄 其他变更 / Other Changes
+* Update project_framework.png by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/169
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.3.0...v0.4.0
+
+---
+
+
+
 ## [0.3.0] - 2026-02-05
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
