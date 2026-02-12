@@ -22,6 +22,7 @@ class TIGERModel(T5ForConditionalGeneration):
 
 
     def ranking_loss(self, lm_logits, labels):
+        loss = None
         if labels is not None:
             t_logits = lm_logits/self.temperature
             loss_fct = CrossEntropyLoss(ignore_index=-100)
