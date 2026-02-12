@@ -1,3 +1,5 @@
+import json
+import os
 import random
 
 import numpy as np
@@ -536,3 +538,293 @@ class SequenceDataGenerator(object):
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         return train_loader, val_loader, test_loader
+
+
+class TigerSeqDataset(Dataset):
+
+    def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0):
+
+        super().__init__()
+
+        self.max_his_len = max_his_len
+        self.sample_num = sample_num
+        self.mode = mode
+
+        # cache
+        self.new_tokens = None
+        self.allowed_tokens = None
+        self.all_items = None
+
+        # load data
+        self.inters = inters_json
+        self.indices = indices_json
+        self._remap_items()
+
+        # process
+        self.inter_data = self._process_data()
+
+    # =========================================================
+    # Load Data
+    # =========================================================
+
+    def _remap_items(self):
+        self.remapped_inters = dict()
+        for uid, items in self.inters.items():
+            new_items = ["".join(self.indices[str(i)]) for i in items]
+            self.remapped_inters[uid] = new_items
+
+    # =========================================================
+    # Process Data
+    # =========================================================
+
+    def _process_data(self):
+        if self.mode == 'train':
+            return self._process_train_data()
+        elif self.mode == 'valid':
+            return self._process_valid_data()
+        elif self.mode == 'test':
+            return self._process_test_data()
+        else:
+            raise NotImplementedError
+
+    def _truncate_history(self, history):
+        if self.max_his_len > 0:
+            history = history[-self.max_his_len:]
+        return history
+
+    def _process_train_data(self):
+        inter_data = []
+        for uid in self.remapped_inters:
+            items = self.remapped_inters[uid][:-2]
+            for i in range(1, len(items)):
+                history = items[:i]
+                history = self._truncate_history(history)
+
+                inter_data.append({"item": items[i], "inters": "".join(history)})
+
+        return inter_data
+
+    def _process_valid_data(self):
+        inter_data = []
+        for uid in self.remapped_inters:
+            items = self.remapped_inters[uid]
+
+            history = items[:-2]
+            history = self._truncate_history(history)
+
+            inter_data.append({"item": items[-2], "inters": "".join(history)})
+
+        return inter_data
+
+    def _process_test_data(self):
+        inter_data = []
+        for uid in self.remapped_inters:
+            items = self.remapped_inters[uid]
+
+            history = items[:-1]
+            history = self._truncate_history(history)
+
+            inter_data.append({"item": items[-1], "inters": "".join(history)})
+
+        if self.sample_num > 0:
+            all_idx = np.arange(len(inter_data))
+            sample_idx = np.random.choice(all_idx, self.sample_num, replace=False)
+            inter_data = np.array(inter_data)[sample_idx].tolist()
+
+        return inter_data
+
+    def _process_test_data_ids(self):
+        inter_data = []
+        for uid in self.inters:
+            items = self.inters[uid]
+
+            history = items[:-1]
+            history = self._truncate_history(history)
+
+            inter_data.append({"item": items[-1], "inters": history})
+
+        if self.sample_num > 0:
+            all_idx = np.arange(len(inter_data))
+            sample_idx = np.random.choice(all_idx, self.sample_num, replace=False)
+            inter_data = np.array(inter_data)[sample_idx].tolist()
+
+        return inter_data
+
+    # =========================================================
+    # Token Utilities
+    # =========================================================
+
+    def get_new_tokens(self):
+        if self.new_tokens is not None:
+            return self.new_tokens
+
+        tokens = set()
+        for index in self.indices.values():
+            for token in index:
+                tokens.add(token)
+
+        self.new_tokens = sorted(list(tokens))
+        return self.new_tokens
+
+    def get_all_items(self, as_list=False):
+        if self.all_items is not None:
+            return self.all_items
+
+        items = ["".join(index) for index in self.indices.values()]
+        self.all_items = items if as_list else set(items)
+
+        return self.all_items
+
+    def get_prefix_allowed_tokens_fn(self, tokenizer):
+
+        if self.allowed_tokens is None:
+            self.allowed_tokens = {}
+
+            for index in self.indices.values():
+                for i, token in enumerate(index):
+                    token_id = tokenizer(token)["input_ids"][0]
+                    if i not in self.allowed_tokens:
+                        self.allowed_tokens[i] = set()
+                    self.allowed_tokens[i].add(token_id)
+
+            self.allowed_tokens[len(self.allowed_tokens)] = {tokenizer.eos_token_id}
+
+        sep = [0]
+
+        def prefix_allowed_tokens_fn(batch_id, sentence):
+            sentence = sentence.tolist()
+            reversed_sent = sentence[::-1]
+
+            for i in range(len(reversed_sent)):
+                if reversed_sent[i:i + len(sep)] == sep[::-1]:
+                    return list(self.allowed_tokens[i])
+
+        return prefix_allowed_tokens_fn
+
+    # =========================================================
+    # Dataset API
+    # =========================================================
+
+    def __len__(self):
+        return len(self.inter_data)
+
+    def __getitem__(self, index):
+        index = index % len(self.inter_data)
+        d = self.inter_data[index]
+        return {"input_ids": d["inters"], "labels": d["item"]}
+
+    # =========================================================
+    # Collate Function
+    # =========================================================
+
+    def get_collate_fn(self, tokenizer):
+
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = 0
+
+        def collate_fn(batch):
+
+            input_texts = [d["input_ids"] for d in batch]
+            label_texts = [d["labels"] for d in batch]
+
+            inputs = tokenizer(input_texts, return_tensors="pt", padding="longest", max_length=tokenizer.model_max_length, truncation=True, return_attention_mask=True)
+
+            labels = tokenizer(label_texts, return_tensors="pt", padding="longest", max_length=tokenizer.model_max_length, truncation=True, return_attention_mask=True)
+
+            inputs["labels"] = labels["input_ids"]
+            inputs["labels"][inputs["labels"] == tokenizer.pad_token_id] = -100
+
+            return inputs
+
+        return collate_fn
+
+
+class Trie(object):
+
+    def __init__(self, sequences=[]):
+        self.trie_dict = {}
+        self.len = 0
+        if sequences:
+            for sequence in sequences:
+                Trie._add_to_trie(sequence, self.trie_dict)
+                self.len += 1
+
+        self.append_trie = None
+        self.bos_token_id = None
+
+    def def_prefix_allowed_tokens_fn(self, candidate_trie):
+
+        def prefix_allowed_tokens(batch_id, sentence):
+            sentence = sentence.tolist()
+            trie_out = candidate_trie.get(sentence)
+            return trie_out
+
+        return prefix_allowed_tokens
+
+    def append(self, trie, bos_token_id):
+        self.append_trie = trie
+        self.bos_token_id = bos_token_id
+
+    def add(self, sequence):
+        Trie._add_to_trie(sequence, self.trie_dict)
+        self.len += 1
+
+    def get(self, prefix_sequence):
+        return Trie._get_from_trie(prefix_sequence, self.trie_dict, self.append_trie, self.bos_token_id)
+
+    @staticmethod
+    def load_from_dict(trie_dict):
+        trie = Trie()
+        trie.trie_dict = trie_dict
+        trie.len = sum(1 for _ in trie)
+        return trie
+
+    @staticmethod
+    def _add_to_trie(sequence, trie_dict):
+        if sequence:
+            if sequence[0] not in trie_dict:
+                trie_dict[sequence[0]] = {}
+            Trie._add_to_trie(sequence[1:], trie_dict[sequence[0]])
+
+    @staticmethod
+    def _get_from_trie(
+        prefix_sequence,
+        trie_dict,
+        append_trie=None,
+        bos_token_id=None,
+    ):
+        if len(prefix_sequence) == 0:
+            output = list(trie_dict.keys())
+            if append_trie and bos_token_id in output:
+                output.remove(bos_token_id)
+                output += list(append_trie.trie_dict.keys())
+            return output
+        elif prefix_sequence[0] in trie_dict:
+            return Trie._get_from_trie(
+                prefix_sequence[1:],
+                trie_dict[prefix_sequence[0]],
+                append_trie,
+                bos_token_id,
+            )
+        else:
+            if append_trie:
+                return append_trie.get(prefix_sequence)
+            else:
+                return []
+
+    def __iter__(self):
+
+        def _traverse(prefix_sequence, trie_dict):
+            if trie_dict:
+                for next_token in trie_dict:
+                    yield from _traverse(prefix_sequence + [next_token], trie_dict[next_token])
+            else:
+                yield prefix_sequence
+
+        return _traverse([], self.trie_dict)
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, value):
+        return self.get(value)

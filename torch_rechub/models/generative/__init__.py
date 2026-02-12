@@ -3,4 +3,4 @@
 from .hllm import HLLMModel
 from .hstu import HSTUModel
 
-__all__ = ['HSTUModel', 'HLLMModel']
+__all__ = ['HSTUModel', 'HLLMModel', 'TIGERModel']
