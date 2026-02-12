@@ -1,15 +1,17 @@
 import argparse
 import json
 import os
-from transformers import EarlyStoppingCallback
+
 import torch
 import transformers
 from torch.utils.data import DataLoader
-from transformers import T5Tokenizer, T5Config, T5ForConditionalGeneration
-from torch_rechub.models.generative.tiger import TIGERModel
-from torch_rechub.utils.data import TigerSeqDataset
-from torch_rechub.utils.data import Trie
 from tqdm import tqdm
+from transformers import EarlyStoppingCallback, T5Config, T5ForConditionalGeneration, T5Tokenizer
+
+from torch_rechub.models.generative.tiger import TIGERModel
+from torch_rechub.utils.data import TigerSeqDataset, Trie
+
+
 def train(args):
     """
     Training example of TIGER on Amazon Books dataset.
@@ -28,7 +30,7 @@ def train(args):
 
     with open(args.data_inter_path, 'r') as f:
         inters_json = json.load(f)
-    with open(args.data_indice_path, 'r') as f: 
+    with open(args.data_indice_path, 'r') as f:
         indices_json = json.load(f)
     train_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="train")
     valid_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="valid")
@@ -62,37 +64,35 @@ def train(args):
             output_dir=args.output_dir,
             save_total_limit=2,
             load_best_model_at_end=True,
-            eval_delay= 1 if args.save_and_eval_strategy=="epoch" else 2000,
+            eval_delay=1 if args.save_and_eval_strategy == "epoch" else 2000,
         ),
         tokenizer=tokenizer,
         data_collator=valid_data.get_collate_fn(tokenizer),
-        callbacks = [EarlyStoppingCallback(early_stopping_patience=20)]
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=20)]
     )
     model.config.use_cache = False
 
-    trainer.train(
-        resume_from_checkpoint=args.resume_from_checkpoint,
-    )
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint,)
 
     trainer.save_state()
     trainer.save_model(output_dir=args.output_dir)
 
+
 def parse_global_args(parser):
-    parser.add_argument("--base_model", type=str, default="t5-small",help="basic model path")
-    parser.add_argument("--output_dir", type=str, default="./ckpt",
-                        help="The output directory")
+    parser.add_argument("--base_model", type=str, default="t5-small", help="basic model path")
+    parser.add_argument("--output_dir", type=str, default="./ckpt", help="The output directory")
     return parser
+
 
 def parse_dataset_args(parser):
     parser.add_argument("--data_inter_path", type=str, default="./data/amazon-books/book.inter.json", help="the user-item interaction file")
     parser.add_argument("--data_indice_path", type=str, default="./data/amazon-books/book.index.json", help="the item indices file")
 
     # arguments related to sequential task
-    parser.add_argument("--max_his_len", type=int, default=20,
-                        help="the max number of items in history sequence, -1 means no limit")
-    parser.add_argument("--add_prefix", action="store_true", default=False,
-                        help="whether add sequential prefix in history")
+    parser.add_argument("--max_his_len", type=int, default=20, help="the max number of items in history sequence, -1 means no limit")
+    parser.add_argument("--add_prefix", action="store_true", default=False, help="whether add sequential prefix in history")
     return parser
+
 
 def parse_train_args(parser):
     parser.add_argument("--optim", type=str, default="adamw_torch", help='The name of the optimizer')
@@ -112,20 +112,17 @@ def parse_train_args(parser):
 
     return parser
 
+
 def parse_test_args(parser):
 
-    parser.add_argument("--ckpt_path", type=str,
-                        default="/home/liuwei/workshop/torch-rechub/examples/generative/ckp",
-                        help="The checkpoint path")
-    parser.add_argument("--filter_items", action="store_true", default=True,
-                        help="whether filter illegal items")
+    parser.add_argument("--ckpt_path", type=str, default="/home/liuwei/workshop/torch-rechub/examples/generative/ckp", help="The checkpoint path")
+    parser.add_argument("--filter_items", action="store_true", default=True, help="whether filter illegal items")
     parser.add_argument("--test_batch_size", type=int, default=2)
     parser.add_argument("--num_beams", type=int, default=20)
-    parser.add_argument("--sample_num", type=int, default=-1,
-                        help="test sample number, -1 represents using all test data")
-    parser.add_argument("--metrics", type=str, default="hit@1,hit@5,hit@10,ndcg@5,ndcg@10",
-                        help="test metrics, separate by comma")
+    parser.add_argument("--sample_num", type=int, default=-1, help="test sample number, -1 represents using all test data")
+    parser.add_argument("--metrics", type=str, default="hit@1,hit@5,hit@10,ndcg@5,ndcg@10", help="test metrics, separate by comma")
     return parser
+
 
 def generate_data():
     """
@@ -140,11 +137,7 @@ def generate_data():
     # -------------------------
     # inter.json
     # -------------------------
-    inter_data = {
-        "0": [1, 2, 3, 4, 1, 2, 3, 4],
-        "1": [2, 3, 4, 1, 2, 3, 4],
-        "2": [3, 4, 6, 1, 2, 3]
-    }
+    inter_data = {"0": [1, 2, 3, 4, 1, 2, 3, 4], "1": [2, 3, 4, 1, 2, 3, 4], "2": [3, 4, 6, 1, 2, 3]}
 
     with open(os.path.join(save_dir, "inter.json"), "w") as f:
         json.dump(inter_data, f, indent=4)
@@ -152,20 +145,13 @@ def generate_data():
     # -------------------------
     # semantic_ids.json
     # -------------------------
-    index_data = {
-        "1": ["<a-1>", "<b-10>"],
-        "2": ["<a-1>", "<b-20>"],
-        "3": ["<a-2>", "<b-30>"],
-        "4": ["<a-2>", "<b-40>"],
-        "5": ["<a-3>", "<b-50>"],
-        "6": ["<a-3>", "<b-60>"],
-        "7": ["<a-4>", "<b-70>"]
-    }
+    index_data = {"1": ["<a-1>", "<b-10>"], "2": ["<a-1>", "<b-20>"], "3": ["<a-2>", "<b-30>"], "4": ["<a-2>", "<b-40>"], "5": ["<a-3>", "<b-50>"], "6": ["<a-3>", "<b-60>"], "7": ["<a-4>", "<b-70>"]}
 
     with open(os.path.join(save_dir, "semantic_ids.json"), "w") as f:
         json.dump(index_data, f, indent=4)
 
     print("book dataset generated.")
+
 
 def test(args):
     """
@@ -183,27 +169,18 @@ def test(args):
     )
     with open(args.data_inter_path, 'r') as f:
         inters_json = json.load(f)
-    with open(args.data_indice_path, 'r') as f: 
+    with open(args.data_indice_path, 'r') as f:
         indices_json = json.load(f)
     test_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="test")
     add_num = tokenizer.add_tokens(test_data.get_new_tokens())
     config.vocab_size = len(tokenizer)
     print("add {} new token.".format(add_num))
     # tokenizer = T5Tokenizer.from_pretrained(args.ckpt_path)
-    model = model = TIGERModel.from_pretrained(
-        args.ckpt_path,
-        low_cpu_mem_usage=True
-    )
+    model = model = TIGERModel.from_pretrained(args.ckpt_path, low_cpu_mem_usage=True)
     all_items = test_data.get_all_items()
-    candidate_trie = Trie(
-        [
-            [0] + tokenizer.encode(candidate)
-            for candidate in all_items
-        ]
-    )
+    candidate_trie = Trie([[0] + tokenizer.encode(candidate) for candidate in all_items])
     prefix_allowed_tokens = candidate_trie.def_prefix_allowed_tokens_fn(candidate_trie)
-    test_loader = DataLoader(test_data, batch_size=args.test_batch_size, collate_fn=test_data.get_collate_fn(tokenizer),
-                             shuffle=True, num_workers=4, pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=args.test_batch_size, collate_fn=test_data.get_collate_fn(tokenizer), shuffle=True, num_workers=4, pin_memory=True)
     print("data num:", len(test_data))
     model.eval()
     metrics = args.metrics.split(",")
@@ -232,19 +209,9 @@ def test(args):
             output_ids = output["sequences"]
             scores = output["sequences_scores"]
 
-            output_text = tokenizer.batch_decode(
-                output_ids, skip_special_tokens=True
-            )
-            targets_text = tokenizer.batch_decode(
-                targets, skip_special_tokens=True
-            )
-            topk_res = get_topk_results(
-                output_text,
-                scores,
-                targets_text,
-                args.num_beams,
-                all_items=all_items if args.filter_items else None
-            )
+            output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+            targets_text = tokenizer.batch_decode(targets, skip_special_tokens=True)
+            topk_res = get_topk_results(output_text, scores, targets_text, args.num_beams, all_items=all_items if args.filter_items else None)
 
             batch_metrics_res = get_metrics_results(topk_res, metrics)
 
@@ -265,12 +232,13 @@ def test(args):
 
 import math
 
+
 def get_topk_results(predictions, scores, targets, k, all_items=None):
     results = []
     B = len(targets)
     # predictions = [_.split("Response:")[-1] for _ in predictions]
-    predictions = [_.strip().replace(" ","") for _ in predictions]
-    targets = [_.strip().replace(" ","") for _ in targets]
+    predictions = [_.strip().replace(" ", "") for _ in predictions]
+    targets = [_.strip().replace(" ", "") for _ in targets]
     # print(predictions)##################
     if all_items is not None:
         for i, seq in enumerate(predictions):
@@ -279,8 +247,8 @@ def get_topk_results(predictions, scores, targets, k, all_items=None):
 
     # print(scores)
     for b in range(B):
-        batch_seqs = predictions[b * k: (b + 1) * k]
-        batch_scores = scores[b * k: (b + 1) * k]
+        batch_seqs = predictions[b * k:(b + 1) * k]
+        batch_scores = scores[b * k:(b + 1) * k]
 
         pairs = [(a, b) for a, b in zip(batch_seqs, batch_scores)]
         # print(pairs)
@@ -296,6 +264,8 @@ def get_topk_results(predictions, scores, targets, k, all_items=None):
         results.append(one_results)
 
     return results
+
+
 def get_topk_ranking_results(predictions, targets, k, all_items=None):
     results = []
     B = len(targets)
@@ -313,6 +283,8 @@ def get_topk_ranking_results(predictions, targets, k, all_items=None):
         results.append(one_results)
 
     return results
+
+
 def get_metrics_results(topk_results, metrics):
     res = {}
     for m in metrics:
@@ -327,6 +299,7 @@ def get_metrics_results(topk_results, metrics):
 
     return res
 
+
 def ndcg_k(topk_results, k):
     """
     Since we apply leave-one-out, each user only have one ground truth item, so the idcg would be 1.0
@@ -340,6 +313,7 @@ def ndcg_k(topk_results, k):
         ndcg += one_ndcg
     return ndcg
 
+
 def hit_k(topk_results, k):
     hit = 0.0
     for row in topk_results:
@@ -347,6 +321,7 @@ def hit_k(topk_results, k):
         if sum(res) > 0:
             hit += 1
     return hit
+
 
 if __name__ == "__main__":
     """

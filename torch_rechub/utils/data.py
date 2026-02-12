@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import random
 
 import numpy as np
@@ -523,9 +523,10 @@ class SequenceDataGenerator(object):
 
         return train_loader, val_loader, test_loader
 
+
 class TigerSeqDataset(Dataset):
 
-    def __init__(self, inters_json, indices_json, max_his_len, mode="train",sample_num =0):
+    def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0):
 
         super().__init__()
 
@@ -538,14 +539,13 @@ class TigerSeqDataset(Dataset):
         self.allowed_tokens = None
         self.all_items = None
 
-        # load data    
+        # load data
         self.inters = inters_json
         self.indices = indices_json
         self._remap_items()
 
         # process
         self.inter_data = self._process_data()
-
 
     # =========================================================
     # Load Data
@@ -584,10 +584,7 @@ class TigerSeqDataset(Dataset):
                 history = items[:i]
                 history = self._truncate_history(history)
 
-                inter_data.append({
-                    "item": items[i],
-                    "inters": "".join(history)
-                })
+                inter_data.append({"item": items[i], "inters": "".join(history)})
 
         return inter_data
 
@@ -599,10 +596,7 @@ class TigerSeqDataset(Dataset):
             history = items[:-2]
             history = self._truncate_history(history)
 
-            inter_data.append({
-                "item": items[-2],
-                "inters": "".join(history)
-            })
+            inter_data.append({"item": items[-2], "inters": "".join(history)})
 
         return inter_data
 
@@ -614,10 +608,7 @@ class TigerSeqDataset(Dataset):
             history = items[:-1]
             history = self._truncate_history(history)
 
-            inter_data.append({
-                "item": items[-1],
-                "inters": "".join(history)
-            })
+            inter_data.append({"item": items[-1], "inters": "".join(history)})
 
         if self.sample_num > 0:
             all_idx = np.arange(len(inter_data))
@@ -634,10 +625,7 @@ class TigerSeqDataset(Dataset):
             history = items[:-1]
             history = self._truncate_history(history)
 
-            inter_data.append({
-                "item": items[-1],
-                "inters": history
-            })
+            inter_data.append({"item": items[-1], "inters": history})
 
         if self.sample_num > 0:
             all_idx = np.arange(len(inter_data))
@@ -683,9 +671,7 @@ class TigerSeqDataset(Dataset):
                         self.allowed_tokens[i] = set()
                     self.allowed_tokens[i].add(token_id)
 
-            self.allowed_tokens[len(self.allowed_tokens)] = {
-                tokenizer.eos_token_id
-            }
+            self.allowed_tokens[len(self.allowed_tokens)] = {tokenizer.eos_token_id}
 
         sep = [0]
 
@@ -709,11 +695,8 @@ class TigerSeqDataset(Dataset):
     def __getitem__(self, index):
         index = index % len(self.inter_data)
         d = self.inter_data[index]
-        return {
-            "input_ids": d["inters"],
-            "labels": d["item"]
-        }
-    
+        return {"input_ids": d["inters"], "labels": d["item"]}
+
     # =========================================================
     # Collate Function
     # =========================================================
@@ -728,23 +711,9 @@ class TigerSeqDataset(Dataset):
             input_texts = [d["input_ids"] for d in batch]
             label_texts = [d["labels"] for d in batch]
 
-            inputs = tokenizer(
-                input_texts,
-                return_tensors="pt",
-                padding="longest",
-                max_length=tokenizer.model_max_length,
-                truncation=True,
-                return_attention_mask=True
-            )
+            inputs = tokenizer(input_texts, return_tensors="pt", padding="longest", max_length=tokenizer.model_max_length, truncation=True, return_attention_mask=True)
 
-            labels = tokenizer(
-                label_texts,
-                return_tensors="pt",
-                padding="longest",
-                max_length=tokenizer.model_max_length,
-                truncation=True,
-                return_attention_mask=True
-            )
+            labels = tokenizer(label_texts, return_tensors="pt", padding="longest", max_length=tokenizer.model_max_length, truncation=True, return_attention_mask=True)
 
             inputs["labels"] = labels["input_ids"]
             inputs["labels"][inputs["labels"] == tokenizer.pad_token_id] = -100
@@ -753,7 +722,9 @@ class TigerSeqDataset(Dataset):
 
         return collate_fn
 
+
 class Trie(object):
+
     def __init__(self, sequences=[]):
         self.trie_dict = {}
         self.len = 0
@@ -764,15 +735,15 @@ class Trie(object):
 
         self.append_trie = None
         self.bos_token_id = None
-        
+
     def def_prefix_allowed_tokens_fn(self, candidate_trie):
+
         def prefix_allowed_tokens(batch_id, sentence):
             sentence = sentence.tolist()
             trie_out = candidate_trie.get(sentence)
             return trie_out
 
         return prefix_allowed_tokens
-
 
     def append(self, trie, bos_token_id):
         self.append_trie = trie
@@ -783,9 +754,7 @@ class Trie(object):
         self.len += 1
 
     def get(self, prefix_sequence):
-        return Trie._get_from_trie(
-            prefix_sequence, self.trie_dict, self.append_trie, self.bos_token_id
-        )
+        return Trie._get_from_trie(prefix_sequence, self.trie_dict, self.append_trie, self.bos_token_id)
 
     @staticmethod
     def load_from_dict(trie_dict):
@@ -806,7 +775,7 @@ class Trie(object):
         prefix_sequence,
         trie_dict,
         append_trie=None,
-        bos_token_id= None,
+        bos_token_id=None,
     ):
         if len(prefix_sequence) == 0:
             output = list(trie_dict.keys())
@@ -828,12 +797,11 @@ class Trie(object):
                 return []
 
     def __iter__(self):
+
         def _traverse(prefix_sequence, trie_dict):
             if trie_dict:
                 for next_token in trie_dict:
-                    yield from _traverse(
-                        prefix_sequence + [next_token], trie_dict[next_token]
-                    )
+                    yield from _traverse(prefix_sequence + [next_token], trie_dict[next_token])
             else:
                 yield prefix_sequence
 

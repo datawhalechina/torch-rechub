@@ -1,11 +1,8 @@
-from transformers.models.t5.configuration_t5 import T5Config
-from transformers.models.t5.modeling_t5 import ( T5ForConditionalGeneration
-)
-import torch
 import torch
 from torch.nn import CrossEntropyLoss
-
-from transformers.modeling_outputs import  BaseModelOutput, Seq2SeqLMOutput
+from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
+from transformers.models.t5.configuration_t5 import T5Config
+from transformers.models.t5.modeling_t5 import T5ForConditionalGeneration
 
 
 class TIGERModel(T5ForConditionalGeneration):
@@ -17,20 +14,18 @@ class TIGERModel(T5ForConditionalGeneration):
         # You can add parameters out here.
         self.temperature = 1.0
 
-    def set_hyper(self,temperature):
+    def set_hyper(self, temperature):
         self.temperature = temperature
-
 
     def ranking_loss(self, lm_logits, labels):
         loss = None
         if labels is not None:
-            t_logits = lm_logits/self.temperature
+            t_logits = lm_logits / self.temperature
             loss_fct = CrossEntropyLoss(ignore_index=-100)
             # move labels to correct device to enable PP
             labels = labels.to(lm_logits.device)
             loss = loss_fct(t_logits.view(-1, t_logits.size(-1)), labels.view(-1))
         return loss
-
 
     def forward(
         self,
@@ -40,21 +35,19 @@ class TIGERModel(T5ForConditionalGeneration):
         encoder_outputs=None,
         decoder_input_ids=None,
         decoder_attention_mask=None,
-        cross_attn_head_mask = None,
+        cross_attn_head_mask=None,
         past_key_values=None,
         use_cache=None,
         labels=None,
         inputs_embeds=None,
         decoder_inputs_embeds=None,
         head_mask=None,
-        decoder_head_mask = None,
+        decoder_head_mask=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
         reduce_loss=False,
-
         return_hidden_state=False,
-
         **kwargs,
     ):
         r"""
@@ -112,7 +105,6 @@ class TIGERModel(T5ForConditionalGeneration):
             attention_mask=decoder_attention_mask,
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
-
             encoder_hidden_states=hidden_states,
             encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
@@ -137,7 +129,7 @@ class TIGERModel(T5ForConditionalGeneration):
             sequence_output = sequence_output * (self.model_dim**-0.5)
 
         lm_logits = self.lm_head(sequence_output)
-        
+
         # ------------------------------------------
         # Loss Computing!
         loss = None
