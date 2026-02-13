@@ -21,6 +21,7 @@ class SASRec(torch.nn.Module):
         max_len: The length of the sequence feature.
         num_blocks: The number of stacks of attention modules.
         num_heads: The number of heads in MultiheadAttention.
+        item_feature: Optional item feature for in-batch negative sampling mode.
 
     """
 
@@ -31,8 +32,14 @@ class SASRec(torch.nn.Module):
         dropout_rate=0.5,
         num_blocks=2,
         num_heads=1,
+        item_feature=None,
     ):
         super(SASRec, self).__init__()
+
+        self.features = features
+        self.item_feature = item_feature  # Optional: for in-batch negative sampling
+        self.mode = None  # For inference: "user" or "item"
+        self.max_len = max_len
 
         self.features = features
 
@@ -94,17 +101,60 @@ class SASRec(torch.nn.Module):
 
         return seq_output
 
-    def forward(self, x):
-        # (batch_size, 3, max_len, embed_dim)
-        embedding = self.item_emb(x, self.features)
-        # (batch_size, max_len, embed_dim)
-        seq_embed, pos_embed, neg_embed = embedding[:, 0], embedding[:, 1], embedding[:, 2]
+    def user_tower(self, x):
+        """Compute user embedding for in-batch negative sampling.
+        Takes the last valid position's output as user representation.
+        """
+        if self.mode == "item":
+            return None
+        # Get sequence embedding
+        seq_embed = self.item_emb(x, self.features[:1])[:, 0]  # Only use seq feature
+        seq_output = self.seq_forward(x, seq_embed)  # [batch_size, max_len, embed_dim]
 
-        # (batch_size, max_len, embed_dim)
+        # Get the last valid position for each sequence
+        seq = x['seq']
+        seq_lens = (seq != 0).sum(dim=1) - 1  # Last valid index
+        seq_lens = seq_lens.clamp(min=0)
+        batch_idx = torch.arange(seq_output.size(0), device=seq_output.device)
+        user_emb = seq_output[batch_idx, seq_lens]  # [batch_size, embed_dim]
+
+        if self.mode == "user":
+            return user_emb
+        return user_emb.unsqueeze(1)  # [batch_size, 1, embed_dim]
+
+    def item_tower(self, x):
+        """Compute item embedding for in-batch negative sampling."""
+        if self.mode == "user":
+            return None
+        if self.item_feature is not None:
+            item_ids = x[self.item_feature.name]
+            # Use the embedding layer to get item embeddings
+            item_emb = self.item_emb.embedding[self.features[0].name](item_ids)
+            if self.mode == "item":
+                return item_emb
+            return item_emb.unsqueeze(1)  # [batch_size, 1, embed_dim]
+        return None
+
+    def forward(self, x):
+        # Support inference mode
+        if self.mode == "user":
+            return self.user_tower(x)
+        if self.mode == "item":
+            return self.item_tower(x)
+
+        # In-batch negative sampling mode
+        if self.item_feature is not None:
+            user_emb = self.user_tower(x)  # [batch_size, 1, embed_dim]
+            item_emb = self.item_tower(x)  # [batch_size, 1, embed_dim]
+            return torch.mul(user_emb, item_emb).sum(dim=-1).squeeze()
+
+        # Original behavior: pairwise loss with pos/neg sequences
+        embedding = self.item_emb(x, self.features)
+        seq_embed, pos_embed, neg_embed = embedding[:, 0], embedding[:, 1], embedding[:, 2]
         seq_output = self.seq_forward(x, seq_embed)
 
         pos_logits = (seq_output * pos_embed).sum(dim=-1)
-        neg_logits = (seq_output * neg_embed).sum(dim=-1)  # (batch_size, max_len)
+        neg_logits = (seq_output * neg_embed).sum(dim=-1)
 
         return pos_logits, neg_logits
 

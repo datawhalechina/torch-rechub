@@ -75,6 +75,16 @@ trainer.export_onnx(
 - **输入 shape 固定**：可尝试 `dynamo=True` 获取更好的导出覆盖率（不同 torch 版本表现不同）。
 - **老版本 PyTorch**：可能不支持 `dynamo` 参数；Torch-RecHub 会自动兼容（不传该参数）。
 
+### 查看 ONNX 模型结构
+
+导出 ONNX 后，可以使用 [Netron](https://netron.app/) 在线查看模型结构：
+
+1. 打开 https://netron.app/
+2. 拖拽或上传导出的 `.onnx` 文件
+3. 即可可视化查看模型的网络结构、各层参数和张量形状
+
+> **提示**：Netron 支持多种模型格式（ONNX、TensorFlow、PyTorch 等），是调试和验证导出模型的便捷工具。
+
 ## ONNX 量化（Quantization）
 
 在工业推理中，FP32 往往不是最优解。常用两类压缩方式：

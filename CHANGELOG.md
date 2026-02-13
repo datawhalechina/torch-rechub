@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-02-11
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 📝 文档更新 / Documentation
+* Update quick_start docs: params and outputs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/171
+### 📦 依赖更新 / Dependencies
+* Fix the version of this package by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/170
+### 🔄 其他变更 / Other Changes
+* Update project_framework.png by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/169
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.3.0...v0.4.0
+
+---
+
+
+
+## [0.3.0] - 2026-02-05
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Inbatchsample by @zerolovesea in https://github.com/datawhalechina/torch-rechub/pull/128
+### 📝 文档更新 / Documentation
+* Enhance docs: ONNX, serving, tools, tutorials by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/165
+* Expand docs: community, guides, models, data by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/166
+### 🔄 其他变更 / Other Changes
+* Update favicon and logo images by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/164
+* Update docs imports to torch_rechub by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/167
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.2.0...v0.3.0
+
+---
+
+
+
+## [0.2.0] - 2026-01-11
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* Update HSTULayer with L2 norm and SiLU attention by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/157
+* Add ONNX quantization scripts and tests, improve dataloader split  by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/161
+### 📝 文档更新 / Documentation
+* Update docs and README with new architecture image by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/154
+* Add comprehensive vector index docs (EN & ZH) by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/162
+* Update quick start and tracking docs in EN and ZH by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/163
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.1.0...v0.2.0
+
+---
+
+
+
+## [0.1.0] - 2025-12-17
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Update docs and tutorials && Add ONNX quantization utilities and enhance export  by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/150
+* REFACTOR+FEATURE: Standardize retrieval backends (ANNOY/FAISS/Milvus) by @ywuenthought in https://github.com/datawhalechina/torch-rechub/pull/151
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.0.6...v0.1.0
+
+---
+
+
+
 ## [0.0.6] - 2025-12-11
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->

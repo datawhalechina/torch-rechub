@@ -1,6 +1,10 @@
-# 🔥 Torch-RecHub - 轻量、高效、易用的 PyTorch 推荐系统框架
+<div align="center">
 
-> 🚀 **30+ 主流推荐模型** | 🎯 **开箱即用** | 📦 **一键部署 ONNX** | 🤖 **支持生成式推荐 (HSTU/HLLM)**
+![Torch-RecHub 横幅](docs/public/img/banner.png)
+
+# Torch-RecHub: 轻量、高效、易用的 PyTorch 推荐系统框架
+
+【⚠️ Alpha内测版本警告：此为早期内部构建版本，尚不完整且可能存在错误，欢迎大家提Issue反馈问题或建议。】
 
 [![许可证](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 ![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
@@ -12,28 +16,22 @@
 [![pandas 版本](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/)
 [![numpy 版本](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/)
 [![scikit-learn 版本](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
-[![torch-rechub 版本](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
+[![torch-rechub 版本](https://img.shields.io/badge/torch_rechub-0.4.0%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
+[![torchview](https://img.shields.io/badge/torchview-0.2%2B-green?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 [English](README_en.md) | 简体中文
 
-**在线文档：** https://datawhalechina.github.io/torch-rechub/ （英文）| https://datawhalechina.github.io/torch-rechub/zh/ （简体中文）
+![架构图](docs/public/img/project_framework.png)
+
+</div>
+
+**在线文档：** https://datawhalechina.github.io/torch-rechub/zh/
 
 **Torch-RecHub** —— **10 行代码实现工业级推荐系统**。30+ 主流模型开箱即用，支持一键 ONNX 部署，让你专注于业务而非工程。
 
-![Torch-RecHub 横幅](docs/public/img/banner.png)
-
-## 🎯 为什么选择 Torch-RecHub？
-
-| 特性          | Torch-RecHub                | 其他框架   |
-| ------------- | --------------------------- | ---------- |
-| 代码行数      | **10行** 完成训练+评估+部署 | 100+ 行    |
-| 模型覆盖      | **30+** 主流模型            | 有限       |
-| 生成式推荐    | ✅ HSTU/HLLM (Meta 2024)     | ❌          |
-| ONNX 一键导出 | ✅ 内置支持                  | 需手动适配 |
-| 学习曲线      | 极低                        | 陡峭       |
-
 ## ✨ 特性
 
+* **生成式推荐模型:** LLM时代下，可以复现部分生成式推荐模型
 * **模块化设计:** 易于添加新的模型、数据集和评估指标。
 * **基于 PyTorch:** 利用 PyTorch 的动态图和 GPU 加速能力。
 * **丰富的模型库:** 涵盖 **30+** 经典和前沿推荐算法（召回、排序、多任务、生成式推荐等）。
@@ -47,7 +45,6 @@
 ## 📖 目录
 
 - [🔥 Torch-RecHub - 轻量、高效、易用的 PyTorch 推荐系统框架](#-torch-rechub---轻量高效易用的-pytorch-推荐系统框架)
-  - [🎯 为什么选择 Torch-RecHub？](#-为什么选择-torch-rechub)
   - [✨ 特性](#-特性)
   - [📖 目录](#-目录)
   - [🔧 安装](#-安装)
@@ -159,6 +156,8 @@ torch-rechub/             # 根目录
 
 本框架目前支持 **30+** 主流推荐模型：
 
+<details>
+
 ### 排序模型 (Ranking Models) - 13个
 
 | 模型          | 论文                                             | 简介                    |
@@ -174,7 +173,11 @@ torch-rechub/             # 根目录
 | **AutoInt**   | [CIKM 2019](https://arxiv.org/abs/1810.11921)    | 自动特征交互学习        |
 | **FiBiNET**   | [RecSys 2019](https://arxiv.org/abs/1905.09433)  | 特征重要性 + 双线性交互 |
 | **DeepFFM**   | [RecSys 2019](https://arxiv.org/abs/1611.00144)  | 场感知因子分解机        |
-| **EDCN**      | [KDD 2021](https://arxiv.org/abs/2106.03032)     | 增强型交叉网络          |
+| **EDCN**      | [KDD 2021](https://arxiv.org/abs/2106.03032)     | 增强型交叉网络  
+        |
+</details>
+
+<details>
 
 ### 召回模型 (Matching Models) - 12个
 
@@ -191,6 +194,10 @@ torch-rechub/             # 根目录
 | **STAMP**      | [KDD 2018](https://dl.acm.org/doi/10.1145/3219819.3219895)                     | 短期注意力记忆优先 |
 | **ComiRec**    | [KDD 2020](https://arxiv.org/abs/2005.09347)                                   | 可控多兴趣推荐     |
 
+</details>
+
+<details>
+
 ### 多任务模型 (Multi-Task Models) - 5个
 
 | 模型             | 论文                                                          | 简介               |
@@ -201,12 +208,18 @@ torch-rechub/             # 根目录
 | **AITM**         | [KDD 2021](https://arxiv.org/abs/2105.08489)                  | 自适应信息迁移     |
 | **SharedBottom** | -                                                             | 经典多任务共享底层 |
 
+</details>
+
+<details>
+
 ### 生成式推荐 (Generative Recommendation) - 2个
 
 | 模型     | 论文                                          | 简介                                         |
 | -------- | --------------------------------------------- | -------------------------------------------- |
 | **HSTU** | [Meta 2024](https://arxiv.org/abs/2402.17152) | 层级序列转换单元，支撑 Meta 万亿参数推荐系统 |
 | **HLLM** | [2024](https://arxiv.org/abs/2409.12740)      | 层级大语言模型推荐，融合 LLM 语义理解能力    |
+
+</details>
 
 ## 📊 支持的数据集
 

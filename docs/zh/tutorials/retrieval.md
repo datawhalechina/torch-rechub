@@ -14,14 +14,31 @@ description: Torch-RecHub 召回模型使用教程，包括 DSSM、GRU4Rec 和 M
 ```python
 import pandas as pd
 import numpy as np
-from rechub.utils import DataGenerator
-from rechub.models import *
-from rechub.trainers import *
+from torch_rechub.basic.features import DenseFeature, SparseFeature, SequenceFeature
+from torch_rechub.utils.data import MatchDataGenerator
+from torch_rechub.utils.match import generate_seq_feature_match, gen_model_input
 
 # 加载数据
 df = pd.read_csv("movielens.csv")
-user_features = ['user_id', 'age', 'gender', 'occupation']
-item_features = ['movie_id', 'genre', 'year']
+
+# 定义用户特征
+user_features = [
+    SparseFeature("user_id", vocab_size=user_num, embed_dim=16),
+    SparseFeature("gender", vocab_size=3, embed_dim=16),
+    SparseFeature("age", vocab_size=10, embed_dim=16),
+    SparseFeature("occupation", vocab_size=25, embed_dim=16)
+]
+# 添加用户历史序列特征
+user_features += [
+    SequenceFeature("hist_movie_id", vocab_size=item_num, embed_dim=16,
+                    pooling="mean", shared_with="movie_id")
+]
+
+# 定义物品特征
+item_features = [
+    SparseFeature("movie_id", vocab_size=item_num, embed_dim=16),
+    SparseFeature("cate_id", vocab_size=cate_num, embed_dim=16)
+]
 ```
 
 ## 基础双塔模型 (DSSM)
@@ -29,20 +46,29 @@ item_features = ['movie_id', 'genre', 'year']
 DSSM 是最基础的双塔模型，分别对用户和物品进行建模：
 
 ```python
+from torch_rechub.models.matching import DSSM
+from torch_rechub.trainers import MatchTrainer
+
 # 模型配置
-model = DSSM(user_features=user_features,
-             item_features=item_features,
-             hidden_units=[64, 32, 16],
-             dropout_rates=[0.1, 0.1, 0.1])
+model = DSSM(
+    user_features=user_features,
+    item_features=item_features,
+    temperature=0.02,
+    user_params={"dims": [256, 128, 64], "activation": "prelu"},
+    item_params={"dims": [256, 128, 64], "activation": "prelu"}
+)
 
 # 训练配置
-trainer = MatchTrainer(model=model,
-                      mode=0,  # point-wise 训练
-                      optimizer_params={'lr': 0.001},
-                      n_epochs=10)
+trainer = MatchTrainer(
+    model=model,
+    mode=0,  # point-wise 训练
+    optimizer_params={"lr": 0.001, "weight_decay": 1e-5},
+    n_epoch=10,
+    device="cuda:0"
+)
 
 # 训练模型
-trainer.fit(train_dataloader, val_dataloader)
+trainer.fit(train_dl, val_dl)
 ```
 
 ## 序列推荐模型 (GRU4Rec)
@@ -50,24 +76,31 @@ trainer.fit(train_dataloader, val_dataloader)
 GRU4Rec 通过 GRU 网络建模用户的行为序列：
 
 ```python
-# 生成序列特征
-seq_features = generate_seq_feature(df,
-                                  user_col='user_id',
-                                  item_col='movie_id',
-                                  time_col='timestamp',
-                                  item_attribute_cols=['genre'])
+from torch_rechub.models.matching import GRU4Rec
+from torch_rechub.basic.features import SequenceFeature
+
+# 定义序列特征
+history_features = [SequenceFeature("hist_movie_id", vocab_size=item_num, embed_dim=16, pooling=None)]
+neg_item_feature = [SparseFeature("neg_items", vocab_size=item_num, embed_dim=16)]
 
 # 模型配置
-model = GRU4Rec(item_num=item_num,
-                hidden_size=64,
-                num_layers=2,
-                dropout_rate=0.1)
+model = GRU4Rec(
+    user_features=user_features,
+    history_features=history_features,
+    item_features=item_features,
+    neg_item_feature=neg_item_feature,
+    user_params={"dims": [128, 64], "num_layers": 2, "dropout": 0.2},
+    temperature=1.0
+)
 
 # 训练配置
-trainer = MatchTrainer(model=model,
-                      mode=1,  # pair-wise 训练
-                      optimizer_params={'lr': 0.001},
-                      n_epochs=10)
+trainer = MatchTrainer(
+    model=model,
+    mode=2,  # list-wise 训练
+    optimizer_params={"lr": 0.001},
+    n_epoch=10,
+    device="cuda:0"
+)
 ```
 
 ## 多兴趣模型 (MIND)
@@ -75,17 +108,27 @@ trainer = MatchTrainer(model=model,
 MIND 模型可以捕捉用户的多样化兴趣：
 
 ```python
+from torch_rechub.models.matching import MIND
+
 # 模型配置
-model = MIND(item_num=item_num,
-            num_interests=4,
-            hidden_size=64,
-            routing_iterations=3)
+model = MIND(
+    user_features=user_features,
+    history_features=history_features,
+    item_features=item_features,
+    neg_item_feature=neg_item_feature,
+    max_length=50,
+    temperature=1.0,
+    interest_num=4
+)
 
 # 训练配置
-trainer = MatchTrainer(model=model,
-                      mode=2,  # list-wise 训练
-                      optimizer_params={'lr': 0.001},
-                      n_epochs=10)
+trainer = MatchTrainer(
+    model=model,
+    mode=2,  # list-wise 训练
+    optimizer_params={"lr": 0.001},
+    n_epoch=10,
+    device="cuda:0"
+)
 ```
 
 ## 模型评估
@@ -93,11 +136,13 @@ trainer = MatchTrainer(model=model,
 使用常见的召回指标进行评估：
 
 ```python
-# 计算召回率和命中率
-recall_score = evaluate_recall(model, test_dataloader, k=10)
-hit_rate = evaluate_hit_rate(model, test_dataloader, k=10)
-print(f"Recall@10: {recall_score:.4f}")
-print(f"HitRate@10: {hit_rate:.4f}")
+# 评估模型
+auc = trainer.evaluate(trainer.model, test_dl)
+print(f"Test AUC: {auc:.4f}")
+
+# 获取用户/物品向量用于离线评估
+user_embeddings = trainer.inference_embedding(model, "user", user_dl, model_path="./")
+item_embeddings = trainer.inference_embedding(model, "item", item_dl, model_path="./")
 ```
 
 ## 向量检索
@@ -105,44 +150,52 @@ print(f"HitRate@10: {hit_rate:.4f}")
 训练好的模型可以用于生成用户和物品的向量表示，进行快速检索：
 
 ```python
-# 使用 Annoy 进行向量检索
-from rechub.utils import Annoy
+from torch_rechub.utils.match import Annoy
 
-# 构建索引
-item_vectors = model.get_item_vectors()
-annoy = Annoy(metric='angular')
-annoy.fit(item_vectors)
+# 构建 Annoy 索引
+annoy = Annoy(n_trees=10)
+annoy.fit(item_embeddings)
 
 # 查询相似物品
-user_vector = model.get_user_vector(user_id=1)
-similar_items = annoy.query(user_vector, n=10)
+similar_items, scores = annoy.query(user_embeddings[0], topk=10)
+print(f"Top 10 similar items: {similar_items}")
 ```
 
 ## 高级技巧
 
 1. 温度系数调节
 ```python
-trainer = MatchTrainer(model=model,
-                      temperature=0.2,  # 添加温度系数
-                      mode=2)
+# 温度系数影响相似度分数的分布
+model = DSSM(
+    user_features=user_features,
+    item_features=item_features,
+    temperature=0.02,  # 较小的温度使分布更尖锐
+    user_params={"dims": [256, 128, 64]},
+    item_params={"dims": [256, 128, 64]}
+)
 ```
 
-2. 负样本采样
+2. 正则化配置
 ```python
-from rechub.utils import negative_sample
-
-neg_samples = negative_sample(items_cnt_order,
-                            ratio=5,
-                            method_id=1)  # Word2Vec式采样
+trainer = MatchTrainer(
+    model=model,
+    mode=0,
+    regularization_params={
+        "embedding_l2": 1e-5,
+        "dense_l2": 1e-5
+    }
+)
 ```
 
 3. 模型保存与加载
 ```python
+import torch
+
 # 保存模型
-torch.save(model.state_dict(), 'model.pth')
+torch.save(model.state_dict(), "model.pth")
 
 # 加载模型
-model.load_state_dict(torch.load('model.pth'))
+model.load_state_dict(torch.load("model.pth"))
 ```
 
 ## 注意事项

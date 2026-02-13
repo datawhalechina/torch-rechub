@@ -4,15 +4,25 @@ build-backend = "hatchling.build"
 
 [project]
 name = "torch-rechub"
-version = "0.0.6"
-description = "A Pytorch Toolbox for Recommendation Models, Easy-to-use and Easy-to-extend."
+version = "0.4.0"
+description = "A lightweight, efficient, and easy-to-use PyTorch recommendation system framework."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "rechub team", email = "morningsky@tju.edu.cn" },
+    { name = "Datawhale", email = "thisisevy@foxmail.com" },
+]
+keywords = [
+    "recommendation",
+    "deep-learning",
+    "pytorch",
+    "ctr",
+    "matching",
+    "ranking",
+    "multi-task",
+    "recsys",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -23,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.9"
 dependencies = [
@@ -36,8 +47,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+annoy = ["annoy>=1.17.2"]
+faiss = ["faiss-cpu==1.13.0"]
+milvus = ["pymilvus>=2.6.5"]
 bigdata = [
-    "pyarrow~=21.0",
+    "pyarrow>=21,<23",
 ]
 onnx = [
     "onnx>=1.14.0",
@@ -68,13 +82,13 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/datawhalechina/torch-rechub"
-Documentation = "https://www.torch-rechub.com"
+Documentation = "https://datawhalechina.github.io/torch-rechub/"
 Repository = "https://github.com/datawhalechina/torch-rechub.git"
 Issues = "https://github.com/datawhalechina/torch-rechub/issues"
 
 # UV 工具配置
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
     "flake8>=3.8.0",
