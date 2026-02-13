@@ -540,6 +540,62 @@ class SequenceDataGenerator(object):
         return train_loader, val_loader, test_loader
 
 
+# ============ Embedding Data Classes ============
+class EmbDataset(Dataset):
+    """Embedding dataset for loading precomputed feature vectors.
+
+        Loads embeddings stored in ``.npy`` or ``.pt`` format and exposes
+        them as a PyTorch ``Dataset`` for downstream training or inference.
+
+        Parameters
+        ----------
+        data_path : str
+            Path to the embedding file. Supported formats are ``.npy``
+            (NumPy array) and ``.pt`` (PyTorch tensor saved via ``torch.save``).
+        device : str, default='cpu'
+            Device used when loading ``.pt`` tensors.
+
+        Shape
+        -----
+        Input
+            embeddings : ``(num_samples, emb_dim)``
+        Output
+            tensor_emb : ``(emb_dim,)``
+
+        Examples
+        --------
+        >>> dataset = EmbDataset("embeddings.npy")
+        >>> len(dataset)
+        10000
+        >>> emb = dataset[0]
+        >>> emb.shape
+        torch.Size([768])
+    """
+
+    def __init__(self, data_path, device='cpu'):
+        self.data_path = data_path
+        suffix = os.path.splitext(data_path)[-1]
+        if suffix == ".npy":
+            self.embeddings = np.load(data_path)
+        elif suffix == ".pt":
+            # torch.save 的 tensor
+            tensor = torch.load(data_path, map_location=device)
+            if not isinstance(tensor, torch.Tensor):
+                raise TypeError(f"{data_path} does not contain a torch.Tensor")
+            self.embeddings = tensor.cpu().numpy()
+        else:
+            raise ValueError(f"Unsupported embedding format: {suffix}")
+        self.dim = self.embeddings.shape[-1]
+
+    def __getitem__(self, index):
+        emb = self.embeddings[index]
+        tensor_emb = torch.FloatTensor(emb)
+        return tensor_emb
+
+    def __len__(self):
+        return len(self.embeddings)
+
+
 class TigerSeqDataset(Dataset):
 
     def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0):

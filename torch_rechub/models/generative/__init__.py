@@ -2,5 +2,6 @@
 
 from .hllm import HLLMModel
 from .hstu import HSTUModel
+from .rqvae import RQVAEModel
 
-__all__ = ['HSTUModel', 'HLLMModel', 'TIGERModel']
+__all__ = ['HSTUModel', 'HLLMModel', 'RQVAEModel', 'TIGERModel']
