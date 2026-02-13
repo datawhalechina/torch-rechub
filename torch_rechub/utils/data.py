@@ -594,8 +594,8 @@ class EmbDataset(Dataset):
 
     def __len__(self):
         return len(self.embeddings)
-      
-      
+
+
 class TigerSeqDataset(Dataset):
 
     def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0):
