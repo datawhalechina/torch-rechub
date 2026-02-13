@@ -31,6 +31,7 @@ def test_inbatch_negative_sampling_hard_negative():
 
 
 def _build_small_match_dataloader():
+    np.random.seed(42)
     n_users, n_items, n_samples = 12, 24, 80
     data = pd.DataFrame({
         "user_id": np.random.randint(0,
