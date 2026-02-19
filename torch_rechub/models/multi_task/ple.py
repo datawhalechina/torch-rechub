@@ -34,7 +34,7 @@ class PLE(nn.Module):
         self.input_dims = sum([fea.embed_dim for fea in features])
         self.embedding = EmbeddingLayer(features)
         self.cgc_layers = nn.ModuleList(CGC(i + 1, n_level, self.n_task, n_expert_specific, n_expert_shared, self.input_dims, expert_params) for i in range(n_level))
-        self.towers = nn.ModuleList(MLP(expert_params["dims"][-1], output_layer=False, **tower_params_list[i]) for i in range(self.n_task))
+        self.towers = nn.ModuleList(MLP(expert_params["dims"][-1], **tower_params_list[i]) for i in range(self.n_task))
         self.predict_layers = nn.ModuleList(PredictionLayer(task_type) for task_type in task_types)
 
     def forward(self, x):
