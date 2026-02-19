@@ -35,7 +35,7 @@ class SequenceFeature(object):
 
     def get_embedding_layer(self):
         if not hasattr(self, 'embed'):
-            self.embed = self.initializer(self.vocab_size, self.embed_dim)
+            self.embed = self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
         return self.embed
 
 
@@ -67,7 +67,7 @@ class SparseFeature(object):
 
     def get_embedding_layer(self):
         if not hasattr(self, 'embed'):
-            self.embed = self.initializer(self.vocab_size, self.embed_dim)
+            self.embed = self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
         return self.embed
 
 

@@ -13,9 +13,11 @@ class RandomNormal(object):
         self.mean = mean
         self.std = std
 
-    def __call__(self, vocab_size, embed_dim):
-        embed = torch.nn.Embedding(vocab_size, embed_dim)
+    def __call__(self, vocab_size, embed_dim, padding_idx=None):
+        embed = torch.nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         torch.nn.init.normal_(embed.weight, self.mean, self.std)
+        if padding_idx is not None:
+            torch.nn.init.zeros_(embed.weight[padding_idx])
         return embed
 
 
@@ -31,9 +33,11 @@ class RandomUniform(object):
         self.minval = minval
         self.maxval = maxval
 
-    def __call__(self, vocab_size, embed_dim):
-        embed = torch.nn.Embedding(vocab_size, embed_dim)
+    def __call__(self, vocab_size, embed_dim, padding_idx=None):
+        embed = torch.nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         torch.nn.init.uniform_(embed.weight, self.minval, self.maxval)
+        if padding_idx is not None:
+            torch.nn.init.zeros_(embed.weight[padding_idx])
         return embed
 
 
@@ -49,9 +53,11 @@ class XavierNormal(object):
     def __init__(self, gain=1.0):
         self.gain = gain
 
-    def __call__(self, vocab_size, embed_dim):
-        embed = torch.nn.Embedding(vocab_size, embed_dim)
+    def __call__(self, vocab_size, embed_dim, padding_idx=None):
+        embed = torch.nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         torch.nn.init.xavier_normal_(embed.weight, self.gain)
+        if padding_idx is not None:
+            torch.nn.init.zeros_(embed.weight[padding_idx])
         return embed
 
 
@@ -67,9 +73,11 @@ class XavierUniform(object):
     def __init__(self, gain=1.0):
         self.gain = gain
 
-    def __call__(self, vocab_size, embed_dim):
-        embed = torch.nn.Embedding(vocab_size, embed_dim)
+    def __call__(self, vocab_size, embed_dim, padding_idx=None):
+        embed = torch.nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         torch.nn.init.xavier_uniform_(embed.weight, self.gain)
+        if padding_idx is not None:
+            torch.nn.init.zeros_(embed.weight[padding_idx])
         return embed
 
 
@@ -86,7 +94,7 @@ class Pretrained(object):
         self.embedding_weight = torch.FloatTensor(embedding_weight)
         self.freeze = freeze
 
-    def __call__(self, vocab_size, embed_dim):
+    def __call__(self, vocab_size, embed_dim, padding_idx=None):
         assert vocab_size == self.embedding_weight.shape[0] and embed_dim == self.embedding_weight.shape[1]
-        embed = torch.nn.Embedding.from_pretrained(self.embedding_weight, freeze=self.freeze)
+        embed = torch.nn.Embedding.from_pretrained(self.embedding_weight, freeze=self.freeze, padding_idx=padding_idx)
         return embed
