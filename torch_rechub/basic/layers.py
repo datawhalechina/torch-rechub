@@ -61,6 +61,7 @@ class EmbeddingLayer(nn.Module):
         self.features = features
         self.embed_dict = nn.ModuleDict()
         self.n_dense = 0
+        self.input_mask = InputMask()
 
         for fea in features:
             if fea.name in self.embed_dict:  # exist
@@ -90,7 +91,7 @@ class EmbeddingLayer(nn.Module):
                     pooling_layer = ConcatPooling()
                 else:
                     raise ValueError("Sequence pooling method supports only pooling in %s, got %s." % (["sum", "mean"], fea.pooling))
-                fea_mask = InputMask()(x, fea)
+                fea_mask = self.input_mask(x, fea)
                 if fea.shared_with is None:
                     sparse_emb.append(pooling_layer(self.embed_dict[fea.name](x[fea.name].long()), fea_mask).unsqueeze(1))
                 else:
