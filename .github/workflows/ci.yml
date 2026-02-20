@@ -139,7 +139,7 @@ jobs:
           # Install CPU-only PyTorch for faster CI
           pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
           # Install the package with dev and onnx dependencies
-          pip install -e ".[dev,annoy,faiss,milvus,onnx]" || pip install -r requirements-dev.txt && pip install -e .
+          pip install -e ".[dev,annoy,faiss,milvus,onnx]"
 
       - name: Start Milvus
         if: matrix.os == 'ubuntu-latest'
@@ -185,11 +185,10 @@ jobs:
       - name: Shutdown Milvus
         if: always() && matrix.os == 'ubuntu-latest'
         run: |
-          # Stop Milvus
-          bash standalone_embed.sh stop
-
-          # Delete Milvus data
-          bash standalone_embed.sh delete
+          if [ -f standalone_embed.sh ]; then
+            bash standalone_embed.sh stop
+            bash standalone_embed.sh delete
+          fi
 
 
   # ===================================================================
