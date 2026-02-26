@@ -238,7 +238,7 @@ The expected data format is typically an interaction file containing:
 - Rating (optional)
 - Timestamp (optional)
 
-For specific format requirements, please refer to the example code in the `tutorials` directory.
+For specific format requirements, please refer to the example code in the `tutorials` directory. The `examples/` directory already includes sample datasets in each scenario subdirectory, which you can use directly for quick experimentation and debugging.
 
 You can easily integrate your own datasets by ensuring they conform to the framework's data format requirements or by writing custom data loaders.
 
