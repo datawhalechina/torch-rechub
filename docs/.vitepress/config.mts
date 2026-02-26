@@ -39,7 +39,8 @@ export default defineConfig({
           { text: '🚀 Serving', link: '/serving/intro' },
           { text: '📖 Tutorials', link: '/tutorials/intro' },
           { text: 'ℹ️ API', link: '/api/api' },
-          { text: '👥 Community', link: '/community/faq' }
+          { text: '👥 Community', link: '/community/faq' },
+          { text: '📝 Blog', link: '/blog/match' }
         ],
 
         sidebar: {
@@ -112,6 +113,16 @@ export default defineConfig({
                 { text: 'Changelog', link: '/community/changelog' }
               ]
             }
+          ],
+          '/blog/': [
+            {
+              text: '📝 Blog',
+              items: [
+                { text: 'Matching Models Guide', link: '/blog/match' },
+                { text: 'Ranking Models Guide', link: '/blog/rank' },
+                { text: 'HLLM Reproduction', link: '/blog/hllm_reproduction' }
+              ]
+            }
           ]
         }
       }
@@ -134,7 +145,8 @@ export default defineConfig({
           { text: '🚀 生产部署', link: '/zh/serving/intro' },
           { text: '📖 场景教程', link: '/zh/tutorials/intro' },
           { text: 'ℹ️ API', link: '/zh/api/api' },
-          { text: '👥 社区', link: '/zh/community/faq' }
+          { text: '👥 社区', link: '/zh/community/faq' },
+          { text: '📝 博客', link: '/zh/blog/match' }
         ],
 
         sidebar: {
@@ -204,6 +216,17 @@ export default defineConfig({
                 { text: '常见问题 (FAQ)', link: '/zh/community/faq' },
                 { text: '贡献指南 (Contributing)', link: '/zh/community/contributing' },
                 { text: '版本日志 (Changelog)', link: '/zh/community/changelog' }
+              ]
+            }
+          ],
+          '/zh/blog/': [
+            {
+              text: '📝 博客',
+              items: [
+                { text: '召回模型训练指南', link: '/zh/blog/match' },
+                { text: '排序模型训练指南', link: '/zh/blog/rank' },
+                { text: 'HLLM 复现说明', link: '/zh/blog/hllm_reproduction' },
+                { text: 'HSTU 复现说明', link: '/zh/blog/hstu_reproduction' }
               ]
             }
           ]

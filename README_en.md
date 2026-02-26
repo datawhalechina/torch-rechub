@@ -102,11 +102,16 @@ git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 
-# Run example
-python examples/matching/run_ml_dssm.py
+# Run matching example (cd into the script directory first, as scripts use relative data paths)
+cd examples/matching
+python run_ml_dssm.py
 
 # Or with custom parameters:
-python examples/matching/run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+
+# Run ranking example
+cd ../ranking
+python run_criteo.py
 ```
 
 After training, model files will be saved in the `saved/dssm_ml-100k` directory (or your configured directory).

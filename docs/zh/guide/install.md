@@ -70,7 +70,9 @@ print(torch_rechub.__version__)
 或运行一个简单的示例：
 
 ```bash
-python examples/matching/run_ml_dssm.py
+# 需要先进入脚本所在目录（脚本使用相对路径加载数据）
+cd examples/matching
+python run_ml_dssm.py
 ```
 
 ## 故障排除
