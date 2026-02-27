@@ -104,11 +104,16 @@ git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 
-# 运行示例
-python examples/matching/run_ml_dssm.py
+# 运行召回示例（需要先进入对应目录，脚本使用相对路径加载数据）
+cd examples/matching
+python run_ml_dssm.py
 
 # 或使用自定义参数：
-python examples/matching/run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+
+# 运行精排示例
+cd ../ranking
+python run_criteo.py
 ```
 
 训练完成后，模型文件将保存在 `saved/dssm_ml-100k` 目录下（或你配置的其他目录）。

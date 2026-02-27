@@ -70,7 +70,9 @@ print(torch_rechub.__version__)
 Or run a simple example:
 
 ```bash
-python examples/matching/run_ml_dssm.py
+# cd into the script directory first (scripts use relative data paths)
+cd examples/matching
+python run_ml_dssm.py
 ```
 
 ## Troubleshooting
