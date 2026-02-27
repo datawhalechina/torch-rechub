@@ -9,6 +9,10 @@ export default defineConfig({
 
   base: '/torch-rechub/',
 
+  markdown: {
+    math: true
+  },
+
   // 路径重写: 假设你的源文件都在 docs/en/ 下，但访问路径去掉 en
   rewrites: {
     'en/:rest*': ':rest*'
