@@ -49,3 +49,27 @@ trainer.fit(train_dl)
 
 [查看完整教程 →](/zh/tutorials/retrieval)
 
+## 模型使用示例
+
+按模型分类的详细使用教程，每篇包含数据准备、模型配置、训练、评估和调优的完整流程。
+
+### 排序模型
+
+| 模型 | 说明 | 链接 |
+| --- | --- | --- |
+| DeepFM | FM + Deep 联合模型 | [DeepFM 教程](/zh/tutorials/models/ranking/deepfm) |
+| Wide&Deep | 记忆 + 泛化联合模型 | [Wide&Deep 教程](/zh/tutorials/models/ranking/widedeep) |
+| DCN / DCNv2 | 显式特征交叉网络 | [DCN 教程](/zh/tutorials/models/ranking/dcn) |
+
+### 召回模型
+
+| 模型 | 说明 | 链接 |
+| --- | --- | --- |
+| DSSM | 双塔语义匹配模型 | [DSSM 教程](/zh/tutorials/models/matching/dssm) |
+| YoutubeDNN | YouTube 深度召回模型 | [YoutubeDNN 教程](/zh/tutorials/models/matching/youtube_dnn) |
+
+### 多任务模型
+
+| 模型 | 说明 | 链接 |
+| --- | --- | --- |
+| MMOE | 多门控专家混合模型 | [MMOE 教程](/zh/tutorials/models/multi_task/mmoe) |
