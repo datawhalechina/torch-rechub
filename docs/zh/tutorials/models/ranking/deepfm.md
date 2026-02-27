@@ -13,6 +13,10 @@ DeepFM（Deep Factorization Machine）是由华为诺亚方舟实验室在 IJCAI
 
 ### 模型结构
 
+<div align="center">
+  <img src="../../../images/models/deepfm_arch.png" alt="DeepFM Model Architecture" width="600"/>
+</div>
+
 - **FM 部分**：通过二阶交互捕获特征间的组合关系
 - **Deep 部分**：通过多层全连接网络捕获高阶非线性特征交互
 - **共享 Embedding**：FM 和 Deep 共享底层 Embedding，减少参数

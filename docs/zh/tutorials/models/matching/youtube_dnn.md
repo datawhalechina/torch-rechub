@@ -13,6 +13,10 @@ YoutubeDNN 是 Google 在 RecSys'2016 上提出的深度神经网络召回模型
 
 ### 模型结构
 
+<div align="center">
+  <img src="../../../images/models/youtube_dnn_arch.png" alt="YoutubeDNN Model Architecture" width="400"/>
+</div>
+
 - **User Tower**: 将用户属性和行为序列通过 DNN 映射为用户 Embedding
 - **Item Tower**: 直接使用物品 Embedding（不经过 DNN）
 - **训练方式**: 使用 Softmax + 负采样的 list-wise 训练

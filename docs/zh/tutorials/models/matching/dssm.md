@@ -13,6 +13,10 @@ DSSM（Deep Structured Semantic Model）是微软在 CIKM'2013 上提出的经�
 
 ### 模型结构
 
+<div align="center">
+  <img src="../../../images/models/dssm_arch.png" alt="DSSM Model Architecture" width="500"/>
+</div>
+
 - **User Tower**：将用户特征映射为向量表示
 - **Item Tower**：将物品特征映射为向量表示
 - **相似度计算**：通过余弦相似度 / 点积计算 User-Item 匹配分
