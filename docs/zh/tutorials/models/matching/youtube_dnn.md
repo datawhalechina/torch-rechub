@@ -239,6 +239,12 @@ from torch_rechub.utils.visualization import visualize_model
 # 自动生成输入并可视化
 graph = visualize_model(model, depth=4)
 
+
+### YoutubeDNN 架构图
+
+![YoutubeDNN 模型架构图](../../../../images/models/youtube_dnn_arch.png)
+
+
 # 保存为图片
 visualize_model(model, save_path="youtube_dnn_arch.png", dpi=300)
 ```

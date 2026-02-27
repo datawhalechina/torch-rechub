@@ -264,6 +264,12 @@ from torch_rechub.utils.visualization import visualize_model
 # 自动生成输入并可视化（在 Jupyter 中直接显示内嵌图像）
 graph = visualize_model(model, depth=4)
 
+
+### DeepFM 架构图
+
+![DeepFM 模型架构图](../../../../images/models/deepfm_arch.png)
+
+
 # 保存为高清 PNG（适合论文/文档）
 visualize_model(model, save_path="deepfm_architecture.png", dpi=300)
 

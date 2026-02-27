@@ -379,6 +379,12 @@ visualize_model(model, save_path="dssm_architecture.pdf")
 
 > 可视化会自动从模型中提取特征信息生成 dummy input，无需手动构造输入数据。
 
+
+### DSSM 架构图
+
+![DSSM 模型架构图](../../../../images/models/dssm_arch.png)
+
+
 ---
 
 ## 8. ONNX 导出
