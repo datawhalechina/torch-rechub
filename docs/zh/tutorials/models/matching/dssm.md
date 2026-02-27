@@ -247,19 +247,186 @@ match_evaluation(user_embedding, item_embedding, test_user, all_item, topk=10)
 4. **负采样比例**: `neg_ratio=3~5` 通常效果较好
 5. **学习率**: 匹配任务推荐较小的学习率 `1e-4`
 
-### 6.2 线上部署建议
+### 6.2 向量检索与部署
+
+训练完成后，需要将 Embedding 插入向量检索引擎进行 ANN（近似最近邻）搜索。Torch-RecHub 内置了对 **Annoy**、**Faiss** 和 **Milvus** 三种主流引擎的封装。
+
+#### 方式一：Annoy（轻量级，适合快速原型）
+
+```bash
+pip install annoy
+```
 
 ```python
-# 离线生成 Item Embedding 并保存
-torch.save(item_embedding.data.cpu(), "item_embedding.pth")
+from torch_rechub.utils.match import Annoy
 
-# 使用向量检索引擎（如 Faiss, Milvus）进行近似最近邻搜索 (ANN)
-# 线上只需实时计算 User Embedding，然后从索引中检索 Top-K
+# 构建 Annoy 索引
+annoy = Annoy(n_trees=10, metric='angular')
+annoy.fit(item_embedding)
+
+# 为单个用户查询 Top-10 相似物品
+indices, distances = annoy.query(user_embedding[0], n=10)
+print(f"Top-10 Item 索引: {indices}")
+print(f"对应距离: {distances}")
+```
+
+#### 方式二：Faiss（高性能，支持 GPU 加速）
+
+```bash
+pip install faiss-cpu  # 或 faiss-gpu
+```
+
+```python
+from torch_rechub.utils.match import Faiss
+import numpy as np
+
+# 确保 embedding 是 float32 numpy 数组
+item_emb_np = item_embedding.cpu().numpy().astype(np.float32)
+user_emb_np = user_embedding.cpu().numpy().astype(np.float32)
+
+# 创建 Faiss 索引（支持 flat / ivf / hnsw）
+faiss_index = Faiss(dim=item_emb_np.shape[1], index_type='flat', metric='l2')
+faiss_index.fit(item_emb_np)
+
+# 查询 Top-10
+indices, distances = faiss_index.query(user_emb_np[0], n=10)
+print(f"Top-10 Item 索引: {indices}")
+
+# 保存 / 加载索引
+faiss_index.save_index("item_faiss.index")
+faiss_index.load_index("item_faiss.index")
+```
+
+> **Faiss 索引类型选择**:
+> | 类型 | 特点 | 适用场景 |
+> |------|------|---------|
+> | `flat` | 精确搜索，无需训练 | 数据量 < 100万 |
+> | `ivf` | 倒排索引，需训练 | 数据量 100万~1亿 |
+> | `hnsw` | 图索引，无需训练 | 高召回率需求 |
+
+#### 方式三：Milvus（分布式，适合生产环境）
+
+```bash
+pip install pymilvus
+# 需要先启动 Milvus 服务: https://milvus.io/docs/install_standalone-docker.md
+```
+
+```python
+from torch_rechub.utils.match import Milvus
+
+# 连接 Milvus 并插入 Embedding
+milvus = Milvus(dim=item_embedding.shape[1], host="localhost", port="19530")
+milvus.fit(item_embedding)
+
+# 查询 Top-10
+indices, distances = milvus.query(user_embedding, n=10)
+```
+
+#### 使用新版 Serving API（Builder/Indexer 模式）
+
+项目还提供了更标准化的 `serving` 模块，统一管理不同后端：
+
+```python
+from torch_rechub.serving import builder_factory
+
+# 使用工厂函数创建 Builder（支持 "annoy" / "faiss" / "milvus"）
+builder = builder_factory("faiss", d=64, index_type="Flat", metric="L2")
+
+# 构建索引并查询
+with builder.from_embeddings(item_embedding) as indexer:
+    results = indexer.query(user_embedding[:5], k=10)
+    print(results.indices, results.distances)
+    indexer.save("item.index")
+
+# 从文件加载
+with builder.from_index_file("item.index") as indexer:
+    results = indexer.query(user_embedding[:5], k=10)
 ```
 
 ---
 
-## 7. 常见问题与解决方案
+## 7. 模型可视化
+
+Torch-RecHub 内置了基于 `torchview` 的模型结构可视化工具，可以生成模型的计算图。
+
+### 安装依赖
+
+```bash
+pip install torch-rechub[visualization]
+# 还需要安装系统级 graphviz:
+# Ubuntu: sudo apt-get install graphviz
+# macOS: brew install graphviz
+```
+
+### 可视化 DSSM 模型
+
+```python
+from torch_rechub.utils.visualization import visualize_model
+
+# 自动生成输入并可视化（在 Jupyter 中直接显示）
+graph = visualize_model(model, depth=4)
+
+# 保存为图片（适合论文/文档）
+visualize_model(model, save_path="dssm_architecture.png", dpi=300)
+
+# 保存为 PDF
+visualize_model(model, save_path="dssm_architecture.pdf")
+```
+
+> 可视化会自动从模型中提取特征信息生成 dummy input，无需手动构造输入数据。
+
+---
+
+## 8. ONNX 导出
+
+将训练好的模型导出为 ONNX 格式，用于跨框架部署（如 ONNX Runtime、TensorRT）。
+
+### 导出完整模型
+
+```python
+from torch_rechub.utils.onnx_export import ONNXExporter
+
+exporter = ONNXExporter(model, device="cpu")
+
+# 导出完整 DSSM 模型
+exporter.export("dssm_full.onnx", verbose=True)
+```
+
+### 分别导出 User Tower 和 Item Tower
+
+双塔模型可以分别导出两个 Tower，用于独立部署：
+
+```python
+# 导出 User Tower（线上实时推理）
+exporter.export("dssm_user_tower.onnx", mode="user")
+
+# 导出 Item Tower（离线批量计算）
+exporter.export("dssm_item_tower.onnx", mode="item")
+```
+
+### 使用 ONNX Runtime 推理
+
+```python
+import onnxruntime as ort
+import numpy as np
+
+# 加载 User Tower
+session = ort.InferenceSession("dssm_user_tower.onnx")
+
+# 查看输入信息
+for inp in session.get_inputs():
+    print(f"  {inp.name}: shape={inp.shape}, type={inp.type}")
+
+# 构造输入并推理
+input_feed = {inp.name: np.zeros(inp.shape, dtype=np.int64)
+              for inp in session.get_inputs()}
+output = session.run(None, input_feed)
+print(f"User Embedding shape: {output[0].shape}")
+```
+
+---
+
+## 9. 常见问题与解决方案
 
 ### Q1: User Tower 和 Item Tower 的 dims 必须相同吗？
 最终输出维度（`dims[-1]`）必须相同，因为需要计算相似度。中间层维度可以不同。
@@ -275,12 +442,21 @@ SequenceFeature("hist_movie_id", vocab_size=n_movie,
 
 ### Q3: 线上如何高效部署 DSSM？
 关键思路是 **User 和 Item 解耦**：
-1. 离线计算所有 Item Embedding，存入向量数据库
-2. 线上实时计算 User Embedding
-3. 通过 ANN（如 Faiss）检索最相似的 Top-K Item
+1. 离线计算所有 Item Embedding，存入向量数据库（Faiss/Milvus）
+2. 线上用 ONNX Runtime 实时计算 User Embedding
+3. 通过 ANN 检索最相似的 Top-K Item
 
 ### Q4: temperature 设置过小会怎样？
 temperature 过小会使梯度变大，训练不稳定。如果 loss 出现 NaN，尝试增大 temperature（如 0.05 → 0.1）。
+
+### Q5: Annoy、Faiss、Milvus 如何选择？
+
+| 特性 | Annoy | Faiss | Milvus |
+|------|-------|-------|--------|
+| 安装复杂度 | 简单 | 中等 | 需要服务 |
+| 检索速度 | 中等 | 快（支持GPU） | 快 |
+| 数据规模 | < 百万 | 亿级 | 亿级+分布式 |
+| 适用场景 | 原型验证 | 生产单机 | 生产分布式 |
 
 ---
 
@@ -297,7 +473,7 @@ from torch_rechub.basic.features import SparseFeature, SequenceFeature
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
+from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
 
 
 def main():
@@ -351,10 +527,17 @@ def main():
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=4096)
     trainer.fit(train_dl)
 
-    # 6. 生成 Embedding 并评估
+    # 6. 生成 Embedding
     user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
     item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
     print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
+
+    # 7. 使用 Annoy 进行向量召回
+    annoy = Annoy(n_trees=10)
+    annoy.fit(item_embedding)
+    for i in range(min(5, len(user_embedding))):
+        indices, distances = annoy.query(user_embedding[i], n=10)
+        print(f"User {i} -> Top-10 Items: {indices}")
 
 
 if __name__ == "__main__":

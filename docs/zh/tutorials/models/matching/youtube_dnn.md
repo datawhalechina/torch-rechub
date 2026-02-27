@@ -200,9 +200,64 @@ print(f"Item Embedding: {item_embedding.shape}")
 3. **序列长度**: `seq_max_len=50` 是一个好的起点，可以根据用户行为数据的实际分布调整
 4. **温度系数**: 与 DSSM 类似，`0.02` 是推荐起点
 
+### 6.1 向量检索与部署
+
+与 DSSM 一样，YoutubeDNN 训练完成后需要将 Embedding 插入向量索引进行 ANN 检索。
+
+```python
+from torch_rechub.utils.match import Annoy, Faiss
+
+# 方式一：Annoy（快速原型）
+annoy = Annoy(n_trees=10)
+annoy.fit(item_embedding)
+indices, distances = annoy.query(user_embedding[0], n=10)
+
+# 方式二：Faiss（高性能）
+import numpy as np
+item_emb_np = item_embedding.cpu().numpy().astype(np.float32)
+faiss_index = Faiss(dim=item_emb_np.shape[1], index_type='flat', metric='l2')
+faiss_index.fit(item_emb_np)
+indices, distances = faiss_index.query(user_embedding[0].cpu().numpy().astype(np.float32), n=10)
+
+# 保存索引供线上使用
+faiss_index.save_index("youtube_dnn_item.index")
+```
+
+> **更多向量检索细节**请参考 [DSSM 教程的向量检索部分](/zh/tutorials/models/matching/dssm#62-向量检索与部署)，包含 Milvus 和 Serving API 的使用方法。
+
 ---
 
-## 7. 常见问题与解决方案
+## 7. 模型可视化
+
+```python
+from torch_rechub.utils.visualization import visualize_model
+
+# 自动生成输入并可视化
+graph = visualize_model(model, depth=4)
+
+# 保存为图片
+visualize_model(model, save_path="youtube_dnn_arch.png", dpi=300)
+```
+
+> 安装依赖：`pip install torch-rechub[visualization]` + 系统安装 graphviz
+
+---
+
+## 8. ONNX 导出
+
+```python
+from torch_rechub.utils.onnx_export import ONNXExporter
+
+exporter = ONNXExporter(model, device="cpu")
+
+# 分别导出 User / Item Tower
+exporter.export("youtube_user_tower.onnx", mode="user")
+exporter.export("youtube_item_tower.onnx", mode="item")
+```
+
+---
+
+## 9. 常见问题与解决方案
 
 ### Q1: YoutubeDNN 和 DSSM 的主要区别？
 - **训练方式不同**: DSSM 是 point-wise，YoutubeDNN 是 list-wise
@@ -214,6 +269,9 @@ print(f"Item Embedding: {item_embedding.shape}")
 
 ### Q3: neg_item_feature 的 pooling 为什么用 "concat"？
 因为负样本是一个列表（多个 item），`pooling="concat"` 将它们拼接为 `[batch_size, n_neg, embed_dim]` 的张量，用于 list-wise 计算。
+
+### Q4: 如何导出 ONNX 用于线上部署？
+使用 `ONNXExporter` 分别导出 User Tower 和 Item Tower，线上用 ONNX Runtime 推理 User Tower，配合向量索引（Faiss/Milvus）检索物品。
 
 ---
 
@@ -230,7 +288,7 @@ from torch_rechub.basic.features import SparseFeature, SequenceFeature
 from torch_rechub.models.matching import YoutubeDNN
 from torch_rechub.trainers import MatchTrainer
 from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
+from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
 
 
 def main():
@@ -282,7 +340,15 @@ def main():
     item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
     print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
 
+    # 向量召回
+    annoy = Annoy(n_trees=10)
+    annoy.fit(item_embedding)
+    for i in range(min(5, len(user_embedding))):
+        indices, distances = annoy.query(user_embedding[i], n=10)
+        print(f"User {i} -> Top-10 Items: {indices}")
+
 
 if __name__ == "__main__":
     main()
 ```
+

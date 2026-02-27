@@ -239,6 +239,85 @@ ctr_trainer = CTRTrainer(
 
 ---
 
+## 8. 模型可视化
+
+Torch-RecHub 内置了基于 `torchview` 的模型结构可视化工具，可以生成模型的计算图。
+
+### 安装依赖
+
+```bash
+pip install torch-rechub[visualization]
+# 系统级依赖:
+# Ubuntu: sudo apt-get install graphviz
+# macOS: brew install graphviz
+```
+
+### 可视化 DeepFM 模型
+
+```python
+from torch_rechub.utils.visualization import visualize_model
+
+# 自动生成输入并可视化（在 Jupyter 中直接显示内嵌图像）
+graph = visualize_model(model, depth=4)
+
+# 保存为高清 PNG（适合论文/文档）
+visualize_model(model, save_path="deepfm_architecture.png", dpi=300)
+
+# 保存为 PDF
+visualize_model(model, save_path="deepfm_architecture.pdf")
+```
+
+> `visualize_model` 会自动从模型中提取特征信息并生成 dummy input，无需手动构造。支持自定义 `depth`（展开的层数）和 `batch_size`。
+
+---
+
+## 9. ONNX 导出
+
+将训练好的模型导出为 ONNX 格式，用于跨框架部署（如 ONNX Runtime、TensorRT、OpenVINO）。
+
+### 导出模型
+
+```python
+from torch_rechub.utils.onnx_export import ONNXExporter
+
+exporter = ONNXExporter(model, device="cpu")
+
+# 导出 DeepFM 模型
+exporter.export("deepfm.onnx", verbose=True)
+
+# 查看输入信息
+info = exporter.get_input_info()
+print(info)
+```
+
+### 使用 ONNX Runtime 推理
+
+```python
+import onnxruntime as ort
+import numpy as np
+
+session = ort.InferenceSession("deepfm.onnx")
+
+# 查看模型输入
+for inp in session.get_inputs():
+    print(f"  {inp.name}: shape={inp.shape}, type={inp.type}")
+
+# 构造输入并推理
+input_feed = {}
+for inp in session.get_inputs():
+    if "int" in inp.type.lower():
+        input_feed[inp.name] = np.zeros([d if isinstance(d, int) else 1 for d in inp.shape], dtype=np.int64)
+    else:
+        input_feed[inp.name] = np.zeros([d if isinstance(d, int) else 1 for d in inp.shape], dtype=np.float32)
+
+output = session.run(None, input_feed)
+print(f"Output shape: {output[0].shape}")
+```
+
+> 排序模型（DeepFM / WideDeep / DCN）的 ONNX 导出是完整模型导出，不涉及 Tower 分离。双塔模型（DSSM / YoutubeDNN）支持 `mode="user"/"item"` 分别导出。
+
+---
+
 ## 完整代码
 
 ```python
@@ -313,7 +392,17 @@ def main():
     auc = trainer.evaluate(trainer.model, test_dl)
     print(f"Test AUC: {auc:.4f}")
 
+    # 8. 可视化（可选）
+    # from torch_rechub.utils.visualization import visualize_model
+    # visualize_model(model, save_path="deepfm_arch.png", dpi=300)
+
+    # 9. ONNX 导出（可选）
+    # from torch_rechub.utils.onnx_export import ONNXExporter
+    # exporter = ONNXExporter(model)
+    # exporter.export("deepfm.onnx", verbose=True)
+
 
 if __name__ == "__main__":
     main()
 ```
+
