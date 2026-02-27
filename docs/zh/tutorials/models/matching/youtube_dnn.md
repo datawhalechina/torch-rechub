@@ -14,7 +14,7 @@ YoutubeDNN 是 Google 在 RecSys'2016 上提出的深度神经网络召回模型
 ### 模型结构
 
 <div align="center">
-  <img src="../../../images/models/youtube_dnn_arch.png" alt="YoutubeDNN Model Architecture" width="400"/>
+  <img src="/img/models/youtube_dnn_arch.png" alt="YoutubeDNN Model Architecture" width="400"/>
 </div>
 
 - **User Tower**: 将用户属性和行为序列通过 DNN 映射为用户 Embedding
@@ -239,17 +239,15 @@ from torch_rechub.utils.visualization import visualize_model
 # 自动生成输入并可视化
 graph = visualize_model(model, depth=4)
 
-
-### YoutubeDNN 架构图
-
-![YoutubeDNN 模型架构图](../../../../images/models/youtube_dnn_arch.png)
-
-
 # 保存为图片
 visualize_model(model, save_path="youtube_dnn_arch.png", dpi=300)
 ```
 
-> 安装依赖：`pip install torch-rechub[visualization]` + 系统安装 graphviz
+### YoutubeDNN 架构图
+
+![YoutubeDNN 模型架构图](/img/models/youtube_dnn_arch.png)
+
+> 安装依赖：`pip install torch-rechub[visualization]` + 系统安装 graphviz（Ubuntu: `apt-get install graphviz` / macOS: `brew install graphviz` / Windows: `choco install graphviz`）
 
 ---
 

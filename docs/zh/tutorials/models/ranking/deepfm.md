@@ -14,7 +14,7 @@ DeepFM（Deep Factorization Machine）是由华为诺亚方舟实验室在 IJCAI
 ### 模型结构
 
 <div align="center">
-  <img src="../../../images/models/deepfm_arch.png" alt="DeepFM Model Architecture" width="600"/>
+  <img src="/img/models/deepfm_arch.png" alt="DeepFM Model Architecture" width="600"/>
 </div>
 
 - **FM 部分**：通过二阶交互捕获特征间的组合关系
@@ -108,7 +108,7 @@ train_dl, val_dl, test_dl = dg.generate_dataloader(
 from torch_rechub.models.ranking import DeepFM
 
 model = DeepFM(
-    deep_features=dense_feas,      # Deep 部分使用的特征
+    deep_features=dense_feas + sparse_feas,  # Deep 部分使用全部特征
     fm_features=sparse_feas,       # FM 部分使用的特征
     mlp_params={
         "dims": [256, 128],        # MLP 隐藏层维度
@@ -122,7 +122,7 @@ model = DeepFM(
 
 | 参数 | 类型 | 说明 | 建议值 |
 |------|------|------|--------|
-| `deep_features` | `list[Feature]` | Deep 部分的特征列表，通常包含 DenseFeature | 全部连续特征 |
+| `deep_features` | `list[Feature]` | Deep 部分的特征列表，通常包含全部特征 | 连续特征 + 类别特征 |
 | `fm_features` | `list[Feature]` | FM 部分的特征列表，通常包含 SparseFeature | 全部类别特征 |
 | `mlp_params.dims` | `list[int]` | MLP 每层神经元数量 | `[256, 128]` 或 `[256, 128, 64]` |
 | `mlp_params.dropout` | `float` | Dropout 比率，防止过拟合 | 0.1 ~ 0.3 |
@@ -233,8 +233,8 @@ ctr_trainer = CTRTrainer(
 - 使用更多训练数据
 
 ### Q3: 如何选择 deep_features 和 fm_features?
-- 通常做法：**dense 特征给 Deep 部分，sparse 特征给 FM 部分**
-- 也可以两部分都使用全部特征，但会增加计算量
+- 通常做法：**全部特征给 Deep 部分，sparse 特征给 FM 部分**
+- 也可以只用 dense 特征给 Deep，但效果通常不如全部特征
 
 ### Q4: GPU 内存不足？
 - 减小 `batch_size`（如 2048 → 512）
@@ -254,6 +254,7 @@ pip install torch-rechub[visualization]
 # 系统级依赖:
 # Ubuntu: sudo apt-get install graphviz
 # macOS: brew install graphviz
+# Windows: choco install graphviz
 ```
 
 ### 可视化 DeepFM 模型
@@ -264,18 +265,16 @@ from torch_rechub.utils.visualization import visualize_model
 # 自动生成输入并可视化（在 Jupyter 中直接显示内嵌图像）
 graph = visualize_model(model, depth=4)
 
-
-### DeepFM 架构图
-
-![DeepFM 模型架构图](../../../../images/models/deepfm_arch.png)
-
-
 # 保存为高清 PNG（适合论文/文档）
 visualize_model(model, save_path="deepfm_architecture.png", dpi=300)
 
 # 保存为 PDF
 visualize_model(model, save_path="deepfm_architecture.pdf")
 ```
+
+### DeepFM 架构图
+
+![DeepFM 模型架构图](/img/models/deepfm_arch.png)
 
 > `visualize_model` 会自动从模型中提取特征信息并生成 dummy input，无需手动构造。支持自定义 `depth`（展开的层数）和 `batch_size`。
 
@@ -382,8 +381,7 @@ def main():
 
     # 5. 创建模型
     model = DeepFM(
-        deep_features=dense_feas,
-        fm_features=sparse_feas,
+        deep_features=dense_feas + sparse_feas,        fm_features=sparse_feas,
         mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"}
     )
 

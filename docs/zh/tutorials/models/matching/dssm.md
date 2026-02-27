@@ -14,7 +14,7 @@ DSSM（Deep Structured Semantic Model）是微软在 CIKM'2013 上提出的经�
 ### 模型结构
 
 <div align="center">
-  <img src="../../../images/models/dssm_arch.png" alt="DSSM Model Architecture" width="500"/>
+  <img src="/img/models/dssm_arch.png" alt="DSSM Model Architecture" width="500"/>
 </div>
 
 - **User Tower**：将用户特征映射为向量表示
@@ -87,6 +87,7 @@ df_train, df_test = generate_seq_feature_match(
 # 构建模型输入
 x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 y_train = x_train["label"]
+x_train = {k: v for k, v in x_train.items() if k != "label"}
 x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 ```
 
@@ -360,6 +361,7 @@ pip install torch-rechub[visualization]
 # 还需要安装系统级 graphviz:
 # Ubuntu: sudo apt-get install graphviz
 # macOS: brew install graphviz
+# Windows: choco install graphviz
 ```
 
 ### 可视化 DSSM 模型
@@ -382,7 +384,7 @@ visualize_model(model, save_path="dssm_architecture.pdf")
 
 ### DSSM 架构图
 
-![DSSM 模型架构图](../../../../images/models/dssm_arch.png)
+![DSSM 模型架构图](/img/models/dssm_arch.png)
 
 
 ---
@@ -513,6 +515,7 @@ def main():
     )
     x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
     y_train = x_train["label"]
+    x_train = {k: v for k, v in x_train.items() if k != "label"}
     x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 
     # 3. 定义特征
