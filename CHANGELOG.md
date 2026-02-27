@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-02-27
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* Update test_inbatch_sampling.py by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/174
+* Support padding_idx in embedding initializers by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/176
+### 📝 文档更新 / Documentation
+* Add note about examples/ sample datasets by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/182
+* Docs: add blog nav, fix examples, remove cached docs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/183
+### 🔧 模型更新 / Models
+* Add new generative model: TIGER by @lw-xundong in https://github.com/datawhalechina/torch-rechub/pull/173
+* Feature/rqvae by @lw-xundong in https://github.com/datawhalechina/torch-rechub/pull/156
+### 📦 依赖更新 / Dependencies
+* Update ci.yml by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/181
+### 🔄 其他变更 / Other Changes
+* Update project_framework.png by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/175
+* Update ple.py by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/177
+* 多任务模型学习教程提交 by @Luxorion-12 in https://github.com/datawhalechina/torch-rechub/pull/179
+
+## New Contributors
+* @lw-xundong made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/173
+* @Luxorion-12 made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/179
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.4.0...v0.5.0
+
+---
+
+
+
 ## [0.4.0] - 2026-02-11
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
