@@ -42,32 +42,64 @@ import torch
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.utils.data import DataGenerator
 
-# 加载数据
-data = pd.read_csv("examples/ranking/data/ali-ccp/ali-ccp_sample.csv")
+# 加载预处理好的 Ali-CCP 采样数据
+df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
+df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
+df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
+print(f"训练集: {len(df_train)}, 验证集: {len(df_val)}, 测试集: {len(df_test)}")
 
-# 区分特征
-col_names = data.columns.values.tolist()
-dense_features = ['D109_14', 'D110_14', 'D127_14', 'D150_14', 'D508', 'D509', 'D702', 'D853']
-sparse_features = [col for col in col_names if col not in dense_features and col not in ['ctr_label', 'cvr_label']]
+# 合并数据以统一特征处理
+train_idx = df_train.shape[0]
+val_idx = train_idx + df_val.shape[0]
+data = pd.concat([df_train, df_val, df_test], axis=0)
 
-# 填充缺失值
-data[sparse_features] = data[sparse_features].fillna('-996')
-data[dense_features] = data[dense_features].fillna(0)
+# 重命名标签列
+data.rename(columns={'purchase': 'cvr_label', 'click': 'ctr_label'}, inplace=True)
+```
+
+### 2.2 定义特征和标签
+
+```python
+col_names = data.columns.tolist()
+
+# 区分连续特征和离散特征
+dense_cols = ['D109_14', 'D110_14', 'D127_14', 'D150_14', 'D508', 'D509', 'D702', 'D853']
+sparse_cols = [
+    col for col in col_names
+    if col not in dense_cols and col not in ['cvr_label', 'ctr_label']
+]
 
 # 定义特征
-dense_feas = [DenseFeature(name) for name in dense_features]
-sparse_feas = [SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16) for name in sparse_features]
-features = dense_feas + sparse_feas
+features = [
+    SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols
+] + [
+    DenseFeature(col) for col in dense_cols
+]
 
-# 标签（多任务）
-y = data[["ctr_label", "cvr_label"]]
-del data["ctr_label"]
-del data["cvr_label"]
-x = data
+# 定义多任务标签 (CVR, CTR)
+label_cols = ['cvr_label', 'ctr_label']
+used_cols = sparse_cols + dense_cols
+```
 
-# DataLoader
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=2048)
+### 2.3 构建训练/验证/测试集
+
+```python
+x_train = {name: data[name].values[:train_idx] for name in used_cols}
+y_train = data[label_cols].values[:train_idx]
+
+x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
+y_val = data[label_cols].values[train_idx:val_idx]
+
+x_test = {name: data[name].values[val_idx:] for name in used_cols}
+y_test = data[label_cols].values[val_idx:]
+
+# 创建 DataLoader
+dg = DataGenerator(x_train, y_train)
+train_dl, val_dl, test_dl = dg.generate_dataloader(
+    x_val=x_val, y_val=y_val,
+    x_test=x_test, y_test=y_test,
+    batch_size=2048
+)
 ```
 
 ---
@@ -82,16 +114,15 @@ from torch_rechub.models.multi_task import PLE
 model = PLE(
     features=features,
     task_types=["classification", "classification"],  # 两个分类任务
-    n_level=2,                    # CGC 层数
+    n_level=1,                    # CGC 层数
     n_expert_specific=2,          # 每个任务的专属 Expert 数
     n_expert_shared=1,            # 共享 Expert 数
     expert_params={
-        "dims": [256, 128],
-        "dropout": 0.2
+        "dims": [16]
     },
     tower_params_list=[
-        {"dims": [64]},           # CTR Tower
-        {"dims": [64]}            # CVR Tower
+        {"dims": [8]},            # CVR Tower
+        {"dims": [8]}             # CTR Tower
     ]
 )
 ```
@@ -105,8 +136,8 @@ model = PLE(
 | `n_level` | `int` | CGC 层数（Progressive 的层数） | 1 ~ 3 |
 | `n_expert_specific` | `int` | 每个任务的专属 Expert 数量 | 1 ~ 4 |
 | `n_expert_shared` | `int` | 共享 Expert 数量 | 1 ~ 2 |
-| `expert_params` | `dict` | Expert MLP 参数 | `{"dims": [256, 128]}` |
-| `tower_params_list` | `list[dict]` | 每个 Task Tower 的 MLP 参数 | 每个任务一个 dict |
+| `expert_params` | `dict` | Expert MLP 参数 | `{"dims": [16]}` |
+| `tower_params_list` | `list[dict]` | 每个 Task Tower 的 MLP 参数 | `{"dims": [8]}` |
 
 > **PLE vs MMOE**: MMOE 所有 Expert 都是共享的，PLE 区分了 task-specific 和 shared experts，通常在任务间相关性较低时效果更好。
 
@@ -211,36 +242,48 @@ def main():
     torch.manual_seed(2022)
 
     # 1. 加载数据
-    data = pd.read_csv("examples/ranking/data/ali-ccp/ali-ccp_sample.csv")
+    df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
+    df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
+    df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
 
-    col_names = data.columns.values.tolist()
-    dense_features = ['D109_14', 'D110_14', 'D127_14', 'D150_14', 'D508', 'D509', 'D702', 'D853']
-    sparse_features = [col for col in col_names if col not in dense_features and col not in ['ctr_label', 'cvr_label']]
-
-    data[sparse_features] = data[sparse_features].fillna('-996')
-    data[dense_features] = data[dense_features].fillna(0)
+    train_idx = df_train.shape[0]
+    val_idx = train_idx + df_val.shape[0]
+    data = pd.concat([df_train, df_val, df_test], axis=0)
+    data.rename(columns={'purchase': 'cvr_label', 'click': 'ctr_label'}, inplace=True)
 
     # 2. 定义特征
-    dense_feas = [DenseFeature(name) for name in dense_features]
-    sparse_feas = [SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16) for name in sparse_features]
-    features = dense_feas + sparse_feas
+    dense_cols = ['D109_14', 'D110_14', 'D127_14', 'D150_14', 'D508', 'D509', 'D702', 'D853']
+    sparse_cols = [
+        col for col in data.columns
+        if col not in dense_cols and col not in ['cvr_label', 'ctr_label']
+    ]
 
-    y = data[["ctr_label", "cvr_label"]]
-    del data["ctr_label"]
-    del data["cvr_label"]
-    x = data
+    features = [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] \
+        + [DenseFeature(col) for col in dense_cols]
 
-    # 3. 创建 DataLoader
-    dg = DataGenerator(x, y)
-    train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=2048)
+    label_cols = ['cvr_label', 'ctr_label']
+    used_cols = sparse_cols + dense_cols
+
+    # 3. 构建数据集
+    x_train = {name: data[name].values[:train_idx] for name in used_cols}
+    y_train = data[label_cols].values[:train_idx]
+    x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
+    y_val = data[label_cols].values[train_idx:val_idx]
+    x_test = {name: data[name].values[val_idx:] for name in used_cols}
+    y_test = data[label_cols].values[val_idx:]
+
+    dg = DataGenerator(x_train, y_train)
+    train_dl, val_dl, test_dl = dg.generate_dataloader(
+        x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=2048
+    )
 
     # 4. 创建 PLE 模型
     model = PLE(
         features=features,
         task_types=["classification", "classification"],
-        n_level=2, n_expert_specific=2, n_expert_shared=1,
-        expert_params={"dims": [256, 128], "dropout": 0.2},
-        tower_params_list=[{"dims": [64]}, {"dims": [64]}]
+        n_level=1, n_expert_specific=2, n_expert_shared=1,
+        expert_params={"dims": [16]},
+        tower_params_list=[{"dims": [8]}, {"dims": [8]}]
     )
 
     # 5. 训练

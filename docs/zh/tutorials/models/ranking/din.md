@@ -65,21 +65,18 @@ n_cates = data["cate_id"].max()
 
 ### 2.2 定义特征列表
 
-DIN 的特征严格分为三类：`features`（普通特征）、`target_features`（目标物品特征）、`history_features`（历史序列特征）。注意，`target_features` 与 `history_features` 必须**一一对应**计算 Attention。
+DIN 的特征分为三类：`features`（包含目标物品特征和用户特征）、`target_features`（与 features 相同）、`history_features`（历史序列特征）。`target_features` 与 `history_features` 必须**一一对应**计算 Attention。
 
 ```python
-# 1. 目标物品特征 (Target Features)
-target_features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), 
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
-]
-
-# 2. 普通特征 (User Profile / Context)
+# 1. 特征列表（目标物品 + 用户属性）
 features = [
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
     SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
 ]
+target_features = features
 
-# 3. 历史行为序列特征 (History Features)
+# 2. 历史行为序列特征 (History Features)
 # 注意：shared_with 参数必须指向对应的 target 特征，确保它们共享 Embedding 空间
 history_features = [
     SequenceFeature(
@@ -132,14 +129,10 @@ model = DIN(
     history_features=history_features,
     target_features=target_features,
     mlp_params={
-        "dims": [256, 128],
-        "dropout": 0.2,
-        "activation": "dice"  # 推荐使用 dice 激活函数
+        "dims": [256, 128]
     },
     attention_mlp_params={
-        "dims": [256, 128],
-        "activation": "dice",
-        "use_softmax": False  # 原论文使用的是 False
+        "dims": [256, 128]
     }
 )
 ```
@@ -148,11 +141,11 @@ model = DIN(
 
 | 参数 | 类型 | 说明 | 建议值 |
 |------|------|------|--------|
-| `features` | `list[Feature]` | 普通特征（如 UserID 等），不参与 Attention 计算 | |
+| `features` | `list[Feature]` | 目标物品特征 + 用户特征，同时作为 `target_features` 传入 | |
 | `history_features` | `list[Feature]` | 历史序列特征，必须是 `SequenceFeature` 且 pooling 为 `"concat"` | |
-| `target_features` | `list[Feature]` | 目标物品特征，用于与历史做 Attention (对应数量和类型必须一致) | |
-| `mlp_params` | `dict` | 顶层预测 MLP 的参数 | `activation="dice"` |
-| `attention_mlp_params` | `dict` | 目标注意力网络 (Activation Unit) 的参数 | `activation="dice"`, `use_softmax=False` |
+| `target_features` | `list[Feature]` | 与 `features` 相同，用于与历史做 Attention | |
+| `mlp_params` | `dict` | 顶层预测 MLP 的参数（`activation` 已内置为 `dice`，无需传入） | `{"dims": [256, 128]}` |
+| `attention_mlp_params` | `dict` | 目标注意力网络 (Activation Unit) 的参数（默认 `activation="dice"`, `use_softmax=False`） | `{"dims": [256, 128]}` |
 
 > **关键提醒**: `history_features` 和 `target_features` 应当在物理意义上成对出现（如 `hist_item_id` 对应 `target_item_id`），并且必须通过 `shared_with` 共享 Embedding 表！
 
@@ -259,14 +252,13 @@ def main():
 
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
 
-    # 3. 定义三大类特征
-    target_features = [
-        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), 
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
-    ]
+    # 3. 定义特征
     features = [
+        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
+        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
         SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
     ]
+    target_features = features
     history_features = [
         SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
         SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
@@ -283,10 +275,10 @@ def main():
 
     # 5. 构建 DIN 模型
     model = DIN(
-        features=features, 
-        history_features=history_features, 
-        target_features=target_features, 
-        mlp_params={"dims": [256, 128]}, 
+        features=features,
+        history_features=history_features,
+        target_features=target_features,
+        mlp_params={"dims": [256, 128]},
         attention_mlp_params={"dims": [256, 128]}
     )
 

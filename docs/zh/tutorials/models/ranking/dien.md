@@ -13,9 +13,7 @@ DIEN (Deep Interest Evolution Network) 是阿里妈妈在 AAAI'2019 提出的模
 
 ### 模型结构
 
-<div align="center">
-  <img src="/img/models/dien_arch.png" alt="DIEN Model Architecture" width="600"/>
-</div>
+> **注意**: 由于 DIEN 内部使用 GRU 动态计算，torchview 暂时无法自动追踪其计算图，因此未提供架构可视化图。
 
 - **Interest Extractor Layer**: 使用 GRU 对用户行为序列建模，提取每一步的兴趣状态
 - **Auxiliary Loss**: 利用下一时刻的真实点击行为作为监督信号，辅助训练 GRU
@@ -57,14 +55,13 @@ n_cates = data["cate_id"].max()
 ### 定义特征
 
 ```python
-# 目标物品特征
-target_features = [
+# 特征列表（目标物品 + 用户属性）
+features = [
     SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
 ]
-
-# 普通特征
-features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+target_features = features
 
 # 历史行为序列特征
 history_features = [
@@ -99,7 +96,9 @@ train_dl, val_dl, test_dl = dg.generate_dataloader(
 from torch_rechub.models.ranking import DIEN
 
 # history_labels: 标记历史行为序列中每一步是否为正反馈（1=点击，0=未点击）
-# 这里简单使用全 1 表示所有历史行为都是正反馈
+# 注意：该参数是模型级别的固定配置，而非逐样本的标签
+# 这里简单使用全 1 表示所有历史行为都是正反馈（简化示例）
+# 实际场景中应根据业务数据设置合理的正负反馈标记
 history_labels = [1] * 50  # 与序列长度一致
 
 model = DIEN(
@@ -116,10 +115,10 @@ model = DIEN(
 
 | 参数 | 类型 | 说明 | 建议值 |
 |------|------|------|--------|
-| `features` | `list[Feature]` | 普通特征 | 用户属性等 |
+| `features` | `list[Feature]` | 目标物品特征 + 用户特征，同时作为 `target_features` 传入 | |
 | `history_features` | `list[Feature]` | 历史行为序列，pooling 必须为 `"concat"` | |
-| `target_features` | `list[Feature]` | 目标物品特征，与 history 一一对应 | |
-| `mlp_params` | `dict` | 顶层 MLP 参数 | `{"dims": [256, 128]}` |
+| `target_features` | `list[Feature]` | 与 `features` 相同 | |
+| `mlp_params` | `dict` | 顶层 MLP 参数（`activation` 已内置为 `dice`，无需传入） | `{"dims": [256, 128]}` |
 | `history_labels` | `list` | 历史序列中每步的点击标签 (0/1) | 长度与 seq_len 一致 |
 | `alpha` | `float` | 辅助损失的权重系数 | 0.1 ~ 0.5 |
 
@@ -215,11 +214,12 @@ def main():
     )
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
 
-    target_features = [
+    features = [
         SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+        SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
     ]
-    features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+    target_features = features
     history_features = [
         SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
         SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")

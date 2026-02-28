@@ -13,9 +13,7 @@ MIND (Multi-Interest Network with Dynamic Routing) 是阿里妈妈在 CIKM'2019 
 
 ### 模型结构
 
-<div align="center">
-  <img src="/img/models/mind_arch.png" alt="MIND Model Architecture" width="500"/>
-</div>
+> **注意**: 由于 MIND 内部使用动态路由胶囊网络，torchview 暂时无法自动追踪其计算图，因此未提供架构可视化图。
 
 - **Embedding Layer**: 编码用户属性和历史行为序列
 - **Capsule Network (Dynamic Routing)**: 从行为序列中提取多个兴趣向量
@@ -119,7 +117,7 @@ model = MIND(
     item_features=item_features,
     neg_item_feature=neg_item_feature,
     max_length=50,          # 最大序列长度
-    temperature=1.0,        # 温度系数
+    temperature=0.02,       # 温度系数
     interest_num=4           # 兴趣向量数量
 )
 ```
@@ -133,7 +131,7 @@ model = MIND(
 | `item_features` | `list[Feature]` | 正样本物品特征 | |
 | `neg_item_feature` | `list[Feature]` | 负样本物品特征 | |
 | `max_length` | `int` | 最大序列长度 | 50 |
-| `temperature` | `float` | Softmax 温度系数 | 1.0 |
+| `temperature` | `float` | Softmax 温度系数 | 0.02 |
 | `interest_num` | `int` | 提取的兴趣向量数量 | 4 ~ 8 |
 
 > **interest_num** 是 MIND 最重要的超参数，决定了用多少个向量表示一个用户。通常 4~8 之间效果最好。
@@ -203,7 +201,7 @@ for i in range(min(3, len(user_embedding))):
 
 1. **interest_num**: 关键超参数。值越大，能捕捉越多样的兴趣，但检索成本也成倍增加
 2. **max_length**: 序列越长，胶囊网络能捕获的信息越丰富，但计算量增大
-3. **温度系数**: 对于 MIND，`temperature=1.0` 通常即可
+3. **温度系数**: 对于 MIND，`temperature=0.02` 是推荐值
 
 ---
 
@@ -290,7 +288,7 @@ def main():
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048)
 
     model = MIND(user_features, history_features, item_features, neg_item_feature,
-                 max_length=50, temperature=1.0, interest_num=4)
+                 max_length=50, temperature=0.02, interest_num=4)
 
     trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
                            n_epoch=10, device="cpu", model_path="./saved/mind/")

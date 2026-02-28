@@ -13,9 +13,7 @@ BST (Behavior Sequence Transformer) 是阿里巴巴在 2019 年提出的模型�
 
 ### 模型结构
 
-<div align="center">
-  <img src="/img/models/bst_arch.png" alt="BST Model Architecture" width="600"/>
-</div>
+> **注意**: 由于 BST 内部使用 Transformer 动态计算，torchview 暂时无法自动追踪其计算图，因此未提供架构可视化图。
 
 - **Embedding Layer**: 将用户特征、物品特征和行为序列编码为 Embedding
 - **Transformer Encoder**: 对行为序列 + 目标物品拼接后做 Self-Attention
@@ -51,12 +49,13 @@ n_users = data["user_id"].max()
 n_items = data["item_id"].max()
 n_cates = data["cate_id"].max()
 
-# 特征定义（与 DIN 相同的三类结构）
-target_features = [
+# 特征定义（与 DIN 相同的模式）
+features = [
     SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
 ]
-features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+target_features = features
 history_features = [
     SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8,
                     pooling="concat", shared_with="target_item_id"),
@@ -100,10 +99,10 @@ model = BST(
 
 | 参数 | 类型 | 说明 | 建议值 |
 |------|------|------|--------|
-| `features` | `list[Feature]` | 普通特征 | 用户属性等 |
+| `features` | `list[Feature]` | 目标物品特征 + 用户特征，同时作为 `target_features` 传入 | |
 | `history_features` | `list[Feature]` | 历史行为序列 (pooling=`"concat"`) | |
-| `target_features` | `list[Feature]` | 目标物品特征 | |
-| `mlp_params` | `dict` | 顶层 MLP 参数 | `{"dims": [256, 128]}` |
+| `target_features` | `list[Feature]` | 与 `features` 相同 | |
+| `mlp_params` | `dict` | 顶层 MLP 参数（`activation` 已内置为 `leakyrelu`，无需传入） | `{"dims": [256, 128]}` |
 | `nhead` | `int` | Transformer 多头注意力头数 | 4 或 8 |
 | `dropout` | `float` | Transformer 内部 dropout | 0.1 ~ 0.3 |
 | `num_layers` | `int` | Transformer Encoder 层数 | 1 ~ 3 |
@@ -204,11 +203,12 @@ def main():
     )
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
 
-    target_features = [
+    features = [
         SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+        SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
     ]
-    features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+    target_features = features
     history_features = [
         SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
         SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
