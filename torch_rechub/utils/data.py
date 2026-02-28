@@ -445,7 +445,7 @@ class SeqDataset(Dataset):
         Returns:
             tuple: ``(seq_tokens, seq_positions, seq_time_diffs, target)``.
         """
-        return (torch.LongTensor(self.seq_tokens[index]), torch.LongTensor(self.seq_positions[index]), torch.LongTensor(self.seq_time_diffs[index]), torch.LongTensor([self.targets[index]]))
+        return (torch.LongTensor(self.seq_tokens[index]), torch.LongTensor(self.seq_positions[index]), torch.LongTensor(self.seq_time_diffs[index]), torch.tensor(self.targets[index], dtype=torch.long))
 
     def __len__(self):
         """Return the dataset size."""
