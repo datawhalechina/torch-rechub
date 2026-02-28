@@ -1,0 +1,56 @@
+# 自动标签规则，与 .github/release.yml 分类对应
+# 文档: https://github.com/actions/labeler
+
+# 模型相关（对应 release: 🔧 模型更新）
+model:
+  - changed-files:
+      - any-glob-to-any-file: 'torch_rechub/models/**'
+
+# 文档更新（对应 release: 📝 文档更新）
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+          - 'tutorials/**'
+
+# 依赖更新（对应 release: 📦 依赖更新）
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pyproject.toml'
+          - 'requirements*.txt'
+          - 'package.json'
+          - 'package-lock.json'
+
+# 新功能/增强（对应 release: ✨ 新特性）
+enhancement:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'torch_rechub/trainers/**'
+          - 'torch_rechub/utils/**'
+          - 'torch_rechub/serving/**'
+          - 'examples/**'
+
+# 性能优化（对应 release: ⚡ 性能优化）
+performance:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'torch_rechub/basic/layers.py'
+          - 'torch_rechub/basic/activation.py'
+          - 'torch_rechub/basic/loss_func.py'
+
+# Bug 修复（对应 release: 🐛 Bug 修复）
+bug:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'torch_rechub/basic/features.py'
+          - 'torch_rechub/basic/initializers.py'
+
+# 忽略发布说明
+ignore-for-release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.pre-commit-config.yaml'
+          - 'config/**'
