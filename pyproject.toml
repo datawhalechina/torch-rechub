@@ -67,6 +67,7 @@ tracking = [
     "swanlab>=0.1.0",
     "tensorboardX>=2.5",
 ]
+npu = ["torch-npu>=2.5.1"]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
