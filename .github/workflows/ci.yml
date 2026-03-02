@@ -249,7 +249,7 @@ jobs:
           bandit -r torch_rechub/ -s B101,B311,B614 -x tests,docs,examples -f txt
 
       - name: Upload security scan results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bandit-security-report
@@ -287,7 +287,7 @@ jobs:
           twine check dist/*
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-packages
           path: dist/
