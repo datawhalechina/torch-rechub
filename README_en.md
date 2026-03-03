@@ -78,6 +78,11 @@ English | [简体中文](README.md)
 
 **Stable Version (Recommended):**
 ```bash
+# Install PyTorch matching your device
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -89,6 +94,12 @@ pip install uv
 # Clone and install
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# Install PyTorch matching your device
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 uv sync
 ```
 

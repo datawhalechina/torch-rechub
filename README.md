@@ -78,6 +78,11 @@
 
 **稳定版（推荐用户使用）：**
 ```bash
+# 根据设备选择对应的 PyTorch 版本
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -89,6 +94,12 @@ pip install uv
 # 克隆并安装
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# 根据设备选择对应的 PyTorch 版本
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 uv sync
 ```
 
