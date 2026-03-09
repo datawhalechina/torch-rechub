@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ toJson(github.event.pull_request.labels) == '[]' }}
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v6
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
