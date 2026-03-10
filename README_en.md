@@ -30,7 +30,7 @@ English | [简体中文](README.md)
 ## ✨ Features
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
+* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities. Supports NVIDIA GPU and Huawei Ascend NPU.
 * **Rich Model Library:** Covers **30+** classic and cutting-edge recommendation algorithms (Matching, Ranking, Multi-task, Generative Recommendation, etc.).
 * **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.

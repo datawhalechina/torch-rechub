@@ -25,6 +25,11 @@ description: Torch-RecHub 详细安装说明，包括稳定版和最新版安装
 最简单的安装方式是通过 pip：
 
 ```bash
+# 根据设备选择对应的 PyTorch 版本
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -39,6 +44,12 @@ pip install uv
 # 克隆并安装
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# 根据设备选择对应的 PyTorch 版本
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 uv sync
 ```
 
@@ -87,6 +98,21 @@ python run_ml_dssm.py
 - NVIDIA GPU，计算能力 3.5 或更高
 - 已安装 CUDA Toolkit
 - 已安装 cuDNN 库
+
+### NPU 支持（华为昇腾）
+
+Torch-RecHub 支持华为昇腾 NPU 设备，测试设备为 **华为昇腾 910B**。
+
+使用前请安装昇腾支持的 PyTorch 和 torch-npu 版本，具体版本对应关系请参考 [Ascend PyTorch 官方仓库](https://gitcode.com/Ascend/pytorch)。
+
+安装完成后，需要在代码中导入 `torch_npu`，然后在 Trainer 中指定设备即可：
+
+```python
+import torch
+import torch_npu
+
+trainer = CTRTrainer(model, device='npu:0')
+```
 
 ### 常见问题
 
