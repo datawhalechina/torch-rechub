@@ -30,7 +30,7 @@ English | [简体中文](README.md)
 ## ✨ Features
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities.
+* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities. Supports NVIDIA GPU and Huawei Ascend NPU.
 * **Rich Model Library:** Covers **30+** classic and cutting-edge recommendation algorithms (Matching, Ranking, Multi-task, Generative Recommendation, etc.).
 * **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
@@ -78,6 +78,11 @@ English | [简体中文](README.md)
 
 **Stable Version (Recommended):**
 ```bash
+# Install PyTorch matching your device
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -89,6 +94,12 @@ pip install uv
 # Clone and install
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# Install PyTorch matching your device
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 uv sync
 ```
 
