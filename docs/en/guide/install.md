@@ -25,6 +25,11 @@ Before installing Torch-RecHub, ensure your system meets the following requireme
 The simplest way to install is via pip:
 
 ```bash
+# Install PyTorch matching your device
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -39,6 +44,12 @@ pip install uv
 # Clone and install
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# Install PyTorch matching your device
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+
 uv sync
 ```
 
@@ -87,6 +98,21 @@ For GPU acceleration, ensure you have:
 - NVIDIA GPU with compute capability 3.5 or higher
 - CUDA Toolkit installed
 - cuDNN library installed
+
+### NPU Support (Huawei Ascend)
+
+Torch-RecHub supports Huawei Ascend NPU devices, tested on **Huawei Ascend 910B**.
+
+Please install the Ascend-compatible versions of PyTorch and torch-npu. For version compatibility details, refer to the [Ascend PyTorch repository](https://gitcode.com/Ascend/pytorch).
+
+After installation, import `torch_npu` in your code, then specify the device in the Trainer:
+
+```python
+import torch
+import torch_npu
+
+trainer = CTRTrainer(model, device='npu:0')
+```
 
 ### Common Issues
 
