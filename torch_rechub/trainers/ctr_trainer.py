@@ -21,7 +21,9 @@ class CTRTrainer(object):
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
-        loss_mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
+        loss_mode (bool): whether the model returns prediction only or prediction with extra loss.
+            ``True`` means ``model(x_dict) -> y_pred``.
+            ``False`` means ``model(x_dict) -> (y_pred, other_loss)``.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
         embedding_l1 (float): L1 regularization coefficient for embedding parameters (default=0.0).
         embedding_l2 (float): L2 regularization coefficient for embedding parameters (default=0.0).
