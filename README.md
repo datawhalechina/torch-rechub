@@ -31,7 +31,7 @@
 
 * **生成式推荐模型:** LLM时代下，可以复现部分生成式推荐模型
 * **模块化设计:** 易于添加新的模型、数据集和评估指标。
-* **基于 PyTorch:** 利用 PyTorch 的动态图和 GPU 加速能力。
+* **基于 PyTorch:** 利用 PyTorch 的动态图和 GPU 加速能力，支持 NVIDIA GPU 和华为昇腾 NPU。
 * **丰富的模型库:** 涵盖 **30+** 经典和前沿推荐算法（召回、排序、多任务、生成式推荐等）。
 * **标准化流程:** 提供统一的数据加载、训练和评估流程。
 * **易于配置:** 通过配置文件或命令行参数轻松调整实验设置。
@@ -78,6 +78,11 @@
 
 **稳定版（推荐用户使用）：**
 ```bash
+# 根据设备选择对应的 PyTorch 版本
+pip install torch                                                     # CPU
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 pip install torch-rechub
 ```
 
@@ -89,6 +94,12 @@ pip install uv
 # 克隆并安装
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
+
+# 根据设备选择对应的 PyTorch 版本
+uv pip install torch                                                     # CPU
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # NPU (Huawei Ascend, 需要 torch-npu >= 2.5.1)
+
 uv sync
 ```
 
