@@ -42,7 +42,7 @@
 
 ## 📖 目录
 
-- [🔥 Torch-RecHub - 轻量、高效、易用的 PyTorch 推荐系统框架](#-torch-rechub---轻量高效易用的-pytorch-推荐系统框架)
+- [Torch-RecHub: 轻量、高效、易用的 PyTorch 推荐系统框架](#torch-rechub-轻量高效易用的-pytorch-推荐系统框架)
   - [✨ 特性](#-特性)
   - [📖 目录](#-目录)
   - [🔧 安装](#-安装)
@@ -51,11 +51,16 @@
   - [🚀 快速开始](#-快速开始)
   - [📂 项目结构](#-项目结构)
   - [💡 支持的模型](#-支持的模型)
+    - [排序模型 (Ranking Models) - 13个](#排序模型-ranking-models---13个)
+    - [召回模型 (Matching Models) - 12个](#召回模型-matching-models---12个)
+    - [多任务模型 (Multi-Task Models) - 5个](#多任务模型-multi-task-models---5个)
+    - [生成式推荐 (Generative Recommendation) - 3个](#生成式推荐-generative-recommendation---3个)
   - [📊 支持的数据集](#-支持的数据集)
   - [🧪 示例](#-示例)
     - [精排（CTR预测）](#精排ctr预测)
     - [多任务排序](#多任务排序)
     - [召回模型](#召回模型)
+    - [模型可视化](#模型可视化)
   - [👨‍💻‍ 贡献者](#-贡献者)
   - [🤝 贡献指南](#-贡献指南)
   - [📜 许可证](#-许可证)
@@ -115,16 +120,19 @@ git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 
+# 安装 optinal dependency Annoy
+uv pip install ".[annoy]"
+
 # 运行召回示例（需要先进入对应目录，脚本使用相对路径加载数据）
 cd examples/matching
-python run_ml_dssm.py
+uv run python run_ml_dssm.py
 
 # 或使用自定义参数：
-python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
+uv run python run_ml_dssm.py --model_name dssm --device 'cuda:0' --learning_rate 0.001 --epoch 50 --batch_size 4096 --weight_decay 0.0001 --save_dir 'saved/dssm_ml-100k'
 
 # 运行精排示例
 cd ../ranking
-python run_criteo.py
+uv run python run_criteo.py
 ```
 
 训练完成后，模型文件将保存在 `saved/dssm_ml-100k` 目录下（或你配置的其他目录）。
