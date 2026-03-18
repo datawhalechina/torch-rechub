@@ -17,10 +17,10 @@ Train Model → ONNX Export → Model Quantization → Vector Index → Online S
 
 | Feature | Description | Documentation |
 | --- | --- | --- |
-| **ONNX Export** | Export PyTorch models to ONNX format | [ONNX Export & Quantization](/en/serving/onnx) |
-| **Model Quantization** | INT8/FP16 quantization to reduce inference latency | [ONNX Export & Quantization](/en/serving/onnx) |
-| **Vector Retrieval** | Annoy/FAISS/Milvus vector indexing | [Vector Retrieval](/en/serving/vector_index) |
-| **Online Service** | Deployment examples and best practices | [Online Service Demo](/en/serving/demo) |
+| **ONNX Export** | Export PyTorch models to ONNX format | [ONNX Export & Quantization](/serving/onnx) |
+| **Model Quantization** | INT8/FP16 quantization to reduce inference latency | [ONNX Export & Quantization](/serving/onnx) |
+| **Vector Retrieval** | Annoy/FAISS/Milvus vector indexing | [Vector Retrieval](/serving/vector_index) |
+| **Online Service** | Deployment examples and best practices | [Online Service Demo](/serving/demo) |
 
 ## Quick Start
 
@@ -80,6 +80,6 @@ User Request → User Tower Inference → Vector Retrieval → Retrieval Results
 
 ## Next Steps
 
-- Learn about [ONNX Export & Quantization](/en/serving/onnx) in detail
-- Learn about [Vector Retrieval](/en/serving/vector_index) configuration
-- Check [Online Service Demo](/en/serving/demo) for complete deployment workflow
+- Learn about [ONNX Export & Quantization](/serving/onnx) in detail
+- Learn about [Vector Retrieval](/serving/vector_index) configuration
+- Check [Online Service Demo](/serving/demo) for complete deployment workflow

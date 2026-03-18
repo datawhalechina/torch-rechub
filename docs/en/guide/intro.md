@@ -36,31 +36,31 @@ Torch-RecHub adopts a modular design, dividing the core functions of recommendat
 
 Handles different types of features, including dense features, sparse features, and sequence features.
 
-See [Feature Definitions](/en/core/features) for details.
+See [Feature Definitions](/core/features) for details.
 
 ### 2. Data Pipeline
 
 Responsible for data loading, preprocessing, and generating dataloaders, supporting data processing for ranking and matching models.
 
-See [Data Pipeline](/en/core/data) for details.
+See [Data Pipeline](/core/data) for details.
 
 ### 3. Model Library
 
 Implements various recommendation models, including ranking models, matching models, multi-task models, and generative recommendation models.
 
-See [Model Library](/en/models/intro) for details.
+See [Model Library](/models/intro) for details.
 
 ### 4. Training & Evaluation
 
 Provides a unified training interface, supporting model training, evaluation, prediction, and ONNX export.
 
-See [Training & Evaluation](/en/core/evaluation) for details.
+See [Training & Evaluation](/core/evaluation) for details.
 
 ### 5. Development Tools
 
 Provides various utility functions, such as ONNX export, model visualization, callbacks, and loss functions.
 
-See [Development Tools](/en/tools/intro) for details.
+See [Development Tools](/tools/intro) for details.
 
 ## Supported Models
 
@@ -82,16 +82,16 @@ See [Development Tools](/en/tools/intro) for details.
 
 ## Quick Start
 
-To get started with Torch-RecHub, see the [Quick Start](/en/guide/quick_start) page to learn how to install the framework and run your first example.
+To get started with Torch-RecHub, see the [Quick Start](/guide/quick_start) page to learn how to install the framework and run your first example.
 
 ## Production Deployment
 
-Torch-RecHub supports exporting trained models to ONNX format for production deployment. See [Production Deployment](/en/serving/intro) for details.
+Torch-RecHub supports exporting trained models to ONNX format for production deployment. See [Production Deployment](/serving/intro) for details.
 
 ## Community Contribution
 
-We welcome all forms of contributions! See the [Contributing Guide](/en/community/contributing) for detailed contribution guidelines.
+We welcome all forms of contributions! See the [Contributing Guide](/community/contributing) for detailed contribution guidelines.
 
 ## FAQ
 
-If you encounter issues, see the [FAQ](/en/community/faq) page or submit an Issue on GitHub.
+If you encounter issues, see the [FAQ](/community/faq) page or submit an Issue on GitHub.

@@ -13,9 +13,9 @@ This section provides practical tutorials for Torch-RecHub in different recommen
 
 | Tutorial | Description | Link |
 | --- | --- | --- |
-| **CTR Prediction** | Click-through rate prediction model training | [CTR Prediction Tutorial](/en/tutorials/ctr) |
-| **Matching Models** | Two-tower matching model training | [Matching Models Tutorial](/en/tutorials/retrieval) |
-| **Complete Pipeline** | End-to-end recommendation system | [Complete Pipeline Tutorial](/en/tutorials/pipeline) |
+| **CTR Prediction** | Click-through rate prediction model training | [CTR Prediction Tutorial](/tutorials/ctr) |
+| **Matching Models** | Two-tower matching model training | [Matching Models Tutorial](/tutorials/retrieval) |
+| **Complete Pipeline** | End-to-end recommendation system | [Complete Pipeline Tutorial](/tutorials/pipeline) |
 
 ## Quick Navigation
 
@@ -32,7 +32,7 @@ trainer = CTRTrainer(model)
 trainer.fit(train_dl, val_dl)
 ```
 
-[View Full Tutorial →](/en/tutorials/ctr)
+[View Full Tutorial →](/tutorials/ctr)
 
 ### Matching Models
 
@@ -47,4 +47,4 @@ trainer = MatchTrainer(model)
 trainer.fit(train_dl)
 ```
 
-[View Full Tutorial →](/en/tutorials/retrieval)
+[View Full Tutorial →](/tutorials/retrieval)

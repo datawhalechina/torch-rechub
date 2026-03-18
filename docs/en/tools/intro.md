@@ -11,9 +11,9 @@ Torch-RecHub provides a rich set of development tools to help developers more ef
 
 | Tool Category | Description | Documentation |
 | --- | --- | --- |
-| **Callbacks** | Early stopping, model saving during training | [Callbacks](/en/tools/callbacks) |
-| **Experiment Tracking** | WandB, SwanLab, TensorBoardX integration | [Experiment Tracking](/en/tools/tracking) |
-| **Model Visualization** | Model architecture graph generation and display | [Visualization](/en/tools/visualization) |
+| **Callbacks** | Early stopping, model saving during training | [Callbacks](/tools/callbacks) |
+| **Experiment Tracking** | WandB, SwanLab, TensorBoardX integration | [Experiment Tracking](/tools/tracking) |
+| **Model Visualization** | Model architecture graph generation and display | [Visualization](/tools/visualization) |
 
 ## Callbacks
 
@@ -40,7 +40,7 @@ for epoch in range(n_epoch):
         break
 ```
 
-See [Callbacks](/en/tools/callbacks) for details.
+See [Callbacks](/tools/callbacks) for details.
 
 ## Experiment Tracking
 
@@ -62,7 +62,7 @@ trainer = CTRTrainer(model, model_logger=logger)
 trainer.fit(train_dl, val_dl)
 ```
 
-See [Experiment Tracking](/en/tools/tracking) for details.
+See [Experiment Tracking](/tools/tracking) for details.
 
 ## Model Visualization
 
@@ -78,7 +78,7 @@ graph = visualize_model(model, depth=4)
 visualize_model(model, save_path="model_arch.pdf", dpi=300)
 ```
 
-See [Visualization](/en/tools/visualization) for details.
+See [Visualization](/tools/visualization) for details.
 
 ## Loss Functions
 
@@ -138,7 +138,7 @@ loss = nce_loss(logits, targets)
 
 ## Next Steps
 
-- Learn about [Callbacks](/en/tools/callbacks) in detail
-- Learn about [Experiment Tracking](/en/tools/tracking) configuration
-- Learn about [Visualization](/en/tools/visualization) usage
+- Learn about [Callbacks](/tools/callbacks) in detail
+- Learn about [Experiment Tracking](/tools/tracking) configuration
+- Learn about [Visualization](/tools/visualization) usage
 
