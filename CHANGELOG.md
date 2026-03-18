@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-03-18
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* fix data.py by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/192
+* Update metric.py by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/194
+* feat: add NPU optional dependency for Huawei Ascend support by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/196
+* feat: add MMOE/ESMM notebook and training code by @Luxorion-12 in https://github.com/datawhalechina/torch-rechub/pull/200
+### 🐛 Bug 修复 / Bug Fixes
+* Update 00_QuickStart_CTR_DeepFM.ipynb && Update __init__.py by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/187
+### 📝 文档更新 / Documentation
+* docs: add model usage example documentation for 6 priority models by @sliortega295-ops in https://github.com/datawhalechina/torch-rechub/pull/185
+* docs: add model usage example documentation for DIN, DIEN, BST, MIND, PLE (Batch 2) by @sliortega295-ops in https://github.com/datawhalechina/torch-rechub/pull/188
+* add DSSM,DeepFM,DIN.ipynb by @queenyn in https://github.com/datawhalechina/torch-rechub/pull/199
+### 🔧 模型更新 / Models
+* Refactor BST transformer handling by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/195
+
+## New Contributors
+* @sliortega295-ops made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/185
+* @queenyn made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/199
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.5.0...v0.6.0
+
+---
+
+
+
 ## [0.5.0] - 2026-02-27
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
