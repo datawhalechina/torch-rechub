@@ -4,18 +4,17 @@
 
 # Torch-RecHub: A Lightweight, Efficient, and Easy-to-use PyTorch Recommender Framework
 
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
-![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
-![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/)
-[![PyTorch Version](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/)
-[![annoy Version](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://github.com/spotify/annoy)
-[![pandas Version](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/)
-[![numpy Version](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/)
-[![scikit-learn Version](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
-[![torch-rechub Version](https://img.shields.io/badge/torch_rechub-0.0.3%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
-[![torchview](https://img.shields.io/badge/torchview-0.2%2B-green?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
+[![torch_rechub](https://img.shields.io/pypi/v/torch-rechub?style=for-the-badge&color=orange&label=torch_rechub)](https://pypi.org/project/torch-rechub/)
+[![downloads](https://img.shields.io/pepy/dt/torch-rechub?style=for-the-badge&color=orange&label=downloads)](https://pepy.tech/projects/torch-rechub)
+[![license](https://img.shields.io/badge/license-MIT-4c1?style=for-the-badge)](LICENSE)
+
+![stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+![forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+![issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+
+[![python](https://img.shields.io/badge/python-3.9%2B-3776AB?style=for-the-badge)](https://www.python.org/)
+[![pytorch](https://img.shields.io/badge/pytorch-1.7%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
+[![torchview](https://img.shields.io/badge/torchview-0.2%2B-6CB33F?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 English | [简体中文](README.md)
 
@@ -376,4 +375,4 @@ If you use this framework in your research or work, please consider citing:
 
 ---
 
-*Last updated: [2025-12-11]*
+*Last updated: [2026-03-20]*
