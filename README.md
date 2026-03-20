@@ -4,18 +4,17 @@
 
 # Torch-RecHub: 轻量、高效、易用的 PyTorch 推荐系统框架
 
-[![许可证](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-![GitHub Repo stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge)
-![GitHub forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge)
-![GitHub issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge)
-[![Python 版本](https://img.shields.io/badge/python-3.9%2B-orange?style=for-the-badge)](https://www.python.org/)
-[![PyTorch 版本](https://img.shields.io/badge/pytorch-1.7%2B-orange?style=for-the-badge)](https://pytorch.org/)
-[![annoy 版本](https://img.shields.io/badge/annoy-1.17%2B-orange?style=for-the-badge)](https://github.com/spotify/annoy)
-[![pandas 版本](https://img.shields.io/badge/pandas-1.2%2B-orange?style=for-the-badge)](https://pandas.pydata.org/)
-[![numpy 版本](https://img.shields.io/badge/numpy-1.19%2B-orange?style=for-the-badge)](https://numpy.org/)
-[![scikit-learn 版本](https://img.shields.io/badge/scikit_learn-0.23%2B-orange?style=for-the-badge)](https://scikit-learn.org/)
-[![torch-rechub 版本](https://img.shields.io/badge/torch_rechub-0.4.0%2B-orange?style=for-the-badge)](https://pypi.org/project/torch-rechub/)
-[![torchview](https://img.shields.io/badge/torchview-0.2%2B-green?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
+[![torch_rechub](https://img.shields.io/pypi/v/torch-rechub?style=for-the-badge&color=orange&label=torch_rechub)](https://pypi.org/project/torch-rechub/)
+[![downloads](https://img.shields.io/pepy/dt/torch-rechub?style=for-the-badge&color=orange&label=downloads)](https://pepy.tech/projects/torch-rechub)
+[![license](https://img.shields.io/badge/license-MIT-4c1?style=for-the-badge)](LICENSE)
+
+![stars](https://img.shields.io/github/stars/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+![forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+![issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
+
+[![python](https://img.shields.io/badge/python-3.9%2B-3776AB?style=for-the-badge)](https://www.python.org/)
+[![pytorch](https://img.shields.io/badge/pytorch-1.7%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
+[![torchview](https://img.shields.io/badge/torchview-0.2%2B-6CB33F?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 [English](README_en.md) | 简体中文
 
@@ -380,4 +379,4 @@ ctr_trainer.visualization(save_path="model.pdf", dpi=300)  # 保存为高清 PDF
 
 ---
 
-*最后更新: [2025-12-11]*
+*最后更新: [2026-03-20]*
