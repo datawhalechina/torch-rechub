@@ -60,13 +60,13 @@ Models are organized by stage/task:
 ## Documentation Navigation
 
 - Ranking models: detailed principles, usage, and parameters.  
-  [See ranking docs](/en/models/ranking)
+  [See ranking docs](/models/ranking)
 - Matching models: detailed principles, usage, and parameters.  
-  [See matching docs](/en/models/matching)
+  [See matching docs](/models/matching)
 - Multi-task models: detailed principles, usage, and parameters.  
-  [See multi-task docs](/en/models/mtl)
+  [See multi-task docs](/models/mtl)
 - Generative models: principles, usage, and parameters.  
-  [See generative docs](/en/models/generative)
+  [See generative docs](/models/generative)
 
 ## Usage Examples
 
@@ -102,5 +102,5 @@ trainer.fit(train_dataloader)
 
 ## Contributing New Models
 
-If you want to contribute new models, please refer to the [Contributing Guide](/en/community/contributing) and follow the project's coding standards and documentation requirements.
+If you want to contribute new models, please refer to the [Contributing Guide](/community/contributing) and follow the project's coding standards and documentation requirements.
 

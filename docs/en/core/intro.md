@@ -24,7 +24,7 @@ Torch-RecHub is modular: features, data, models, training, and tools are separat
 
 ## Component Details
 
-- **Feature processing**: `DenseFeature`, `SparseFeature`, `SequenceFeature`. See [Features](/en/core/features).  
-- **Data pipeline**: `TorchDataset`, `PredictDataset`, `DataGenerator`, `MatchDataGenerator`. See [Data](/en/core/data).  
-- **Training & evaluation**: `CTRTrainer`, `MatchTrainer`, `MTLTrainer` (and generative trainer variants). See [Training & Evaluation](/en/core/evaluation).
+- **Feature processing**: `DenseFeature`, `SparseFeature`, `SequenceFeature`. See [Features](/core/features).  
+- **Data pipeline**: `TorchDataset`, `PredictDataset`, `DataGenerator`, `MatchDataGenerator`. See [Data](/core/data).  
+- **Training & evaluation**: `CTRTrainer`, `MatchTrainer`, `MTLTrainer` (and generative trainer variants). See [Training & Evaluation](/core/evaluation).
 
