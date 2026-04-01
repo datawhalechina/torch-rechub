@@ -1,0 +1,57 @@
+name: API Docs
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'torch_rechub/**'
+      - 'config/generate_api_md.py'
+      - '.github/workflows/api-docs.yml'
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  api-docs:
+    name: Auto Generate API Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Detect API source changes
+        id: changed-files
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            torch_rechub:
+              - 'torch_rechub/**'
+
+      - name: Set up Python
+        if: steps.changed-files.outputs.torch_rechub == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Generate API docs
+        if: steps.changed-files.outputs.torch_rechub == 'true'
+        run: |
+          python config/generate_api_md.py
+
+      - name: Commit generated API docs
+        if: steps.changed-files.outputs.torch_rechub == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/en/api/api.md docs/zh/api/api.md
+          if git diff --staged --quiet; then
+            echo "No API doc changes to commit"
+          else
+            git commit -m "docs(api): auto-generate API docs [skip ci]"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
