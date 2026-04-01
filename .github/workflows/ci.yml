@@ -8,18 +8,8 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'torch_rechub/**'
-      - 'tutorials/**'
-      - 'examples/**'
-      - 'config/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - '.github/workflows/ci.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'torch_rechub/**'
       - 'tutorials/**'

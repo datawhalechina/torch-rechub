@@ -21,7 +21,8 @@ class CTRTrainer(object):
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
-        loss_mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
+        loss_mode (bool): whether the model returns only prediction or prediction with extra loss
+            (`True`: `model(x_dict) -> y_pred`, `False`: `model(x_dict) -> (y_pred, other_loss)`).
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
         embedding_l1 (float): L1 regularization coefficient for embedding parameters (default=0.0).
         embedding_l2 (float): L2 regularization coefficient for embedding parameters (default=0.0).
@@ -246,62 +247,43 @@ class CTRTrainer(object):
         showing layer connections, tensor shapes, and nested module structures.
         It automatically extracts feature information from the model.
 
-        Parameters
-        ----------
-        input_data : dict, optional
-            Example input dict {feature_name: tensor}.
-            If not provided, dummy inputs will be generated automatically.
-        batch_size : int, default=2
-            Batch size for auto-generated dummy input.
-        seq_length : int, default=10
-            Sequence length for SequenceFeature.
-        depth : int, default=3
-            Visualization depth, higher values show more detail.
-            Set to -1 to show all layers.
-        show_shapes : bool, default=True
-            Whether to display tensor shapes.
-        expand_nested : bool, default=True
-            Whether to expand nested modules.
-        save_path : str, optional
-            Path to save the graph image (.pdf, .svg, .png).
-            If None, displays in Jupyter or opens system viewer.
-        graph_name : str, default="model"
-            Name for the graph.
-        device : str, optional
-            Device for model execution. If None, defaults to 'cpu'.
-        dpi : int, default=300
-            Resolution in dots per inch for output image.
-            Higher values produce sharper images suitable for papers.
-        **kwargs : dict
-            Additional arguments passed to torchview.draw_graph().
+        Args:
+            input_data (dict, optional): Example input dict {feature_name: tensor}.
+                If not provided, dummy inputs will be generated automatically.
+            batch_size (int): Batch size for auto-generated dummy input (default: 2).
+            seq_length (int): Sequence length for SequenceFeature (default: 10).
+            depth (int): Visualization depth, higher values show more detail.
+                Set to -1 to show all layers (default: 3).
+            show_shapes (bool): Whether to display tensor shapes (default: True).
+            expand_nested (bool): Whether to expand nested modules (default: True).
+            save_path (str, optional): Path to save the graph image (.pdf, .svg, .png).
+                If None, displays in Jupyter or opens system viewer.
+            graph_name (str): Name for the graph (default: "model").
+            device (str, optional): Device for model execution. If None, defaults to 'cpu'.
+            dpi (int): Resolution in dots per inch for output image.
+                Higher values produce sharper images suitable for papers (default: 300).
+            **kwargs: Additional arguments passed to ``torchview.draw_graph()``.
 
-        Returns
-        -------
-        ComputationGraph
-            A torchview ComputationGraph object.
+        Returns:
+            ComputationGraph: A torchview ComputationGraph object.
 
-        Raises
-        ------
-        ImportError
-            If torchview or graphviz is not installed.
+        Raises:
+            ImportError: If torchview or graphviz is not installed.
 
-        Notes
-        -----
-        Default Display Behavior:
-            When `save_path` is None (default):
+        Note:
+            When ``save_path`` is None (default):
             - In Jupyter/IPython: automatically displays the graph inline
             - In Python script: opens the graph with system default viewer
 
-        Examples
-        --------
-        >>> trainer = CTRTrainer(model, ...)
-        >>> trainer.fit(train_dl, val_dl)
-        >>>
-        >>> # Auto-display in Jupyter (no save_path needed)
-        >>> trainer.visualization(depth=4)
-        >>>
-        >>> # Save to high-DPI PNG for papers
-        >>> trainer.visualization(save_path="model.png", dpi=300)
+        Example:
+            >>> trainer = CTRTrainer(model, ...)
+            >>> trainer.fit(train_dl, val_dl)
+            >>>
+            >>> # Auto-display in Jupyter (no save_path needed)
+            >>> trainer.visualization(depth=4)
+            >>>
+            >>> # Save to high-DPI PNG for papers
+            >>> trainer.visualization(save_path="model.png", dpi=300)
         """
         from ..utils.visualization import TORCHVIEW_AVAILABLE, visualize_model
 
