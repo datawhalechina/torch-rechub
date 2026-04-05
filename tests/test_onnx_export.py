@@ -387,6 +387,106 @@ class TestONNXExportRankingModels:
             assert os.path.exists(onnx_path)
             assert check_onnx_model_valid(onnx_path)
 
+    def test_export_din_with_sequence_features(self):
+        """Test ONNX export for DIN with sequence features."""
+        from torch_rechub.models.ranking import DIN
+        from torch_rechub.trainers import CTRTrainer
+
+        features = [
+            SparseFeature("target_item_id",
+                          vocab_size=100,
+                          embed_dim=8),
+            SparseFeature("target_cate_id",
+                          vocab_size=50,
+                          embed_dim=8),
+            SparseFeature("user_id",
+                          vocab_size=20,
+                          embed_dim=8),
+        ]
+        target_features = features[:2]
+        history_features = [
+            SequenceFeature("hist_item_id",
+                            vocab_size=100,
+                            embed_dim=8,
+                            pooling="concat",
+                            shared_with="target_item_id"),
+            SequenceFeature("hist_cate_id",
+                            vocab_size=50,
+                            embed_dim=8,
+                            pooling="concat",
+                            shared_with="target_cate_id"),
+        ]
+
+        model = DIN(
+            features=features,
+            history_features=history_features,
+            target_features=target_features,
+            mlp_params={"dims": [16,
+                                 8]},
+            attention_mlp_params={"dims": [16,
+                                           8]},
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            trainer = CTRTrainer(model, n_epoch=1, device='cpu', model_path=tmpdir)
+            onnx_path = os.path.join(tmpdir, "din.onnx")
+
+            result = trainer.export_onnx(onnx_path, dynamic_batch=False, verbose=False)
+
+            assert result is True
+            assert os.path.exists(onnx_path)
+            assert check_onnx_model_valid(onnx_path)
+
+    def test_export_din_with_dynamic_batch_default(self):
+        """Test ONNX export for DIN with default dynamic-batch export behavior."""
+        from torch_rechub.models.ranking import DIN
+        from torch_rechub.trainers import CTRTrainer
+
+        features = [
+            SparseFeature("target_item_id",
+                          vocab_size=100,
+                          embed_dim=8),
+            SparseFeature("target_cate_id",
+                          vocab_size=50,
+                          embed_dim=8),
+            SparseFeature("user_id",
+                          vocab_size=20,
+                          embed_dim=8),
+        ]
+        target_features = features[:2]
+        history_features = [
+            SequenceFeature("hist_item_id",
+                            vocab_size=100,
+                            embed_dim=8,
+                            pooling="concat",
+                            shared_with="target_item_id"),
+            SequenceFeature("hist_cate_id",
+                            vocab_size=50,
+                            embed_dim=8,
+                            pooling="concat",
+                            shared_with="target_cate_id"),
+        ]
+
+        model = DIN(
+            features=features,
+            history_features=history_features,
+            target_features=target_features,
+            mlp_params={"dims": [16,
+                                 8]},
+            attention_mlp_params={"dims": [16,
+                                           8]},
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            trainer = CTRTrainer(model, n_epoch=1, device='cpu', model_path=tmpdir)
+            onnx_path = os.path.join(tmpdir, "din_dynamic.onnx")
+
+            result = trainer.export_onnx(onnx_path, dynamic_batch=True, verbose=False)
+
+            assert result is True
+            assert os.path.exists(onnx_path)
+            assert check_onnx_model_valid(onnx_path)
+
 
 class TestONNXExportMatchingModels:
     """Integration tests for ONNX export of matching models."""

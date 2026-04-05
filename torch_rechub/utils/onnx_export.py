@@ -98,6 +98,31 @@ class ONNXExporter:
         self.device = device
         self.feature_info = extract_feature_info(model)
 
+    def _build_dynamic_shapes(self,
+                              features: List[Union[DenseFeature,
+                                                   SequenceFeature,
+                                                   SparseFeature]]) -> Tuple[
+                                                       Tuple[Dict[int,
+                                                                  Any],
+                                                             ...],
+                                                   ]:
+        """Build ``dynamic_shapes`` config for the dynamo exporter."""
+        try:
+            Dim = torch.export.Dim
+        except AttributeError as exc:
+            raise RuntimeError("The dynamo ONNX exporter requires torch.export.Dim, which is unavailable in this PyTorch version.") from exc
+
+        batch_dim = Dim("batch_size")
+        dynamic_shapes = []
+        for feature in features:
+            feature_axes: Dict[int, Any] = {0: batch_dim}
+            if isinstance(feature, SequenceFeature):
+                feature_axes[1] = Dim(f"{feature.name}_seq_length")
+            dynamic_shapes.append(feature_axes)
+        # ``ONNXWrapper.forward`` uses ``*args`` so torch.export sees a single top-level
+        # tuple argument whose elements are the actual model inputs.
+        return (tuple(dynamic_shapes),)
+
     def export(
         self,
         output_path: str,
@@ -139,6 +164,10 @@ class ONNXExporter:
               - If you pass keys that overlap with the explicit parameters above
                 (like ``opset_version`` / ``dynamic_axes`` / ``input_names``), this function
                 will raise a ``ValueError`` to avoid ambiguous behavior.
+              - By default, this method tries the dynamo exporter first and
+                falls back to the legacy exporter automatically. To force one
+                path, pass ``onnx_export_kwargs={"dynamo": True}`` or
+                ``onnx_export_kwargs={"dynamo": False}``.
               - Some kwargs (like ``dynamo``) are only available in newer PyTorch; unsupported
                 keys will be ignored for compatibility.
 
@@ -197,17 +226,18 @@ class ONNXExporter:
                                         "f": output_path,
                                         "input_names": input_names,
                                         "output_names": ["output"],
-                                        "dynamic_axes": dynamic_axes,
                                         "opset_version": opset_version,
                                         "do_constant_folding": True,
                                         "verbose": verbose,
                                     }
+                if dynamic_axes is not None:
+                    export_kwargs["dynamic_axes"] = dynamic_axes
 
                 if onnx_export_kwargs:
                     # Prevent silent conflicts with explicit arguments
                     overlap = set(export_kwargs.keys()) & set(onnx_export_kwargs.keys())
                     # allow user to set 'dynamo' even if we inject it later
-                    overlap.discard("dynamo")
+                    overlap -= {"dynamo", "dynamic_shapes"}
                     if overlap:
                         raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
                                          f"{sorted(overlap)}. Please set them via export() parameters instead.")
@@ -222,13 +252,35 @@ class ONNXExporter:
                 #
                 # In older torch versions, 'dynamo' kwarg does not exist.
                 sig = inspect.signature(torch.onnx.export)
+                user_specified_dynamo = bool(onnx_export_kwargs and "dynamo" in onnx_export_kwargs)
+                user_specified_dynamic_shapes = bool(onnx_export_kwargs and "dynamic_shapes" in onnx_export_kwargs)
                 if "dynamo" in sig.parameters:
                     if "dynamo" not in export_kwargs:
-                        export_kwargs["dynamo"] = False if dynamic_axes is not None else True
+                        export_kwargs["dynamo"] = True
                 else:
                     export_kwargs.pop("dynamo", None)
 
-                torch.onnx.export(wrapper, dummy_tuple, **export_kwargs)
+                if export_kwargs.get("dynamo") is True:
+                    export_kwargs.pop("dynamic_axes", None)
+                    if dynamic_batch and not user_specified_dynamic_shapes:
+                        export_kwargs["dynamic_shapes"] = self._build_dynamic_shapes(features)
+                elif dynamic_axes is not None:
+                    export_kwargs.pop("dynamic_shapes", None)
+
+                try:
+                    torch.onnx.export(wrapper, dummy_tuple, **export_kwargs)
+                except Exception as export_error:
+                    should_retry_with_legacy = (export_kwargs.get("dynamo") is True and not user_specified_dynamo and "dynamo" in sig.parameters)
+                    if not should_retry_with_legacy:
+                        raise
+
+                    warnings.warn("Dynamo-based ONNX export failed; retrying with the legacy exporter. "
+                                  f"Original error: {export_error}")
+                    export_kwargs["dynamo"] = False
+                    export_kwargs.pop("dynamic_shapes", None)
+                    if dynamic_axes is not None:
+                        export_kwargs["dynamic_axes"] = dynamic_axes
+                    torch.onnx.export(wrapper, dummy_tuple, **export_kwargs)
 
             if verbose:
                 print(f"Successfully exported ONNX model to: {output_path}")

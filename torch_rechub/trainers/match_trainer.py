@@ -286,6 +286,9 @@ class MatchTrainer(object):
                 If None, defaults to 'cpu' for maximum compatibility.
             verbose (bool): Print export details (default: False).
             onnx_export_kwargs (dict, optional): Extra kwargs forwarded to ``torch.onnx.export``.
+                The exporter tries the dynamo path first and falls back to the
+                legacy exporter automatically. Pass ``{\"dynamo\": False}`` here
+                to force legacy export when needed.
 
         Returns:
             bool: True if export succeeded, False otherwise.
