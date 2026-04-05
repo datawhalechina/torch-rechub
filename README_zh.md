@@ -102,6 +102,19 @@ uv pip install torch torch-npu                                           # NPU (
 uv sync
 ```
 
+### 可选依赖
+
+可以通过 `uv sync --extra <name>` 或 `pip install "torch-rechub[<name>]"` 安装对应的可选依赖组。
+
+* `annoy`: 提供基于 Annoy 的近似最近邻索引能力，适合召回服务实验。
+* `faiss`: 提供基于 FAISS 的高性能向量索引能力，适合检索实验与评估。
+* `milvus`: 提供 Milvus 客户端支持，便于对接外部向量数据库服务。
+* `bigdata`: 提供 PyArrow 支持，用于基于 Parquet 的数据加载与大数据预处理。
+* `onnx`: 提供 ONNX 导出、运行时推理与模型转换相关依赖。
+* `visualization`: 提供 TorchView 与 Graphviz 支持，用于模型结构可视化。
+* `tracking`: 提供 WandB、SwanLab 与 TensorBoardX 支持，用于实验跟踪。
+* `dev`: 提供测试、格式化、类型检查与本地开发工具链。
+
 
 
 ## 🚀 快速开始

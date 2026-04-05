@@ -102,6 +102,19 @@ uv pip install torch torch-npu                                           # NPU (
 uv sync
 ```
 
+### Optional Dependencies
+
+Install an extra group with `uv sync --extra <name>` or `pip install "torch-rechub[<name>]"`.
+
+* `annoy`: Adds Annoy-based approximate nearest neighbor indexing for retrieval serving.
+* `faiss`: Adds FAISS-based vector indexing for high-performance retrieval experiments.
+* `milvus`: Adds Milvus client support for external vector database serving workflows.
+* `bigdata`: Adds PyArrow support for Parquet-based data loading and big-data preprocessing.
+* `onnx`: Adds ONNX export, runtime inference, and model conversion dependencies.
+* `visualization`: Adds model graph visualization support with TorchView and Graphviz.
+* `tracking`: Adds WandB, SwanLab, and TensorBoardX integrations for experiment tracking.
+* `dev`: Adds testing, linting, typing, and local development tooling.
+
 ## 🚀 Quick Start
 
 Here's a simple example of training a model (e.g., DSSM) on the MovieLens dataset:
