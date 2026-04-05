@@ -3337,6 +3337,9 @@ for deployment. The export is non-invasive and does not modify the model code.
   If None, defaults to 'cpu' for maximum compatibility.
 - `verbose` (`bool`): Print export details (default: False).
 - `onnx_export_kwargs` (`dict, optional`): Extra kwargs forwarded to ``torch.onnx.export``.
+  The exporter tries the dynamo path first and falls back to the
+  legacy exporter automatically. Pass ``{"dynamo": False}`` here
+  to force legacy export when needed.
 
 **Returns**
 
@@ -3509,6 +3512,9 @@ tower separately for efficient online serving.
   If None, defaults to 'cpu' for maximum compatibility.
 - `verbose` (`bool`): Print export details (default: False).
 - `onnx_export_kwargs` (`dict, optional`): Extra kwargs forwarded to ``torch.onnx.export``.
+  The exporter tries the dynamo path first and falls back to the
+  legacy exporter automatically. Pass ``{"dynamo": False}`` here
+  to force legacy export when needed.
 
 **Returns**
 
@@ -3677,6 +3683,9 @@ corresponding to each task.
   If None, defaults to 'cpu' for maximum compatibility.
 - `verbose` (`bool`): Print export details (default: False).
 - `onnx_export_kwargs` (`dict, optional`): Extra kwargs forwarded to ``torch.onnx.export``.
+  The exporter tries the dynamo path first and falls back to the
+  legacy exporter automatically. Pass ``{"dynamo": False}`` here
+  to force legacy export when needed.
 
 **Returns**
 
@@ -3879,44 +3888,27 @@ Module: `torch_rechub.trainers.seq_trainer`
 
 #### `SeqTrainer`
 
-序列生成模型训练器.
+Sequence Generation Model Trainer.
 
-用于训练HSTU等序列生成模型。
-支持CrossEntropyLoss损失函数和生成式评估指标。
+Used for training HSTU, HLLM, and RQVAE models.
+Supports CrossEntropyLoss, NCE Loss, and RQVAE-specific losses.
 
 **Parameters**
 
-- `model` (`nn.Module`): 要训练的模型
-- `optimizer_fn` (`torch.optim`): 优化器函数，默认为torch.optim.Adam
-- `optimizer_params` (`dict`): 优化器参数
-- `scheduler_fn` (`torch.optim.lr_scheduler`): torch调度器类
-- `scheduler_params` (`dict`): 调度器参数
-- `n_epoch` (`int`): 训练轮数，默认10
-- `earlystop_patience` (`int`): 早停耐心值，默认10
-- `device` (`str`): 设备，'cpu'或'cuda'，默认'cpu'
-- `gpus` (`list`): 多GPU的id列表，默认为[]
-- `model_path` (`str`): 模型保存路径，默认为'./'
-
-**Methods**
-
-- `fit` (`训练模型`)
-- `evaluate` (`评估模型`)
-- `predict` (`生成预测`)
-
-**Examples**
-
-```python
->>> trainer = SeqTrainer(
-...     model=model,
-...     optimizer_fn=torch.optim.Adam,
-...     optimizer_params={'lr': 1e-3, 'weight_decay': 1e-5},
-...     device='cuda'
-... )
->>> trainer.fit(
-...     train_loader=train_loader,
-...     val_loader=val_loader
-... )
-```
+- `model` (`nn.Module`): Model to be trained.
+- `optimizer_fn` (`torch.optim`): Optimizer constructor, default torch.optim.Adam.
+- `optimizer_params` (`dict`): Optimizer parameters.
+- `scheduler_fn` (`torch.optim.lr_scheduler`): Torch scheduler class.
+- `scheduler_params` (`dict`): Scheduler parameters.
+- `n_epoch` (`int`): Number of training epochs, default 10.
+- `earlystop_patience` (`int`): Early stopping patience, default 10.
+- `device` (`str`): Device 'cpu' or 'cuda', default 'cpu'.
+- `gpus` (`list`): List of GPU ids for parallel training, default [].
+- `model_path` (`str`): Path to save model checkpoints, default './'.
+- `loss_type` (`str`): Loss function type ('cross_entropy', 'nce', 'mse', 'l1').
+- `loss_params` (`dict`): Parameters for loss function.
+- `model_logger` (`object`): Logger instance.
+- `eval_step` (`int`): Evaluation interval in epochs (for RQVAE), default 50.
 
 ##### `SeqTrainer.fit`
 
@@ -3924,16 +3916,32 @@ Module: `torch_rechub.trainers.seq_trainer`
 fit(self, train_dataloader, val_dataloader = None)
 ```
 
-训练模型.
+Train the model.
 
 **Parameters**
 
-- `train_dataloader` (`DataLoader`): 训练数据加载器
-- `val_dataloader` (`DataLoader`): 验证数据加载器
+- `train_dataloader` (`DataLoader`): Training data loader.
+- `val_dataloader` (`DataLoader`): Validation data loader.
 
 **Returns**
 
-- `dict` (`训练历史`)
+- `dict or tuple: Training history or (best_loss, best_collision_rate) for RQVAE.`
+
+##### `SeqTrainer.train_rqvae_one_epoch`
+
+```python
+train_rqvae_one_epoch(self, data_loader)
+```
+
+Train one epoch for RQVAE model.
+
+##### `SeqTrainer.evaluate_rqvae`
+
+```python
+evaluate_rqvae(self, data_loader)
+```
+
+Evaluate RQVAE model (calculate collision rate).
 
 ##### `SeqTrainer.train_one_epoch`
 
@@ -5107,6 +5115,10 @@ Export model to ONNX format.
       - If you pass keys that overlap with the explicit parameters above
         (like ``opset_version`` / ``dynamic_axes`` / ``input_names``), this function
         will raise a ``ValueError`` to avoid ambiguous behavior.
+      - By default, this method tries the dynamo exporter first and
+        falls back to the legacy exporter automatically. To force one
+        path, pass ``onnx_export_kwargs={"dynamo": True}`` or
+        ``onnx_export_kwargs={"dynamo": False}``.
       - Some kwargs (like ``dynamo``) are only available in newer PyTorch; unsupported
         keys will be ignored for compatibility.
 
