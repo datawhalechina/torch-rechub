@@ -117,6 +117,27 @@
   --vp-backdrop-bg-color: rgba(14, 22, 30, 0.42);
 }
 
+html[lang^='zh'] {
+  --vp-font-family-base:
+    "LXGW WenKai Screen", "霞鹜文楷屏幕阅读版", "LXGW WenKai", "霞鹜文楷",
+    "Kaiti SC", "STKaiti", "KaiTi", "Microsoft YaHei", "PingFang SC",
+    "Hiragino Sans GB", serif;
+  --vp-font-family-heading:
+    "LXGW WenKai Screen", "霞鹜文楷屏幕阅读版", "LXGW WenKai", "霞鹜文楷",
+    "Kaiti SC", "STKaiti", "KaiTi", "Microsoft YaHei", "PingFang SC",
+    "Hiragino Sans GB", serif;
+}
+
+html[lang='en'],
+html:not([lang^='zh']) {
+  --vp-font-family-base:
+    "LXGW WenKai", "霞鹜文楷", Consolas, "Cascadia Code", "SFMono-Regular", "Liberation Mono", Menlo,
+    monospace;
+  --vp-font-family-heading:
+    "LXGW WenKai", "霞鹜文楷", Consolas, "Cascadia Code", "SFMono-Regular", "Liberation Mono", Menlo,
+    monospace;
+}
+
 .dark {
   --vp-c-bg: #0d1418;
   --vp-c-bg-alt: #121b20;

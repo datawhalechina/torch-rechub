@@ -120,13 +120,11 @@
 }
 
 .DocSearch-Container {
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  background: rgba(10, 18, 22, 0.18);
+  background: transparent;
 }
 
 .dark .DocSearch-Container {
-  background: rgba(4, 9, 12, 0.26);
+  background: transparent;
 }
 
 .DocSearch-Modal {
@@ -220,12 +218,12 @@
   transform: translateX(2px);
 }
 
-.VPSidebarItem.is-active > .item > .link > .text,
+.VPSidebarItem.is-active>.item>.link>.text,
 .VPSidebarItem .link:hover .text {
   color: var(--vp-c-brand-1);
 }
 
-.VPSidebarItem.is-active > .item > .link {
+.VPSidebarItem.is-active>.item>.link {
   background: var(--vp-c-brand-soft);
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.12);
@@ -318,7 +316,7 @@
   color: var(--vp-c-text-1);
 }
 
-.vp-doc p + p {
+.vp-doc p+p {
   margin-top: 0.95rem;
 }
 
@@ -398,7 +396,7 @@
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
-.vp-doc div[class*='language-'] > .copy {
+.vp-doc div[class*='language-']>.copy {
   opacity: 0;
   width: auto;
   min-width: 72px;
@@ -413,7 +411,7 @@
     background-color 0.2s ease;
 }
 
-.vp-doc div[class*='language-'] > .copy::after {
+.vp-doc div[class*='language-']>.copy::after {
   display: block;
   font-size: 12px;
   font-weight: 600;
@@ -422,40 +420,40 @@
   content: 'Copy';
 }
 
-.dark .vp-doc div[class*='language-'] > .copy::after {
+.dark .vp-doc div[class*='language-']>.copy::after {
   color: var(--vp-c-text-1);
 }
 
-html[lang^='zh'] .vp-doc div[class*='language-'] > .copy::after {
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy::after {
   content: '复制';
 }
 
-.vp-doc div[class*='language-']:hover > .copy,
-.vp-doc div[class*='language-'] > .copy:focus,
-.vp-doc div[class*='language-'] > .copy.copied {
+.vp-doc div[class*='language-']:hover>.copy,
+.vp-doc div[class*='language-']>.copy:focus,
+.vp-doc div[class*='language-']>.copy.copied {
   opacity: 1;
 }
 
-.vp-doc div[class*='language-'] > .copy:hover,
-.vp-doc div[class*='language-'] > .copy:focus {
+.vp-doc div[class*='language-']>.copy:hover,
+.vp-doc div[class*='language-']>.copy:focus {
   transform: translateY(-1px);
 }
 
-.vp-doc div[class*='language-'] > .copy.copied,
-.vp-doc div[class*='language-'] > .copy:hover.copied {
+.vp-doc div[class*='language-']>.copy.copied,
+.vp-doc div[class*='language-']>.copy:hover.copied {
   min-width: 84px;
   border-radius: 12px;
   background-image: none !important;
 }
 
-.vp-doc div[class*='language-'] > .copy.copied::before,
-.vp-doc div[class*='language-'] > .copy:hover.copied::before {
+.vp-doc div[class*='language-']>.copy.copied::before,
+.vp-doc div[class*='language-']>.copy:hover.copied::before {
   display: none;
   content: none;
 }
 
-.vp-doc div[class*='language-'] > .copy.copied::after,
-.vp-doc div[class*='language-'] > .copy:hover.copied::after {
+.vp-doc div[class*='language-']>.copy.copied::after,
+.vp-doc div[class*='language-']>.copy:hover.copied::after {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -463,8 +461,8 @@ html[lang^='zh'] .vp-doc div[class*='language-'] > .copy::after {
   content: 'Copied';
 }
 
-html[lang^='zh'] .vp-doc div[class*='language-'] > .copy.copied::after,
-html[lang^='zh'] .vp-doc div[class*='language-'] > .copy:hover.copied::after {
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy.copied::after,
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy:hover.copied::after {
   content: '已复制';
 }
 
@@ -563,7 +561,7 @@ html[lang^='zh'] .vp-doc div[class*='language-'] > .copy:hover.copied::after {
   box-shadow: 0 22px 46px rgba(8, 22, 31, 0.12);
 }
 
-.vp-doc img + em {
+.vp-doc img+em {
   display: block;
   margin: -0.5rem auto 1.6rem;
   text-align: center;
@@ -578,7 +576,9 @@ html[lang^='zh'] .vp-doc div[class*='language-'] > .copy:hover.copied::after {
 }
 
 .VPHomeHero .text {
-  max-width: 11ch;
+  max-width: 37ch;
+  font-size: clamp(1.05rem, 1.9vw, 1.55rem);
+  line-height: 1.22;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -711,25 +711,63 @@ html[lang^='zh'] .vp-doc div[class*='language-'] > .copy:hover.copied::after {
 }
 
 .VPFeature .icon {
-  min-width: 56px;
-  min-height: 44px;
-  padding: 0 0.78rem;
+  align-self: flex-start;
+  min-width: 62px;
+  min-height: 40px;
+  padding: 0 0.76rem;
   border: 1px solid rgba(15, 118, 110, 0.14);
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(20, 184, 166, 0.16), rgba(8, 145, 178, 0.08));
   color: var(--vp-c-brand-1);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 800;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.VPFeature .box {
+  padding: 1.1rem 1.15rem 1rem;
 }
 
 .VPFeature .title {
-  font-size: 1.06rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.38;
 }
 
 .VPFeature .details {
   color: var(--vp-c-text-2);
+  font-size: 0.95rem;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.VPFeature .link-text {
+  padding-top: 0.72rem;
+}
+
+.VPFeature .link-text-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+html[lang^='zh'] .VPFeature .title,
+html[lang^='zh'] .VPFeature .link-text-value {
+  word-break: keep-all;
+  line-break: strict;
+}
+
+html[lang^='zh'] .VPFeature .details {
+  word-break: normal;
+  line-break: auto;
+}
+
+html[lang^='zh'] .VPFeature .icon {
+  min-width: 72px;
+  padding: 0 0.82rem;
 }
 
 .VPDocFooter .pager-link {

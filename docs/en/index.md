@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Torch-RecHub"
-  text: "Recommendation engineering that moves from research to production"
-  tagline: "Build ranking, matching, multi-task, generative, and serving workflows on top of a lightweight PyTorch stack that stays easy to extend."
+  text: "A Lightweight PyTorch Framework for Recommendation Systems"
+  tagline: "Easy-to-use, extensible, and high-performance recommendation system framework"
   image:
     src: /img/logo.png
     alt: Torch-RecHub
@@ -22,35 +22,51 @@ hero:
 features:
   - icon: R
     title: Ranking Workflows
-    details: Start with production-friendly ranking models such as WideDeep, DeepFM, DIN, BST, DIEN, DCN, and more.
+    details: Cover production-friendly ranking models such as WideDeep, DeepFM, DIN, BST, DIEN, and DCN.
+    link: /models/ranking
+    linkText: Explore ranking models
 
   - icon: M
     title: Matching and Retrieval
-    details: Cover two-tower retrieval, sequential recall, multi-interest modeling, vector indexing, and recall evaluation in one workflow.
+    details: Support two-tower retrieval, sequential recall, multi-interest modeling, and recall evaluation.
+    link: /models/matching
+    linkText: Explore retrieval models
 
   - icon: MT
     title: Multi-Task Learning
-    details: Train ESMM, MMOE, PLE, AITM, and related architectures with a consistent trainer and feature definition style.
+    details: Train ESMM, MMOE, PLE, AITM, and related multi-task architectures in one workflow.
+    link: /models/mtl
+    linkText: Explore multi-task models
 
   - icon: G
     title: Generative Extensions
-    details: Explore newer recommendation directions without leaving the same core data, trainer, and deployment conventions.
+    details: Explore generative recommendation directions with the same data, trainer, and deployment conventions.
+    link: /models/generative
+    linkText: Explore generative models
 
   - icon: ONNX
     title: Deployment Ready
-    details: Export models to ONNX, validate runtime behavior, and connect serving steps without rebuilding your pipeline from scratch.
+    details: Export to ONNX, validate runtime behavior, and connect serving-friendly deployment steps.
+    link: /serving/onnx
+    linkText: Open ONNX guide
 
   - icon: V
     title: Vector and Search Tooling
-    details: Plug in Annoy, Faiss, or Milvus flows to support recall experiments and retrieval system construction.
+    details: Plug in Annoy, Faiss, or Milvus for vector indexing and retrieval experiments.
+    link: /serving/vector_index
+    linkText: Open vector indexing
 
   - icon: EXP
     title: Experiment Visibility
-    details: Add callbacks, tracking, and visualization to keep runs reproducible and easier to debug across datasets and models.
+    details: Add callbacks, tracking, and visualization to keep experiments reproducible and easier to debug.
+    link: /tools/tracking
+    linkText: Open tracking tools
 
   - icon: DATA
     title: Unified Data Pipeline
-    details: Reuse the same feature schema, data processing, and trainer patterns across ranking, matching, and tutorial examples.
+    details: Reuse one feature schema, data pipeline, and trainer pattern across ranking, matching, and tutorials.
+    link: /core/data
+    linkText: Open data pipeline
 ---
 
 <div class="home-badges">
@@ -65,15 +81,15 @@ features:
 </div>
 
 <div class="home-quick-grid">
-  <a class="home-quick-card" href="/guide/quick_start">
+  <a class="home-quick-card" href="./tutorials/ctr">
     <strong>Get your first run working</strong>
     <span>Install the project, define features, train a baseline, and understand the common trainer flow.</span>
   </a>
-  <a class="home-quick-card" href="/models/intro">
+  <a class="home-quick-card" href="./models/ranking">
     <strong>Choose the right model family</strong>
     <span>Browse ranking, matching, multi-task, and generative models with a consistent documentation structure.</span>
   </a>
-  <a class="home-quick-card" href="/serving/onnx">
+  <a class="home-quick-card" href="./serving/demo">
     <strong>Prepare for deployment</strong>
     <span>Export to ONNX, verify runtime outputs, and wire serving-friendly artifacts into downstream systems.</span>
   </a>
