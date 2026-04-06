@@ -1,394 +1,899 @@
-/* 全局图片样式设置 */
-.vp-doc img {
-  max-height: 50vh;
-  /* 最大高度为视口高度的40% */
-  width: auto;
-  /* 保持宽高比 */
-  display: block;
-  margin: 1.5rem auto;
-  /* 居中显示，上下留白 */
+/* Global layout and typography */
+
+.Layout {
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.06), transparent 26%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.05), transparent 22%);
 }
 
-/* 图片说明文字样式 */
-.vp-doc img+em {
-  display: block;
-  text-align: center;
+.dark .Layout {
+  background:
+    radial-gradient(circle at top left, rgba(47, 192, 190, 0.08), transparent 26%),
+    radial-gradient(circle at top right, rgba(87, 180, 255, 0.08), transparent 22%);
+}
+
+.VPNavBar,
+.VPLocalNav,
+.VPSidebar {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.VPNavBar {
+  border-bottom: 1px solid var(--vp-c-divider-light);
+  box-shadow: 0 12px 30px rgba(7, 26, 35, 0.06);
+}
+
+.dark .VPNavBar {
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
+}
+
+.VPNavBarTitle .logo {
+  filter: drop-shadow(0 10px 20px rgba(15, 118, 110, 0.18));
+}
+
+.VPNavBarTitle .title {
+  font-family: var(--vp-font-family-heading);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.VPNavBarMenu .VPNavBarMenuLink,
+.VPNavBarMenuGroup .button {
+  align-self: center;
+  height: 42px;
+  padding: 0 0.95rem !important;
+  border-radius: 10px;
+  line-height: 1 !important;
+  font-weight: 600;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.VPNavBarMenu .VPNavBarMenuLink:hover,
+.VPNavBarMenuGroup .button:hover {
+  background: rgba(20, 184, 166, 0.06);
+  transform: translateY(-1px);
+}
+
+.VPNavBarMenu .VPNavBarMenuLink.active,
+.VPNavBarMenu .VPNavBarMenuLink:hover,
+.VPNavBarMenuGroup .button:hover {
+  color: var(--vp-c-brand-1);
+}
+
+.VPNavBarMenu .VPNavBarMenuLink.active {
+  border-radius: 12px;
+  background: var(--vp-c-brand-soft);
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.12);
+}
+
+.VPNavBarSearch .DocSearch-Button {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 250, 0.98));
+  box-shadow: 0 10px 24px rgba(6, 26, 34, 0.08);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.dark .VPNavBarSearch .DocSearch-Button {
+  background:
+    linear-gradient(180deg, rgba(21, 32, 37, 0.96), rgba(14, 23, 28, 0.98));
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+.VPNavBarSearch .DocSearch-Button:hover {
+  border-color: rgba(15, 118, 110, 0.24);
+  box-shadow: 0 14px 28px rgba(8, 33, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.DocSearch-Button-Container,
+.DocSearch-Search-Icon,
+.DocSearch-Button-Placeholder,
+.DocSearch-Button-Key {
   color: var(--vp-c-text-2);
-  font-size: 0.9em;
-  margin-top: -1rem;
-  margin-bottom: 1.5rem;
 }
 
-/* ============================================================================
-   VitePress 布局相关 CSS 变量参考
-   ============================================================================
-
-   本节列出了 VitePress 默认主题中所有与布局相关的 CSS 变量。
-   你可以在 :root 选择器中覆盖这些变量来自定义布局。
-
-   来源：https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
-   ============================================================================ */
-
-/* ----------------------------------------------------------------------------
-   1. 整体布局宽度 (Layout Width)
-   ---------------------------------------------------------------------------- */
-
-:root {
-  /* 页面整体最大宽度
-   * 默认值：1440px
-   * 说明：控制整个页面内容的最大宽度，包括侧边栏和主内容区域
-   *
-   * 💡 调整内容区域宽度的主要变量
-   *
-   * 示例 1：增加内容宽度到 90% 视口宽度
-   * --vp-layout-max-width: 90%;
-   *
-   * 示例 2：固定宽度为 1600px
-   * --vp-layout-max-width: 1600px;
-   *
-   * 示例 3：使用 calc() 动态计算（视口宽度减去固定边距）
-   * --vp-layout-max-width: calc(100vw - 100px);
-   *
-   * ⚠️ 注意事项：
-   * - 修改此变量会影响整个页面的宽度，包括导航栏、侧边栏和内容区域
-   * - 在小屏幕设备上，VitePress 会自动调整布局为响应式
-   * - 建议值范围：1200px - 1800px（固定宽度）或 80% - 95%（百分比）
-   */
-  --vp-layout-max-width: 90%;
+.DocSearch-Button-Keys {
+  min-width: 0;
 }
 
-/* ----------------------------------------------------------------------------
-   2. 侧边栏 (Sidebar)
-   ---------------------------------------------------------------------------- */
-
-/* 侧边栏宽度
- * 默认值：272px
- * 说明：控制左侧导航侧边栏的宽度
- *
- * 示例：增加侧边栏宽度
- * :root {
- *   --vp-sidebar-width: 320px;
- * }
- *
- * 💡 提示：
- * - 侧边栏宽度会影响主内容区域的可用宽度
- * - 实际内容宽度 = --vp-layout-max-width - --vp-sidebar-width
- * - 在移动设备上（< 960px），侧边栏会自动折叠为抽屉式菜单
- */
-/* --vp-sidebar-width: 272px; */
-
-/* 侧边栏背景色
- * 默认值：var(--vp-c-bg-alt)
- * 说明：侧边栏的背景颜色，默认使用次要背景色
- */
-/* --vp-sidebar-bg-color: var(--vp-c-bg-alt); */
-
-/* ----------------------------------------------------------------------------
-   3. 导航栏 (Navigation Bar)
-   ---------------------------------------------------------------------------- */
-
-/* 导航栏高度
- * 默认值：64px
- * 说明：顶部导航栏的高度
- *
- * 示例：减小导航栏高度
- * :root {
- *   --vp-nav-height: 56px;
- * }
- */
-/* --vp-nav-height: 64px; */
-
-/* 导航栏背景色
- * 默认值：var(--vp-c-bg)
- * 说明：导航栏的背景颜色
- */
-/* --vp-nav-bg-color: var(--vp-c-bg); */
-
-/* 导航栏全屏菜单背景色
- * 默认值：var(--vp-c-bg)
- * 说明：移动设备上展开菜单时的背景色
- */
-/* --vp-nav-screen-bg-color: var(--vp-c-bg); */
-
-/* 导航栏 Logo 高度
- * 默认值：24px
- * 说明：导航栏中 Logo 图片的高度
- */
-/* --vp-nav-logo-height: 24px; */
-
-/* ----------------------------------------------------------------------------
-   4. 本地导航 (Local Navigation)
-   ---------------------------------------------------------------------------- */
-
-/* 本地导航背景色
- * 默认值：var(--vp-c-bg)
- * 说明：页面内导航（如目录）的背景色
- */
-/* --vp-local-nav-bg-color: var(--vp-c-bg); */
-
-/* ----------------------------------------------------------------------------
-   5. 层级控制 (Z-Index)
-   ---------------------------------------------------------------------------- */
-
-/* 页脚层级
- * 默认值：10
- * 说明：页脚的 z-index 值
- */
-/* --vp-z-index-footer: 10; */
-
-/* 本地导航层级
- * 默认值：20
- * 说明：页面内导航的 z-index 值
- */
-/* --vp-z-index-local-nav: 20; */
-
-/* 顶部导航栏层级
- * 默认值：30
- * 说明：顶部导航栏的 z-index 值
- */
-/* --vp-z-index-nav: 30; */
-
-/* 布局顶层层级
- * 默认值：40
- * 说明：布局顶层元素的 z-index 值
- */
-/* --vp-z-index-layout-top: 40; */
-
-/* 遮罩层层级
- * 默认值：50
- * 说明：模态框遮罩的 z-index 值
- */
-/* --vp-z-index-backdrop: 50; */
-
-/* 侧边栏层级
- * 默认值：60（移动设备）/ 25（桌面设备 >= 960px）
- * 说明：侧边栏的 z-index 值，在不同屏幕尺寸下有不同的值
- *
- * 响应式调整：
- * @media (min-width: 960px) {
- *   :root {
- *     --vp-z-index-sidebar: 25;
- *   }
- * }
- */
-/* --vp-z-index-sidebar: 60; */
-
-/* ----------------------------------------------------------------------------
-   6. 遮罩层 (Backdrop)
-   ---------------------------------------------------------------------------- */
-
-/* 遮罩层背景色
- * 默认值：rgba(0, 0, 0, 0.6)
- * 说明：模态框、抽屉等组件的半透明遮罩背景色
- */
-/* --vp-backdrop-bg-color: rgba(0, 0, 0, 0.6); */
-
-/* ============================================================================
-   实用示例：常见布局调整场景
-   ============================================================================ */
-
-/* 场景 1：增加内容区域宽度（推荐用于宽屏显示器）
- *
- * :root {
- *   --vp-layout-max-width: 1600px;
- * }
- */
-
-/* 场景 2：使用百分比宽度（更灵活的响应式布局）
- *
- * :root {
- *   --vp-layout-max-width: 90%;
- * }
- */
-
-/* 场景 3：调整侧边栏和内容区域的比例
- *
- * :root {
- *   --vp-layout-max-width: 1600px;
- *   --vp-sidebar-width: 300px;
- * }
- *
- * 💡 说明：
- * - 总宽度：1600px
- * - 侧边栏：300px
- * - 内容区域：约 1300px（1600px - 300px）
- */
-
-/* 场景 4：紧凑型布局（适合笔记本电脑）
- *
- * :root {
- *   --vp-layout-max-width: 1200px;
- *   --vp-sidebar-width: 240px;
- *   --vp-nav-height: 56px;
- * }
- */
-
-/* 场景 5：全宽布局（最大化内容显示）
- *
- * :root {
- *   --vp-layout-max-width: 100%;
- * }
- *
- * .VPDoc .container {
- *   max-width: 100%;
- *   padding: 0 2rem;
- * }
- *
- * ⚠️ 注意：全宽布局可能导致文本行过长，影响阅读体验
- * 建议配合 .VPDoc 的 max-width 限制内容宽度
- */
-
-/* ============================================================================
-   变量之间的关系说明
-   ============================================================================
-
-   1. 内容区域实际宽度计算：
-      实际内容宽度 ≈ --vp-layout-max-width - --vp-sidebar-width
-
-   2. 响应式断点：
-      - < 960px：移动设备布局，侧边栏折叠
-      - >= 960px：桌面布局，侧边栏固定显示
-
-   3. 层级关系（从低到高）：
-      页脚(10) < 本地导航(20) < 侧边栏(25/60) < 顶部导航(30) <
-      布局顶层(40) < 遮罩层(50)
-
-   4. 修改建议：
-      - 优先修改 --vp-layout-max-width 来调整整体宽度
-      - 如需更精细控制，再调整 --vp-sidebar-width
-      - 避免修改 z-index 变量，除非遇到层级冲突
-      - 使用百分比宽度可以获得更好的响应式效果
-   ============================================================================ */
-
-/* ============================================================================
-   内容宽度覆盖规则（解决 688px 限制问题）
-   ============================================================================
-
-   ⚠️ 问题说明：
-   VitePress 默认的内容区域最大宽度被限制为 688px，这是由多个嵌套的 CSS 规则
-   共同作用的结果。仅仅修改 --vp-layout-max-width 变量是不够的，还需要覆盖
-   以下几个关键选择器的 max-width 属性。
-
-   📊 默认宽度计算（在 1440px 窗口宽度下）：
-   1. 整体布局：1440px
-   2. 减去左右边距：1440 - 32 - 32 = 1376px
-   3. 减去侧边栏：1376 - 240 = 1136px
-   4. 减去右侧目录：1136 - 224 = 912px
-   5. 减去内容左右边距：912 - 112 - 112 = 688px
-
-   💡 解决方案：
-   通过覆盖以下选择器的 max-width 属性，可以在宽屏显示器上获得更宽的内容区域。
-
-   参考来源：
-   - https://github.com/vuejs/vitepress/discussions/1646
-   - https://github.com/vuejs/vitepress/discussions/1709
-   ============================================================================ */
-
-/* 1. 无侧边栏时的容器宽度
- * 说明：当页面没有左侧边栏时（如首页），容器的最大宽度
- * 默认值：约 1136px
- * 推荐值：1584px（适合 1920px 宽屏）/ 2000px（适合 2560px 宽屏）
- */
-.VPDoc:not(.has-sidebar) .container {
-  max-width: 1584px !important;
+.DocSearch-Button-Key {
+  border: 1px solid var(--vp-c-divider-light);
+  border-bottom-color: rgba(15, 118, 110, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
 }
 
-/* 2. 无侧边栏时的内容宽度
- * 说明：当页面没有左侧边栏时，主内容区域的最大宽度
- * 默认值：约 912px
- * 推荐值：1264px（适合 1920px 宽屏）/ 1600px（适合 2560px 宽屏）
- */
-.VPDoc:not(.has-sidebar) .content {
-  max-width: 1264px !important;
+.dark .DocSearch-Button-Key {
+  background: rgba(24, 36, 42, 0.96);
 }
 
-/* 3. 有右侧目录时的内容容器宽度（最重要）
- * 说明：当页面有右侧目录（Aside）时，内容容器的最大宽度
- * 这是导致 688px 限制的主要原因
- * 默认值：约 912px
- * 推荐值：1168px（适合 1920px 宽屏）/ 1500px（适合 2560px 宽屏）
- *
- * 💡 这是最关键的规则！
- * 如果你的内容区域被限制在 688px，主要就是这个选择器在起作用。
- */
-.VPDoc.has-aside .content-container {
-  max-width: 1168px !important;
+.DocSearch-Container {
+  background: transparent;
 }
 
-/* 4. 通用容器边距重置
- * 说明：移除容器的默认边距，让内容更靠近边缘
- */
+.dark .DocSearch-Container {
+  background: transparent;
+}
+
+.DocSearch-Modal {
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 24px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: 0 28px 80px rgba(7, 18, 25, 0.24);
+}
+
+.DocSearch-SearchBar {
+  border-bottom: 1px solid var(--vp-c-divider-light);
+}
+
+.DocSearch-Form {
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  border-radius: 18px;
+}
+
+.DocSearch-Input {
+  font-size: 1rem;
+  color: var(--vp-c-text-1);
+}
+
+.DocSearch-Dropdown {
+  padding: 0.4rem 0.35rem 0.6rem;
+}
+
+.DocSearch-Hit a {
+  border: 1px solid transparent;
+  border-radius: 16px;
+}
+
+.DocSearch-Hit a,
+.DocSearch-Footer,
+.DocSearch-Hit-source,
+.DocSearch-Form {
+  background: transparent;
+}
+
+.DocSearch-Hit:hover a,
+.DocSearch-Hit[aria-selected='true'] a {
+  background: var(--vp-c-brand-soft);
+  border-color: rgba(15, 118, 110, 0.14);
+}
+
+.DocSearch-Hit-title,
+.DocSearch-Hit-path,
+.DocSearch-Hit-source,
+.DocSearch-Commands-Key,
+.DocSearch-Footer {
+  color: var(--vp-c-text-2);
+}
+
+.DocSearch-Button-Placeholder {
+  color: var(--vp-c-text-2);
+}
+
+.VPSidebar {
+  border-right: 1px solid var(--vp-c-divider-light);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3);
+}
+
+.VPSidebarGroup .title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+}
+
+.VPSidebarItem .text {
+  font-weight: 500;
+}
+
+.VPSidebarItem .item .link,
+.VPSidebarItem .item .item {
+  margin: 0.16rem 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-radius: 14px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.VPSidebarItem .link:hover,
+.VPSidebarItem .item .item:hover {
+  background: rgba(20, 184, 166, 0.08);
+  transform: translateX(2px);
+}
+
+.VPSidebarItem.is-active>.item>.link>.text,
+.VPSidebarItem .link:hover .text {
+  color: var(--vp-c-brand-1);
+}
+
+.VPSidebarItem.is-active>.item>.link {
+  background: var(--vp-c-brand-soft);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.12);
+}
+
+.VPDocAsideOutline .content {
+  padding: 0.9rem 0 0.9rem 1rem;
+  border-left: 1px solid var(--vp-c-divider-light);
+  border-radius: 0 18px 18px 0;
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.06), transparent 72%);
+}
+
+.VPDocAsideOutline .outline-link {
+  display: block;
+  padding: 0.26rem 0 0.26rem 0.35rem;
+  border-left: 2px solid transparent;
+  color: var(--vp-c-text-2);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.VPDocAsideOutline .outline-link:hover,
+.VPDocAsideOutline .outline-link.active {
+  border-left-color: var(--vp-c-brand-2);
+  color: var(--vp-c-brand-1);
+  transform: translateX(2px);
+}
+
 .VPDoc .container {
   margin: 0;
 }
 
-/* ============================================================================
-   宽度调整建议
-   ============================================================================
+.VPDoc:not(.has-sidebar) .container {
+  max-width: 1520px !important;
+}
 
-   根据你的显示器分辨率，可以参考以下推荐值：
+.VPDoc:not(.has-sidebar) .content {
+  max-width: 1240px !important;
+}
 
-   📱 1920px 宽屏（Full HD）：
-   :root {
-     --vp-layout-max-width: 90%;
-   }
-   .VPDoc:not(.has-sidebar) .container {
-     max-width: 1584px !important;
-   }
-   .VPDoc:not(.has-sidebar) .content {
-     max-width: 1264px !important;
-   }
-   .VPDoc.has-aside .content-container {
-     max-width: 1168px !important;
-   }
+.VPDoc.has-aside .content-container {
+  max-width: 1180px !important;
+}
 
-   🖥️ 2560px 宽屏（2K/QHD）：
-   :root {
-     --vp-layout-max-width: 90%;
-   }
-   .VPDoc:not(.has-sidebar) .container {
-     max-width: 2000px !important;
-   }
-   .VPDoc:not(.has-sidebar) .content {
-     max-width: 1600px !important;
-   }
-   .VPDoc.has-aside .content-container {
-     max-width: 1500px !important;
-   }
+.vp-doc {
+  font-size: 16px;
+  line-height: 1.78;
+}
 
-   🖥️ 3840px 宽屏（4K/UHD）：
-   :root {
-     --vp-layout-max-width: 90%;
-   }
-   .VPDoc:not(.has-sidebar) .container {
-     max-width: 3000px !important;
-   }
-   .VPDoc:not(.has-sidebar) .content {
-     max-width: 2400px !important;
-   }
-   .VPDoc.has-aside .content-container {
-     max-width: 2200px !important;
-   }
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.home-quick-card strong,
+.VPFeature .title {
+  font-family: var(--vp-font-family-heading);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
 
-   ⚠️ 注意事项：
-   1. 使用 !important 是必要的，因为需要覆盖 VitePress 的内联样式
-   2. 这些修改不会影响移动端布局（< 960px），VitePress 会自动切换为响应式布局
-   3. 建议保持内容宽度在合理范围内，过宽的文本行会影响阅读体验
-   4. 可以使用浏览器开发者工具（F12）实时调整这些值，找到最适合你的宽度
+.vp-doc h1 {
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  margin-bottom: 0.75rem;
+  font-weight: 800;
+}
 
-   🔍 如何验证修改效果：
-   1. 打开浏览器开发者工具（F12）
-   2. 选择 Elements 标签
-   3. 找到 <div class="VPDoc has-aside"> 元素
-   4. 查看其子元素 <div class="content-container"> 的 Computed 样式
-   5. 确认 max-width 值已经被成功覆盖
-   ============================================================================ */
+.vp-doc h2 {
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-top: 0.3rem;
+  font-size: 1.55rem;
+  font-weight: 760;
+}
 
-/* 表格样式 */
-th,
-td {
-  /* white-space: nowrap !important; */
-  /* 不让th，td内容换行显示 */
-  width: 10%;
-  /* 强制均匀分配宽度 */
+.vp-doc h3 {
+  margin-top: 1.9rem;
+  margin-bottom: 0.7rem;
+  font-size: 1.16rem;
+  font-weight: 720;
+}
+
+.vp-doc h4 {
+  margin-top: 1.45rem;
+  margin-bottom: 0.55rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.vp-doc p,
+.vp-doc li {
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc p+p {
+  margin-top: 0.95rem;
+}
+
+.vp-doc hr {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--vp-c-divider-light);
+}
+
+.vp-doc a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vp-doc a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+}
+
+.vp-doc code {
+  padding: 0.18rem 0.42rem;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  font-size: 0.92em;
+  color: var(--vp-c-brand-1);
+}
+
+.vp-doc div[class*='language-'] {
+  margin: 1.3rem 0 1.7rem;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 18px;
+  box-shadow: 0 20px 42px rgba(11, 31, 39, 0.08);
+  overflow: hidden;
+}
+
+.dark .vp-doc div[class*='language-'] {
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.25);
+}
+
+.vp-doc div[class*='language-']::before {
+  display: block;
+  height: 42px;
+  border-bottom: 1px solid var(--vp-c-divider-light);
+  background:
+    radial-gradient(circle at 18px 21px, #fb7185 0 4px, transparent 4.5px),
+    radial-gradient(circle at 34px 21px, #f59e0b 0 4px, transparent 4.5px),
+    radial-gradient(circle at 50px 21px, #34d399 0 4px, transparent 4.5px);
+  content: '';
+}
+
+.vp-doc div[class*='language-'] pre {
+  padding: 0.8rem 1.15rem 1rem;
+  font-size: 0.94rem;
+  line-height: 1.72;
+}
+
+.vp-doc div[class*='language-'] code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.vp-doc div[class*='language-'] .copy,
+.vp-doc div[class*='language-'] .collapse {
+  top: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-code-copy-code-bg);
+  box-shadow: 0 8px 20px rgba(8, 25, 33, 0.12);
+}
+
+.dark .vp-doc div[class*='language-'] .copy,
+.dark .vp-doc div[class*='language-'] .collapse {
+  background: var(--vp-code-copy-code-bg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.vp-doc div[class*='language-']>.copy {
+  opacity: 0;
+  width: auto;
+  min-width: 72px;
+  height: 34px;
+  padding: 0 0.9rem;
+  border-radius: 12px;
+  background-image: none !important;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.vp-doc div[class*='language-']>.copy::after {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--vp-c-brand-1);
+  content: 'Copy';
+}
+
+.dark .vp-doc div[class*='language-']>.copy::after {
+  color: var(--vp-c-text-1);
+}
+
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy::after {
+  content: '复制';
+}
+
+.vp-doc div[class*='language-']:hover>.copy,
+.vp-doc div[class*='language-']>.copy:focus,
+.vp-doc div[class*='language-']>.copy.copied {
+  opacity: 1;
+}
+
+.vp-doc div[class*='language-']>.copy:hover,
+.vp-doc div[class*='language-']>.copy:focus {
+  transform: translateY(-1px);
+}
+
+.vp-doc div[class*='language-']>.copy.copied,
+.vp-doc div[class*='language-']>.copy:hover.copied {
+  min-width: 84px;
+  border-radius: 12px;
+  background-image: none !important;
+}
+
+.vp-doc div[class*='language-']>.copy.copied::before,
+.vp-doc div[class*='language-']>.copy:hover.copied::before {
+  display: none;
+  content: none;
+}
+
+.vp-doc div[class*='language-']>.copy.copied::after,
+.vp-doc div[class*='language-']>.copy:hover.copied::after {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--vp-code-copy-code-active-text);
+  content: 'Copied';
+}
+
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy.copied::after,
+html[lang^='zh'] .vp-doc div[class*='language-']>.copy:hover.copied::after {
+  content: '已复制';
+}
+
+.vp-doc div[class*='language-'] .highlighted {
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.vp-doc div[class*='language-'] .line {
+  padding: 0 0.4rem 0 0.2rem;
+}
+
+.vp-doc blockquote {
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--vp-c-brand-2);
+  border-radius: 0 14px 14px 0;
+  background: linear-gradient(90deg, var(--vp-c-brand-soft), transparent 82%);
+}
+
+.vp-doc .custom-block {
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vp-doc .custom-block .custom-block-title {
+  font-family: var(--vp-font-family-heading);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 16px;
+  margin: 1.4rem 0 1.8rem;
+  background: var(--vp-c-bg-elv);
+  box-shadow: 0 16px 34px rgba(8, 24, 33, 0.07);
+}
+
+.vp-doc thead th {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-weight: 700;
+}
+
+.vp-doc tbody tr:nth-child(2n) {
+  background: rgba(20, 184, 166, 0.04);
+}
+
+.dark .vp-doc tbody tr:nth-child(2n) {
+  background: rgba(47, 192, 190, 0.06);
+}
+
+.vp-doc th,
+.vp-doc td {
+  width: auto;
+  padding: 0.82rem 1rem;
+  border-bottom: 1px solid var(--vp-c-divider-light);
+}
+
+.vp-doc tbody tr:hover {
+  background: rgba(8, 145, 178, 0.06);
+}
+
+.dark .vp-doc tbody tr:hover {
+  background: rgba(87, 180, 255, 0.08);
+}
+
+.vp-doc img {
+  width: auto;
+  max-width: 100%;
+  max-height: 60vh;
+  display: block;
+  margin: 1.75rem auto;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 18px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: 0 18px 40px rgba(8, 22, 31, 0.08);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.dark .vp-doc img {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.vp-doc img:hover {
+  transform: translateY(-2px);
+  border-color: rgba(15, 118, 110, 0.22);
+  box-shadow: 0 22px 46px rgba(8, 22, 31, 0.12);
+}
+
+.vp-doc img+em {
+  display: block;
+  margin: -0.5rem auto 1.6rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--vp-c-text-2);
+}
+
+/* Home page */
+
+.VPHomeHero .name {
+  letter-spacing: -0.04em;
+}
+
+.VPHomeHero .text {
+  max-width: 37ch;
+  font-size: clamp(1.05rem, 1.9vw, 1.55rem);
+  line-height: 1.22;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.VPHomeHero .tagline {
+  max-width: 680px;
+  font-size: 1.08rem;
+  color: var(--vp-c-text-2);
+}
+
+.VPHomeHero .actions {
+  gap: 0.85rem;
+}
+
+.VPHomeHero .image-container {
+  border-radius: 32px;
+}
+
+.home-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.2rem 0 1rem;
+}
+
+.home-badges span {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--vp-c-text-1);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.dark .home-badges span {
+  background: rgba(23, 34, 40, 0.9);
+}
+
+.home-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 2.5rem;
+}
+
+.home-quick-card {
+  display: block;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.96)),
+    var(--vp-c-bg-elv);
+  box-shadow: 0 18px 40px rgba(9, 27, 37, 0.08);
+  text-decoration: none !important;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.dark .home-quick-card {
+  background:
+    linear-gradient(180deg, rgba(24, 36, 42, 0.92), rgba(23, 34, 40, 0.98)),
+    var(--vp-c-bg-elv);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+.home-quick-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(15, 118, 110, 0.24);
+  box-shadow: 0 24px 48px rgba(9, 27, 37, 0.12);
+}
+
+.VPButton.brand {
+  color: #fff !important;
+  border: 1px solid rgba(8, 63, 60, 0.26) !important;
+  background: linear-gradient(135deg, #0d6f68 0%, #0f766e 48%, #0891b2 100%) !important;
+  box-shadow:
+    0 18px 34px rgba(15, 118, 110, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.VPButton.brand:hover,
+.VPButton.brand:focus-visible {
+  color: #fff !important;
+  background: linear-gradient(135deg, #0b5d57 0%, #0d6f68 46%, #067996 100%) !important;
+}
+
+.dark .VPButton.brand {
+  border-color: rgba(105, 213, 202, 0.2);
+  box-shadow: 0 18px 34px rgba(20, 159, 157, 0.22);
+}
+
+.home-quick-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--vp-c-text-1);
+  font-size: 1rem;
+}
+
+.home-quick-card span {
+  color: var(--vp-c-text-2);
+  font-size: 0.94rem;
+}
+
+.VPFeatures {
+  padding-top: 0.8rem;
+}
+
+.VPFeature {
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.96)),
+    var(--vp-c-bg-elv);
+  box-shadow: 0 20px 44px rgba(9, 27, 37, 0.08);
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.dark .VPFeature {
+  background:
+    linear-gradient(180deg, rgba(24, 36, 42, 0.92), rgba(23, 34, 40, 0.98)),
+    var(--vp-c-bg-elv);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.24);
+}
+
+.VPFeature:hover {
+  transform: translateY(-4px);
+  border-color: rgba(15, 118, 110, 0.24);
+  box-shadow: 0 26px 52px rgba(9, 27, 37, 0.12);
+}
+
+.VPFeature .icon {
+  align-self: flex-start;
+  min-width: 62px;
+  min-height: 40px;
+  padding: 0 0.76rem;
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.16), rgba(8, 145, 178, 0.08));
+  color: var(--vp-c-brand-1);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.VPFeature .box {
+  padding: 1.1rem 1.15rem 1rem;
+}
+
+.VPFeature .title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.38;
+}
+
+.VPFeature .details {
+  color: var(--vp-c-text-2);
+  font-size: 0.95rem;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.VPFeature .link-text {
+  padding-top: 0.72rem;
+}
+
+.VPFeature .link-text-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+html[lang^='zh'] .VPFeature .title,
+html[lang^='zh'] .VPFeature .link-text-value {
+  word-break: keep-all;
+  line-break: strict;
+}
+
+html[lang^='zh'] .VPFeature .details {
+  word-break: normal;
+  line-break: auto;
+}
+
+html[lang^='zh'] .VPFeature .icon {
+  min-width: 72px;
+  padding: 0 0.82rem;
+}
+
+.VPDocFooter .pager-link {
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.96)),
+    var(--vp-c-bg-elv);
+  box-shadow: 0 14px 30px rgba(8, 24, 33, 0.06);
+}
+
+.dark .VPDocFooter .pager-link {
+  background:
+    linear-gradient(180deg, rgba(24, 36, 42, 0.92), rgba(23, 34, 40, 0.98)),
+    var(--vp-c-bg-elv);
+}
+
+.VPDocFooter .pager-link:hover {
+  border-color: rgba(15, 118, 110, 0.22);
+}
+
+.scroll-progress-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 70;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.scroll-progress-ring {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  background:
+    conic-gradient(var(--vp-c-brand-2) 0 var(--scroll-progress), rgba(15, 118, 110, 0.14) 0 100%);
+  box-shadow: 0 20px 40px rgba(7, 24, 33, 0.16);
+}
+
+.scroll-progress-button.is-idle .scroll-progress-ring {
+  opacity: 0.9;
+}
+
+.dark .scroll-progress-ring {
+  box-shadow: 0 24px 44px rgba(0, 0, 0, 0.3);
+}
+
+.scroll-progress-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--vp-c-divider-light);
+  border-radius: 999px;
+  background: rgba(252, 253, 252, 0.94);
+  color: var(--vp-c-text-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .scroll-progress-core {
+  background: rgba(13, 20, 24, 0.94);
+}
+
+.scroll-progress-arrow {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--vp-c-brand-1);
+}
+
+.scroll-progress-value {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.scroll-progress-button:hover .scroll-progress-ring,
+.scroll-progress-button:focus-visible .scroll-progress-ring {
+  transform: translateY(-2px);
+}
+
+.scroll-progress-ring {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.scroll-progress-fade-enter-active,
+.scroll-progress-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-progress-fade-enter-from,
+.scroll-progress-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (max-width: 960px) {
+  .home-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .VPDoc.has-aside .content-container,
+  .VPDoc:not(.has-sidebar) .container,
+  .VPDoc:not(.has-sidebar) .content {
+    max-width: 100% !important;
+  }
+
+  .scroll-progress-button {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .scroll-progress-ring {
+    width: 56px;
+    height: 56px;
+  }
+
+  .scroll-progress-core {
+    width: 45px;
+    height: 45px;
+  }
 }
