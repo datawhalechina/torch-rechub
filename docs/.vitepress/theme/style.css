@@ -1,3 +1,8 @@
+@import "@fontsource/lora/400.css";
+@import "@fontsource/lora/600.css";
+@import "@fontsource/lora/700.css";
+@import "lxgw-wenkai-screen-webfont/style.css";
+
 /**
  * Global design tokens for the documentation theme.
  * The goal is a calm engineering palette with strong readability in both modes.
@@ -119,23 +124,23 @@
 
 html[lang^='zh'] {
   --vp-font-family-base:
-    "LXGW WenKai Screen", "霞鹜文楷屏幕阅读版", "LXGW WenKai", "霞鹜文楷",
-    "Kaiti SC", "STKaiti", "KaiTi", "Microsoft YaHei", "PingFang SC",
-    "Hiragino Sans GB", serif;
+    "LXGW WenKai Screen", "LXGW WenKai", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --vp-font-family-heading:
-    "LXGW WenKai Screen", "霞鹜文楷屏幕阅读版", "LXGW WenKai", "霞鹜文楷",
-    "Kaiti SC", "STKaiti", "KaiTi", "Microsoft YaHei", "PingFang SC",
-    "Hiragino Sans GB", serif;
+    "LXGW WenKai Screen", "LXGW WenKai", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
 }
 
 html[lang='en'],
 html:not([lang^='zh']) {
   --vp-font-family-base:
-    "LXGW WenKai", "霞鹜文楷", Consolas, "Cascadia Code", "SFMono-Regular", "Liberation Mono", Menlo,
-    monospace;
+    "Lora", "LXGW WenKai Screen", "Segoe UI Variable", "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Georgia, serif;
+
   --vp-font-family-heading:
-    "LXGW WenKai", "霞鹜文楷", Consolas, "Cascadia Code", "SFMono-Regular", "Liberation Mono", Menlo,
-    monospace;
+    "Lora", "LXGW WenKai Screen", "Avenir Next", "Segoe UI Variable",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Georgia, serif;
+
 }
 
 .dark {
