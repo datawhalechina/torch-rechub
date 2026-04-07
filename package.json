@@ -8,6 +8,8 @@
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
+    "@fontsource/lora": "^5.2.6",
+    "lxgw-wenkai-screen-webfont": "^1.7.0",
     "markdown-it-mathjax3": "^4.3.2",
     "vitepress-plugin-image-viewer": "^1.1.6"
   },
