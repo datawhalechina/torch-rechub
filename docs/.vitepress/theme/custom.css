@@ -320,6 +320,12 @@
   margin-top: 0.95rem;
 }
 
+.vp-doc mjx-container,
+.vp-doc mjx-container[jax='SVG'] {
+  font-family: "Lora", "Times New Roman", Georgia, serif !important;
+}
+
+
 .vp-doc hr {
   margin: 2.5rem 0;
   border: 0;
