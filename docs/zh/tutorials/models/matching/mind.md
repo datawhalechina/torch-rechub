@@ -99,7 +99,7 @@ all_item = df_to_dict(item_profile)
 test_user = x_test
 
 dg = MatchDataGenerator(x=x_train, y=y_train)
-train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048)
+train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
 ```
 
 ---
@@ -141,9 +141,12 @@ model = MIND(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import MatchTrainer
 
 torch.manual_seed(2022)
+save_dir = "./saved/mind/"
+os.makedirs(save_dir, exist_ok=True)
 
 trainer = MatchTrainer(
     model,
@@ -151,7 +154,7 @@ trainer = MatchTrainer(
     optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
     n_epoch=10,
     device="cpu",
-    model_path="./saved/mind/"
+    model_path=save_dir
 )
 
 trainer.fit(train_dl)
@@ -163,11 +166,12 @@ trainer.fit(train_dl)
 
 ```python
 # 生成向量
+# MIND 的用户侧不是单个向量，而是多个兴趣向量
 user_embedding = trainer.inference_embedding(
-    model=model, mode="user", data_loader=test_dl, model_path="./saved/mind/"
+    model=model, mode="user", data_loader=test_dl, model_path=save_dir
 )
 item_embedding = trainer.inference_embedding(
-    model=model, mode="item", data_loader=item_dl, model_path="./saved/mind/"
+    model=model, mode="item", data_loader=item_dl, model_path=save_dir
 )
 
 # MIND 的 user_embedding shape: [n_users, interest_num, embed_dim]
@@ -189,7 +193,7 @@ annoy.fit(item_embedding)
 # 对每个用户的每个兴趣向量检索
 for i in range(min(3, len(user_embedding))):
     all_indices = set()
-    for k in range(user_embedding.shape[1]):  # interest_num
+    for k in range(user_embedding.shape[1]):  # interest_num，对每个兴趣分别召回再合并
         indices, _ = annoy.query(user_embedding[i, k], n=10)
         all_indices.update(indices)
     print(f"User {i} -> Total unique items: {len(all_indices)}")
@@ -238,6 +242,7 @@ exporter.export("mind_item_tower.onnx", mode="item")
 ## 完整代码
 
 ```python
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -252,6 +257,8 @@ from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
 
 def main():
     torch.manual_seed(2022)
+    save_dir = "./saved/mind/"
+    os.makedirs(save_dir, exist_ok=True)
 
     data = pd.read_csv("examples/matching/data/ml-1m/ml-1m_sample.csv")
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
@@ -285,17 +292,17 @@ def main():
     test_user = x_test
 
     dg = MatchDataGenerator(x=x_train, y=y_train)
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
 
     model = MIND(user_features, history_features, item_features, neg_item_feature,
                  max_length=50, temperature=0.02, interest_num=4)
 
     trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-                           n_epoch=10, device="cpu", model_path="./saved/mind/")
+                           n_epoch=10, device="cpu", model_path=save_dir)
     trainer.fit(train_dl)
 
-    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path="./saved/mind/")
-    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path="./saved/mind/")
+    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
+    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
     print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
 
     # 向量召回

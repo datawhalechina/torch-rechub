@@ -115,8 +115,8 @@ model = PLE(
     features=features,
     task_types=["classification", "classification"],  # 两个分类任务
     n_level=1,                    # CGC 层数
-    n_expert_specific=2,          # 每个任务的专属 Expert 数
-    n_expert_shared=1,            # 共享 Expert 数
+    n_expert_specific=2,          # 每个任务自己的 experts
+    n_expert_shared=1,            # 任务共享 experts；这是它和 MMOE 的关键差异
     expert_params={
         "dims": [16]
     },
@@ -146,9 +146,11 @@ model = PLE(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import MTLTrainer
 
 torch.manual_seed(2022)
+os.makedirs("./saved/ple", exist_ok=True)
 
 mtl_trainer = MTLTrainer(
     model,
@@ -229,6 +231,7 @@ exporter.export("ple.onnx", verbose=True)
 ## 完整代码
 
 ```python
+import os
 import pandas as pd
 import torch
 
@@ -240,6 +243,7 @@ from torch_rechub.utils.data import DataGenerator
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/ple", exist_ok=True)
 
     # 1. 加载数据
     df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")

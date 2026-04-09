@@ -111,9 +111,9 @@ from torch_rechub.models.multi_task import MMOE
 model = MMOE(
     features=features,
     task_types=["classification", "classification"],   # 两个分类任务
-    n_expert=8,                                         # 专家数量
+    n_expert=8,                                         # 所有任务共享的一组 experts
     expert_params={"dims": [16]},                       # 专家网络参数
-    tower_params_list=[{"dims": [8]}, {"dims": [8]}]    # 每个任务的 Tower 参数
+    tower_params_list=[{"dims": [8]}, {"dims": [8]}]    # 每个任务各自的输出塔
 )
 ```
 
@@ -136,9 +136,11 @@ model = MMOE(
 ### 4.1 训练模型
 
 ```python
+import os
 from torch_rechub.trainers import MTLTrainer
 
 torch.manual_seed(2022)
+os.makedirs("./saved/mmoe", exist_ok=True)
 
 mtl_trainer = MTLTrainer(
     model,
@@ -161,6 +163,10 @@ mtl_trainer.fit(train_dl, val_dl)
 当多个任务的 loss 量级差异较大时，可以使用自适应权重：
 
 ```python
+import os
+
+os.makedirs("./saved/mmoe", exist_ok=True)
+
 mtl_trainer = MTLTrainer(
     model,
     task_types=["classification", "classification"],
@@ -258,6 +264,7 @@ Expert 数量增加会线性增加计算量。可以减小 Expert 维度来平�
 ## 完整代码
 
 ```python
+import os
 import pandas as pd
 import torch
 
@@ -269,6 +276,7 @@ from torch_rechub.utils.data import DataGenerator
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/mmoe", exist_ok=True)
 
     # 1. 加载数据
     df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")

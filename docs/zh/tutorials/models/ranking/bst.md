@@ -89,7 +89,7 @@ model = BST(
     history_features=history_features,
     target_features=target_features,
     mlp_params={"dims": [256, 128]},
-    nhead=8,         # 多头注意力头数
+    nhead=8,         # 多头注意力头数；embed_dim 必须能被它整除
     dropout=0.2,     # Transformer 内部 dropout
     num_layers=1     # Transformer Encoder 层数
 )
@@ -114,7 +114,10 @@ model = BST(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import CTRTrainer
+
+os.makedirs("./saved/bst", exist_ok=True)
 
 ctr_trainer = CTRTrainer(
     model,
@@ -184,6 +187,7 @@ exporter.export("bst.onnx", dynamic_batch=True)
 ## 完整代码
 
 ```python
+import os
 import pandas as pd
 import torch
 
@@ -195,6 +199,7 @@ from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feat
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/bst", exist_ok=True)
 
     data = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")
     train, val, test = generate_seq_feature(

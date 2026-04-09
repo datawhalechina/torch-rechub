@@ -1,194 +1,249 @@
 ---
 title: Multi-Task Learning Tutorial
-description: Torch-RecHub multi-task learning model tutorial, including SharedBottom, ESMM, MMoE, and PLE model examples
+description: Torch-RecHub multi-task learning tutorial covering Ali-CCP data preparation, MMOE, PLE, and ESMM
 ---
 
 # Multi-Task Learning Tutorial
 
-This tutorial introduces how to use multi-task learning models in Torch-RecHub. We will use Alibaba's e-commerce dataset as an example.
+This tutorial uses the built-in `Ali-CCP` sample dataset to introduce the actual multi-task training flow in Torch-RecHub. All code snippets assume you are running from the **repository root**.
 
-## Data Preparation
+## 1. Data Preparation
 
-First, we need to prepare data for multi-task learning:
+### 1. Load sample data
 
 ```python
 import pandas as pd
-import numpy as np
-from torch_rechub.utils import DataGenerator
-from torch_rechub.models import *
-from torch_rechub.trainers import *
 
-# Load data
-df = pd.read_csv("ali_ccp_data.csv")
+df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
+df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
+df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
 
-# Feature definition
-user_features = ['user_id', 'age', 'gender', 'occupation']
-item_features = ['item_id', 'category_id', 'shop_id', 'brand_id']
-features = user_features + item_features
+# Concatenate train / val / test first so feature definitions stay consistent.
+train_idx = df_train.shape[0]
+val_idx = train_idx + df_val.shape[0]
 
-# Multi-task labels
-tasks = ['click', 'conversion']  # CTR and CVR tasks
+data = pd.concat([df_train, df_val, df_test], axis=0)
+# ctcvr_label is often used in ESMM as the third task: click * conversion
+data.rename(columns={"purchase": "cvr_label", "click": "ctr_label"}, inplace=True)
+data["ctcvr_label"] = data["cvr_label"] * data["ctr_label"]
 ```
 
-## SharedBottom Model
-
-The most basic multi-task learning model with shared bottom network parameters:
+### 2. Build dense and sparse features
 
 ```python
-# Model configuration
-model = SharedBottom(
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+
+# Ali-CCP is mostly sparse features, with a small number of dense columns.
+dense_cols = ["D109_14", "D110_14", "D127_14", "D150_14", "D508", "D509", "D702", "D853"]
+sparse_cols = [
+    col for col in data.columns
+    if col not in dense_cols and col not in ["cvr_label", "ctr_label", "ctcvr_label"]
+]
+
+# In multi-task learning, all tasks share the same bottom input feature set by default.
+features = [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
+    DenseFeature(col) for col in dense_cols
+]
+
+label_cols = ["cvr_label", "ctr_label"]
+used_cols = sparse_cols + dense_cols
+```
+
+### 3. Build train / validation / test loaders
+
+```python
+from torch_rechub.utils.data import DataGenerator
+
+# In multi-task settings, y becomes a 2D label matrix instead of a single label vector.
+x_train = {name: data[name].values[:train_idx] for name in used_cols}
+y_train = data[label_cols].values[:train_idx]
+
+x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
+y_val = data[label_cols].values[train_idx:val_idx]
+
+x_test = {name: data[name].values[val_idx:] for name in used_cols}
+y_test = data[label_cols].values[val_idx:]
+
+dg = DataGenerator(x_train, y_train)
+train_dl, val_dl, test_dl = dg.generate_dataloader(
+    x_val=x_val,
+    y_val=y_val,
+    x_test=x_test,
+    y_test=y_test,
+    batch_size=1024,
+)
+```
+
+## 2. MMOE
+
+```python
+from torch_rechub.models.multi_task import MMOE
+from torch_rechub.trainers import MTLTrainer
+
+# MMOE: shared experts + task-specific gates
+model = MMOE(
     features=features,
-    hidden_units=[256, 128],
-    task_hidden_units=[64, 32],
-    num_tasks=2,
-    task_types=['binary', 'binary'])
-
-# Training configuration
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
-
-# Train model
-trainer.fit(train_dataloader, val_dataloader)
+    task_types=["classification", "classification"],
+    n_expert=8,
+    expert_params={"dims": [16]},
+    tower_params_list=[{"dims": [8]}, {"dims": [8]}],
+)
 ```
 
-## ESMM (Entire Space Multi-Task Model)
-
-Multi-task model that addresses sample selection bias:
+### Training pattern
 
 ```python
-# Model configuration
-model = ESMM(
-    features=features,
-    hidden_units=[256, 128, 64],
-    tower_units=[32, 16],
-    embedding_dim=16)
+import os
+import torch
 
-# Training configuration
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
+torch.manual_seed(2022)
+# MTLTrainer does not create model_path automatically.
+os.makedirs("./saved/mmoe", exist_ok=True)
+
+mtl_trainer = MTLTrainer(
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3, "weight_decay": 1e-4},
+    n_epoch=5,
+    earlystop_patience=5,
+    device="cpu",  # Change to "cuda:0" for GPU.
+    model_path="./saved/mmoe",
+)
+
+mtl_trainer.fit(train_dl, val_dl)
+# evaluate() returns a list whose order matches task_types.
+auc = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
+print(f"Test AUC: {auc}")  # [cvr_auc, ctr_auc]
 ```
 
-## MMoE (Multi-gate Mixture-of-Experts)
-
-Achieves soft parameter sharing between tasks through expert mechanism:
+## 3. PLE
 
 ```python
-# Model configuration
-model = MMoE(
-    features=features,
-    expert_units=[256, 128],
-    num_experts=8,
-    num_tasks=2,
-    expert_activation='relu',
-    gate_activation='softmax')
+from torch_rechub.models.multi_task import PLE
 
-# Training configuration
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
-```
-
-## PLE (Progressive Layered Extraction)
-
-Better models task relationships through layered extraction:
-
-```python
-# Model configuration
+# PLE is often more stable than MMOE when task differences are larger,
+# because it separates shared and task-specific experts.
 model = PLE(
     features=features,
-    expert_units=[256, 128],
-    num_experts=4,
-    num_layers=3,
-    num_shared_experts=2,
-    task_types=['binary', 'binary'])
+    task_types=["classification", "classification"],
+    n_level=1,
+    n_expert_specific=2,
+    n_expert_shared=1,
+    expert_params={"dims": [16]},
+    tower_params_list=[{"dims": [8]}, {"dims": [8]}],
+)
+```
 
-# Training configuration
+### Adaptive loss weighting (optional)
+
+```python
+# adaptive_params turns on dynamic loss balancing; this example uses UWL.
+os.makedirs("./saved/ple", exist_ok=True)
+
+mtl_trainer = MTLTrainer(
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3, "weight_decay": 1e-5},
+    adaptive_params={"method": "uwl"},
+    n_epoch=5,
+    earlystop_patience=5,
+    device="cpu",
+    model_path="./saved/ple",
+)
+
+mtl_trainer.fit(train_dl, val_dl)
+```
+
+## 4. ESMM
+
+`ESMM` differs from `MMOE / PLE` in two ways:
+
+- it only uses sparse features
+- its label order is usually `["cvr_label", "ctr_label", "ctcvr_label"]`
+
+```python
+from torch_rechub.models.multi_task import ESMM
+
+item_cols = ["129", "205", "206", "207", "210", "216"]
+user_cols = [col for col in sparse_cols if col not in item_cols]
+
+user_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in user_cols]
+item_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in item_cols]
+
+label_cols = ["cvr_label", "ctr_label", "ctcvr_label"]
+x_train = {name: data[name].values[:train_idx] for name in sparse_cols}
+y_train = data[label_cols].values[:train_idx]
+```
+
+```python
+# ESMM estimates CTR / CVR / CTCVR jointly from user and item feature towers.
+model = ESMM(
+    user_features,
+    item_features,
+    cvr_params={"dims": [16, 8]},
+    ctr_params={"dims": [16, 8]},
+)
+```
+
+## 5. Trainer Interface
+
+```python
+from torch_rechub.trainers import MTLTrainer
+
 trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3},
+    regularization_params={"embedding_l2": 0.0, "dense_l2": 0.0},
+    adaptive_params=None,   # Optional: {"method": "uwl"} / {"method": "gradnorm"} / {"method": "metabalance"}
+    n_epoch=10,
+    earlystop_taskid=0,
+    earlystop_patience=10,
+    device="cpu",
+    model_path="./saved/mtl",
+)
 ```
 
-## Task Weight Optimization
+## 6. Evaluation and Tuning Suggestions
 
-### GradNorm
-
-Use GradNorm algorithm to dynamically adjust task weights:
+### 1. Evaluation output
 
 ```python
-# Configure GradNorm
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    task_weights_strategy='gradnorm',
-    gradnorm_alpha=1.5)
+scores = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
+print(scores)
 ```
 
-### MetaBalance
+`evaluate()` returns a list ordered by `task_types`, for example:
 
-Use MetaBalance optimizer to balance task gradients:
+- `[cvr_auc, ctr_auc]`
+- or three task scores in the ESMM case
 
-```python
-from torch_rechub.utils import MetaBalance
+### 2. What to tune first
 
-# Configure MetaBalance optimizer
-optimizer = MetaBalance(
-    model.parameters(),
-    relax_factor=0.7,
-    beta=0.9)
+- `MMOE`: start with `n_expert`
+- `PLE`: start with `n_level / n_expert_specific / n_expert_shared`
+- if task imbalance is obvious: try `adaptive_params={"method": "uwl"}`
+- if multi-task AUC is unstable: reduce the learning rate first, then shrink expert/tower dimensions
 
-trainer = MTLTrainer(
-    model=model,
-    optimizer=optimizer)
-```
+## 7. FAQ
 
-## Model Evaluation
+### Q1: Why not use `from torch_rechub.utils import DataGenerator` here?
 
-Use appropriate evaluation metrics for different tasks:
+Because `DataGenerator` lives in `torch_rechub.utils.data`, not in the top-level `torch_rechub.utils` namespace.
 
-```python
-# Evaluate model
-results = evaluate_multi_task(model, test_dataloader)
-for task, metrics in results.items():
-    print(f"Task: {task}")
-    print(f"AUC: {metrics['auc']:.4f}")
-    print(f"LogLoss: {metrics['logloss']:.4f}")
-```
+### Q2: Why use `n_epoch` instead of `n_epochs`?
 
-## Advanced Applications
+The actual parameter name in `MTLTrainer` is `n_epoch`.
 
-1. Custom Task Loss Weights
-```python
-trainer = MTLTrainer(
-    model=model,
-    task_weights=[1.0, 0.5])  # Set fixed task weights
-```
+### Q3: Why is there no `evaluate_multi_task()` helper?
 
-2. Get Shared and Task-Specific Layers
-```python
-from torch_rechub.utils import shared_task_layers
+The framework directly uses `MTLTrainer.evaluate(model, data_loader)`, which returns a list of task scores.
 
-shared_params, task_params = shared_task_layers(model)
-```
+### Q4: Why call `os.makedirs(...)` before training?
 
-3. Task-Specific Learning Rates
-```python
-trainer = MTLTrainer(
-    model=model,
-    task_specific_lr={'click': 0.001, 'conversion': 0.0005})
-```
+`MTLTrainer` does not create `model_path` automatically, so the examples create the save directory explicitly.
 
-## Notes
+### Q5: Where should I go next?
 
-1. Choose appropriate multi-task learning architecture
-2. Pay attention to task correlations
-3. Handle data imbalance between tasks
-4. Set task weights appropriately
-5. Monitor training progress for each task
-6. Prevent negative transfer between tasks
-7. Consider computational resource constraints
+- [MMOE tutorial](/tutorials/models/multi_task/mmoe)
+- [PLE tutorial](/tutorials/models/multi_task/ple)

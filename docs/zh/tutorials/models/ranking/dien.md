@@ -106,7 +106,7 @@ model = DIEN(
     history_features=history_features,
     target_features=target_features,
     mlp_params={"dims": [256, 128]},
-    history_labels=history_labels,
+    history_labels=history_labels,  # DIEN 比 DIN 多了一路兴趣演化监督信号
     alpha=0.2  # 辅助损失权重
 )
 ```
@@ -129,7 +129,10 @@ model = DIEN(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import CTRTrainer
+
+os.makedirs("./saved/dien", exist_ok=True)
 
 ctr_trainer = CTRTrainer(
     model,
@@ -195,6 +198,7 @@ exporter.export("dien.onnx", dynamic_batch=True)
 ## 完整代码
 
 ```python
+import os
 import pandas as pd
 import torch
 
@@ -206,6 +210,7 @@ from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feat
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/dien", exist_ok=True)
 
     data = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")
     train, val, test = generate_seq_feature(
