@@ -1,139 +1,222 @@
+@import "@fontsource/lora/400.css";
+@import "@fontsource/lora/600.css";
+@import "@fontsource/lora/700.css";
+@import "lxgw-wenkai-screen-webfont/style.css";
+
 /**
- * Customize default theme styling by overriding CSS variables:
- * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
+ * Global design tokens for the documentation theme.
+ * The goal is a calm engineering palette with strong readability in both modes.
  */
 
-/**
- * Colors
- *
- * Each colors have exact same color scale system with 3 levels of solid
- * colors with different brightness, and 1 soft color.
- *
- * - `XXX-1`: The most solid color used mainly for colored text. It must
- *   satisfy the contrast ratio against when used on top of `XXX-soft`.
- *
- * - `XXX-2`: The color used mainly for hover state of the button.
- *
- * - `XXX-3`: The color for solid background, such as bg color of the button.
- *   It must satisfy the contrast ratio with pure white (#ffffff) text on
- *   top of it.
- *
- * - `XXX-soft`: The color used for subtle background such as custom container
- *   or badges. It must satisfy the contrast ratio when putting `XXX-1` colors
- *   on top of it.
- *
- *   The soft color must be semi transparent alpha channel. This is crucial
- *   because it allows adding multiple "soft" colors on top of each other
- *   to create an accent, such as when having inline code block inside
- *   custom containers.
- *
- * - `default`: The color used purely for subtle indication without any
- *   special meanings attached to it such as bg color for menu hover state.
- *
- * - `brand`: Used for primary brand colors, such as link text, button with
- *   brand theme, etc.
- *
- * - `tip`: Used to indicate useful information. The default theme uses the
- *   brand color for this by default.
- *
- * - `warning`: Used to indicate warning to the users. Used in custom
- *   container, badges, etc.
- *
- * - `danger`: Used to show error, or dangerous message to the users. Used
- *   in custom container, badges, etc.
- * -------------------------------------------------------------------------- */
-
 :root {
-  --vp-c-default-1: var(--vp-c-gray-1);
-  --vp-c-default-2: var(--vp-c-gray-2);
-  --vp-c-default-3: var(--vp-c-gray-3);
-  --vp-c-default-soft: var(--vp-c-gray-soft);
+  --vp-font-family-base:
+    "Segoe UI Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-heading:
+    "Avenir Next", "Segoe UI Variable", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-mono:
+    "Maple Mono", "JetBrains Mono", "Cascadia Code", "SFMono-Regular",
+    Consolas, "Liberation Mono", Menlo, monospace;
 
-  --vp-c-brand-1: var(--vp-c-indigo-1);
-  --vp-c-brand-2: var(--vp-c-indigo-2);
-  --vp-c-brand-3: var(--vp-c-indigo-3);
-  --vp-c-brand-soft: var(--vp-c-indigo-soft);
+  --vp-layout-max-width: 1480px;
+  --vp-sidebar-width: 284px;
+  --vp-nav-height: 68px;
 
-  --vp-c-tip-1: var(--vp-c-brand-1);
-  --vp-c-tip-2: var(--vp-c-brand-2);
-  --vp-c-tip-3: var(--vp-c-brand-3);
-  --vp-c-tip-soft: var(--vp-c-brand-soft);
+  --vp-c-bg: #fcfdfc;
+  --vp-c-bg-alt: #f5f8f7;
+  --vp-c-bg-soft: #eef4f3;
+  --vp-c-bg-elv: #ffffff;
 
-  --vp-c-warning-1: var(--vp-c-yellow-1);
-  --vp-c-warning-2: var(--vp-c-yellow-2);
-  --vp-c-warning-3: var(--vp-c-yellow-3);
-  --vp-c-warning-soft: var(--vp-c-yellow-soft);
+  --vp-c-text-1: #162126;
+  --vp-c-text-2: #50606c;
+  --vp-c-text-3: #72828d;
 
-  --vp-c-danger-1: var(--vp-c-red-1);
-  --vp-c-danger-2: var(--vp-c-red-2);
-  --vp-c-danger-3: var(--vp-c-red-3);
-  --vp-c-danger-soft: var(--vp-c-red-soft);
-}
+  --vp-c-divider: rgba(23, 42, 58, 0.12);
+  --vp-c-divider-light: rgba(23, 42, 58, 0.08);
+  --vp-c-gutter: rgba(23, 42, 58, 0.06);
 
-/**
- * Component: Button
- * -------------------------------------------------------------------------- */
+  --vp-c-default-1: #48606b;
+  --vp-c-default-2: #627987;
+  --vp-c-default-3: #7e95a2;
+  --vp-c-default-soft: rgba(86, 109, 121, 0.12);
 
-:root {
-  --vp-button-brand-border: transparent;
-  --vp-button-brand-text: var(--vp-c-white);
-  --vp-button-brand-bg: var(--vp-c-brand-3);
-  --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-hover-text: var(--vp-c-white);
-  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
-  --vp-button-brand-active-border: transparent;
-  --vp-button-brand-active-text: var(--vp-c-white);
-  --vp-button-brand-active-bg: var(--vp-c-brand-1);
-}
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #0d9488;
+  --vp-c-brand-3: #14b8a6;
+  --vp-c-brand-soft: rgba(20, 184, 166, 0.14);
 
-/**
- * Component: Home
- * -------------------------------------------------------------------------- */
+  --vp-c-tip-1: #0f766e;
+  --vp-c-tip-2: #0d9488;
+  --vp-c-tip-3: #14b8a6;
+  --vp-c-tip-soft: rgba(20, 184, 166, 0.14);
 
-:root {
+  --vp-c-warning-1: #b45309;
+  --vp-c-warning-2: #d97706;
+  --vp-c-warning-3: #f59e0b;
+  --vp-c-warning-soft: rgba(245, 158, 11, 0.14);
+
+  --vp-c-danger-1: #c2410c;
+  --vp-c-danger-2: #ea580c;
+  --vp-c-danger-3: #f97316;
+  --vp-c-danger-soft: rgba(249, 115, 22, 0.14);
+
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(
-    120deg,
-    #bd34fe 30%,
-    #41d1ff
-  );
+  --vp-home-hero-name-background: linear-gradient(135deg, #0f766e 0%, #0891b2 52%, #f59e0b 100%);
+  --vp-home-hero-image-background-image:
+    radial-gradient(circle at 30% 30%, rgba(20, 184, 166, 0.28), transparent 46%),
+    radial-gradient(circle at 72% 25%, rgba(8, 145, 178, 0.22), transparent 42%),
+    radial-gradient(circle at 50% 78%, rgba(245, 158, 11, 0.18), transparent 35%);
+  --vp-home-hero-image-filter: blur(68px);
 
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #bd34fe 50%,
-    #47caff 50%
-  );
-  --vp-home-hero-image-filter: blur(44px);
-}
+  --vp-button-brand-border: rgba(5, 90, 85, 0.28);
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-bg: linear-gradient(135deg, #0d6f68 0%, #0f766e 48%, #0891b2 100%);
+  --vp-button-brand-hover-border: rgba(5, 90, 85, 0.34);
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-hover-bg: linear-gradient(135deg, #0b5d57 0%, #0d6f68 46%, #067996 100%);
+  --vp-button-brand-active-border: rgba(5, 90, 85, 0.38);
+  --vp-button-brand-active-text: #ffffff;
+  --vp-button-brand-active-bg: #0b5d57;
 
-@media (min-width: 640px) {
-  :root {
-    --vp-home-hero-image-filter: blur(56px);
-  }
-}
+  --vp-button-alt-border: rgba(15, 118, 110, 0.18);
+  --vp-button-alt-text: var(--vp-c-text-1);
+  --vp-button-alt-bg: rgba(255, 255, 255, 0.78);
+  --vp-button-alt-hover-border: rgba(15, 118, 110, 0.28);
+  --vp-button-alt-hover-text: var(--vp-c-brand-1);
+  --vp-button-alt-hover-bg: rgba(255, 255, 255, 0.96);
 
-@media (min-width: 960px) {
-  :root {
-    --vp-home-hero-image-filter: blur(68px);
-  }
-}
+  --vp-custom-block-info-border: transparent;
+  --vp-custom-block-info-text: var(--vp-c-text-1);
+  --vp-custom-block-info-bg: rgba(8, 145, 178, 0.1);
+  --vp-custom-block-info-code-bg: rgba(8, 145, 178, 0.12);
 
-/**
- * Component: Custom Block
- * -------------------------------------------------------------------------- */
-
-:root {
   --vp-custom-block-tip-border: transparent;
   --vp-custom-block-tip-text: var(--vp-c-text-1);
-  --vp-custom-block-tip-bg: var(--vp-c-brand-soft);
-  --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
+  --vp-custom-block-tip-bg: rgba(20, 184, 166, 0.12);
+  --vp-custom-block-tip-code-bg: rgba(20, 184, 166, 0.14);
+
+  --vp-custom-block-warning-border: transparent;
+  --vp-custom-block-warning-text: var(--vp-c-text-1);
+  --vp-custom-block-warning-bg: rgba(245, 158, 11, 0.12);
+  --vp-custom-block-warning-code-bg: rgba(245, 158, 11, 0.16);
+
+  --vp-custom-block-danger-border: transparent;
+  --vp-custom-block-danger-text: var(--vp-c-text-1);
+  --vp-custom-block-danger-bg: rgba(249, 115, 22, 0.12);
+  --vp-custom-block-danger-code-bg: rgba(249, 115, 22, 0.16);
+
+  --vp-code-copy-code-border-color: rgba(9, 43, 57, 0.16);
+  --vp-code-copy-code-bg: rgba(255, 255, 255, 0.92);
+  --vp-code-copy-code-hover-border-color: rgba(8, 115, 109, 0.34);
+  --vp-code-copy-code-hover-bg: rgba(240, 250, 248, 0.98);
+  --vp-code-copy-code-active-text: #0f4f54;
+
+  --vp-icon-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%230b5560' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/g%3E%3C/svg%3E");
+  --vp-icon-copied: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%230b5560' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Cpath d='m9 14l2 2l4-4'/%3E%3C/g%3E%3C/svg%3E");
+
+  --vp-nav-bg-color: rgba(252, 253, 252, 0.76);
+  --vp-nav-screen-bg-color: rgba(252, 253, 252, 0.98);
+  --vp-sidebar-bg-color: rgba(245, 248, 247, 0.84);
+  --vp-local-nav-bg-color: rgba(252, 253, 252, 0.88);
+  --vp-backdrop-bg-color: rgba(14, 22, 30, 0.42);
 }
 
-/**
- * Component: Algolia
- * -------------------------------------------------------------------------- */
+html[lang^='zh'] {
+  --vp-font-family-base:
+    "LXGW WenKai Screen", "LXGW WenKai", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-heading:
+    "LXGW WenKai Screen", "LXGW WenKai", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+}
+
+html[lang='en'],
+html:not([lang^='zh']) {
+  --vp-font-family-base:
+    "Lora", "LXGW WenKai Screen", "Segoe UI Variable", "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Georgia, serif;
+
+  --vp-font-family-heading:
+    "Lora", "LXGW WenKai Screen", "Avenir Next", "Segoe UI Variable",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Georgia, serif;
+
+}
+
+.dark {
+  --vp-c-bg: #0d1418;
+  --vp-c-bg-alt: #121b20;
+  --vp-c-bg-soft: #18242a;
+  --vp-c-bg-elv: #172228;
+
+  --vp-c-text-1: #ecf5f4;
+  --vp-c-text-2: #adc0c6;
+  --vp-c-text-3: #86989f;
+
+  --vp-c-divider: rgba(206, 234, 239, 0.12);
+  --vp-c-divider-light: rgba(206, 234, 239, 0.08);
+  --vp-c-gutter: rgba(206, 234, 239, 0.08);
+
+  --vp-c-default-1: #c2d2d7;
+  --vp-c-default-2: #93a9b1;
+  --vp-c-default-3: #6f8790;
+  --vp-c-default-soft: rgba(111, 135, 144, 0.16);
+
+  --vp-c-brand-1: #69d5ca;
+  --vp-c-brand-2: #2fc0be;
+  --vp-c-brand-3: #149f9d;
+  --vp-c-brand-soft: rgba(47, 192, 190, 0.18);
+
+  --vp-c-tip-1: #69d5ca;
+  --vp-c-tip-2: #2fc0be;
+  --vp-c-tip-3: #149f9d;
+  --vp-c-tip-soft: rgba(47, 192, 190, 0.18);
+
+  --vp-c-warning-1: #f3bf61;
+  --vp-c-warning-2: #eba84b;
+  --vp-c-warning-3: #ce7f1d;
+  --vp-c-warning-soft: rgba(235, 168, 75, 0.16);
+
+  --vp-c-danger-1: #ffb17a;
+  --vp-c-danger-2: #f88c4b;
+  --vp-c-danger-3: #d76b20;
+  --vp-c-danger-soft: rgba(248, 140, 75, 0.16);
+
+  --vp-home-hero-name-background: linear-gradient(135deg, #84e8dc 0%, #57b4ff 48%, #f3bf61 100%);
+  --vp-home-hero-image-background-image:
+    radial-gradient(circle at 28% 30%, rgba(47, 192, 190, 0.32), transparent 44%),
+    radial-gradient(circle at 74% 24%, rgba(87, 180, 255, 0.2), transparent 40%),
+    radial-gradient(circle at 54% 78%, rgba(243, 191, 97, 0.18), transparent 34%);
+
+  --vp-button-alt-border: rgba(105, 213, 202, 0.2);
+  --vp-button-alt-text: var(--vp-c-text-1);
+  --vp-button-alt-bg: rgba(23, 34, 40, 0.92);
+  --vp-button-alt-hover-border: rgba(105, 213, 202, 0.32);
+  --vp-button-alt-hover-text: var(--vp-c-brand-1);
+  --vp-button-alt-hover-bg: rgba(23, 34, 40, 1);
+
+  --vp-code-copy-code-border-color: rgba(118, 205, 196, 0.2);
+  --vp-code-copy-code-bg: rgba(13, 20, 24, 0.92);
+  --vp-code-copy-code-hover-border-color: rgba(105, 213, 202, 0.36);
+  --vp-code-copy-code-hover-bg: rgba(17, 31, 37, 0.98);
+  --vp-code-copy-code-active-text: #d7f6f1;
+
+  --vp-icon-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23d4f6f3' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/g%3E%3C/svg%3E");
+  --vp-icon-copied: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23d4f6f3' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Cpath d='m9 14l2 2l4-4'/%3E%3C/g%3E%3C/svg%3E");
+
+  --vp-nav-bg-color: rgba(13, 20, 24, 0.72);
+  --vp-nav-screen-bg-color: rgba(13, 20, 24, 0.98);
+  --vp-sidebar-bg-color: rgba(18, 27, 32, 0.86);
+  --vp-local-nav-bg-color: rgba(13, 20, 24, 0.88);
+  --vp-backdrop-bg-color: rgba(4, 8, 11, 0.56);
+}
+
+@media (max-width: 960px) {
+  :root {
+    --vp-layout-max-width: 100%;
+  }
+}
 
 .DocSearch {
   --docsearch-primary-color: var(--vp-c-brand-1) !important;
 }
-

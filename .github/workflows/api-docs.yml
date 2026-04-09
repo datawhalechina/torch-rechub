@@ -26,7 +26,7 @@ jobs:
 
       - name: Detect API source changes
         id: changed-files
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             torch_rechub:

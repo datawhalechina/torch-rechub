@@ -13,40 +13,84 @@ hero:
       text: 快速开始
       link: /zh/guide/quick_start
     - theme: alt
-      text: 查看文档
-      link: /zh/guide/intro
+      text: 模型总览
+      link: /zh/models/intro
+    - theme: alt
+      text: ONNX 部署
+      link: /zh/serving/onnx
 
 features:
-  - icon: 🏗️
-    title: 模块化设计
-    details: 易于添加新的模型、数据集和评估指标，具有清晰的架构设计
+  - icon: 排序
+    title: 排序模型工作流
+    details: 覆盖 WideDeep、DeepFM、DIN、BST、DIEN、DCN 等主流排序模型。
+    link: /zh/models/ranking
+    linkText: 查看排序模型
 
-  - icon: ⚡
-    title: 基于 PyTorch
-    details: 充分利用 PyTorch 的动态图和 GPU 加速能力，实现高性能计算
+  - icon: 召回
+    title: 召回与检索能力
+    details: 支持双塔召回、序列召回、多兴趣建模和召回评估。
+    link: /zh/models/matching
+    linkText: 查看召回模型
 
-  - icon: 📚
-    title: 丰富的模型库
-    details: 包含多种经典和前沿的推荐算法，涵盖排序、召回和多任务学习模型
+  - icon: 多任务
+    title: 多任务学习
+    details: 统一训练 ESMM、MMOE、PLE、AITM 等多任务架构。
+    link: /zh/models/mtl
+    linkText: 查看多任务模型
 
-  - icon: 🔄
-    title: 标准化流程
-    details: 提供统一的数据加载、训练和评估流程，确保实验的一致性
+  - icon: 生成式
+    title: 生成式扩展
+    details: 在同一套训练与部署约定下探索生成式推荐方向。
+    link: /zh/models/generative
+    linkText: 查看生成式模型
 
-  - icon: ⚙️
-    title: 易于配置
-    details: 通过配置文件或命令行参数轻松调整实验设置，无需修改代码
+  - icon: ONNX
+    title: 面向部署
+    details: 支持 ONNX 导出、运行时校验与后续服务化衔接。
+    link: /zh/serving/onnx
+    linkText: 查看 ONNX 部署
 
-  - icon: 🎯
-    title: 可复现性
-    details: 设计确保实验结果的可复现性，支持固定随机种子和确定性操作
+  - icon: 向量
+    title: 向量检索工具链
+    details: 接入 Annoy、Faiss、Milvus 等向量检索能力。
+    link: /zh/serving/vector_index
+    linkText: 查看向量索引
 
-  - icon: 🔧
-    title: 高级特性
-    details: 支持负采样、多任务学习等高级推荐技术
+  - icon: 实验
+    title: 实验可见性
+    details: 结合回调、实验追踪与可视化，提高训练可复现性。
+    link: /zh/tools/tracking
+    linkText: 查看实验追踪
 
-  - icon: 📊
-    title: 多个数据集
-    details: 内置支持 MovieLens、Amazon、Criteo、Avazu 等多个流行数据集
+  - icon: 数据
+    title: 统一数据流水线
+    details: 复用统一的特征规范、数据处理方式和训练入口。
+    link: /zh/core/data
+    linkText: 查看数据流水线
 ---
 
+<div class="home-badges">
+  <span>排序</span>
+  <span>召回</span>
+  <span>多任务</span>
+  <span>生成式</span>
+  <span>ONNX</span>
+  <span>向量检索</span>
+  <span>实验追踪</span>
+  <span>可视化</span>
+</div>
+
+<div class="home-quick-grid">
+  <a class="home-quick-card" href="./tutorials/ctr">
+    <strong>先把第一条训练链路跑通</strong>
+    <span>完成安装、定义特征、训练基线模型，并快速理解这个项目最常用的 Trainer 工作流。</span>
+  </a>
+  <a class="home-quick-card" href="./models/ranking">
+    <strong>快速挑选模型家族</strong>
+    <span>按排序、召回、多任务、生成式四条主线浏览能力，建立对项目模型结构的全局认识。</span>
+  </a>
+  <a class="home-quick-card" href="./serving/demo">
+    <strong>面向部署准备产物</strong>
+    <span>了解 ONNX 导出、运行时校验与服务化对接方式，让实验结果更容易走向实际使用。</span>
+  </a>
+</div>
