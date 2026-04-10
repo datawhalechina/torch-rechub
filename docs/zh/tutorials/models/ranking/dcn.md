@@ -124,9 +124,11 @@ model_dcnv2 = DCNv2(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import CTRTrainer
 
 torch.manual_seed(2022)
+os.makedirs("./saved/dcn", exist_ok=True)
 
 # 使用 DCN 或 DCNv2
 model = model_dcn  # 或 model_dcnv2
@@ -195,6 +197,7 @@ Cross Network 的设计目的就是自动学习特征交叉，理论上可以替
 ## 完整代码
 
 ```python
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -209,6 +212,8 @@ from torch_rechub.utils.data import DataGenerator
 
 def main(use_dcnv2=False):
     torch.manual_seed(2022)
+    save_dir = f"./saved/{'dcnv2' if use_dcnv2 else 'dcn'}"
+    os.makedirs(save_dir, exist_ok=True)
 
     data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
     dense_features = [f for f in data.columns if f.startswith("I")]
@@ -253,7 +258,7 @@ def main(use_dcnv2=False):
         n_epoch=50,
         earlystop_patience=10,
         device="cpu",
-        model_path=f"./saved/{'dcnv2' if use_dcnv2 else 'dcn'}"
+        model_path=save_dir
     )
     trainer.fit(train_dl, val_dl)
 

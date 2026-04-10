@@ -108,8 +108,8 @@ train_dl, val_dl, test_dl = dg.generate_dataloader(
 from torch_rechub.models.ranking import DeepFM
 
 model = DeepFM(
-    deep_features=dense_feas + sparse_feas,  # Deep 部分使用全部特征
-    fm_features=sparse_feas,       # FM 部分使用的特征
+    deep_features=dense_feas + sparse_feas,  # Deep 部分负责学习高阶非线性关系
+    fm_features=sparse_feas,       # FM 部分只对稀疏特征做二阶交互
     mlp_params={
         "dims": [256, 128],        # MLP 隐藏层维度
         "dropout": 0.2,            # dropout 比率
@@ -135,10 +135,12 @@ model = DeepFM(
 ### 4.1 创建训练器并训练
 
 ```python
+import os
 import torch
 from torch_rechub.trainers import CTRTrainer
 
 torch.manual_seed(2022)
+os.makedirs("./saved/deepfm", exist_ok=True)
 
 ctr_trainer = CTRTrainer(
     model,
@@ -204,7 +206,11 @@ print(f"Test AUC: {auc:.4f}")
 ### 6.2 调优技巧
 
 ```python
+import os
+
 # 使用学习率调度器
+os.makedirs("./saved/deepfm", exist_ok=True)
+
 ctr_trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
@@ -330,6 +336,7 @@ print(f"Output shape: {output[0].shape}")
 ## 完整代码
 
 ```python
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -344,6 +351,7 @@ from torch_rechub.utils.data import DataGenerator
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/deepfm", exist_ok=True)
 
     # 1. 加载数据
     data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")

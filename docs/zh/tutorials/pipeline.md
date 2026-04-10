@@ -1,195 +1,245 @@
 ---
 title: 多任务学习教程
-description: Torch-RecHub 多任务学习模型教程，包括 SharedBottom、ESMM、MMoE 和 PLE 等模型示例
+description: Torch-RecHub 多任务学习教程，覆盖 Ali-CCP 数据准备、MMOE、PLE 与 ESMM
 ---
 
 # 多任务学习教程
 
-本教程将介绍如何使用 Torch-RecHub 中的多任务学习模型。我们将使用阿里巴巴的电商数据集作为示例。
+本教程使用仓库内置的 `Ali-CCP` 样本数据，介绍当前 Torch-RecHub 中多任务学习模型的真实训练方式。文中的代码默认在**仓库根目录**执行。
 
-## 数据准备
+## 一、数据准备
 
-首先，我们需要准备多任务学习的数据：
+### 1. 加载样本数据
 
 ```python
 import pandas as pd
-import numpy as np
-from torch_rechub.utils import DataGenerator
-from torch_rechub.models import *
-from torch_rechub.trainers import *
 
-# 加载数据
-df = pd.read_csv("ali_ccp_data.csv")
+df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
+df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
+df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
 
-# 特征定义
-user_features = ['user_id', 'age', 'gender', 'occupation']
-item_features = ['item_id', 'category_id', 'shop_id', 'brand_id']
-features = user_features + item_features
+# 先把 train / val / test 拼起来统一做特征定义，后面再按索引切回去
+train_idx = df_train.shape[0]
+val_idx = train_idx + df_val.shape[0]
 
-# 多任务标签
-tasks = ['click', 'conversion']  # CTR 和 CVR 任务
+data = pd.concat([df_train, df_val, df_test], axis=0)
+# ctcvr_label 是 ESMM 常用的第三个任务标签：click * conversion
+data.rename(columns={"purchase": "cvr_label", "click": "ctr_label"}, inplace=True)
+data["ctcvr_label"] = data["cvr_label"] * data["ctr_label"]
 ```
 
-## SharedBottom 模型
-
-最基础的多任务学习模型，底层网络共享参数：
+### 2. 构建 Dense / Sparse 特征
 
 ```python
-# 模型配置
-model = SharedBottom(
+from torch_rechub.basic.features import DenseFeature, SparseFeature
+
+# Ali-CCP 里稀疏特征占多数，少量列按 dense feature 处理
+dense_cols = ["D109_14", "D110_14", "D127_14", "D150_14", "D508", "D509", "D702", "D853"]
+sparse_cols = [
+    col for col in data.columns
+    if col not in dense_cols and col not in ["cvr_label", "ctr_label", "ctcvr_label"]
+]
+
+# 多任务场景里，所有任务默认共享同一套底层输入特征
+features = [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
+    DenseFeature(col) for col in dense_cols
+]
+
+label_cols = ["cvr_label", "ctr_label"]
+used_cols = sparse_cols + dense_cols
+```
+
+### 3. 构建训练 / 验证 / 测试集
+
+```python
+from torch_rechub.utils.data import DataGenerator
+
+# DataGenerator 在多任务场景下仍然复用同一套接口，只是 y 变成二维标签
+x_train = {name: data[name].values[:train_idx] for name in used_cols}
+y_train = data[label_cols].values[:train_idx]
+
+x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
+y_val = data[label_cols].values[train_idx:val_idx]
+
+x_test = {name: data[name].values[val_idx:] for name in used_cols}
+y_test = data[label_cols].values[val_idx:]
+
+dg = DataGenerator(x_train, y_train)
+train_dl, val_dl, test_dl = dg.generate_dataloader(
+    x_val=x_val,
+    y_val=y_val,
+    x_test=x_test,
+    y_test=y_test,
+    batch_size=1024,
+)
+```
+
+## 二、MMOE
+
+```python
+from torch_rechub.models.multi_task import MMOE
+from torch_rechub.trainers import MTLTrainer
+
+# MMOE：共享 expert + 任务专属 gate，是最常见的多任务基线
+model = MMOE(
     features=features,
-    hidden_units=[256, 128],
-    task_hidden_units=[64, 32],
-    num_tasks=2,
-    task_types=['binary', 'binary'])
-
-# 训练配置
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
-
-# 训练模型
-trainer.fit(train_dataloader, val_dataloader)
+    task_types=["classification", "classification"],
+    n_expert=8,
+    expert_params={"dims": [16]},
+    tower_params_list=[{"dims": [8]}, {"dims": [8]}],
+)
 ```
 
-## ESMM (Entire Space Multi-Task Model)
-
-解决样本选择偏差的多任务模型：
+### 训练方式
 
 ```python
-# 模型配置
-model = ESMM(
-    features=features,
-    hidden_units=[256, 128, 64],
-    tower_units=[32, 16],
-    embedding_dim=16)
+import os
+import torch
 
-# 训练配置
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
+torch.manual_seed(2022)
+# MTLTrainer 不会自动创建 model_path，这里先手动创建目录
+os.makedirs("./saved/mmoe", exist_ok=True)
+
+mtl_trainer = MTLTrainer(
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3, "weight_decay": 1e-4},
+    n_epoch=5,
+    earlystop_patience=5,
+    device="cpu",  # GPU 改成 "cuda:0"
+    model_path="./saved/mmoe",
+)
+
+mtl_trainer.fit(train_dl, val_dl)
+# evaluate 返回的是一个列表，顺序与 task_types 一致
+auc = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
+print(f"Test AUC: {auc}")  # [cvr_auc, ctr_auc]
 ```
 
-## MMoE (Multi-gate Mixture-of-Experts)
-
-通过专家机制实现任务间的软参数共享：
+## 三、PLE
 
 ```python
-# 模型配置
-model = MMoE(
-    features=features,
-    expert_units=[256, 128],
-    num_experts=8,
-    num_tasks=2,
-    expert_activation='relu',
-    gate_activation='softmax')
+from torch_rechub.models.multi_task import PLE
 
-# 训练配置
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
-```
-
-## PLE (Progressive Layered Extraction)
-
-通过分层提取更好地建模任务关系：
-
-```python
-# 模型配置
+# PLE 在任务差异更大时通常比 MMOE 更稳，因为它区分 shared / task-specific experts
 model = PLE(
     features=features,
-    expert_units=[256, 128],
-    num_experts=4,
-    num_layers=3,
-    num_shared_experts=2,
-    task_types=['binary', 'binary'])
+    task_types=["classification", "classification"],
+    n_level=1,
+    n_expert_specific=2,
+    n_expert_shared=1,
+    expert_params={"dims": [16]},
+    tower_params_list=[{"dims": [8]}, {"dims": [8]}],
+)
+```
 
-# 训练配置
+### 自适应损失权重（可选）
+
+```python
+# adaptive_params 用于打开动态 loss 平衡；这里示例用的是 UWL
+os.makedirs("./saved/ple", exist_ok=True)
+
+mtl_trainer = MTLTrainer(
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3, "weight_decay": 1e-5},
+    adaptive_params={"method": "uwl"},
+    n_epoch=5,
+    earlystop_patience=5,
+    device="cpu",
+    model_path="./saved/ple",
+)
+
+mtl_trainer.fit(train_dl, val_dl)
+```
+
+## 四、ESMM
+
+`ESMM` 的输入与 `MMOE / PLE` 不同：它只使用稀疏特征，并且标签顺序通常为 `["cvr_label", "ctr_label", "ctcvr_label"]`。
+
+```python
+from torch_rechub.models.multi_task import ESMM
+
+item_cols = ["129", "205", "206", "207", "210", "216"]
+user_cols = [col for col in sparse_cols if col not in item_cols]
+
+user_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in user_cols]
+item_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in item_cols]
+
+label_cols = ["cvr_label", "ctr_label", "ctcvr_label"]
+x_train = {name: data[name].values[:train_idx] for name in sparse_cols}
+y_train = data[label_cols].values[:train_idx]
+```
+
+```python
+# ESMM 会把 user tower 和 item tower 的组合用于估计 CTR / CVR / CTCVR
+model = ESMM(
+    user_features,
+    item_features,
+    cvr_params={"dims": [16, 8]},
+    ctr_params={"dims": [16, 8]},
+)
+```
+
+## 五、训练器接口
+
+```python
+from torch_rechub.trainers import MTLTrainer
+
 trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    n_epochs=10)
+    model,
+    task_types=["classification", "classification"],
+    optimizer_params={"lr": 1e-3},
+    regularization_params={"embedding_l2": 0.0, "dense_l2": 0.0},
+    adaptive_params=None,   # 可选: {"method": "uwl"} / {"method": "gradnorm"} / {"method": "metabalance"}
+    n_epoch=10,
+    earlystop_taskid=0,
+    earlystop_patience=10,
+    device="cpu",
+    model_path="./saved/mtl",
+)
 ```
 
-## 任务权重优化
+## 六、评估与调优建议
 
-### GradNorm
-
-使用 GradNorm 算法动态调整任务权重：
+### 1. 评估输出
 
 ```python
-# 配置 GradNorm
-trainer = MTLTrainer(
-    model=model,
-    optimizer_params={'lr': 0.001},
-    task_weights_strategy='gradnorm',
-    gradnorm_alpha=1.5)
+scores = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
+print(scores)
 ```
 
-### MetaBalance
+`evaluate()` 会返回一个列表，顺序与 `task_types` 一致。例如：
 
-使用 MetaBalance 优化器平衡任务梯度：
+- `[cvr_auc, ctr_auc]`
+- 或 ESMM 下的三个任务分数
 
-```python
-from torch_rechub.utils import MetaBalance
+### 2. 调优重点
 
-# 配置 MetaBalance 优化器
-optimizer = MetaBalance(
-    model.parameters(),
-    relax_factor=0.7,
-    beta=0.9)
+- `MMOE`：优先调 `n_expert`
+- `PLE`：优先调 `n_level / n_expert_specific / n_expert_shared`
+- 任务失衡明显时：尝试 `adaptive_params={"method": "uwl"}`
+- 多任务 AUC 波动较大时：先减小学习率，再缩短专家网络维度
 
-trainer = MTLTrainer(
-    model=model,
-    optimizer=optimizer)
-```
+## 七、常见问题
 
-## 模型评估
+### Q1：为什么这页不再使用 `from torch_rechub.utils import DataGenerator`？
 
-针对不同任务使用相应的评估指标：
+因为 `DataGenerator` 位于 `torch_rechub.utils.data`，不是从 `torch_rechub.utils` 顶层导出。
 
-```python
-# 评估模型
-results = evaluate_multi_task(model, test_dataloader)
-for task, metrics in results.items():
-    print(f"Task: {task}")
-    print(f"AUC: {metrics['auc']:.4f}")
-    print(f"LogLoss: {metrics['logloss']:.4f}")
-```
+### Q2：为什么文档不再使用 `n_epochs`？
 
-## 高级应用
+`MTLTrainer` 的参数名是 `n_epoch`。
 
-1. 自定义任务损失权重
-```python
-trainer = MTLTrainer(
-    model=model,
-    task_weights=[1.0, 0.5])  # 设置固定任务权重
-```
+### Q3：为什么这里没有 `evaluate_multi_task()`？
 
-2. 获取共享层和任务特定层
-```python
-from torch_rechub.utils import shared_task_layers
+框架直接使用 `MTLTrainer.evaluate(model, data_loader)`，返回每个任务的分数列表，不存在 `evaluate_multi_task()` 这个公开函数。
 
-shared_params, task_params = shared_task_layers(model)
-```
+### Q4：为什么训练前要先执行 `os.makedirs`？
 
-3. 任务特定的学习率
-```python
-trainer = MTLTrainer(
-    model=model,
-    task_specific_lr={'click': 0.001, 'conversion': 0.0005})
-```
+`MTLTrainer` 不会自动创建 `model_path` 目录，因此文档示例中显式创建保存目录。
 
-## 注意事项
+### Q5：还想继续看具体模型页？
 
-1. 选择合适的多任务学习架构
-2. 注意任务之间的相关性
-3. 处理任务间的数据不平衡
-4. 合理设置任务权重
-5. 监控每个任务的训练进度
-6. 防止任务间的负迁移
-7. 考虑计算资源的限制
-
+- [MMOE 教程](/zh/tutorials/models/multi_task/mmoe)
+- [PLE 教程](/zh/tutorials/models/multi_task/ple)

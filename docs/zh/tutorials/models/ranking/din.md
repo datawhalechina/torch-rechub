@@ -69,6 +69,7 @@ DIN 的特征分为三类：`features`（包含目标物品特征和用户特征
 
 ```python
 # 1. 特征列表（目标物品 + 用户属性）
+# DIN 的关键是“目标物品”和“历史行为”成对做注意力，所以 target 特征会直接影响激活结果
 features = [
     SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
     SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
@@ -126,8 +127,8 @@ from torch_rechub.models.ranking import DIN
 
 model = DIN(
     features=features,
-    history_features=history_features,
-    target_features=target_features,
+    history_features=history_features,  # 历史序列
+    target_features=target_features,    # 当前候选物品，会和历史逐步计算注意力
     mlp_params={
         "dims": [256, 128]
     },
@@ -154,7 +155,10 @@ model = DIN(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import CTRTrainer
+
+os.makedirs("./saved/din", exist_ok=True)
 
 ctr_trainer = CTRTrainer(
     model,
@@ -230,6 +234,7 @@ exporter.export("din.onnx", dynamic_batch=True)
 
 ```python
 import pandas as pd
+import os
 import torch
 
 from torch_rechub.basic.features import SparseFeature, SequenceFeature
@@ -240,6 +245,7 @@ from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feat
 
 def main():
     torch.manual_seed(2022)
+    os.makedirs("./saved/din", exist_ok=True)
 
     # 1. 加载数据
     data = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")

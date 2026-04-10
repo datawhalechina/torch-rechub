@@ -109,7 +109,7 @@ test_user = x_test
 
 # 创建 DataLoader
 dg = MatchDataGenerator(x=x_train, y=y_train)
-train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048)
+train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
 ```
 
 ---
@@ -147,20 +147,23 @@ model = YoutubeDNN(
 ## 4. 训练过程与代码示例
 
 ```python
+import os
 from torch_rechub.trainers import MatchTrainer
 
 torch.manual_seed(2022)
+save_dir = "./saved/youtube_dnn/"
+os.makedirs(save_dir, exist_ok=True)
 
 trainer = MatchTrainer(
     model,
-    mode=2,                     # list-wise 训练模式
+    mode=2,                     # list-wise 训练模式；YoutubeDNN 通常不走 point-wise
     optimizer_params={
         "lr": 1e-4,
         "weight_decay": 1e-6
     },
     n_epoch=10,
     device="cpu",
-    model_path="./saved/youtube_dnn/"
+    model_path=save_dir
 )
 
 trainer.fit(train_dl)
@@ -183,12 +186,12 @@ trainer.fit(train_dl)
 user_embedding = trainer.inference_embedding(
     model=model, mode="user",
     data_loader=test_dl,
-    model_path="./saved/youtube_dnn/"
+    model_path=save_dir
 )
 item_embedding = trainer.inference_embedding(
     model=model, mode="item",
     data_loader=item_dl,
-    model_path="./saved/youtube_dnn/"
+    model_path=save_dir
 )
 
 print(f"User Embedding: {user_embedding.shape}")
@@ -341,7 +344,7 @@ def main():
     trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
                            n_epoch=10, device="cpu", model_path=save_dir)
 
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
     trainer.fit(train_dl)
 
     user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
