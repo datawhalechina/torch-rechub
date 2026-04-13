@@ -17,7 +17,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         with:
           script: |
             const title = context.payload.pull_request.title.toLowerCase();
