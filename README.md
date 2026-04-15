@@ -120,8 +120,7 @@ git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 uv sync
 
-# 安装 optinal dependency Annoy
-uv pip install ".[annoy]"
+# 安装 Annoy 向量检索库, 详细内容请参考 https://datawhalechina.github.io/torch-rechub/zh/serving/vector_index.html
 
 # 运行召回示例（需要先进入对应目录，脚本使用相对路径加载数据）
 cd examples/matching
