@@ -70,7 +70,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
 
     model = MIND(user_features, history_features, item_features, neg_item_feature, max_length=seq_max_len, temperature=0.02)
 
-    # mode=1 means pair-wise learning
+    # mode=2 means list-wise learning with sampled negatives.
     trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir, gpus=[0])
 
     train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size, num_workers=0)
