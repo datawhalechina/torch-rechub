@@ -1,6 +1,7 @@
 name: Deploy VitePress to GitHub Pages
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
