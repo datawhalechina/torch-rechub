@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-04-21
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ 新特性 / Features
+* Add workflow and script to auto-generate API docs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/208
+* Add dynamo ONNX export with fallback by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/212
+* Fix MIND and ComiRec list-wise logits shape by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/222
+### 🐛 Bug 修复 / Bug Fixes
+* fix: 修复英文首页 Get Started 按钮 404 链接 by @happydog-intj in https://github.com/datawhalechina/torch-rechub/pull/205
+* fix: 修复 docs/en/ 下所有 /en/ 前缀内部链接 404 by @happydog-intj in https://github.com/datawhalechina/torch-rechub/pull/206
+### 📝 文档更新 / Documentation
+* Consolidate README: English main, add Chinese by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/209
+* Update README by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/213
+* Revamp VitePress theme and docs navigation by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/214
+* Update images of tutorials by @queenyn in https://github.com/datawhalechina/torch-rechub/pull/203
+* Update custom.css by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/217
+* Revise Quick Start and add model tutorials by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/218
+* Update README images and add MIND list-wise docs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/223
+
+## New Contributors
+* @happydog-intj made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/205
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.6.0...v0.7.0
+
+---
+
+
+
 ## [0.6.0] - 2026-03-18
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
