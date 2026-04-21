@@ -55,13 +55,11 @@ class MIND(torch.nn.Module):
 
         pos_item_embedding = item_embedding[:, 0, :]
         dot_res = torch.bmm(user_embedding, pos_item_embedding.squeeze(1).unsqueeze(-1))
-        k_index = torch.argmax(dot_res, dim=1)
-        best_interest_emb = torch.rand(user_embedding.shape[0], user_embedding.shape[2]).to(user_embedding.device)
-        for k in range(user_embedding.shape[0]):
-            best_interest_emb[k, :] = user_embedding[k, k_index[k], :]
-        best_interest_emb = best_interest_emb.unsqueeze(1)
+        k_index = torch.argmax(dot_res, dim=1).squeeze(-1)
+        batch_index = torch.arange(user_embedding.shape[0], device=user_embedding.device)
+        best_interest_emb = user_embedding[batch_index, k_index, :].unsqueeze(1)
 
-        y = torch.mul(best_interest_emb, item_embedding).sum(dim=1)
+        y = torch.mul(best_interest_emb, item_embedding).sum(dim=-1)
         return y
 
     def user_tower(self, x):
