@@ -20,6 +20,29 @@ MIND (Multi-Interest Network with Dynamic Routing), proposed by Alibaba at CIKM 
 - **User Representation**: multiple interest vectors with shape `[batch_size, interest_num, embed_dim]`
 - **Training**: list-wise softmax training, similar to YoutubeDNN
 
+### List-wise Forward Output
+
+In `mode=2` list-wise training, `neg_item_feature` provides sampled negative items for each sample, and `item_tower` returns candidate item embeddings:
+
+```text
+item_embedding: [batch_size, 1 + n_neg_items, embed_dim]
+```
+
+MIND first uses the positive item to select the most relevant user interest as `best_interest_emb`:
+
+```text
+best_interest_emb: [batch_size, 1, embed_dim]
+```
+
+It then computes one dot-product logit for each candidate item:
+
+```text
+y = (best_interest_emb * item_embedding).sum(dim=-1)
+y: [batch_size, 1 + n_neg_items]
+```
+
+The reduction must be over the embedding dimension `dim=-1`, not over the candidate item dimension. `MatchTrainer(mode=2)` uses `CrossEntropyLoss`, so `y_train = 0` means the first candidate item is the positive item.
+
 ### Suitable Scenarios
 
 - Retrieval stage of recommendation systems
