@@ -20,6 +20,29 @@ MIND (Multi-Interest Network with Dynamic Routing) 是阿里妈妈在 CIKM'2019 
 - **User Representation**: 多个兴趣向量（而非一个），维度为 `[batch_size, interest_num, embed_dim]`
 - **训练方式**: List-wise (Softmax)，与 YoutubeDNN 类似
 
+### List-wise 前向输出
+
+在 `mode=2` 的 list-wise 训练中，`neg_item_feature` 会提供每条样本的负样本集合，`item_tower` 返回候选物品向量：
+
+```text
+item_embedding: [batch_size, 1 + n_neg_items, embed_dim]
+```
+
+MIND 会先使用正样本物品从多个用户兴趣向量中选择最相关的 `best_interest_emb`：
+
+```text
+best_interest_emb: [batch_size, 1, embed_dim]
+```
+
+然后对每个候选物品计算内积，输出 sampled softmax 所需的 logits：
+
+```text
+y = (best_interest_emb * item_embedding).sum(dim=-1)
+y: [batch_size, 1 + n_neg_items]
+```
+
+这里必须沿 embedding 维度 `dim=-1` 求和，不能沿候选物品维度求和。`MatchTrainer(mode=2)` 使用 `CrossEntropyLoss`，因此 `y_train = 0` 表示第 0 个候选物品是正样本。
+
 ### 适用场景
 
 - 推荐系统**召回阶段**

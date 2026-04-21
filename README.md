@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-![Torch-RecHub Banner](docs/public/img/banner.png)
+![Torch-RecHub Banner](https://raw.githubusercontent.com/datawhalechina/torch-rechub/main/docs/public/img/banner.png)
 
 # Torch-RecHub: A Lightweight, Efficient, and Easy-to-use PyTorch Recommender Framework
 
@@ -18,7 +18,7 @@
 
 English | [简体中文](README_zh.md)
 
-![Project Framework](docs/public/img/project_framework.png)
+![Project Framework](https://raw.githubusercontent.com/datawhalechina/torch-rechub/main/docs/public/img/project_framework.png)
 
 </div>
 
