@@ -393,6 +393,9 @@ jobs:
           echo "WHEEL_FILE=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
           echo "SDIST_FILE=$(ls dist/*.tar.gz)" >> $GITHUB_OUTPUT
 
+      - name: Check package metadata
+        run: uvx twine check dist/*
+
       - name: Publish to PyPI
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

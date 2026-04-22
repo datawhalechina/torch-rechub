@@ -7,9 +7,13 @@ name = "torch-rechub"
 version = "0.7.0"
 description = "A lightweight, efficient, and easy-to-use PyTorch recommendation system framework."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-    { name = "Datawhale", email = "thisisevy@foxmail.com" },
+    { name = "Datawhale", email = "opensource@datawhale.club" },
+]
+maintainers = [
+    { name = "1985312383", email = "thisisevy@foxmail.com" },
 ]
 keywords = [
     "recommendation",
@@ -38,18 +42,20 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "torch>=1.10.0",
-    "accelerate>=1.0.1",
     "numpy>=1.19.0",
     "pandas>=1.2.0",
     "scikit-learn>=0.24.0",
     "tqdm>=4.60.0",
-    "transformers>=4.46.3",
 ]
 
 [project.optional-dependencies]
 annoy = ["annoy>=1.17.2"]
 faiss = ["faiss-cpu==1.13.0"]
 milvus = ["pymilvus>=2.6.5"]
+generative = [
+    "accelerate>=1.0.1",
+    "transformers>=4.46.3",
+]
 bigdata = [
     "pyarrow>=21,<23",
 ]
@@ -65,6 +71,28 @@ visualization = [
     "graphviz>=0.20",
 ]
 tracking = [
+    "wandb>=0.13.0",
+    "swanlab>=0.1.0",
+    "tensorboardX>=2.5",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+]
+all = [
+    "annoy>=1.17.2",
+    "faiss-cpu==1.13.0",
+    "pymilvus>=2.6.5",
+    "accelerate>=1.0.1",
+    "transformers>=4.46.3",
+    "pyarrow>=21,<23",
+    "ml-dtypes>=0.5.0",
+    "onnx>=1.14.0",
+    "onnxscript>=0.1.0",
+    "onnxruntime>=1.14.0",
+    "onnxconverter-common>=1.14.0",
+    "torchview>=0.2.6",
+    "graphviz>=0.20",
     "wandb>=0.13.0",
     "swanlab>=0.1.0",
     "tensorboardX>=2.5",
@@ -86,7 +114,9 @@ dev = [
 Homepage = "https://github.com/datawhalechina/torch-rechub"
 Documentation = "https://datawhalechina.github.io/torch-rechub/"
 Repository = "https://github.com/datawhalechina/torch-rechub.git"
+Source = "https://github.com/datawhalechina/torch-rechub"
 Issues = "https://github.com/datawhalechina/torch-rechub/issues"
+Changelog = "https://datawhalechina.github.io/torch-rechub/zh/community/changelog.html"
 
 # UV 工具配置
 [dependency-groups]
