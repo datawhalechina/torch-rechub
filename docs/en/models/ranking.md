@@ -474,7 +474,7 @@ model = DIN(
 
 ### Description
 
-DIEN (Deep Interest Evolution Network) models user interest evolution, capturing dynamic changes in user interests.
+DIEN (Deep Interest Evolution Network), proposed by Alibaba at AAAI 2019, extends DIN with an **Interest Extractor Layer** (GRU + auxiliary loss) and an **Interest Evolution Layer** (AUGRU) to model how user interests evolve over time.
 
 ### Paper Reference
 
@@ -484,41 +484,61 @@ Zhou, Guorui, et al. "Deep interest evolution network for click-through rate pre
 
 ### Core Principles
 
-- **GRU**: Uses GRU to capture temporal changes in user interests
-- **Interest Extraction Layer**: Extracts interest sequences from raw behavior sequences
-- **Interest Evolution Layer**: Models dynamic interest evolution using GRU and attention
-- **Interest Activation Layer**: Activates relevant interests based on target item
+- **Interest Extractor Layer**: GRU over behaviour sequences; auxiliary loss supervises each hidden state with positive/negative next-step samples (paper Eq.7)
+- **Interest Evolution Layer**: AUGRU embeds attention into the update gate; attention is softmax-normalised over the full valid sequence (paper Eq.14-16)
+- **Auxiliary Loss**: $L_{aux} = -\frac{1}{N}\sum[\log\sigma(h_t \cdot e^+_{t+1}) + \log(1-\sigma(h_t \cdot e^-_{t+1}))]$
+- **Padding**: index 0 is the padding token; padding positions are excluded from GRU, AUGRU attention, and auxiliary loss; all-padding samples keep zero hidden state
 
 ### Usage
 
 ```python
+from torch_rechub.basic.features import SparseFeature, SequenceFeature
 from torch_rechub.models.ranking import DIEN
 
-sequence_features = [SequenceFeature(name="user_history", vocab_size=10000, embed_dim=32, pooling=None)]
+# padding_idx=0 must be set on target_features — they own the embedding tables
+target_features = [
+    SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates+1, embed_dim=8, padding_idx=0),
+]
+history_features = [
+    SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("hist_cate_id", vocab_size=n_cates+1, embed_dim=8,
+                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
+]
+neg_history_features = [
+    SequenceFeature("neg_hist_item_id", vocab_size=n_items+1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("neg_hist_cate_id", vocab_size=n_cates+1, embed_dim=8,
+                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
+]
 
 model = DIEN(
-    deep_features=sparse_features + dense_features,
-    sequence_features=sequence_features,
-    target_features=sparse_features,
-    mlp_params={"dims": [256, 128, 64], "dropout": 0.2, "activation": "relu"},
-    dien_params={"gru_layers": 2, "attention_dim": 64, "dropout": 0.2}
+    features=features,
+    history_features=history_features,
+    neg_history_features=neg_history_features,
+    target_features=target_features,
+    mlp_params={"dims": [256, 128]},
+    alpha=0.2,
 )
+# CTRTrainer must use loss_mode=False — forward returns (prediction, aux_loss)
 ```
 
 ### Parameters
 
-| Parameter | Type | Description | Default |
-| --- | --- | --- | --- |
-| deep_features | list | Feature list for Deep part | None |
-| sequence_features | list | Sequence feature list | None |
-| target_features | list | Target feature list | None |
-| mlp_params | dict | DNN parameters | None |
-| dien_params | dict | DIEN network parameters | None |
+| Parameter | Type | Description |
+| --- | --- | --- |
+| features | list | User profile / context features fed into the top MLP |
+| history_features | list | Positive behaviour sequences; pooling="concat", padding_idx=0, shared_with=target_feature |
+| neg_history_features | list | Negative-sampled sequences; same constraints as history_features; shared_with must point to target feature |
+| target_features | list | Target item features; padding_idx=0 so the shared embedding table's row 0 is a zero vector |
+| mlp_params | dict | Top MLP params; activation is fixed to dice |
+| alpha | float | Auxiliary loss weight (default 0.2) |
 
 ### Use Cases
 
-- Scenarios with evolving user interests
-- Long sequence interest modeling
+- E-commerce / news recommendation where user interests evolve over time
+- Sequential behaviour data with temporal ordering
 - CTR prediction tasks
 
 ## 12. AutoInt
