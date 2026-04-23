@@ -22,7 +22,7 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 ROOT_DIR = Path(__file__).parent.parent
-SOURCE_DIRS = ["torch_rechub", "examples", "tests"]
+SOURCE_DIRS = ["torch_rechub", "examples", "tests", "benchmarks"]
 
 YAPF_STYLE = (
     "{based_on_style: google, column_limit: 248, join_multiple_lines: false, "
@@ -31,10 +31,8 @@ YAPF_STYLE = (
     "indent_width: 4}"
 )
 
-FLAKE8_IGNORE = (
-    "E203,W503,E501,E722,E402,F821,F523,E711,E741,F401,"
-    "E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302"
-)
+FLAKE8_IGNORE = ("E203,W503,E501,E722,E402,F821,F523,E711,E741,F401,"
+                 "E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302")
 
 
 def run_command(command, description, exit_on_error=True):
@@ -67,11 +65,7 @@ def main():
 
     # 阶段 3: flake8
     print("\n[阶段 3] flake8 代码质量检查")
-    flake8_ok = run_command(
-        ["flake8", "--max-line-length=248", f"--extend-ignore={FLAKE8_IGNORE}", "--max-complexity=30"] + SOURCE_DIRS,
-        "flake8",
-        exit_on_error=False
-    )
+    flake8_ok = run_command(["flake8", "--max-line-length=248", f"--extend-ignore={FLAKE8_IGNORE}", "--max-complexity=30"] + SOURCE_DIRS, "flake8", exit_on_error=False)
 
     # 结果
     print("\n" + "=" * 50)
