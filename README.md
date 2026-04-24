@@ -13,7 +13,7 @@
 ![issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
 
 [![python](https://img.shields.io/badge/python-3.9%2B-3776AB?style=for-the-badge)](https://www.python.org/)
-[![pytorch](https://img.shields.io/badge/pytorch-1.7%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
+[![pytorch](https://img.shields.io/badge/pytorch-1.10%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
 [![torchview](https://img.shields.io/badge/torchview-0.2%2B-6CB33F?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 English | [简体中文](README_zh.md)
@@ -67,7 +67,7 @@ English | [简体中文](README_zh.md)
 ### Requirements
 
 * Python 3.9+
-* PyTorch 1.7+ (CUDA-enabled version recommended for GPU acceleration)
+* PyTorch 1.10+ (CUDA-enabled version recommended for GPU acceleration)
 * NumPy
 * Pandas
 * SciPy
