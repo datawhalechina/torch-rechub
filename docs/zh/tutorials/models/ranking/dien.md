@@ -5,258 +5,173 @@ description: Deep Interest Evolution Network (DIEN) 模型完整使用教程 —
 
 # DIEN 使用示例
 
-## 1. 模型简介与适用场景
+## 1. 模型简介
 
-DIEN (Deep Interest Evolution Network) 是阿里妈妈在 AAAI'2019 提出的模型，是 DIN 的进化版。DIEN 引入了**兴趣抽取层 (Interest Extractor)**（GRU）和**兴趣演化层 (Interest Evolution)**（AUGRU），能够建模用户兴趣随时间的**动态演化过程**，而不仅仅是对历史行为做加权求和。
+DIEN (Deep Interest Evolution Network) 是阿里妈妈在 AAAI'2019 提出的模型，是 DIN 的进化版。
 
 **论文**: [Deep Interest Evolution Network for Click-Through Rate Prediction](https://arxiv.org/pdf/1809.03672)
 
-### 模型结构
-
-> **注意**: 由于 DIEN 内部使用 GRU 动态计算，torchview 暂时无法自动追踪其计算图，因此未提供架构可视化图。
-
-- **Interest Extractor Layer**: 使用 GRU 对用户行为序列建模，提取每一步的兴趣状态
-- **Auxiliary Loss**: 利用下一时刻的真实点击行为作为监督信号，辅助训练 GRU
-- **Interest Evolution Layer**: 使用 AUGRU (Attention-based Update Gate GRU) 结合目标物品的注意力，建模与目标物品相关的兴趣演化
-
-### 适用场景
-
-- CTR 预估（点击率预测）
-- 用户兴趣随时间有明显变化的场景（如电商、新闻推荐）
-- 拥有丰富的带时序的用户行为序列数据
+- **Interest Extractor Layer**: GRU 对行为序列建模，辅助损失用正负样本对监督每步隐状态（论文 Eq.7）
+- **Interest Evolution Layer**: AUGRU 将注意力嵌入更新门，对全序列 softmax 归一化后演化（论文 Eq.14-16）
+- **辅助损失**: $L_{aux} = -\frac{1}{N}\sum[\log\sigma(h_t \cdot e^+_{t+1}) + \log(1-\sigma(h_t \cdot e^-_{t+1}))]$
+- **Padding 处理**: padding 位（index=0）不参与 GRU/AUGRU 计算；空历史样本保持零隐状态
 
 ---
 
-## 2. 数据准备与预处理
+## 2. 关键约定
 
-DIEN 的数据准备与 DIN 基本一致，同样使用 Amazon Electronics 数据集，但额外需要提供 `history_labels`（历史行为标签，标记每一步是否点击）。
+| 约定 | 说明 |
+|------|------|
+| padding index | 序列用 0 填充（`generate_seq_feature` 默认），所有序列特征和 target 特征都需显式设 `padding_idx=0` |
+| shared_with | `history_features` 和 `neg_history_features` 的 `shared_with` 必须指向 **target feature 的名字**，不能指向 history feature，因为 `EmbeddingLayer` 只把 `shared_with=None` 的特征注册为 embedding root |
+| loss_mode | `CTRTrainer` 需设 `loss_mode=False`，因为 `forward` 返回 `(prediction, aux_loss)` |
+
+---
+
+## 3. 数据准备
 
 ```python
 import pandas as pd
-import torch
+from sklearn.preprocessing import LabelEncoder
+from torch_rechub.utils.data import generate_seq_feature, df_to_dict
 
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feature
+raw = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")
 
-# 加载数据
-data = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")
+# 复现 generate_seq_feature 内部的编码，用于构建 item2cate 映射
+enc_data = raw.copy()
+for feat in enc_data:
+    le = LabelEncoder()
+    enc_data[feat] = le.fit_transform(enc_data[feat]) + 1
+enc_data = enc_data.astype('int32')
+item2cate = enc_data[['item_id','cate_id']].drop_duplicates().set_index('item_id')['cate_id'].to_dict()
+n_items, n_users, n_cates = enc_data['item_id'].max(), enc_data['user_id'].max(), enc_data['cate_id'].max()
 
-# 自动生成历史序列特征
 train, val, test = generate_seq_feature(
-    data=data, user_col="user_id", item_col="item_id",
+    data=raw, user_col="user_id", item_col="item_id",
     time_col="time", item_attribute_cols=["cate_id"]
-)
-
-n_users = data["user_id"].max()
-n_items = data["item_id"].max()
-n_cates = data["cate_id"].max()
-```
-
-### 定义特征
-
-```python
-# 特征列表（目标物品 + 用户属性）
-features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
-    SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
-]
-target_features = features
-
-# 历史行为序列特征
-history_features = [
-    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8,
-                    pooling="concat", shared_with="target_item_id"),
-    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8,
-                    pooling="concat", shared_with="target_cate_id")
-]
-```
-
-### 构建 DataLoader
-
-```python
-train_dict, val_dict, test_dict = df_to_dict(train), df_to_dict(val), df_to_dict(test)
-train_y = train_dict.pop("label")
-val_y = val_dict.pop("label")
-test_y = test_dict.pop("label")
-
-dg = DataGenerator(train_dict, train_y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    x_val=val_dict, y_val=val_y, x_test=test_dict, y_test=test_y, batch_size=4096
 )
 ```
 
 ---
 
-## 3. 模型配置与参数说明
-
-### 3.1 创建模型
+## 4. 负样本构造
 
 ```python
-from torch_rechub.models.ranking import DIEN
+import random
+import numpy as np
 
-# history_labels: 标记历史行为序列中每一步是否为正反馈（1=点击，0=未点击）
-# 注意：该参数是模型级别的固定配置，而非逐样本的标签
-# 这里简单使用全 1 表示所有历史行为都是正反馈（简化示例）
-# 实际场景中应根据业务数据设置合理的正负反馈标记
-history_labels = [1] * 50  # 与序列长度一致
+def build_neg_history(split, hist_item_col, item2cate, n_items):
+    """逐时刻采样负 item，再通过 item2cate 查出对应 cate，保证属性一致。"""
+    seqs = split[hist_item_col]
+    neg_items = np.zeros_like(seqs)
+    neg_cates = np.zeros_like(seqs)
+    for i, row in enumerate(seqs):
+        for t, item in enumerate(row):
+            if item == 0:
+                continue
+            neg = item
+            while neg == item:
+                neg = random.randint(1, n_items)
+            neg_items[i, t] = neg
+            neg_cates[i, t] = item2cate.get(neg, 1)
+    return neg_items, neg_cates
+
+train, val, test = df_to_dict(train), df_to_dict(val), df_to_dict(test)
+train_y, val_y, test_y = train.pop("label"), val.pop("label"), test.pop("label")
+
+for split in [train, val, test]:
+    neg_items, neg_cates = build_neg_history(split, "hist_item_id", item2cate, n_items)
+    split["neg_hist_item_id"] = neg_items
+    split["neg_hist_cate_id"] = neg_cates
+```
+
+---
+
+## 5. 特征定义
+
+```python
+from torch_rechub.basic.features import SparseFeature, SequenceFeature
+
+features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+
+# padding_idx=0 必须设在 target_features 上，因为 embedding 表由它创建
+target_features = [
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0),
+]
+
+history_features = [
+    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8,
+                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
+]
+neg_history_features = [
+    SequenceFeature("neg_hist_item_id", vocab_size=n_items + 1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("neg_hist_cate_id", vocab_size=n_cates + 1, embed_dim=8,
+                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
+]
+```
+
+---
+
+## 6. 创建模型与训练
+
+```python
+import os
+from torch_rechub.models.ranking import DIEN
+from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.data import DataGenerator
+
+os.makedirs("./saved/dien", exist_ok=True)
+
+dg = DataGenerator(train, train_y)
+train_dl, val_dl, test_dl = dg.generate_dataloader(
+    x_val=val, y_val=val_y, x_test=test, y_test=test_y, batch_size=4096
+)
 
 model = DIEN(
     features=features,
     history_features=history_features,
+    neg_history_features=neg_history_features,
     target_features=target_features,
     mlp_params={"dims": [256, 128]},
-    history_labels=history_labels,  # DIEN 比 DIN 多了一路兴趣演化监督信号
-    alpha=0.2  # 辅助损失权重
+    alpha=0.2,
 )
-```
 
-### 3.2 参数详解
-
-| 参数 | 类型 | 说明 | 建议值 |
-|------|------|------|--------|
-| `features` | `list[Feature]` | 目标物品特征 + 用户特征，同时作为 `target_features` 传入 | |
-| `history_features` | `list[Feature]` | 历史行为序列，pooling 必须为 `"concat"` | |
-| `target_features` | `list[Feature]` | 与 `features` 相同 | |
-| `mlp_params` | `dict` | 顶层 MLP 参数（`activation` 已内置为 `dice`，无需传入） | `{"dims": [256, 128]}` |
-| `history_labels` | `list` | 历史序列中每步的点击标签 (0/1) | 长度与 seq_len 一致 |
-| `alpha` | `float` | 辅助损失的权重系数 | 0.1 ~ 0.5 |
-
-> **关键**: DIEN 的 `forward()` 返回 `(prediction, auxiliary_loss)`，训练器会自动处理辅助损失。
-
----
-
-## 4. 训练过程与代码示例
-
-```python
-import os
-from torch_rechub.trainers import CTRTrainer
-
-os.makedirs("./saved/dien", exist_ok=True)
-
-ctr_trainer = CTRTrainer(
+trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
     n_epoch=5,
     earlystop_patience=2,
     device="cpu",
-    model_path="./saved/dien"
+    model_path="./saved/dien",
+    loss_mode=False,  # forward 返回 (prediction, aux_loss)
 )
-
-ctr_trainer.fit(train_dl, val_dl)
-```
-
----
-
-## 5. 模型评估与结果分析
-
-```python
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dl)
+trainer.fit(train_dl, val_dl)
+auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
 ---
 
-## 6. 参数调优建议
-
-1. **辅助损失权重** (`alpha`): 过大会导致主任务训练不充分，过小辅助信号太弱。建议从 `0.2` 开始调整
-2. **激活函数**: MLP 默认使用 `dice`，与 DIN 一致
-3. **序列长度**: DIEN 的计算随序列长度线性增长（GRU），通常限制在 20~50
-
----
-
-## 7. 常见问题与解决方案
+## 7. 常见问题
 
 ### Q1: DIEN 和 DIN 的核心区别？
-- DIN 用 Activation Unit 做加权求和（静态），DIEN 用 GRU+AUGRU 建模兴趣的**时序演化**（动态）
-- DIEN 额外引入辅助损失来监督 GRU 的中间状态
+DIN 用 Activation Unit 做加权求和（静态），DIEN 用 GRU+AUGRU 建模兴趣的时序演化（动态），并引入辅助损失监督 GRU 中间状态。
 
-### Q2: history_labels 如何获取？
-在实际场景中，`history_labels` 来自用户的真实行为反馈（点击/未点击）。在训练数据中，可以根据用户的实际交互记录生成。
+### Q2: shared_with 为什么要指向 target feature 而不是 history feature？
+`EmbeddingLayer` 只把 `shared_with=None` 的特征注册进 `embed_dict`。`history_features` 本身已经 `shared_with="target_*"`，所以 `embed_dict` 里没有 `hist_*` 这个 key，`neg_history_features` 的 `shared_with` 必须直接指向 target feature。
 
----
+### Q3: 为什么 target_features 也要设 padding_idx=0？
+`history_features` 和 `neg_history_features` 共享 target feature 的 embedding 表。只有在 target feature 上设 `padding_idx=0`，embedding 表的 row 0 才真正是受保护的零向量。
 
-## 8. 模型可视化
-
-```python
-from torch_rechub.utils.visualization import visualize_model
-visualize_model(model, save_path="dien_architecture.png", dpi=300)
-```
-
----
-
-## 9. ONNX 导出
-
-```python
-from torch_rechub.utils.onnx_export import ONNXExporter
-exporter = ONNXExporter(model, device="cpu")
-exporter.export("dien.onnx", dynamic_batch=True)
-```
+### Q4: 序列长度建议？
+DIEN 计算随序列长度线性增长（GRU 逐步展开），通常限制在 20~50。
 
 ---
 
 ## 完整代码
 
-```python
-import os
-import pandas as pd
-import torch
-
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.models.ranking import DIEN
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feature
-
-
-def main():
-    torch.manual_seed(2022)
-    os.makedirs("./saved/dien", exist_ok=True)
-
-    data = pd.read_csv("examples/ranking/data/amazon-electronics/amazon_electronics_sample.csv")
-    train, val, test = generate_seq_feature(
-        data=data, user_col="user_id", item_col="item_id",
-        time_col="time", item_attribute_cols=["cate_id"]
-    )
-    n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
-
-    features = [
-        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
-        SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
-    ]
-    target_features = features
-    history_features = [
-        SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-        SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
-    ]
-
-    train_dict, val_dict, test_dict = df_to_dict(train), df_to_dict(val), df_to_dict(test)
-    train_y = train_dict.pop("label")
-    val_y = val_dict.pop("label")
-    test_y = test_dict.pop("label")
-
-    dg = DataGenerator(train_dict, train_y)
-    train_dl, val_dl, test_dl = dg.generate_dataloader(
-        x_val=val_dict, y_val=val_y, x_test=test_dict, y_test=test_y, batch_size=4096
-    )
-
-    history_labels = [1] * 50
-    model = DIEN(
-        features=features, history_features=history_features,
-        target_features=target_features, mlp_params={"dims": [256, 128]},
-        history_labels=history_labels, alpha=0.2
-    )
-
-    ctr_trainer = CTRTrainer(
-        model, optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
-        n_epoch=2, earlystop_patience=4, device="cpu", model_path="./saved/dien/"
-    )
-    ctr_trainer.fit(train_dl, val_dl)
-
-    auc = ctr_trainer.evaluate(ctr_trainer.model, test_dl)
-    print(f"Test AUC: {auc:.4f}")
-
-
-if __name__ == "__main__":
-    main()
-```
+完整可运行示例见 [examples/ranking/run_dien.py](../../../../../examples/ranking/run_dien.py)。

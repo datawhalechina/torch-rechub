@@ -487,7 +487,7 @@ model = DIN(
 
 ### 功能描述
 
-DIEN（Deep Interest Evolution Network）是一种用于建模用户兴趣演化过程的深度网络，能够捕获用户兴趣的动态变化。
+DIEN（Deep Interest Evolution Network）是阿里妈妈在 AAAI'2019 提出的模型，在 DIN 基础上引入**兴趣抽取层**（GRU + 辅助损失）和**兴趣演化层**（AUGRU），建模用户兴趣随时间的动态演化过程。
 
 ### 论文引用
 
@@ -497,43 +497,57 @@ Zhou, Guorui, et al. "Deep interest evolution network for click-through rate pre
 
 ### 核心原理
 
-- **GRU**：使用 GRU 捕捉用户兴趣的时序变化
-- **兴趣抽取层**：从原始行为序列中提取兴趣序列
-- **兴趣演化层**：使用 GRU 和注意力机制建模兴趣的动态演化
-- **兴趣激活层**：根据目标物品激活相关兴趣
+- **兴趣抽取层**：GRU 对行为序列建模，辅助损失用正负样本对监督每步隐状态（论文 Eq.7）
+- **兴趣演化层**：AUGRU 将注意力分数嵌入更新门，对全序列 softmax 归一化后逐步演化（论文 Eq.14-16）
+- **辅助损失**：$L_{aux} = -\frac{1}{N}\sum[\log\sigma(h_t \cdot e^+_{t+1}) + \log(1-\sigma(h_t \cdot e^-_{t+1}))]$
+- **Padding 处理**：padding 位（index=0）不参与 GRU/AUGRU 计算；空历史样本保持零隐状态
 
 ### 使用方法
 
 ```python
+from torch_rechub.basic.features import SparseFeature, SequenceFeature
 from torch_rechub.models.ranking import DIEN
 
-# 定义序列特征
-sequence_features = [SequenceFeature(name="user_history", vocab_size=10000, embed_dim=32, pooling=None)]
+# target_features 必须设 padding_idx=0，因为 history/neg_history 共享其 embedding 表
+target_features = [
+    SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8, padding_idx=0),
+]
+# history/neg_history 通过 shared_with 指向 target feature（embed_dict 的 root key）
+history_features = [
+    SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+]
+neg_history_features = [
+    SequenceFeature("neg_hist_item_id", vocab_size=n_items+1, embed_dim=8,
+                    pooling="concat", shared_with="target_item_id", padding_idx=0),
+]
 
-# 创建模型
 model = DIEN(
-    deep_features=sparse_features + dense_features,
-    sequence_features=sequence_features,
-    target_features=sparse_features,
-    mlp_params={"dims": [256, 128, 64], "dropout": 0.2, "activation": "relu"},
-    dien_params={"gru_layers": 2, "attention_dim": 64, "dropout": 0.2}
+    features=features,
+    history_features=history_features,
+    neg_history_features=neg_history_features,
+    target_features=target_features,
+    mlp_params={"dims": [256, 128]},
+    alpha=0.2,
 )
+# CTRTrainer 需设 loss_mode=False，因为 forward 返回 (prediction, aux_loss)
 ```
 
 ### 参数说明
 
-| 参数 | 类型 | 描述 | 默认值 |
-| --- | --- | --- | --- |
-| deep_features | list | Deep 部分使用的特征列表 | None |
-| sequence_features | list | 序列特征列表 | None |
-| target_features | list | 目标特征列表 | None |
-| mlp_params | dict | 深度神经网络参数 | None |
-| dien_params | dict | DIEN 网络参数 | None |
+| 参数 | 类型 | 描述 |
+| --- | --- | --- |
+| features | list | 用户画像 / 上下文特征，输入顶层 MLP |
+| history_features | list | 正样本行为序列，pooling="concat"，padding_idx=0，shared_with=target_feature |
+| neg_history_features | list | 负采样行为序列，同上，shared_with 必须指向 target feature（非 history feature） |
+| target_features | list | 目标物品特征，padding_idx=0，用于 AUGRU 注意力 |
+| mlp_params | dict | 顶层 MLP 参数，activation 固定为 dice |
+| alpha | float | 辅助损失权重，默认 0.2 |
 
 ### 适用场景
 
-- 用户兴趣动态演化的场景
-- 长序列兴趣建模
+- 用户兴趣随时间动态演化的场景（电商、新闻推荐）
+- 拥有带时序的用户行为序列数据
 - 点击率预测任务
 
 ## 12. AutoInt
