@@ -22,7 +22,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: ${{ github.head_ref }}
+          # Use the PR head commit SHA instead of the branch name.
+          # This avoids checkout failures when the branch ref cannot be
+          # resolved directly as origin/<branch> in Actions.
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Detect API source changes
         id: changed-files
