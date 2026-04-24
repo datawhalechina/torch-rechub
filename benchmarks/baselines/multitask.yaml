@@ -1,0 +1,24 @@
+# Multi-task baselines on the Census-Income sample.  Tiny test split (~20
+# rows) so AUCs swing widely between runs; tolerances here are wide and the
+# baselines exist mostly to catch pipeline regressions (labels aligned, task
+# order preserved) rather than to judge model quality.
+
+configs:
+  benchmarks/configs/multitask/census_mmoe.yaml:
+    metrics:
+      "AUC[cvr_label]": {expected: 0.9722, tolerance: 0.25}
+      "AUC[ctr_label]": {expected: 0.6667, tolerance: 0.30}
+      AUC_mean:         {expected: 0.8194, tolerance: 0.25}
+  benchmarks/configs/multitask/census_ple.yaml:
+    metrics:
+      "AUC[cvr_label]": {expected: 0.0000, tolerance: 0.40}
+      "AUC[ctr_label]": {expected: 0.8214, tolerance: 0.30}
+      AUC_mean:         {expected: 0.4107, tolerance: 0.30}
+  benchmarks/configs/multitask/census_esmm.yaml:
+    # ``AUC[ctcvr_label]`` and ``AUC_mean`` are omitted because the Census sample's
+    # test split is tiny enough that the derived ctcvr label is often all 0s, which
+    # drives roc_auc_score to NaN and contaminates the mean.  Add back once we
+    # benchmark on a larger dataset.
+    metrics:
+      "AUC[cvr_label]": {expected: 0.5, tolerance: 0.5}
+      "AUC[ctr_label]": {expected: 0.5, tolerance: 0.5}

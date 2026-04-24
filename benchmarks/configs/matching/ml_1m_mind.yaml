@@ -1,0 +1,31 @@
+task: matching
+
+dataset:
+  name: ml-1m-sample
+  path: examples/matching/data/ml-1m/ml-1m_sample.csv
+  seq_max_len: 50
+  neg_ratio: 3
+  sample_method: 1
+  padding: post
+  truncating: post
+
+model:
+  name: MIND
+  params:
+    embed_dim: 16
+    interest_num: 4
+    temperature: 0.02
+
+trainer:
+  mode: 2
+  epochs: 1
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.000001
+  device: cpu
+  seed: 2022
+
+metrics:
+  topk: 10
+
+output_dir: benchmark_results/matching/ml_1m_mind

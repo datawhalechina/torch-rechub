@@ -1,0 +1,28 @@
+task: multitask
+
+dataset:
+  name: census-income-sample
+  path: examples/ranking/data/census-income
+
+model:
+  name: PLE
+  params:
+    embed_dim: 4
+    n_level: 1
+    n_expert_specific: 2
+    n_expert_shared: 1
+    expert_dims:
+      - 16
+    tower_dims:
+      - 8
+
+trainer:
+  epochs: 1
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  earlystop_patience: 10
+  device: cpu
+  seed: 2022
+
+output_dir: benchmark_results/multitask/census_ple

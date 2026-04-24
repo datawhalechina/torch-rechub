@@ -79,6 +79,9 @@ test = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
 ]
+benchmark = [
+    "pyyaml>=6.0",
+]
 all = [
     "annoy>=1.17.2",
     "faiss-cpu==1.13.0",
@@ -96,6 +99,7 @@ all = [
     "wandb>=0.13.0",
     "swanlab>=0.1.0",
     "tensorboardX>=2.5",
+    "pyyaml>=6.0",
 ]
 dev = [
     "pytest>=6.0",
@@ -108,6 +112,7 @@ dev = [
     "bandit>=1.7.0",
     "toml>=0.10.2",
     "pyarrow-stubs>=20.0",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -132,6 +137,7 @@ dev = [
     "toml>=0.10.2",
     "jupyter>=1.0.0",
     "notebook>=6.0.0",
+    "pyyaml>=6.0",
 ]
 
 # 工具配置

@@ -1,0 +1,33 @@
+task: ranking
+
+dataset:
+  name: criteo-sample
+  path: examples/ranking/data/criteo/criteo_sample.csv
+
+model:
+  name: DCN
+  params:
+    embed_dim: 16
+    n_cross_layers: 3
+    mlp_params:
+      dims:
+        - 256
+        - 128
+
+trainer:
+  epochs: 1
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.001
+  earlystop_patience: 10
+  split_ratio:
+    - 0.7
+    - 0.1
+  device: cpu
+  seed: 2022
+
+metrics:
+  - AUC
+  - LogLoss
+
+output_dir: benchmark_results/ranking/criteo_dcn

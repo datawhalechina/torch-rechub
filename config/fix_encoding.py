@@ -48,7 +48,7 @@ def main():
                 if file.endswith(".py"):
                     if fix_file_encoding(Path(root) / file):
                         fixed_count += 1
-    
+
     if fixed_count > 0:
         print(f"\n✅ Successfully fixed encoding for {fixed_count} file(s).")
     else:

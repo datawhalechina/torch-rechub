@@ -1,0 +1,17 @@
+# Ranking baselines on the shipped Criteo sample (~115 rows).  Numbers are
+# derived from CPU runs with seed=2022; tolerances are wide enough to absorb
+# cross-platform BLAS / threading drift without masking real regressions.
+
+configs:
+  benchmarks/configs/ranking/criteo_widedeep.yaml:
+    metrics:
+      AUC:     {expected: 0.6375, tolerance: 0.15}
+      LogLoss: {expected: 0.6511, tolerance: 0.20}
+  benchmarks/configs/ranking/criteo_deepfm.yaml:
+    metrics:
+      AUC:     {expected: 0.3875, tolerance: 0.20}
+      LogLoss: {expected: 0.7234, tolerance: 0.20}
+  benchmarks/configs/ranking/criteo_dcn.yaml:
+    metrics:
+      AUC:     {expected: 0.5750, tolerance: 0.20}
+      LogLoss: {expected: 0.6784, tolerance: 0.20}

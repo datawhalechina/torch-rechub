@@ -166,6 +166,7 @@ cython_debug/
 .idea/
 
 # data files
+benchmark_results/
 *.pkl
 *.pt
 *.dat
