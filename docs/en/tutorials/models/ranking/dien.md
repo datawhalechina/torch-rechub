@@ -171,4 +171,4 @@ DIEN scales linearly with sequence length (GRU unrolled step by step). Typical r
 
 ## Full Example
 
-See [examples/ranking/run_dien.py](../../../../../examples/ranking/run_dien.py) for a complete runnable script.
+See [examples/ranking/run_dien.py](https://github.com/datawhalechina/torch-rechub/blob/main/examples/ranking/run_dien.py) for a complete runnable script.
