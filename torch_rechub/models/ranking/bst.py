@@ -24,46 +24,66 @@ class BST(nn.Module):
         nhead (int): the number of heads in the multi-head-attention models.
         dropout (float): the dropout value in the multi-head-attention models.
         num_layers (Any): the number of sub-encoder-layers in the encoder.
+        max_seq_len (int): maximum sequence length (history + 1 target). Used for positional encoding table size.
     """
 
-    def __init__(self, features, history_features, target_features, mlp_params, nhead=8, dropout=0.2, num_layers=1):
+    def __init__(self, features, history_features, target_features, mlp_params, nhead=8, dropout=0.2, num_layers=1, max_seq_len=51):
         super(BST, self).__init__()
         self.features = features
         self.history_features = history_features
         self.target_features = target_features
-        self.nhead = nhead
-        self.dropout = dropout
-        self.num_layers = num_layers
-        self.num_history_features = len(history_features)
-        self.embed_dim = history_features[0].embed_dim
-        self.all_dims = sum([fea.embed_dim for fea in features + history_features + target_features])
-
+        self.max_seq_len = max_seq_len
+        self.item_dim = sum([fea.embed_dim for fea in history_features])
+        target_dim = sum([fea.embed_dim for fea in target_features])
+        if self.item_dim != target_dim:
+            raise ValueError(f"sum of history_features embed_dim ({self.item_dim}) must equal sum of target_features embed_dim ({target_dim})")
+        if self.item_dim % nhead != 0:
+            raise ValueError(f"item_dim ({self.item_dim}) must be divisible by nhead ({nhead})")
+        self.all_dims = sum([fea.embed_dim for fea in features + target_features]) + self.item_dim
         self.embedding = EmbeddingLayer(features + history_features + target_features)
-        self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.embed_dim,
-            nhead=nhead,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.transformer_layers = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
+        # positional encoding: absolute index (simplified from paper's time-diff pos)
+        self.pos_embedding = nn.Embedding(max_seq_len, self.item_dim)
+        # paper uses LeakyReLU in FFN
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.item_dim, nhead=nhead, dropout=dropout, activation=nn.LeakyReLU(), batch_first=True)
+        self.transformer_layers = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.mlp = MLP(self.all_dims, **mlp_params)
 
     def forward(self, x):
-        # (batch_size, num_features, emb_dim)
         embed_x_features = self.embedding(x, self.features)
         # (batch_size, num_history_features, seq_length, emb_dim)
         embed_x_history = self.embedding(x, self.history_features)
         # (batch_size, num_target_features, emb_dim)
         embed_x_target = self.embedding(x, self.target_features)
-        transformer_pooling = []
-        for i in range(self.num_history_features):
-            # (batch_size, seq_length + num_target_features, emb_dim)
-            transformer_seq = self.transformer_layers(torch.cat([embed_x_history[:, i, :, :], embed_x_target], dim=1))
-            # (batch_size, emb_dim)
-            transformer_pooling.append(torch.mean(transformer_seq, dim=1).unsqueeze(1))
-        # (batch_size, num_history_features, emb_dim)
-        transformer_pooling = torch.cat(transformer_pooling, dim=1)
 
-        mlp_in = torch.cat([transformer_pooling.flatten(start_dim=1), embed_x_target.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  # (batch_size, N)
+        # fuse all history features into one item vector per timestep: [B, T, item_dim]
+        hist = torch.cat([embed_x_history[:, i] for i in range(len(self.history_features))], dim=-1)
+        # fuse target features into one vector: [B, item_dim]
+        tgt = torch.cat([embed_x_target[:, i] for i in range(len(self.target_features))], dim=-1)
+
+        # append target at end of sequence: [B, T+1, item_dim]
+        seq = torch.cat([hist, tgt.unsqueeze(1)], dim=1)
+        if seq.size(1) > self.max_seq_len:
+            raise ValueError(f"sequence length {seq.size(1)} exceeds max_seq_len {self.max_seq_len}")
+        positions = torch.arange(seq.size(1), device=seq.device).unsqueeze(0)
+        seq = seq + self.pos_embedding(positions)
+
+        # padding mask: a position is padding only if ALL history features are padding there
+        pad_mask = torch.ones(embed_x_history.size(0), embed_x_history.size(2), dtype=torch.bool, device=embed_x_history.device)
+        for fea in self.history_features:
+            pidx = fea.padding_idx if fea.padding_idx is not None else 0
+            pad_mask = pad_mask & (x[fea.name].long() == pidx)
+        tgt_mask = torch.zeros(pad_mask.size(0), 1, dtype=torch.bool, device=pad_mask.device)
+        src_key_padding_mask = torch.cat([pad_mask, tgt_mask], dim=1)  # [B, T+1]
+
+        out = self.transformer_layers(seq, src_key_padding_mask=src_key_padding_mask)
+        # take target position output as interest representation
+        interest = out[:, -1, :]  # [B, item_dim]
+
+        mlp_in = torch.cat([
+            interest,
+            embed_x_target.flatten(start_dim=1),
+            embed_x_features.flatten(start_dim=1),
+        ],
+                           dim=1)
         y = self.mlp(mlp_in)
         return torch.sigmoid(y.squeeze(1))
