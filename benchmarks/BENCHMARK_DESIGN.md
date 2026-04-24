@@ -25,16 +25,23 @@ benchmarks/
 │   ├── matching/
 │   │   ├── ml_1m_mind.yaml
 │   │   ├── ml_1m_youtube_dnn.yaml
-│   │   └── ml_1m_comirec_dr.yaml
-│   └── ranking/
-│       ├── criteo_widedeep.yaml
-│       ├── criteo_deepfm.yaml
-│       └── criteo_dcn.yaml
+│   │   ├── ml_1m_comirec_dr.yaml
+│   │   └── ml_1m_comirec_sa.yaml
+│   ├── ranking/
+│   │   ├── criteo_widedeep.yaml
+│   │   ├── criteo_deepfm.yaml
+│   │   └── criteo_dcn.yaml
+│   └── multitask/
+│       ├── census_esmm.yaml
+│       ├── census_mmoe.yaml
+│       └── census_ple.yaml
 ├── datasets.py
 ├── metrics.py
 ├── models.py
 ├── report.py
-└── runner.py
+├── runner.py
+├── schema.py
+└── suite.py
 ```
 
 ## 第一阶段：Matching Benchmark

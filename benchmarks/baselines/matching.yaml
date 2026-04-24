@@ -1,0 +1,38 @@
+# Matching baselines on the shipped ml-1m sample.
+#
+# These numbers are degenerate because the sample has ~2 test users, so they
+# function as regression sentinels for the benchmark plumbing (seed, splits,
+# pipeline stages) rather than as statements about model quality.
+#
+# Tolerance is absolute.  A run whose metric differs from ``expected`` by more
+# than ``tolerance`` fails ``--check-baseline``.
+
+configs:
+  benchmarks/configs/matching/ml_1m_mind.yaml:
+    metrics:
+      Hit@10:       {expected: 0.50,  tolerance: 0.15}
+      NDCG@10:      {expected: 0.50,  tolerance: 0.15}
+      Recall@10:    {expected: 0.50,  tolerance: 0.15}
+      MRR@10:       {expected: 0.50,  tolerance: 0.15}
+      Precision@10: {expected: 0.05,  tolerance: 0.05}
+  benchmarks/configs/matching/ml_1m_youtube_dnn.yaml:
+    metrics:
+      Hit@10:       {expected: 0.0,   tolerance: 0.10}
+      NDCG@10:      {expected: 0.0,   tolerance: 0.10}
+      Recall@10:    {expected: 0.0,   tolerance: 0.10}
+      MRR@10:       {expected: 0.0,   tolerance: 0.10}
+      Precision@10: {expected: 0.0,   tolerance: 0.02}
+  benchmarks/configs/matching/ml_1m_comirec_dr.yaml:
+    metrics:
+      Hit@10:       {expected: 0.0,   tolerance: 0.10}
+      NDCG@10:      {expected: 0.0,   tolerance: 0.10}
+      Recall@10:    {expected: 0.0,   tolerance: 0.10}
+      MRR@10:       {expected: 0.0,   tolerance: 0.10}
+      Precision@10: {expected: 0.0,   tolerance: 0.02}
+  benchmarks/configs/matching/ml_1m_comirec_sa.yaml:
+    metrics:
+      Hit@10:       {expected: 0.0,   tolerance: 0.10}
+      NDCG@10:      {expected: 0.0,   tolerance: 0.10}
+      Recall@10:    {expected: 0.0,   tolerance: 0.10}
+      MRR@10:       {expected: 0.0,   tolerance: 0.10}
+      Precision@10: {expected: 0.0,   tolerance: 0.02}

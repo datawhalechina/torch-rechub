@@ -44,8 +44,28 @@ class RankingDatasetBundle:
     sparse_features: list[Any]
 
 
-def build_movielens_matching_dataset(config: dict[str, Any]) -> MatchingDatasetBundle:
+@dataclass
+class MultiTaskDatasetBundle:
+    """Prepared inputs and features for multi-task benchmarks."""
+
+    x_train: dict[str, np.ndarray]
+    y_train: np.ndarray
+    x_val: dict[str, np.ndarray]
+    y_val: np.ndarray
+    x_test: dict[str, np.ndarray]
+    y_test: np.ndarray
+    features: list[Any]
+    user_features: list[Any]
+    item_features: list[Any]
+    task_names: list[str]
+    task_types: list[str]
+
+
+def build_movielens_matching_dataset(config: dict[str, Any], embed_dim: int, mode: int) -> MatchingDatasetBundle:
     """Build the MovieLens list-wise matching benchmark dataset."""
+    if mode != 2:
+        raise ValueError(f"Phase-1 matching benchmark only supports list-wise mode (mode=2); got mode={mode}.")
+
     data_path = Path(config["path"])
     seq_max_len = int(config.get("seq_max_len", 50))
     neg_ratio = int(config.get("neg_ratio", 3))
@@ -80,7 +100,7 @@ def build_movielens_matching_dataset(config: dict[str, Any]) -> MatchingDatasetB
         time_col="timestamp",
         item_attribute_cols=[],
         sample_method=sample_method,
-        mode=2,
+        mode=mode,
         neg_ratio=neg_ratio,
         min_item=0,
     )
@@ -88,7 +108,6 @@ def build_movielens_matching_dataset(config: dict[str, Any]) -> MatchingDatasetB
     y_train = np.zeros(train_df.shape[0], dtype=np.int64)
     x_test = gen_model_input(test_df, user_profile, user_col, item_profile, item_col, seq_max_len=seq_max_len, padding=padding, truncating=truncating)
 
-    embed_dim = int(config.get("embed_dim", 16))
     user_cols = ["user_id", "gender", "age", "occupation", "zip"]
     user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=embed_dim) for name in user_cols]
     history_features = [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx[item_col], embed_dim=embed_dim, pooling="concat", shared_with=item_col)]
@@ -113,18 +132,17 @@ def build_movielens_matching_dataset(config: dict[str, Any]) -> MatchingDatasetB
     )
 
 
-def build_matching_dataset(config: dict[str, Any]) -> MatchingDatasetBundle:
+def build_matching_dataset(config: dict[str, Any], embed_dim: int, mode: int) -> MatchingDatasetBundle:
     """Dispatch matching dataset construction by dataset name."""
     name = config.get("name")
     if name == "ml-1m-sample":
-        return build_movielens_matching_dataset(config)
+        return build_movielens_matching_dataset(config, embed_dim=embed_dim, mode=mode)
     raise ValueError(f"Unsupported matching dataset: {name}")
 
 
-def build_criteo_ranking_dataset(config: dict[str, Any]) -> RankingDatasetBundle:
+def build_criteo_ranking_dataset(config: dict[str, Any], embed_dim: int) -> RankingDatasetBundle:
     """Build the Criteo sample CTR benchmark dataset."""
     data_path = Path(config["path"])
-    embed_dim = int(config.get("embed_dim", 16))
     data = pd.read_csv(data_path, compression="gzip" if str(data_path).endswith(".gz") else None)
     dense_feature_names = [name for name in data.columns.tolist() if name.startswith("I")]
     sparse_feature_names = [name for name in data.columns.tolist() if name.startswith("C")]
@@ -150,11 +168,11 @@ def build_criteo_ranking_dataset(config: dict[str, Any]) -> RankingDatasetBundle
     return RankingDatasetBundle(x=x, y=y, dense_features=dense_features, sparse_features=sparse_features)
 
 
-def build_ranking_dataset(config: dict[str, Any]) -> RankingDatasetBundle:
+def build_ranking_dataset(config: dict[str, Any], embed_dim: int) -> RankingDatasetBundle:
     """Dispatch ranking dataset construction by dataset name."""
     name = config.get("name")
     if name == "criteo-sample":
-        return build_criteo_ranking_dataset(config)
+        return build_criteo_ranking_dataset(config, embed_dim=embed_dim)
     raise ValueError(f"Unsupported ranking dataset: {name}")
 
 
@@ -163,3 +181,83 @@ def _convert_numeric_feature(value):
     if value > 2:
         return int(np.log(value)**2)
     return value - 2
+
+
+_CENSUS_DENSE_COLS = [
+    "age",
+    "wage per hour",
+    "capital gains",
+    "capital losses",
+    "divdends from stocks",
+    "num persons worked for employer",
+    "weeks worked in year",
+]
+_CENSUS_ESMM_USER_COLS = ["industry code", "occupation code", "race", "education", "sex"]
+
+
+def build_census_multitask_dataset(config: dict[str, Any], embed_dim: int, model_name: str) -> MultiTaskDatasetBundle:
+    """Build the Census-Income multi-task benchmark dataset.
+
+    Two tasks drawn from Census-Income: income (cvr_label) and marital-status (ctr_label).
+    When ``model_name == 'ESMM'`` we additionally emit the derived ``ctcvr_label`` and split
+    the sparse columns into user/item groups, matching the original paper setup.
+    """
+    data_dir = Path(config["path"])
+    df_train = pd.read_csv(data_dir / "census_income_train_sample.csv")
+    df_val = pd.read_csv(data_dir / "census_income_val_sample.csv")
+    df_test = pd.read_csv(data_dir / "census_income_test_sample.csv")
+    train_idx = df_train.shape[0]
+    val_idx = train_idx + df_val.shape[0]
+
+    data = pd.concat([df_train, df_val, df_test], axis=0, ignore_index=True).fillna(0)
+    data = data.rename(columns={"income": "cvr_label", "marital status": "ctr_label"})
+    data["ctcvr_label"] = data["cvr_label"] * data["ctr_label"]
+
+    non_label_cols = [col for col in data.columns if col not in ("cvr_label", "ctr_label", "ctcvr_label")]
+    dense_cols = [col for col in _CENSUS_DENSE_COLS if col in non_label_cols]
+    sparse_cols = [col for col in non_label_cols if col not in dense_cols]
+
+    if model_name == "ESMM":
+        label_cols = ["cvr_label", "ctr_label", "ctcvr_label"]
+        used_cols = sparse_cols
+        user_cols = [col for col in _CENSUS_ESMM_USER_COLS if col in sparse_cols]
+        item_cols = [col for col in sparse_cols if col not in user_cols]
+        user_features = [SparseFeature(col, int(data[col].max()) + 1, embed_dim=embed_dim) for col in user_cols]
+        item_features = [SparseFeature(col, int(data[col].max()) + 1, embed_dim=embed_dim) for col in item_cols]
+        features: list[Any] = []
+        task_types = ["classification", "classification", "classification"]
+    else:
+        label_cols = ["cvr_label", "ctr_label"]
+        used_cols = sparse_cols + dense_cols
+        user_features, item_features = [], []
+        features = [SparseFeature(col, int(data[col].max()) + 1, embed_dim=embed_dim) for col in sparse_cols] + [DenseFeature(col) for col in dense_cols]
+        task_types = ["classification", "classification"]
+
+    x_train = {name: data[name].values[:train_idx] for name in used_cols}
+    x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
+    x_test = {name: data[name].values[val_idx:] for name in used_cols}
+    y_train = data[label_cols].values[:train_idx]
+    y_val = data[label_cols].values[train_idx:val_idx]
+    y_test = data[label_cols].values[val_idx:]
+
+    return MultiTaskDatasetBundle(
+        x_train=x_train,
+        y_train=y_train,
+        x_val=x_val,
+        y_val=y_val,
+        x_test=x_test,
+        y_test=y_test,
+        features=features,
+        user_features=user_features,
+        item_features=item_features,
+        task_names=label_cols,
+        task_types=task_types,
+    )
+
+
+def build_multitask_dataset(config: dict[str, Any], embed_dim: int, model_name: str) -> MultiTaskDatasetBundle:
+    """Dispatch multi-task dataset construction by dataset name."""
+    name = config.get("name")
+    if name == "census-income-sample":
+        return build_census_multitask_dataset(config, embed_dim=embed_dim, model_name=model_name)
+    raise ValueError(f"Unsupported multi-task dataset: {name}")
