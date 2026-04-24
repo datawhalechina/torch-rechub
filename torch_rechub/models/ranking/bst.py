@@ -44,8 +44,7 @@ class BST(nn.Module):
         # positional encoding: absolute index (simplified from paper's time-diff pos)
         self.pos_embedding = nn.Embedding(max_seq_len, self.item_dim)
         # paper uses LeakyReLU in FFN
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.item_dim, nhead=nhead, dropout=dropout,
-                                                   activation=nn.LeakyReLU(), batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.item_dim, nhead=nhead, dropout=dropout, activation=nn.LeakyReLU(), batch_first=True)
         self.transformer_layers = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.mlp = MLP(self.all_dims, **mlp_params)
 
@@ -84,6 +83,7 @@ class BST(nn.Module):
             interest,
             embed_x_target.flatten(start_dim=1),
             embed_x_features.flatten(start_dim=1),
-        ], dim=1)
+        ],
+                           dim=1)
         y = self.mlp(mlp_in)
         return torch.sigmoid(y.squeeze(1))
