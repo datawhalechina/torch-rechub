@@ -174,4 +174,4 @@ DIEN 计算随序列长度线性增长（GRU 逐步展开），通常限制在 2
 
 ## 完整代码
 
-完整可运行示例见 [examples/ranking/run_dien.py](../../../../../examples/ranking/run_dien.py)。
+完整可运行示例见 [examples/ranking/run_dien.py](https://github.com/datawhalechina/torch-rechub/blob/main/examples/ranking/run_dien.py)。
