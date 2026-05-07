@@ -9,9 +9,7 @@ Torch-RecHub provides a complete production deployment solution, supporting depl
 
 ## Deployment Process Overview
 
-```
-Train Model → ONNX Export → Model Quantization → Vector Index → Online Service
-```
+![Production deployment pipeline](/img/diagrams/serving_pipeline.png)
 
 ## Core Features
 

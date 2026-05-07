@@ -7,6 +7,8 @@ description: Torch-RecHub 向量检索工具
 
 Torch-RecHub 提供了统一的向量检索接口，支持三种主流的近似最近邻（ANN）检索库：**Annoy**、**FAISS** 和 **Milvus**。通过标准化的 Builder-Indexer 模式，用户可以方便地在不同检索后端之间切换。
 
+![向量索引 Builder-Indexer 组件关系图](/img/diagrams/vector_index_builder_indexer.png)
+
 ## 快速开始
 
 ```python

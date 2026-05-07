@@ -7,6 +7,8 @@ description: Torch-RecHub 特征类型定义
 
 Torch-RecHub提供了三种核心特征类，用于处理不同类型的特征：
 
+![特征类型到模型输入示意图](/img/diagrams/feature_types_flow.png)
+
 ## DenseFeature
 
 处理数值型特征，如年龄、薪资、日点击量等。

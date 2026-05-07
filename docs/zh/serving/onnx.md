@@ -7,6 +7,8 @@ description: Torch-RecHub 模型 ONNX 导出与量化
 
 Torch-RecHub 已支持将训练好的模型导出为 ONNX，用于跨平台推理部署。面向工业推理场景（低延迟、低内存）， **ONNX 导出** 与 **量化（INT8/FP16）** 的完整用法与建议实践。
 
+![ONNX 导出与量化链路图](/img/diagrams/onnx_quantization_flow.png)
+
 ## 安装依赖
 
 ONNX 相关依赖是可选的，按需安装：

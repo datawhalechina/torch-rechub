@@ -7,6 +7,8 @@ description: Torch-RecHub Vector Retrieval Tools
 
 Torch-RecHub provides a unified vector retrieval interface supporting three mainstream Approximate Nearest Neighbor (ANN) search libraries: **Annoy**, **FAISS**, and **Milvus**. Through the standardized Builder-Indexer pattern, users can easily switch between different retrieval backends.
 
+![Vector index Builder-Indexer component relationship](/img/diagrams/vector_index_builder_indexer.png)
+
 ## Quick Start
 
 ```python

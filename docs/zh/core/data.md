@@ -7,6 +7,8 @@ description: Torch-RecHub 数据加载与预处理
 
 Torch-RecHub提供了完整的数据处理流水线，包括数据集类、数据生成器和工具函数，用于处理推荐系统中的各种数据需求。
 
+![数据流水线图](/img/diagrams/data_pipeline.png)
+
 ## 数据类
 
 ### TorchDataset

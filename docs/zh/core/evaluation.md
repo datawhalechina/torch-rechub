@@ -7,6 +7,8 @@ description: Torch-RecHub 模型训练与评估
 
 Torch-RecHub提供了多种训练器，用于训练不同类型的推荐模型，包括排序模型、召回模型和多任务模型。所有训练器均提供统一的接口，包括训练、评估、预测、ONNX导出，以及可选的实验跟踪与可视化能力。
 
+![Trainer 工作流图](/img/diagrams/trainer_lifecycle.png)
+
 ## 实验跟踪与可视化
 
 - 支持 **WandB / SwanLab / TensorBoardX** 作为 `model_logger`，可传入单个实例或列表。

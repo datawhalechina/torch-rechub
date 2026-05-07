@@ -149,6 +149,8 @@ loader = DataLoader(dataset, batch_size=None, num_workers=8)
 
 ## Typical Flow
 
+![Data pipeline](/img/diagrams/data_pipeline.png)
+
 1. Define features (Dense/Sparse/Sequence).
 2. Load raw data.
 3. Encode categorical features (e.g., LabelEncoder).

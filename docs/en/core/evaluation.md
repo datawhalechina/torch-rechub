@@ -7,6 +7,8 @@ description: Torch-RecHub training and evaluation
 
 Torch-RecHub provides trainers for ranking, matching, multi-task, and generative models. All trainers expose a unified interface for training, evaluation, prediction, ONNX export, and optional experiment tracking/visualization.
 
+![Trainer workflow](/img/diagrams/trainer_lifecycle.png)
+
 ## Experiment Tracking & Visualization
 
 - Supports **WandB / SwanLab / TensorBoardX** as `model_logger`; you can pass a single instance or a list.
