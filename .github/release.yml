@@ -1,5 +1,5 @@
 # GitHub 自动生成 Release Notes 的配置
-# 当你点击 "Generate release notes" 按钮时，会根据此配置生成内容
+# 当你点击 "Generate release notes" 按钮时，会根据此配置生成内容。
 # 文档: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
 
 changelog:
@@ -14,29 +14,32 @@ changelog:
       - dependabot[bot]
 
   categories:
-    - title: "✨ 新特性 / Features"
-      labels:
-        - enhancement
-
+    # Categories are ordered by priority. A PR with multiple matching labels
+    # should be grouped by its most important label, not by incidental changes
+    # such as documentation updates.
     - title: "🐛 Bug 修复 / Bug Fixes"
       labels:
         - bug
-
-    - title: "⚡ 性能优化 / Performance"
-      labels:
-        - performance
-
-    - title: "📝 文档更新 / Documentation"
-      labels:
-        - documentation
 
     - title: "🔧 模型更新 / Models"
       labels:
         - model
 
+    - title: "✨ 新特性 / Features"
+      labels:
+        - enhancement
+
+    - title: "⚡ 性能优化 / Performance"
+      labels:
+        - performance
+
     - title: "📦 依赖更新 / Dependencies"
       labels:
         - dependencies
+
+    - title: "📝 文档更新 / Documentation"
+      labels:
+        - documentation
 
     - title: "🔄 其他变更 / Other Changes"
       labels:
