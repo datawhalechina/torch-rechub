@@ -7,6 +7,8 @@ description: Torch-RecHub model ONNX export and quantization
 
 Torch-RecHub supports exporting trained models to ONNX format for cross-platform inference deployment.
 
+![ONNX export and quantization flow](/img/diagrams/onnx_quantization_flow.png)
+
 ## Installation
 
 ONNX dependencies are optional:

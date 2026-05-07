@@ -7,6 +7,8 @@ description: Torch-RecHub feature types
 
 Torch-RecHub provides three core feature classes for different data types.
 
+![Feature types to model inputs](/img/diagrams/feature_types_flow.png)
+
 ## DenseFeature
 
 Numeric features (e.g., age, income).
