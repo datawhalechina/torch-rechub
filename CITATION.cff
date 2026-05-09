@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use Torch-RecHub in your research or work, please cite it using the metadata from this file."
+type: software
+title: "Torch-RecHub"
+abstract: "A PyTorch-based recommender system framework providing easy-to-use and extensible solutions."
+authors:
+  - name: "Datawhale"
+version: "0.7.0"
+license: "MIT"
+repository-code: "https://github.com/datawhalechina/torch-rechub"
+url: "https://github.com/datawhalechina/torch-rechub"
+contact:
+  - name: "1985312383"
+    email: "thisisevy@foxmail.com"
+keywords:
+  - recommendation
+  - recommender-systems
+  - deep-learning
+  - pytorch
+  - ctr
+  - matching
+  - ranking
+  - multi-task-learning
+  - recsys
+preferred-citation:
+  type: software
+  title: "Torch-RecHub"
+  authors:
+    - name: "Datawhale"
+  year: 2022
+  publisher: "GitHub"
+  repository-code: "https://github.com/datawhalechina/torch-rechub"
+  notes: "A PyTorch-based recommender system framework providing easy-to-use and extensible solutions."
