@@ -60,7 +60,10 @@ class ONNXWrapper(nn.Module):
             raise ValueError(f"Expected {len(self.input_names)} inputs, got {len(args)}. "
                              f"Expected names: {self.input_names}")
         x_dict = {name: arg for name, arg in zip(self.input_names, args)}
-        return self.model(x_dict)
+        output = self.model(x_dict)
+        if isinstance(output, tuple) and len(output) == 2 and torch.is_tensor(output[1]) and output[1].dim() == 0:
+            return output[0]
+        return output
 
     def restore_mode(self):
         """Restore the original mode of the model."""

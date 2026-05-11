@@ -29,7 +29,7 @@ class AUGRU_Cell(nn.Module):
         self.bh = init.xavier_uniform_(Parameter(torch.empty(1, embed_dim)))
 
     def forward(self, x, h_1, a):
-        # a: [ batch_size, 1 ] — pre-computed attention score for this step
+        # x, h_1: [B, D]; a: [B, 1], pre-computed attention score for this step.
         u = torch.sigmoid(torch.matmul(x, self.Wu) + torch.matmul(h_1, self.Uu) + self.bu)
         r = torch.sigmoid(torch.matmul(x, self.Wr) + torch.matmul(h_1, self.Ur) + self.br)
         h_hat = torch.tanh(torch.matmul(x, self.Wh) + r * torch.matmul(h_1, self.Uh) + self.bh)
@@ -126,15 +126,19 @@ class DIEN(nn.Module):
         return (self.BCELoss(pos_score, torch.ones_like(pos_score)) + self.BCELoss(neg_score, torch.zeros_like(neg_score)))
 
     def forward(self, x):
-        embed_x_features = self.embedding(x, self.features)
+        # [B, context_dim], with dense values and sparse embeddings flattened.
+        embed_x_features = self.embedding(x, self.features, squeeze_dim=True)
+        # [B, H, T, D]: H history feature fields, T sequence length.
         embed_x_history = self.embedding(x, self.history_features)
+        # [B, H, T, D]: negative sequence embeddings for the auxiliary loss.
         embed_x_neg_history = self.embedding(x, self.neg_history_features)
+        # [B, H, D]: target item embeddings aligned with history fields.
         embed_x_target = self.embedding(x, self.target_features)
 
         interest_extractor = []
         auxi_loss = 0
         for i, fea in enumerate(self.history_features):
-            seq = embed_x_history[:, i, :, :]
+            seq = embed_x_history[:, i, :, :]  # [B, T, D]
             mask = self.embedding.input_mask(x, fea).squeeze(1).bool()  # [B, T]
             seq_lens = mask.sum(dim=1).cpu()
 
@@ -147,9 +151,9 @@ class DIEN(nn.Module):
                 outs[has_hist] = unpacked
 
             auxi_loss += self.auxiliary(outs, seq, embed_x_neg_history[:, i, :, :], mask)
-            interest_extractor.append(outs.unsqueeze(1))
+            interest_extractor.append(outs.unsqueeze(1))  # [B, 1, T, D]
 
-        interest_extractor = torch.cat(interest_extractor, dim=1)
+        interest_extractor = torch.cat(interest_extractor, dim=1)  # [B, H, T, D]
 
         interest_evolving = []
         for i, fea in enumerate(self.history_features):
@@ -159,13 +163,13 @@ class DIEN(nn.Module):
             if has_hist.any():
                 _, h_valid = self.interest_evolving_layers[i](interest_extractor[has_hist, i, :, :], embed_x_target[has_hist, i, :], mask[has_hist])
                 h[has_hist] = h_valid
-            interest_evolving.append(h.unsqueeze(1))
+            interest_evolving.append(h.unsqueeze(1))  # [B, 1, D]
 
-        interest_evolving = torch.cat(interest_evolving, dim=1)
+        interest_evolving = torch.cat(interest_evolving, dim=1)  # [B, H, D]
         mlp_in = torch.cat([
             interest_evolving.flatten(start_dim=1),
             embed_x_target.flatten(start_dim=1),
-            embed_x_features.flatten(start_dim=1),
+            embed_x_features,
         ],
                            dim=1)
         y = self.mlp(mlp_in)

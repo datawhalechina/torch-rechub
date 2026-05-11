@@ -62,6 +62,7 @@ def extract_feature_info(model: nn.Module) -> Dict[str, Any]:
         'user_features',      # DSSM, YoutubeDNN, MIND
         'item_features',      # DSSM, YoutubeDNN, MIND
         'history_features',   # DIN, MIND
+        'neg_history_features',  # DIEN auxiliary loss
         'target_features',    # DIN
         'neg_item_feature',   # YoutubeDNN, MIND
     ]
