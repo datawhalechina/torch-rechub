@@ -49,10 +49,11 @@ class BST(nn.Module):
         self.mlp = MLP(self.all_dims, **mlp_params)
 
     def forward(self, x):
-        embed_x_features = self.embedding(x, self.features)
-        # (batch_size, num_history_features, seq_length, emb_dim)
+        # [B, context_dim], with dense values and sparse embeddings flattened.
+        embed_x_features = self.embedding(x, self.features, squeeze_dim=True)
+        # [B, H, T, D]: H history feature fields, T sequence length.
         embed_x_history = self.embedding(x, self.history_features)
-        # (batch_size, num_target_features, emb_dim)
+        # [B, K, D]: K target feature fields.
         embed_x_target = self.embedding(x, self.target_features)
 
         # fuse all history features into one item vector per timestep: [B, T, item_dim]
@@ -64,7 +65,7 @@ class BST(nn.Module):
         seq = torch.cat([hist, tgt.unsqueeze(1)], dim=1)
         if seq.size(1) > self.max_seq_len:
             raise ValueError(f"sequence length {seq.size(1)} exceeds max_seq_len {self.max_seq_len}")
-        positions = torch.arange(seq.size(1), device=seq.device).unsqueeze(0)
+        positions = torch.arange(seq.size(1), device=seq.device).unsqueeze(0)  # [1, T+1]
         seq = seq + self.pos_embedding(positions)
 
         # padding mask: a position is padding only if ALL history features are padding there
@@ -75,14 +76,14 @@ class BST(nn.Module):
         tgt_mask = torch.zeros(pad_mask.size(0), 1, dtype=torch.bool, device=pad_mask.device)
         src_key_padding_mask = torch.cat([pad_mask, tgt_mask], dim=1)  # [B, T+1]
 
-        out = self.transformer_layers(seq, src_key_padding_mask=src_key_padding_mask)
+        out = self.transformer_layers(seq, src_key_padding_mask=src_key_padding_mask)  # [B, T+1, item_dim]
         # take target position output as interest representation
         interest = out[:, -1, :]  # [B, item_dim]
 
         mlp_in = torch.cat([
             interest,
             embed_x_target.flatten(start_dim=1),
-            embed_x_features.flatten(start_dim=1),
+            embed_x_features,
         ],
                            dim=1)
         y = self.mlp(mlp_in)
