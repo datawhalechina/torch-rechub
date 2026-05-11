@@ -14,7 +14,10 @@ All commands and code snippets below assume you are running from the **repositor
 
 ## Installation
 
+If you use NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU, check the PyTorch compatibility links in the [Installation Guide](/guide/install) first.
+
 ```bash
+pip install torch         # Install the PyTorch build for your device first; see the installation guide for CUDA/ROCm/NPU
 pip install torch-rechub
 ```
 
@@ -95,7 +98,7 @@ trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3, "weight_decay": 1e-5},
     n_epoch=2,
-    device="cpu",  # Change to "cuda:0" for GPU training.
+    device="cpu",  # Change to "cuda:0" for NVIDIA/ROCm GPU training; use "npu:0" for NPU if configured.
     model_path="./saved/quick_start_deepfm",
 )
 
@@ -234,7 +237,7 @@ trainer = MatchTrainer(
     mode=0,
     optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
     n_epoch=2,
-    device="cpu",  # Change to "cuda:0" for GPU training.
+    device="cpu",  # Change to "cuda:0" for NVIDIA/ROCm GPU training; use "npu:0" for NPU if configured.
     model_path="./saved/quick_start_dssm",
 )
 
@@ -273,7 +276,7 @@ If you hit DataLoader multiprocessing issues in Windows or notebook environments
 
 ## Runtime Tips
 
-- GPU training: change `device="cpu"` to `device="cuda:0"`
+- NVIDIA/ROCm GPU training: change `device="cpu"` to `device="cuda:0"`; for NPU environments, use `device="npu:0"` if configured
 - Working directory: all paths in this page are relative to the **repository root**
 - Save directory: trainers do not create `model_path` automatically, so run `os.makedirs(path, exist_ok=True)` first
 - Windows environments: retrieval pipelines are more stable with `num_workers=0`
