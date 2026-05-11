@@ -29,7 +29,7 @@ English | [简体中文](README_zh.md)
 ## ✨ Features
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **Based on PyTorch:** Leverages PyTorch's dynamic graph and GPU acceleration capabilities. Supports NVIDIA GPU and Huawei Ascend NPU.
+* **Based on PyTorch:** Leverages PyTorch's dynamic graph and hardware acceleration capabilities. Supports CPU, NVIDIA CUDA GPU, AMD ROCm GPU, and Huawei Ascend NPU.
 * **Rich Model Library:** Covers **30+** classic and cutting-edge recommendation algorithms (Matching, Ranking, Multi-task, Generative Recommendation, etc.).
 * **Standardized Pipeline:** Provides unified data loading, training, and evaluation workflows.
 * **Easy Configuration:** Adjust experiment settings via config files or command-line arguments.
@@ -67,7 +67,7 @@ English | [简体中文](README_zh.md)
 ### Requirements
 
 * Python 3.9+
-* PyTorch 1.10+ (CUDA-enabled version recommended for GPU acceleration)
+* PyTorch 1.10+ (choose the CPU, NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU build for your device)
 * NumPy
 * Pandas
 * SciPy
@@ -75,12 +75,15 @@ English | [简体中文](README_zh.md)
 
 ### Installation Steps
 
+PyTorch builds are tightly coupled with your hardware, driver, and runtime versions. Before installing, check the official compatibility references for [NVIDIA CUDA / PyTorch versions](https://pytorch.org/get-started/previous-versions/), [Huawei Ascend NPU / PyTorch versions](https://www.hiascend.com/document/detail/zh/Pytorch/2600/releasenote/docs/zh/release_notes/release_notes.md), and [AMD ROCm / PyTorch versions](https://rocm.docs.amd.com/en/latest/compatibility/ml-compatibility/pytorch-compatibility.html).
+
 **Stable Version (Recommended):**
 ```bash
-# Install PyTorch matching your device
+# Install one PyTorch build matching your device
 pip install torch                                                     # CPU
-pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
-pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+pip install torch torch-npu                                           # Huawei Ascend NPU (requires torch-npu >= 2.5.1)
+uv pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
 pip install torch-rechub
 ```
@@ -94,10 +97,11 @@ pip install uv
 git clone https://github.com/datawhalechina/torch-rechub.git
 cd torch-rechub
 
-# Install PyTorch matching your device
+# Install one PyTorch build matching your device
 uv pip install torch                                                     # CPU
-uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # GPU (CUDA 12.1)
-uv pip install torch torch-npu                                           # NPU (Huawei Ascend, requires torch-npu >= 2.5.1)
+uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+uv pip install torch torch-npu                                           # Huawei Ascend NPU (requires torch-npu >= 2.5.1)
+uv pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
 uv sync
 ```

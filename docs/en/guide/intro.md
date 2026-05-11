@@ -14,7 +14,7 @@ description: Overview of Torch-RecHub project architecture, features, and design
 ## Features
 
 * **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **Based on PyTorch:** Leverage PyTorch's dynamic graph and GPU acceleration capabilities.
+* **Based on PyTorch:** Leverage PyTorch's dynamic graph and hardware acceleration capabilities across CPU, NVIDIA CUDA GPU, AMD ROCm GPU, and Huawei Ascend NPU.
 * **Rich Model Library:** Includes various classic and cutting-edge recommendation algorithms.
 * **Standardized Process:** Provide unified data loading, training, and evaluation processes.
 * **Easy to Configure:** Easily adjust experimental settings through configuration files or command-line parameters.
