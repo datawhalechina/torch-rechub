@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-05-12
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* fix docs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/231
+* Fix stray 'uv' in pip install command by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/239
+### 🔧 模型更新 / Models
+* Update DIEN docs, example and refactor AUGRU by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/229
+* Refactor BST transformer; bump PyTorch to 1.10 by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/233
+* Adjust embedding outputs and unwrap ONNX scalar by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/237
+### 📦 依赖更新 / Dependencies
+* CI: add twine check and update pyproject metadata by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/227
+### 📝 文档更新 / Documentation
+* Update docs images: banner and logo by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/225
+* Add documentation diagrams and embed them by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/235
+* Create CITATION.cff by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/236
+* Improve tutorials: paths, features, DeepFM by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/238
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.7.0...v0.8.0
+
+---
+
+
+
 ## [0.7.0] - 2026-04-21
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
