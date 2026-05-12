@@ -31,7 +31,7 @@ The simplest way to install is via pip:
 pip install torch                                                     # CPU
 pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
 pip install torch torch-npu                                           # Huawei Ascend NPU (requires torch-npu >= 2.5.1)
-uv pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
+pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
 pip install torch-rechub
 ```
