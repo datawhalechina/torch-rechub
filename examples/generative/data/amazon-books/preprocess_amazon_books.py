@@ -106,10 +106,7 @@ def _csv_has_columns(file_path, expected_columns):
 
 
 def _is_supported_interaction_csv(file_path):
-    return (
-        _csv_has_columns(file_path, RAW_INTERACTION_COLUMNS)
-        or _csv_has_columns(file_path, BYTEDANCE_INTERACTION_COLUMNS)
-    )
+    return (_csv_has_columns(file_path, RAW_INTERACTION_COLUMNS) or _csv_has_columns(file_path, BYTEDANCE_INTERACTION_COLUMNS))
 
 
 def get_ratings_file(data_dir, data_source):

@@ -57,8 +57,7 @@ class ONNXWrapper(nn.Module):
     def forward(self, *args) -> torch.Tensor:
         """Convert positional args to dict and call original model."""
         if len(args) != len(self.input_names):
-            raise ValueError(f"Expected {len(self.input_names)} inputs, got {len(args)}. "
-                             f"Expected names: {self.input_names}")
+            raise ValueError(f"Expected {len(self.input_names)} inputs, got {len(args)}. " f"Expected names: {self.input_names}")
         x_dict = {name: arg for name, arg in zip(self.input_names, args)}
         output = self.model(x_dict)
         if isinstance(output, tuple) and len(output) == 2 and torch.is_tensor(output[1]) and output[1].dim() == 0:
@@ -101,14 +100,7 @@ class ONNXExporter:
         self.device = device
         self.feature_info = extract_feature_info(model)
 
-    def _build_dynamic_shapes(self,
-                              features: List[Union[DenseFeature,
-                                                   SequenceFeature,
-                                                   SparseFeature]]) -> Tuple[
-                                                       Tuple[Dict[int,
-                                                                  Any],
-                                                             ...],
-                                                   ]:
+    def _build_dynamic_shapes(self, features: List[Union[DenseFeature, SequenceFeature, SparseFeature]]) -> Tuple[Tuple[Dict[int, Any], ...],]:
         """Build ``dynamic_shapes`` config for the dynamo exporter."""
         try:
             Dim = torch.export.Dim
@@ -242,8 +234,7 @@ class ONNXExporter:
                     # allow user to set 'dynamo' even if we inject it later
                     overlap -= {"dynamo", "dynamic_shapes"}
                     if overlap:
-                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
-                                         f"{sorted(overlap)}. Please set them via export() parameters instead.")
+                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: " f"{sorted(overlap)}. Please set them via export() parameters instead.")
                     export_kwargs.update(onnx_export_kwargs)
 
                 # Auto-pick exporter:
@@ -277,8 +268,7 @@ class ONNXExporter:
                     if not should_retry_with_legacy:
                         raise
 
-                    warnings.warn("Dynamo-based ONNX export failed; retrying with the legacy exporter. "
-                                  f"Original error: {export_error}")
+                    warnings.warn("Dynamo-based ONNX export failed; retrying with the legacy exporter. " f"Original error: {export_error}")
                     export_kwargs["dynamo"] = False
                     export_kwargs.pop("dynamic_shapes", None)
                     if dynamic_axes is not None:

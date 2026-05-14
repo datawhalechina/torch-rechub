@@ -260,10 +260,7 @@ def generate_item_embeddings(model_type, movie_text_map, output_dir, device, voc
     if vocab_path is None:
         vocab_path = os.path.join(output_dir, 'vocab.pkl')
     if not os.path.exists(vocab_path):
-        raise FileNotFoundError(
-            f"vocab.pkl not found at {vocab_path}. "
-            "Run preprocess_ml_hstu.py first."
-        )
+        raise FileNotFoundError(f"vocab.pkl not found at {vocab_path}. " "Run preprocess_ml_hstu.py first.")
 
     with open(vocab_path, 'rb') as f:
         vocab = pickle.load(f)

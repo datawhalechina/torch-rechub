@@ -24,7 +24,6 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-
 MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
 MOVIELENS_ARCHIVE = "ml-1m.zip"
 MOVIELENS_REQUIRED_FILES = ("ratings.dat", "movies.dat", "users.dat")

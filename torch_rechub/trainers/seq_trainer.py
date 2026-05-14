@@ -339,8 +339,7 @@ class SeqTrainer(object):
                     overlap = set(export_kwargs.keys()) & set(onnx_export_kwargs.keys())
                     overlap.discard("dynamo")
                     if overlap:
-                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
-                                         f"{sorted(overlap)}. Please set them via export_onnx() parameters instead.")
+                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: " f"{sorted(overlap)}. Please set them via export_onnx() parameters instead.")
                     export_kwargs.update(onnx_export_kwargs)
 
                 # Auto-pick exporter:
@@ -465,8 +464,7 @@ class SeqTrainer(object):
             elif hasattr(model, 'item_num'):
                 vocab_size = model.item_num
             else:
-                raise ValueError("vocab_size must be provided or model must have "
-                                 "'vocab_size' or 'item_num' attribute")
+                raise ValueError("vocab_size must be provided or model must have " "'vocab_size' or 'item_num' attribute")
 
         # Generate dummy inputs for sequence model
         dummy_seq_tokens = torch.randint(0, vocab_size, (batch_size, seq_length), device=viz_device)
