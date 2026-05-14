@@ -3,7 +3,7 @@
 Architecture Overview:
 - Item Embeddings: Pre-computed using LLM (offline)
 - User LLM: Transformer blocks that model user sequences (trainable)
-- Loss: NCE Loss with temperature scaling
+- Loss: NCE Loss on model-scaled cos-sim logits
 
 This is a lightweight implementation that uses pre-computed item embeddings
 instead of the full end-to-end training with Item LLM.
@@ -89,7 +89,7 @@ def check_training_environment(device, model_type, dataset_path):
         print(f"\n❌ 错误：Item embeddings 文件不存在: {emb_file}")
         print("   请先运行以下命令生成 embeddings：")
         print("   cd examples/generative/data/ml-1m")
-        print(f"   python generate_item_embeddings_hllm.py --model_type {model_type} --device {device}")
+        print(f"   python preprocess_hllm_data.py --model_type {model_type} --device {device}")
         return False
 
     print("✅ Item embeddings 文件存在")
@@ -138,7 +138,8 @@ def get_movielens_data(data_dir=None):
     vocab_file = os.path.join(data_dir, 'vocab.pkl')
     with open(vocab_file, 'rb') as f:
         vocab = pickle.load(f)
-    vocab_size = len(vocab)
+    item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
+    vocab_size = max(item_to_idx.values()) + 1
 
     # 加载数据
     train_file = os.path.join(data_dir, 'train_data.pkl')
@@ -170,7 +171,7 @@ def load_item_embeddings(data_dir, model_type='tinyllama'):
 
     if not os.path.exists(emb_file):
         print(f"❌ Item embeddings文件不存在: {emb_file}")
-        print(f"请先运行: python examples/generative/data/ml-1m/generate_item_embeddings_hllm.py --model_type {model_type}")
+        print(f"请先运行: python examples/generative/data/ml-1m/preprocess_hllm_data.py --model_type {model_type}")
         return None
 
     embeddings = torch.load(emb_file)
@@ -292,7 +293,7 @@ def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_deca
     print("\nCreating trainer...")
     # Configure loss function parameters
     if loss_type == 'nce':
-        loss_params = {"temperature": 0.1, "ignore_index": 0}
+        loss_params = {"temperature": 1.0, "ignore_index": 0}
     else:
         loss_params = {"ignore_index": 0}
 
