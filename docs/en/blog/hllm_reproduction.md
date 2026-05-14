@@ -315,7 +315,7 @@ torch-rechub/
 │               └── preprocess_amazon_books_hllm.py
 ```
 
-For manual ByteDance downloads, interaction files may be named `amazon_books_interactions.csv` or `amazon_books.csv`; item information files may be named `amazon_books_items.csv`, or `amazon_books.csv` with `item_id,description,title` columns.
+For manual ByteDance downloads, the default interaction filename is `amazon_books_interactions.csv` (`amazon_books.csv` is also accepted as a fallback); item information files may be named `amazon_books_items.csv`, or `amazon_books.csv` with `item_id,description,title` columns.
 
 ### 5.2 Quick Start - Recommended
 
@@ -529,7 +529,7 @@ python preprocess_amazon_books.py \
 
 **Local interaction file names**:
 - `raw`: `ratings_Books.csv`
-- `bytedance`: downloads to `ratings_Books.csv` by default; manual downloads may also be named `amazon_books_interactions.csv` or `amazon_books.csv`
+- `bytedance`: downloads to `amazon_books_interactions.csv` by default; `amazon_books.csv` is also accepted as a manual-download fallback
 - Supports both `user_id,item_id,rating,timestamp` and `item_id,user_id,timestamp` column formats
 - `raw` applies `--min_interactions` filtering by default; `bytedance` keeps official processed interactions unchanged
 

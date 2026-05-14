@@ -79,8 +79,8 @@ Output files:
 
 Expected local interaction files:
 - `raw`: `ratings_Books.csv`
-- `bytedance`: `ratings_Books.csv`
-  - If manually downloaded, `amazon_books_interactions.csv` or `amazon_books.csv` is also accepted.
+- `bytedance`: `amazon_books_interactions.csv`
+  - If manually downloaded, `amazon_books.csv` is also accepted as a fallback.
   - Supported interaction columns:
     - `user_id,item_id,rating,timestamp`
     - `item_id,user_id,timestamp` (ByteDance processed format)

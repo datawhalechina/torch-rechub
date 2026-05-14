@@ -315,7 +315,7 @@ torch-rechub/
 │               └── preprocess_amazon_books_hllm.py
 ```
 
-手动下载时，ByteDance 交互文件也可命名为 `amazon_books_interactions.csv` 或 `amazon_books.csv`；ByteDance item information 也可命名为 `amazon_books_items.csv` 或带有 `item_id,description,title` 列的 `amazon_books.csv`。
+手动下载时，ByteDance 交互文件默认命名为 `amazon_books_interactions.csv`（也接受 `amazon_books.csv` 作为 fallback）；ByteDance item information 也可命名为 `amazon_books_items.csv` 或带有 `item_id,description,title` 列的 `amazon_books.csv`。
 
 **预训练 LLM 模型**：
 
@@ -529,7 +529,7 @@ python preprocess_amazon_books.py \
 
 **本地交互文件名**：
 - `raw`：`ratings_Books.csv`
-- `bytedance`：默认下载为 `ratings_Books.csv`；手动下载时也接受 `amazon_books_interactions.csv` 或 `amazon_books.csv`
+- `bytedance`：默认下载为 `amazon_books_interactions.csv`；手动下载时也接受 `amazon_books.csv` 作为 fallback
 - 支持 `user_id,item_id,rating,timestamp` 和 `item_id,user_id,timestamp` 两种列格式
 - `raw` 默认按 `--min_interactions` 过滤稀疏用户和物品；`bytedance` 默认保留官方已处理交互
 

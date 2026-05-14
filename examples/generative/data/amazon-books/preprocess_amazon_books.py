@@ -35,12 +35,20 @@ INTERACTION_SOURCES = {
         "url": "http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv",
         "filename": "ratings_Books.csv",
         "description": "Stanford SNAP raw ratings",
+        "columns": ["user_id",
+                    "item_id",
+                    "rating",
+                    "timestamp"],
     },
-    "bytedance": {
-        "url": "https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv",
-        "filename": "ratings_Books.csv",
-        "description": "ByteDance HLLM processed interactions",
-    },
+    "bytedance":
+        {
+            "url": "https://huggingface.co/ByteDance/HLLM/resolve/main/Interactions/amazon_books.csv",
+            "filename": "amazon_books_interactions.csv",
+            "description": "ByteDance HLLM processed interactions",
+            "columns": ["item_id",
+                        "user_id",
+                        "timestamp"],
+        },
 }
 RAW_INTERACTION_COLUMNS = ["user_id", "item_id", "rating", "timestamp"]
 BYTEDANCE_INTERACTION_COLUMNS = ["item_id", "user_id", "timestamp"]
@@ -127,25 +135,47 @@ def get_ratings_file(data_dir, data_source):
     return primary_path
 
 
-def read_interactions(file_path):
+def detect_interaction_format(file_path):
+    """Detect the actual schema of an interaction CSV.
+
+    Returns one of ``"raw"``, ``"bytedance"`` or ``"headerless"``.
+    """
+    header_columns = pd.read_csv(file_path, nrows=0).columns.tolist()
+    if header_columns == RAW_INTERACTION_COLUMNS:
+        return "raw"
+    if header_columns == BYTEDANCE_INTERACTION_COLUMNS:
+        return "bytedance"
+    return "headerless"
+
+
+def read_interactions(file_path, expected_source=None):
     """Read Amazon Books interactions and keep columns required downstream.
 
     Supported formats:
     - Raw SNAP: no header, ``user_id,item_id,rating,timestamp``
     - Standard CSV: header ``user_id,item_id,rating,timestamp``
     - ByteDance processed CSV: header ``item_id,user_id,timestamp``
-    """
-    header_columns = pd.read_csv(file_path, nrows=0).columns.tolist()
 
-    if header_columns == RAW_INTERACTION_COLUMNS:
+    If ``expected_source`` is provided, the detected schema must match it.
+    item_id and user_id are coerced to ``str`` so they line up with the
+    string-keyed metadata used by the HLLM pipeline.
+    """
+    detected = detect_interaction_format(file_path)
+
+    if detected == "raw":
         ratings = pd.read_csv(file_path)
-    elif header_columns == BYTEDANCE_INTERACTION_COLUMNS:
+    elif detected == "bytedance":
         ratings = pd.read_csv(file_path)
-        ratings = ratings[REQUIRED_INTERACTION_COLUMNS]
     else:
         ratings = pd.read_csv(file_path, sep=",", names=RAW_INTERACTION_COLUMNS, header=None)
+        detected = "raw"
+
+    if expected_source is not None and detected != expected_source:
+        raise ValueError(f"--data_source={expected_source} but {file_path} has {detected} schema. " "Remove the stale file or re-download with --overwrite to avoid mixing sources.")
 
     ratings = ratings[REQUIRED_INTERACTION_COLUMNS]
+    ratings["item_id"] = ratings["item_id"].astype(str)
+    ratings["user_id"] = ratings["user_id"].astype(str)
     ratings["timestamp"] = ratings["timestamp"].astype(float)
     return ratings
 
@@ -182,7 +212,7 @@ def load_ratings(data_dir, data_source, filter_interactions=False, min_interacti
 
     print(f"\n📖 Loading ratings from {ratings_file}...")
 
-    ratings = read_interactions(ratings_file)
+    ratings = read_interactions(ratings_file, expected_source=data_source)
 
     print(f"  Raw data: {len(ratings)} interactions")
     print(f"  Users: {ratings['user_id'].nunique()}")
