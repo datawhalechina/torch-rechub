@@ -1,3 +1,41 @@
+TORCH-RECHUB PREPROCESSING QUICK START
+================================================================================
+
+The preprocessing scripts can download MovieLens-1M automatically. By default
+they download the official archive only when it is missing:
+
+    https://files.grouplens.org/datasets/movielens/ml-1m.zip
+
+Download and preprocess HSTU sequence data:
+
+    python preprocess_ml_hstu.py
+
+Reuse existing local files without downloading:
+
+    python preprocess_ml_hstu.py --no_download
+
+Force re-download and re-extract:
+
+    python preprocess_ml_hstu.py --overwrite
+
+Generate HLLM item text and embeddings:
+
+    python preprocess_hllm_data.py --model_type tinyllama --device cuda
+
+Reuse existing local files without downloading:
+
+    python preprocess_hllm_data.py --model_type tinyllama --device cuda --no_download
+
+Force re-download and re-extract:
+
+    python preprocess_hllm_data.py --model_type tinyllama --device cuda --overwrite
+
+Required local files when using --no_download:
+
+    ratings.dat
+    movies.dat
+    users.dat
+
 SUMMARY
 ================================================================================
 

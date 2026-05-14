@@ -30,21 +30,45 @@ user_id,item_id,rating,timestamp
 
 ## Quick Start
 
-### Step 1: Download Data
+### Step 1: Download and Preprocess HSTU Format Data
+
+The preprocessing scripts can download data automatically. By default they:
+
+- use ByteDance processed data (`--data_source bytedance`)
+- download the required file
+- skip download when the target file already exists
+
+Use `--data_source raw` to use Stanford SNAP raw data instead. Use `--no_download` to skip download and process an existing local file. Use `--overwrite` to refresh an existing downloaded file.
 
 ```bash
-# Download from Stanford SNAP
-wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Books.csv
-wget http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Books.json.gz
+# Default: ByteDance processed interactions, download only if missing.
+# Interaction-count filtering is skipped for ByteDance data by default.
+python preprocess_amazon_books.py \
+    --data_source bytedance \
+    --data_dir . \
+    --output_dir ./processed
 
-# Or download processed version from ByteDance HuggingFace
-# See links above
-```
+# Stanford SNAP raw interactions
+# Interaction-count filtering is enabled for raw data by default.
+python preprocess_amazon_books.py \
+    --data_source raw \
+    --data_dir . \
+    --output_dir ./processed
 
-### Step 2: Preprocess HSTU Format Data
+# Reuse an existing local file without downloading
+python preprocess_amazon_books.py \
+    --data_source bytedance \
+    --no_download \
+    --data_dir . \
+    --output_dir ./processed
 
-```bash
-python preprocess_amazon_books.py --data_dir . --output_dir ./processed
+# Force re-download
+python preprocess_amazon_books.py \
+    --data_source bytedance \
+    --overwrite \
+    --data_dir . \
+    --output_dir ./processed
+
 ```
 
 Output files:
@@ -53,17 +77,55 @@ Output files:
 - `processed/val_data.pkl` - Validation sequences
 - `processed/test_data.pkl` - Test sequences
 
-### Step 3: Generate HLLM Item Embeddings
+Expected local interaction files:
+- `raw`: `ratings_Books.csv`
+- `bytedance`: `ratings_Books.csv`
+  - If manually downloaded, `amazon_books_interactions.csv` or `amazon_books.csv` is also accepted.
+  - Supported interaction columns:
+    - `user_id,item_id,rating,timestamp`
+    - `item_id,user_id,timestamp` (ByteDance processed format)
+  - `bytedance` keeps the provided interactions unchanged, while `raw` applies users/items interaction-count filtering.
+
+### Step 2: Generate HLLM Item Embeddings
 
 ```bash
-python preprocess_amazon_books_hllm.py --model_type tinyllama --device cuda
+# Default: ByteDance processed item information, download only if missing
+python preprocess_amazon_books_hllm.py \
+    --data_source bytedance \
+    --model_type tinyllama \
+    --device cuda
+
+# Stanford SNAP raw item metadata
+python preprocess_amazon_books_hllm.py \
+    --data_source raw \
+    --model_type tinyllama \
+    --device cuda
+
+# Reuse an existing local file without downloading
+python preprocess_amazon_books_hllm.py \
+    --data_source bytedance \
+    --no_download \
+    --model_type tinyllama \
+    --device cuda
+
+# Force re-download
+python preprocess_amazon_books_hllm.py \
+    --data_source bytedance \
+    --overwrite \
+    --model_type tinyllama \
+    --device cuda
 ```
 
 Output files:
 - `processed/item_text_map.pkl` - Item text descriptions
 - `processed/item_embeddings_tinyllama.pt` - Pre-computed item embeddings
 
-### Step 4: Train HLLM Model
+Expected local item information files:
+- `raw`: `meta_Books.json.gz` or `meta_Books.json`
+- `bytedance`: `item_information.csv`
+  - If manually downloaded, `amazon_books_items.csv` or `amazon_books.csv` is also accepted when it has columns `item_id,description,title`.
+
+### Step 3: Train HLLM Model
 
 ```bash
 cd ../..
@@ -77,8 +139,9 @@ amazon-books/
 ├── README.md
 ├── preprocess_amazon_books.py      # HSTU format preprocessing
 ├── preprocess_amazon_books_hllm.py # HLLM embeddings generation
-├── ratings_Books.csv               # Raw interactions (download)
-├── meta_Books.json.gz              # Raw metadata (download)
+├── ratings_Books.csv               # Interactions (downloaded raw or ByteDance)
+├── meta_Books.json.gz              # Raw metadata (downloaded when --data_source raw)
+├── item_information.csv            # ByteDance item information (downloaded when --data_source bytedance)
 └── processed/                      # Preprocessed output
     ├── vocab.pkl
     ├── train_data.pkl
@@ -91,6 +154,5 @@ amazon-books/
 ## Notes
 
 - The official HLLM implementation filters users and items with >= 5 interactions
-- Text format: `"Title: {title}. Description: {description}"` (no 'tag' field for books)
+- Text format: `"Compress the following sentence into embedding: title: {title}description: {description}"` (no 'tag' field for books)
 - This implementation is compatible with the official ByteDance HLLM data format
-
