@@ -12,6 +12,7 @@ from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hstu import HSTUModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator
+from torch_rechub.utils.hstu_utils import VocabMask
 
 sys.path.append("../..")
 
@@ -84,54 +85,40 @@ def get_movielens_data(data_dir=None):
     return train_data, val_data, test_data, vocab_size
 
 
-def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
+def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,)):
     """Evaluate top-K ranking metrics on the test set.
 
-    Args:
-        model: Trained recommendation model.
-        data_loader: DataLoader providing test sequences.
-        device: Target device for inference.
-        topKs: List of K values to evaluate (e.g. [10, 50, 200]).
-
-    Returns:
-        dict: A mapping from metric name to formatted result strings.
+    PAD (token id 0) and any other ids in ``invalid_items`` are masked out
+    before top-K so they never enter recommendations.
     """
+    model = model.to(device)
     model.eval()
+    vocab_mask = VocabMask(model.vocab_size, invalid_items=list(invalid_items)).to(device)
+
     y_true = {}
     y_pred = {}
 
     user_idx = 0
     with torch.no_grad():
-        for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
-            # Move tensors to device
+        for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
             seq_tokens = seq_tokens.to(device)
             seq_time_diffs = seq_time_diffs.to(device)
             targets = targets.cpu().numpy()
 
-            # Forward pass
             logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
+            last_logits = vocab_mask.apply_mask(logits[:, -1, :])  # (B, V)
 
-            # For next-item prediction, only use the last position
-            last_logits = logits[:, -1, :]  # (B, V)
-
-            # Get top-K recommendations for each sample
-            batch_size = last_logits.shape[0]
             max_k = max(topKs)
-
-            # Indices of top-K items
-            _, top_items = torch.topk(last_logits, k=max_k, dim=-1)  # (B, max_k)
+            _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
             top_items = top_items.cpu().numpy()
 
-            # Build y_true and y_pred for each sample
-            for i in range(batch_size):
+            for i in range(top_items.shape[0]):
                 user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]  # ground-truth next item
-                y_pred[user_id] = top_items[i].tolist()  # predicted top-K items
+                y_true[user_id] = [int(targets[i])]
+                y_pred[user_id] = top_items[i].tolist()
                 user_idx += 1
 
-    # Compute ranking metrics
-    results = topk_metrics(y_true, y_pred, topKs=topKs)
-    return results
+    return topk_metrics(y_true, y_pred, topKs=topKs)
 
 
 def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batch_size=512, weight_decay=1e-5, device='cuda', save_dir='./', seed=2022, max_seq_len=200):
