@@ -166,6 +166,19 @@ class SeqTrainer(object):
             return list(self.model_logger)
         return [self.model_logger]
 
+    def _compute_next_token_loss(self, logits, seq_tokens, targets):
+        """Cross-entropy over the whole sequence (autoregressive next-token).
+
+        ``logits[:, i, :]`` predicts ``next_tokens[:, i]`` where
+        ``next_tokens = concat(seq_tokens[:, 1:], targets.unsqueeze(-1))``,
+        i.e. for positions ``0..L-2`` the next token comes from within the
+        sequence, and for the last position it is the held-out target. PAD
+        (``0``) is ignored via ``ignore_index`` on the loss.
+        """
+        vocab_size = logits.size(-1)
+        next_tokens = torch.cat([seq_tokens[:, 1:], targets.unsqueeze(-1)], dim=1)
+        return self.loss_fn(logits.reshape(-1, vocab_size), next_tokens.reshape(-1))
+
     def train_one_epoch(self, data_loader, log_interval=10):
         """Train the model for a single epoch.
 
@@ -181,24 +194,18 @@ class SeqTrainer(object):
         epoch_loss = 0
         batch_count = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
-        for i, (seq_tokens, seq_positions, seq_time_diffs, targets) in enumerate(tk0):
-            # Move tensors to the target device
+        for i, (seq_tokens, _seq_positions, seq_time_diffs, targets) in enumerate(tk0):
+            # Move tensors to the target device. ``seq_positions`` is unused by
+            # ``HSTUModel`` (which derives positions internally); keep the
+            # dataloader API stable but drop it here.
             seq_tokens = seq_tokens.to(self.device)
-            seq_positions = seq_positions.to(self.device)
             seq_time_diffs = seq_time_diffs.to(self.device)
             targets = targets.to(self.device).squeeze(-1)
 
-            # Forward pass
             logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-            # Compute loss
-            # For next-item prediction we only use the last position in the sequence
-            # logits[:, -1, :] selects the prediction at the last step for each sequence
-            last_logits = logits[:, -1, :]  # (B, V)
+            loss = self._compute_next_token_loss(logits, seq_tokens, targets)
 
-            loss = self.loss_fn(last_logits, targets)
-
-            # 反向传播
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -210,14 +217,14 @@ class SeqTrainer(object):
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
-        # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
     def evaluate(self, data_loader):
         """Evaluate the model on a validation/test data loader.
 
-        Args:
-            data_loader (DataLoader): Validation or test data loader.
+        Loss is the full-sequence next-token CE (matching training);
+        accuracy is top-1 hit on the held-out next item only (useful as a
+        ranking-style proxy metric).
 
         Returns:
             tuple: ``(avg_loss, top1_accuracy)``.
@@ -228,31 +235,24 @@ class SeqTrainer(object):
         total_samples = 0
 
         with torch.no_grad():
-            for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
-                # Move tensors to the target device
+            for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
                 seq_tokens = seq_tokens.to(self.device)
-                seq_positions = seq_positions.to(self.device)
                 seq_time_diffs = seq_time_diffs.to(self.device)
                 targets = targets.to(self.device).squeeze(-1)
 
-                # Forward pass
                 logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-                # Compute loss using only the last position (next-item prediction)
-                last_logits = logits[:, -1, :]  # (B, V)
-
-                loss = self.loss_fn(last_logits, targets)
+                loss = self._compute_next_token_loss(logits, seq_tokens, targets)
                 total_loss += loss.item()
 
-                # Compute top-1 accuracy
-                predictions = torch.argmax(last_logits, dim=-1)  # (B,)
-                correct = (predictions == targets).sum().item()
-                total_correct += correct
+                # Top-1 hit on the held-out next item.
+                last_logits = logits[:, -1, :]
+                predictions = torch.argmax(last_logits, dim=-1)
+                total_correct += (predictions == targets).sum().item()
                 total_samples += targets.numel()
 
         avg_loss = total_loss / len(data_loader)
-        accuracy = total_correct / total_samples
-
+        accuracy = total_correct / total_samples if total_samples > 0 else 0.0
         return avg_loss, accuracy
 
     def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False, onnx_export_kwargs=None):
@@ -339,8 +339,7 @@ class SeqTrainer(object):
                     overlap = set(export_kwargs.keys()) & set(onnx_export_kwargs.keys())
                     overlap.discard("dynamo")
                     if overlap:
-                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: "
-                                         f"{sorted(overlap)}. Please set them via export_onnx() parameters instead.")
+                        raise ValueError("onnx_export_kwargs contains keys that overlap with explicit args: " f"{sorted(overlap)}. Please set them via export_onnx() parameters instead.")
                     export_kwargs.update(onnx_export_kwargs)
 
                 # Auto-pick exporter:
@@ -465,8 +464,7 @@ class SeqTrainer(object):
             elif hasattr(model, 'item_num'):
                 vocab_size = model.item_num
             else:
-                raise ValueError("vocab_size must be provided or model must have "
-                                 "'vocab_size' or 'item_num' attribute")
+                raise ValueError("vocab_size must be provided or model must have " "'vocab_size' or 'item_num' attribute")
 
         # Generate dummy inputs for sequence model
         dummy_seq_tokens = torch.randint(0, vocab_size, (batch_size, seq_length), device=viz_device)
