@@ -77,7 +77,8 @@ class VocabMask(nn.Module):
 
         self.register_buffer(
             'mask',
-            torch.ones(vocab_size, dtype=torch.bool),
+            torch.ones(vocab_size,
+                       dtype=torch.bool),
         )
 
         if invalid_items is not None:
