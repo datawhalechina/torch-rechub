@@ -160,7 +160,10 @@ class HLLMModel(nn.Module):
             item_embeddings = torch.load(item_embeddings)
 
         if item_embeddings.shape[0] != vocab_size:
-            raise ValueError(f"item_embeddings.shape[0]={item_embeddings.shape[0]} " f"!= vocab_size={vocab_size}. " "Embedding tensor must be indexed by token_id " "(row i = embedding of vocab token i, row 0 = PAD).")
+            raise ValueError(f"item_embeddings.shape[0]={item_embeddings.shape[0]} "
+                             f"!= vocab_size={vocab_size}. "
+                             "Embedding tensor must be indexed by token_id "
+                             "(row i = embedding of vocab token i, row 0 = PAD).")
         if item_embeddings.shape[1] != d_model:
             raise ValueError(f"item_embeddings.shape[1]={item_embeddings.shape[1]} != d_model={d_model}")
 

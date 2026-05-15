@@ -254,7 +254,9 @@ class Annoy(object):
 
     def __init__(self, metric='angular', n_trees=10, search_k=-1):
         if not ANNOY_AVAILABLE:
-            raise ImportError("Annoy is not available. To use Annoy engine, please install it first:\n" "pip install annoy\n" "Or use other available engines like Faiss or Milvus")
+            raise ImportError("Annoy is not available. To use Annoy engine, please install it first:\n"
+                              "pip install annoy\n"
+                              "Or use other available engines like Faiss or Milvus")
         self._n_trees = n_trees
         self._search_k = search_k
         self._metric = metric
@@ -299,7 +301,9 @@ class Milvus(object):
 
     def __init__(self, dim=64, host="localhost", port="19530"):
         if not MILVUS_AVAILABLE:
-            raise ImportError("Milvus is not available. To use Milvus engine, please install it first:\n" "pip install pymilvus\n" "Or use other available engines like Annoy or Faiss")
+            raise ImportError("Milvus is not available. To use Milvus engine, please install it first:\n"
+                              "pip install pymilvus\n"
+                              "Or use other available engines like Annoy or Faiss")
         self.dim = dim
         has = utility.has_collection("rechub")
         if has:

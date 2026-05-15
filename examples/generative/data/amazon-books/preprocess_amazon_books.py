@@ -171,7 +171,8 @@ def read_interactions(file_path, expected_source=None):
         detected = "raw"
 
     if expected_source is not None and detected != expected_source:
-        raise ValueError(f"--data_source={expected_source} but {file_path} has {detected} schema. " "Remove the stale file or re-download with --overwrite to avoid mixing sources.")
+        raise ValueError(f"--data_source={expected_source} but {file_path} has {detected} schema. "
+                         "Remove the stale file or re-download with --overwrite to avoid mixing sources.")
 
     ratings = ratings[REQUIRED_INTERACTION_COLUMNS]
     ratings["item_id"] = ratings["item_id"].astype(str)

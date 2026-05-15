@@ -246,7 +246,8 @@ def generate_embeddings(item_text_map, model_type, device, output_dir, vocab_pat
     if vocab_path is None:
         vocab_path = os.path.join(output_dir, 'vocab.pkl')
     if not os.path.exists(vocab_path):
-        raise FileNotFoundError(f"vocab.pkl not found at {vocab_path}. " "Run preprocess_amazon_books.py first.")
+        raise FileNotFoundError(f"vocab.pkl not found at {vocab_path}. "
+                                "Run preprocess_amazon_books.py first.")
 
     with open(vocab_path, 'rb') as f:
         vocab = pickle.load(f)

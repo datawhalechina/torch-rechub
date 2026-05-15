@@ -59,7 +59,8 @@ def display_graph(graph: Any, format: str = 'png') -> Any:
         Displayed graph object, or None if display fails.
     """
     if not TORCHVIEW_AVAILABLE:
-        raise ImportError(f"Visualization requires torchview. {TORCHVIEW_SKIP_REASON}\n" "Install with: pip install torch-rechub[visualization]")
+        raise ImportError(f"Visualization requires torchview. {TORCHVIEW_SKIP_REASON}\n"
+                          "Install with: pip install torch-rechub[visualization]")
 
     try:
         import graphviz
@@ -193,7 +194,8 @@ def visualize_model(
         features = feature_info['features']
 
         if not features:
-            raise ValueError("Could not extract feature information from model. " "Please provide input_data parameter manually.")
+            raise ValueError("Could not extract feature information from model. "
+                             "Please provide input_data parameter manually.")
 
         # Generate dummy input dict
         input_data = generate_dummy_input_dict(features, batch_size=batch_size, seq_length=seq_length, device=device)
