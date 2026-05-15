@@ -122,8 +122,8 @@ class HLLMModel(nn.Module):
     Args:
         item_embeddings (Tensor or str): Pre-computed item embeddings of shape
             (vocab_size, d_model), or path to a .pt file containing embeddings.
-            Generated using the last token's hidden state from an LLM.
-        vocab_size (int): Vocabulary size (number of items).
+            Row ``i`` must correspond to vocab token ``i`` and row 0 is PAD.
+        vocab_size (int): Vocabulary size including PAD.
         d_model (int): Hidden dimension. Should match item embedding dimension.
             Default: 512. TinyLlama uses 2048, Baichuan2 uses 4096.
         n_heads (int): Number of attention heads. Default: 8.
@@ -135,11 +135,15 @@ class HLLMModel(nn.Module):
         use_time_embedding (bool): Whether to use time embeddings. Default: True.
         num_time_buckets (int): Number of time buckets. Default: 2048.
         time_bucket_fn (str): Time bucketization function ('sqrt' or 'log'). Default: 'sqrt'.
-        temperature (float): Temperature for NCE scoring. Default: 1.0.
-            Official uses logit_scale = log(1/0.07) ≈ 2.66.
+        temperature (float): Temperature for cos-sim logits. Default: 0.07
+            (matches official ByteDance HLLM logit_scale = log(1/0.07)).
+            item_embeddings and user representation are both L2-normalized,
+            so logits = cos(x, emb) / temperature, bounded in [-1/T, +1/T].
+            Loss functions should be configured with their own temperature=1.0
+            to avoid double scaling.
     """
 
-    def __init__(self, item_embeddings, vocab_size, d_model=512, n_heads=8, n_layers=4, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt', temperature=1.0):
+    def __init__(self, item_embeddings, vocab_size, d_model=512, n_heads=8, n_layers=4, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt', temperature=0.07):
         super().__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
@@ -155,8 +159,19 @@ class HLLMModel(nn.Module):
         if isinstance(item_embeddings, str):
             item_embeddings = torch.load(item_embeddings)
 
+        if item_embeddings.shape[0] != vocab_size:
+            raise ValueError(f"item_embeddings.shape[0]={item_embeddings.shape[0]} "
+                             f"!= vocab_size={vocab_size}. "
+                             "Embedding tensor must be indexed by token_id "
+                             "(row i = embedding of vocab token i, row 0 = PAD).")
+        if item_embeddings.shape[1] != d_model:
+            raise ValueError(f"item_embeddings.shape[1]={item_embeddings.shape[1]} != d_model={d_model}")
+
+        # Normalize once because item embeddings are frozen.
+        item_embeddings = F.normalize(item_embeddings.float(), dim=-1, eps=1e-8)
+
         # Register as buffer (not trainable)
-        self.register_buffer('item_embeddings', item_embeddings.float())
+        self.register_buffer('item_embeddings', item_embeddings)
 
         # Positional embedding
         self.position_embedding = nn.Embedding(max_seq_len, d_model)
@@ -242,8 +257,9 @@ class HLLMModel(nn.Module):
         for block in self.transformer_blocks:
             x = block(x, rel_pos_bias=rel_pos_bias)
 
-        # Scoring head: compute dot product with item embeddings
+        # Scoring head: cosine similarity with normalized item embeddings
         # x: (B, L, D), item_embeddings: (V, D)
+        x = F.normalize(x, dim=-1, eps=1e-8)
         logits = torch.matmul(x, self.item_embeddings.t()) / self.temperature  # (B, L, V)
 
         return logits

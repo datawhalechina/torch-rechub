@@ -57,7 +57,8 @@ def get_movielens_data(data_dir=None):
 
     with open(vocab_file, 'rb') as f:
         vocab = pickle.load(f)
-    vocab_size = len(vocab)
+    item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
+    vocab_size = max(item_to_idx.values()) + 1
 
     # 加载数据
     train_file = os.path.join(data_dir, 'train_data.pkl')

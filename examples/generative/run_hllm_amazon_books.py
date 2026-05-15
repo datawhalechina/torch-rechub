@@ -5,7 +5,7 @@ This is the default dataset for HLLM, following the ByteDance official implement
 Architecture Overview:
 - Item Embeddings: Pre-computed using LLM (offline)
 - User LLM: Transformer blocks that model user sequences (trainable)
-- Loss: NCE Loss with temperature scaling
+- Loss: NCE Loss on model-scaled cos-sim logits
 
 This is a lightweight implementation that uses pre-computed item embeddings
 instead of the full end-to-end training with Item LLM.
@@ -137,7 +137,7 @@ def main():
     with open(os.path.join(args.data_dir, 'item_text_map.pkl'), 'rb') as f:
         item_texts = pickle.load(f)
 
-    vocab_size = len(vocab['item_to_idx'])
+    vocab_size = max(vocab['item_to_idx'].values()) + 1
     print("✅ Data loaded")
     print(f"   Vocab size: {vocab_size}")
     print(f"   Train samples: {len(train_data['targets'])}")
@@ -196,7 +196,7 @@ def main():
 
     # Configure loss function
     if args.loss_type == 'nce':
-        loss_params = {"temperature": 0.1, "ignore_index": 0}
+        loss_params = {"temperature": 1.0, "ignore_index": 0}
     else:
         loss_params = {"ignore_index": 0}
 

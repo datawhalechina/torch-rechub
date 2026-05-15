@@ -16,10 +16,104 @@ training data while preserving temporal order.
 
 import os
 import pickle
+import urllib.request
+import zipfile
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import tqdm
+
+MOVIELENS_1M_URL = "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
+MOVIELENS_ARCHIVE = "ml-1m.zip"
+MOVIELENS_REQUIRED_FILES = ("ratings.dat", "movies.dat", "users.dat")
+
+
+def download_file(url, output_path, overwrite=False):
+    """Download a file with a progress bar."""
+    if os.path.exists(output_path) and not overwrite:
+        print(f"文件已存在，跳过下载: {output_path}")
+        return True
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    tmp_path = output_path + ".tmp"
+    progress_bar = None
+
+    print(f"下载: {url}")
+    print(f"保存到: {output_path}")
+
+    def _progress_hook(block_num, block_size, total_size):
+        nonlocal progress_bar
+        if progress_bar is None:
+            total = total_size if total_size > 0 else None
+            progress_bar = tqdm.tqdm(
+                total=total,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                desc=os.path.basename(output_path),
+            )
+        downloaded = block_num * block_size
+        if progress_bar.total is not None:
+            downloaded = min(downloaded, progress_bar.total)
+        progress_bar.update(downloaded - progress_bar.n)
+
+    try:
+        urllib.request.urlretrieve(url, tmp_path, reporthook=_progress_hook)
+        os.replace(tmp_path, output_path)
+    except Exception as exc:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        print(f"下载失败: {exc}")
+        return False
+    finally:
+        if progress_bar is not None:
+            progress_bar.close()
+
+    print(f"下载完成: {output_path}")
+    return True
+
+
+def extract_movielens_archive(archive_path, data_dir, overwrite=False):
+    """Extract MovieLens-1M files from the official zip archive."""
+    print(f"解压 MovieLens-1M 数据: {archive_path}")
+    os.makedirs(data_dir, exist_ok=True)
+
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        names = set(archive.namelist())
+        for filename in MOVIELENS_REQUIRED_FILES:
+            member = f"ml-1m/{filename}"
+            output_path = os.path.join(data_dir, filename)
+            if member not in names:
+                print(f"压缩包中缺少文件: {member}")
+                return False
+            if os.path.exists(output_path) and not overwrite:
+                print(f"文件已存在，跳过解压: {output_path}")
+                continue
+            with archive.open(member) as src, open(output_path, "wb") as dst:
+                dst.write(src.read())
+            print(f"已解压: {output_path}")
+
+    return True
+
+
+def ensure_movielens_data(data_dir, download=True, overwrite=False):
+    """Download/extract MovieLens-1M data or validate existing local files."""
+    required_paths = [os.path.join(data_dir, filename) for filename in MOVIELENS_REQUIRED_FILES]
+    if not download:
+        print("已禁用下载，将使用本地已有 MovieLens-1M 文件。")
+        missing = [path for path in required_paths if not os.path.exists(path)]
+        if missing:
+            print("缺少必要文件:")
+            for path in missing:
+                print(f"  - {path}")
+            return False
+        return True
+
+    archive_path = os.path.join(data_dir, MOVIELENS_ARCHIVE)
+    if not download_file(MOVIELENS_1M_URL, archive_path, overwrite=overwrite):
+        return False
+    return extract_movielens_archive(archive_path, data_dir, overwrite=overwrite)
 
 
 class MovieLensHSTUPreprocessor:
@@ -107,22 +201,23 @@ class MovieLensHSTUPreprocessor:
         return ratings
 
     def create_vocab(self, ratings):
-        """Create a mapping from raw movie IDs to token IDs.
+        """Create a structured mapping between raw movie IDs and token IDs.
 
         Args:
             ratings (pd.DataFrame): Filtered ratings dataframe.
 
         Returns:
-            dict: Mapping from ``movie_id`` to ``token_id``.
+            dict: Vocabulary with ``item_to_idx`` and ``idx_to_item`` mappings.
         """
         print("\n创建词表...")
 
         unique_movies = sorted(ratings['movie_id'].unique())
         # token_id starts from 1; 0 is reserved for PAD
-        vocab = {movie_id: idx + 1 for idx, movie_id in enumerate(unique_movies)}
-        vocab[0] = 0  # PAD token
+        item_to_idx = {movie_id: idx + 1 for idx, movie_id in enumerate(unique_movies)}
+        idx_to_item = {idx: movie_id for movie_id, idx in item_to_idx.items()}
+        vocab = {'item_to_idx': item_to_idx, 'idx_to_item': idx_to_item}
 
-        print(f"词表大小: {len(vocab)} (包含PAD)")
+        print(f"词表大小: {len(item_to_idx) + 1} (包含PAD)")
         return vocab
 
     def build_user_sequences(self, ratings):
@@ -180,12 +275,13 @@ class MovieLensHSTUPreprocessor:
         Args:
             user_sequences (dict): User sequences {user_id: [movie_id1, ...]}.
             user_timestamps (dict): User timestamps {user_id: [timestamp1, ...]}.
-            vocab (dict): Mapping from ``movie_id`` to ``token_id``.
+            vocab (dict): Vocabulary with ``item_to_idx`` and ``idx_to_item`` mappings.
 
         Returns:
             tuple: ``(seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)``.
         """
         print("\n使用滑动窗口生成训练样本（支持时间戳）...")
+        item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
 
         seq_tokens_list = []
         seq_positions_list = []
@@ -207,8 +303,8 @@ class MovieLensHSTUPreprocessor:
                 target = sequence[end_idx]
 
                 # 转换为token
-                seq_tokens = [vocab.get(movie_id, 0) for movie_id in history]
-                target_token = vocab.get(target, 0)
+                seq_tokens = [item_to_idx.get(movie_id, 0) for movie_id in history]
+                target_token = item_to_idx.get(target, 0)
 
                 # 计算时间差（秒）- 相对于查询时间（序列最后一个时间戳）
                 # 参考Meta官方实现：query_time - timestamps
@@ -331,7 +427,7 @@ class MovieLensHSTUPreprocessor:
 
         Args:
             data_split (dict): Dictionary containing train/val/test splits.
-            vocab (dict): Mapping from ``movie_id`` to ``token_id``.
+            vocab (dict): Vocabulary with ``item_to_idx`` and ``idx_to_item`` mappings.
         """
         print("\n保存数据...")
 
@@ -390,13 +486,26 @@ class MovieLensHSTUPreprocessor:
 
 
 if __name__ == '__main__':
-    # Use the current directory as the data directory
+    import argparse
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = script_dir
-    output_dir = os.path.join(script_dir, 'processed')
+    parser = argparse.ArgumentParser(description="MovieLens-1M preprocessing for HSTU")
+    parser.add_argument("--data_dir", default=script_dir, help="Directory containing MovieLens-1M raw files")
+    parser.add_argument("--output_dir", default=None, help="Output directory")
+    parser.add_argument("--no_download", action="store_true", help="Skip download and use existing local files")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing downloaded/extracted files")
+    args = parser.parse_args()
+
+    data_dir = os.path.abspath(args.data_dir)
+    output_dir = os.path.abspath(args.output_dir) if args.output_dir else os.path.join(data_dir, 'processed')
 
     print(f"数据目录: {data_dir}")
     print(f"输出目录: {output_dir}")
+    print(f"下载: {not args.no_download}")
+    print(f"覆盖已有文件: {args.overwrite}")
+
+    if not ensure_movielens_data(data_dir, download=not args.no_download, overwrite=args.overwrite):
+        raise SystemExit(1)
 
     preprocessor = MovieLensHSTUPreprocessor(data_dir=data_dir, output_dir=output_dir)
     preprocessor.preprocess()
