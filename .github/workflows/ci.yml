@@ -89,6 +89,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: lint
     if: github.event_name != 'release'
+    timeout-minutes: 25
 
     strategy:
       fail-fast: false
@@ -135,19 +136,63 @@ jobs:
       - name: Start Milvus
         if: matrix.os == 'ubuntu-latest'
         run: |
-          # Download the installation script
-          curl -sfL https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/standalone_embed.sh -o standalone_embed.sh
+          cat > embedEtcd.yaml <<'EOF'
+          listen-client-urls: http://0.0.0.0:2379
+          advertise-client-urls: http://0.0.0.0:2379
+          quota-backend-bytes: 4294967296
+          auto-compaction-mode: revision
+          auto-compaction-retention: '1000'
+          EOF
 
-          # Start the Docker container
-          bash standalone_embed.sh start
+          cat > user.yaml <<'EOF'
+          # Extra config to override default milvus.yaml
+          EOF
+
+          docker run -d \
+            --name milvus-standalone \
+            --security-opt seccomp:unconfined \
+            -e ETCD_USE_EMBED=true \
+            -e ETCD_DATA_DIR=/var/lib/milvus/etcd \
+            -e ETCD_CONFIG_PATH=/milvus/configs/embedEtcd.yaml \
+            -e COMMON_STORAGETYPE=local \
+            -e DEPLOY_MODE=STANDALONE \
+            -v "$PWD/volumes/milvus:/var/lib/milvus" \
+            -v "$PWD/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml" \
+            -v "$PWD/user.yaml:/milvus/configs/user.yaml" \
+            -p 19530:19530 \
+            -p 9091:9091 \
+            -p 2379:2379 \
+            --health-cmd="curl -f http://localhost:9091/healthz" \
+            --health-interval=30s \
+            --health-start-period=90s \
+            --health-timeout=20s \
+            --health-retries=3 \
+            milvusdb/milvus:v3.0-beta \
+            milvus run standalone
 
       - name: Wait for Milvus
         if: matrix.os == 'ubuntu-latest'
         run: |
-          for i in {1..60}; do
-            if curl -fsS http://localhost:9091/healthz >/dev/null; then exit 0; fi
+          for i in {1..90}; do
+            if curl -fsS http://localhost:9091/healthz >/dev/null; then
+              echo "Milvus is ready."
+              exit 0
+            fi
+
+            if [ "$(docker inspect -f '{{.State.Running}}' milvus-standalone)" != "true" ]; then
+              echo "Milvus container exited before becoming healthy."
+              docker ps -a
+              docker logs milvus-standalone
+              exit 1
+            fi
+
+            echo "Waiting for Milvus... attempt $i/90"
             sleep 2
           done
+
+          echo "Milvus did not become ready in time."
+          docker ps -a
+          docker logs milvus-standalone
           exit 1
 
       - name: Run tests
@@ -168,10 +213,8 @@ jobs:
       - name: Shutdown Milvus
         if: always() && matrix.os == 'ubuntu-latest'
         run: |
-          if [ -f standalone_embed.sh ]; then
-            bash standalone_embed.sh stop
-            bash standalone_embed.sh delete
-          fi
+          docker rm -f milvus-standalone || true
+          sudo rm -rf volumes embedEtcd.yaml user.yaml
 
 
   # ===================================================================
