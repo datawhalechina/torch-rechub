@@ -1,3 +1,4 @@
+import math
 from itertools import combinations
 
 import torch
@@ -789,204 +790,115 @@ class CEN(nn.Module):
 
 
 class HSTULayer(nn.Module):
-    """Single HSTU layer.
+    """Single HSTU "sequential transduction unit" layer.
 
-    This layer implements the core HSTU "sequential transduction unit": a
-    multi-head self-attention block with gating and a position-wise FFN, plus
-    residual connections and LayerNorm.
+    Aligned with the Meta reference implementation
+    (`meta-recsys/generative-recommenders`):
+
+    1. ``LayerNorm(x)`` then a single UVQK projection producing ``(u, v, q, k)``.
+    2. Scaled dot-product attention with ``attn_alpha = 1/sqrt(dqk)``; no L2
+       normalization on Q/K, no relative-position bias inside the layer.
+    3. ``SiLU`` on the scores then divide by ``max_seq_len`` to keep output
+       magnitudes invariant to ``L``.
+    4. HSTU gate: ``LayerNorm(attn_output) * SiLU(u)``.
+    5. Concat ``[u, x, gated]`` (the ``concat_u=True, concat_x=True`` path) and
+       project back to ``d_model`` — no separate FFN.
 
     Args:
-        d_model (int): Hidden dimension of the model. Default: 512.
-        n_heads (int): Number of attention heads. Default: 8.
-        dqk (int): Dimension of query/key per head. Default: 64.
-        dv (int): Dimension of value per head. Default: 64.
-        dropout (float): Dropout rate applied in the layer. Default: 0.1.
-        use_rel_pos_bias (bool): Whether to use relative position bias.
+        d_model: Hidden dimension. Must be divisible by ``n_heads``.
+        n_heads: Number of attention heads.
+        dqk: Query/key dim per head.
+        dv: Value/u dim per head.
+        dropout: Dropout applied to the gated attention output before the
+            final projection.
+        max_seq_len: Used for the ``silu(scores) / max_seq_len`` scaling.
 
     Shape:
-        - Input: ``(batch_size, seq_len, d_model)``
-        - Output: ``(batch_size, seq_len, d_model)``
-
-    Example:
-        >>> layer = HSTULayer(d_model=512, n_heads=8)
-        >>> x = torch.randn(32, 256, 512)
-        >>> output = layer(x)
-        >>> output.shape
-        torch.Size([32, 256, 512])
+        - ``x``: ``(batch_size, seq_len, d_model)``.
+        - ``padding_mask``: ``(batch_size, seq_len)`` bool, ``True`` for valid
+          tokens. Optional; when provided, padded key positions are masked.
+        - Output: ``(batch_size, seq_len, d_model)``.
     """
 
-    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, max_seq_len=200):
         super().__init__()
+        if d_model % n_heads != 0:
+            raise ValueError(f"d_model ({d_model}) must be divisible by n_heads ({n_heads}).")
+
         self.d_model = d_model
         self.n_heads = n_heads
         self.dqk = dqk
         self.dv = dv
-        self.dropout_rate = dropout
-        self.use_rel_pos_bias = use_rel_pos_bias
+        self.max_seq_len = max_seq_len
+        self.attn_alpha = 1.0 / math.sqrt(dqk)
 
-        # Validate dimensions
-        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+        self.norm_in = nn.LayerNorm(d_model)
+        self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv)
 
-        # Projection 1: d_model -> 2*n_heads*dqk + 2*n_heads*dv
-        proj1_out_dim = 2 * n_heads * dqk + 2 * n_heads * dv
-        self.proj1 = nn.Linear(d_model, proj1_out_dim)
+        self.norm_attn = nn.LayerNorm(n_heads * dv)
 
-        # Projection 2: n_heads*dv -> d_model
-        self.proj2 = nn.Linear(n_heads * dv, d_model)
+        # concat_u + concat_x style output projection: [u, x, gated] -> d_model
+        self.proj2 = nn.Linear(2 * n_heads * dv + d_model, d_model)
 
-        # Feed-forward network (FFN)
-        # Standard Transformer uses 4*d_model as the hidden dimension of FFN
-        ffn_hidden_dim = 4 * d_model
-        self.ffn = nn.Sequential(nn.Linear(d_model, ffn_hidden_dim), nn.ReLU(), nn.Dropout(dropout), nn.Linear(ffn_hidden_dim, d_model), nn.Dropout(dropout))
-
-        # Layer normalization
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-
-        # Dropout
         self.dropout = nn.Dropout(dropout)
 
-        # Scaling factor for attention scores
-        # self.scale = 1.0 / (dqk**0.5)  # Removed in favor of L2 norm + SiLU
-
-    def forward(self, x, rel_pos_bias=None):
-        """Forward pass of a single HSTU layer.
-
-        Args:
-            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
-            rel_pos_bias (Tensor, optional): Relative position bias of shape
-                ``(1, n_heads, seq_len, seq_len)``.
-
-        Returns:
-            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
-        """
+    def forward(self, x, padding_mask=None):
         batch_size, seq_len, _ = x.shape
+        H = self.n_heads
 
-        # Residual connection
-        residual = x
+        residual = x  # raw input for the concat_x path
+        x_normed = self.norm_in(x)
 
-        # Layer normalization
-        x = self.norm1(x)
+        proj_out = self.proj1(x_normed)
+        q = proj_out[..., :H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
+        k = proj_out[..., H * self.dqk:2 * H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
+        u = proj_out[..., 2 * H * self.dqk:2 * H * self.dqk + H * self.dv].reshape(batch_size, seq_len, H, self.dv)
+        v = proj_out[..., 2 * H * self.dqk + H * self.dv:].reshape(batch_size, seq_len, H, self.dv).transpose(1, 2)
 
-        # Projection 1: (B, L, D) -> (B, L, 2*H*dqk + 2*H*dv)
-        proj_out = self.proj1(x)
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.attn_alpha  # (B, H, L, L)
 
-        # Split into Q, K, U, V
-        # Q, K: (B, L, H, dqk)
-        # U, V: (B, L, H, dv)
-        q = proj_out[..., :self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
-        k = proj_out[..., self.n_heads * self.dqk:2 * self.n_heads * self.dqk].reshape(batch_size, seq_len, self.n_heads, self.dqk)
-        u = proj_out[..., 2 * self.n_heads * self.dqk:2 * self.n_heads * self.dqk + self.n_heads * self.dv].reshape(batch_size, seq_len, self.n_heads, self.dv)
-        v = proj_out[..., 2 * self.n_heads * self.dqk + self.n_heads * self.dv:].reshape(batch_size, seq_len, self.n_heads, self.dv)
-
-        # Apply L2 normalization to Q and K (HSTU specific)
-        q = F.normalize(q, p=2, dim=-1)
-        k = F.normalize(k, p=2, dim=-1)
-
-        # Transpose to (B, H, L, dqk/dv)
-        q = q.transpose(1, 2)  # (B, H, L, dqk)
-        k = k.transpose(1, 2)  # (B, H, L, dqk)
-        u = u.transpose(1, 2)  # (B, H, L, dv)
-        v = v.transpose(1, 2)  # (B, H, L, dv)
-
-        # Compute attention scores: (B, H, L, L)
-        # Note: No scaling factor here as we use L2 norm + SiLU
-        scores = torch.matmul(q, k.transpose(-2, -1))
-
-        # Add relative position bias if provided (before masking/activation)
-        if rel_pos_bias is not None:
-            scores = scores + rel_pos_bias
-
-        # Add causal mask (prevent attending to future positions)
-        # For generative models this is required so that position i only attends
-        # to positions <= i.
         causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
-        # Use a large negative number for masking compatible with SiLU
-        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), -1e4)
+        valid_mask = causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, L, L)
+        if padding_mask is not None:
+            # Mask out padded KEY positions; queries at padded rows are handled
+            # by zeroing the layer output downstream.
+            key_mask = padding_mask.unsqueeze(1).unsqueeze(1)  # (B, 1, 1, L)
+            valid_mask = valid_mask & key_mask
 
-        # SiLU activation over attention scores (HSTU specific)
-        attn_weights = F.silu(scores)
-        attn_weights = self.dropout(attn_weights)
+        scores = scores.masked_fill(~valid_mask, -1e4)
 
-        # Attention output: (B, H, L, dv)
-        attn_output = torch.matmul(attn_weights, v)
+        attn_weights = F.silu(scores) / self.max_seq_len  # HSTU: silu then /N
 
-        # Gating mechanism: apply a learned gate on top of attention output
-        # First transpose back to (B, L, H, dv)
-        attn_output = attn_output.transpose(1, 2)  # (B, L, H, dv)
-        u = u.transpose(1, 2)  # (B, L, H, dv)
+        attn_output = torch.matmul(attn_weights, v)  # (B, H, L, dv)
+        attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_len, H * self.dv)
+        u_flat = u.reshape(batch_size, seq_len, H * self.dv)
 
-        # Apply element-wise gate: (B, L, H, dv)
-        gated_output = attn_output * torch.sigmoid(u)
+        gated = self.norm_attn(attn_output) * F.silu(u_flat)
+        gated = self.dropout(gated)
 
-        # Merge heads: (B, L, H*dv)
-        gated_output = gated_output.reshape(batch_size, seq_len, self.n_heads * self.dv)
-
-        # Projection 2: (B, L, H*dv) -> (B, L, D)
-        output = self.proj2(gated_output)
-        output = self.dropout(output)
-
-        # Residual connection
-        output = output + residual
-
-        # Second residual block: LayerNorm + FFN + residual connection
-        residual = output
-        output = self.norm2(output)
-        output = self.ffn(output)
-        output = output + residual
-
-        return output
+        combined = torch.cat([u_flat, residual, gated], dim=-1)  # (B, L, 2*H*dv + d_model)
+        return self.proj2(combined)
 
 
 class HSTUBlock(nn.Module):
-    """Stacked HSTU block.
-
-    This block stacks multiple :class:`HSTULayer` layers to form a deep HSTU
-    encoder for sequential recommendation.
-
-    Args:
-        d_model (int): Hidden dimension of the model. Default: 512.
-        n_heads (int): Number of attention heads. Default: 8.
-        n_layers (int): Number of stacked HSTU layers. Default: 4.
-        dqk (int): Dimension of query/key per head. Default: 64.
-        dv (int): Dimension of value per head. Default: 64.
-        dropout (float): Dropout rate applied in each layer. Default: 0.1.
-        use_rel_pos_bias (bool): Whether to use relative position bias.
+    """Stack of :class:`HSTULayer` modules.
 
     Shape:
         - Input: ``(batch_size, seq_len, d_model)``
         - Output: ``(batch_size, seq_len, d_model)``
-
-    Example:
-        >>> block = HSTUBlock(d_model=512, n_heads=8, n_layers=4)
-        >>> x = torch.randn(32, 256, 512)
-        >>> output = block(x)
-        >>> output.shape
-        torch.Size([32, 256, 512])
     """
 
-    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, use_rel_pos_bias=True):
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, max_seq_len=200):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
         self.n_layers = n_layers
 
-        # Create a stack of HSTULayer modules
-        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, use_rel_pos_bias=use_rel_pos_bias) for _ in range(n_layers)])
+        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len) for _ in range(n_layers)])
 
-    def forward(self, x, rel_pos_bias=None):
-        """Forward pass through all stacked HSTULayer modules.
-
-        Args:
-            x (Tensor): Input tensor of shape ``(batch_size, seq_len, d_model)``.
-            rel_pos_bias (Tensor, optional): Relative position bias shared across
-                all layers.
-
-        Returns:
-            Tensor: Output tensor of shape ``(batch_size, seq_len, d_model)``.
-        """
+    def forward(self, x, padding_mask=None):
         for layer in self.layers:
-            x = layer(x, rel_pos_bias=rel_pos_bias)
+            x = layer(x, padding_mask=padding_mask)
         return x
 
 
