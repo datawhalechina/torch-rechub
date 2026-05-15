@@ -148,6 +148,9 @@ jobs:
           # Extra config to override default milvus.yaml
           EOF
 
+          mkdir -p volumes/milvus
+          chmod -R 777 volumes
+
           docker run -d \
             --name milvus-standalone \
             --security-opt seccomp:unconfined \
