@@ -5,14 +5,14 @@ import pandas as pd
 import torch
 
 from torch_rechub.basic.features import DenseFeature, SequenceFeature, SparseFeature
-from torch_rechub.models.ranking import DIN
+from torch_rechub.models.ranking import DIN, InterFormer
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feature, pad_sequences
 
 sys.path.append("../..")
 
 
-def get_amazon_data_dict(dataset_path):
+def get_amazon_data_dict(dataset_path, embed_dim=8):
     data = pd.read_csv(dataset_path)
     print('========== Start Amazon ==========')
     train, val, test = generate_seq_feature(data=data, user_col="user_id", item_col="item_id", time_col='time', item_attribute_cols=["cate_id"])
@@ -20,17 +20,17 @@ def get_amazon_data_dict(dataset_path):
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     print(train)
 
-    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
-    target_features = features
+    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=embed_dim), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=embed_dim), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=embed_dim)]
+    target_features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=embed_dim), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=embed_dim)]
     history_features = [
         SequenceFeature("hist_item_id",
                         vocab_size=n_items + 1,
-                        embed_dim=8,
+                        embed_dim=embed_dim,
                         pooling="concat",
                         shared_with="target_item_id"),
         SequenceFeature("hist_cate_id",
                         vocab_size=n_cates + 1,
-                        embed_dim=8,
+                        embed_dim=embed_dim,
                         pooling="concat",
                         shared_with="target_cate_id")
     ]
@@ -48,13 +48,19 @@ def get_amazon_data_dict(dataset_path):
     return features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y)
 
 
-def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
     torch.manual_seed(seed)
-    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_amazon_data_dict(dataset_path)
+    embed_dim = 32 if model_name == "interformer" else 8
+    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_amazon_data_dict(dataset_path, embed_dim)
     dg = DataGenerator(train_x, train_y)
 
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=val_x, y_val=val_y, x_test=test_x, y_test=test_y, batch_size=batch_size)
-    model = DIN(features=features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]}, attention_mlp_params={"dims": [256, 128]})
+
+    if model_name == "din":
+        model = DIN(features=features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]}, attention_mlp_params={"dims": [256, 128]})
+    elif model_name == "interformer":
+        user_features = [features[2]]  # user_id
+        model = InterFormer(features=user_features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]}, embed_dim=embed_dim, n_layers=2, num_heads=4, num_cls_tokens=4, num_pma_seeds=2, num_recent_tokens=2, num_sum_features=8)
 
     ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=4, device=device, model_path=save_dir)
     ctr_trainer.fit(train_dataloader, val_dataloader)
@@ -66,6 +72,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', default="./data/amazon-electronics/amazon_electronics_sample.csv")
+    parser.add_argument('--model_name', default='din', choices=['din', 'interformer'])
     parser.add_argument('--epoch', type=int, default=2)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--batch_size', type=int, default=4096)
@@ -75,7 +82,8 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=2022)
 
     args = parser.parse_args()
-    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
 """
-python run_amazon_electronics.py
+python run_amazon_electronics.py --model_name din
+python run_amazon_electronics.py --model_name interformer
 """

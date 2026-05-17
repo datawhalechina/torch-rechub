@@ -34,7 +34,8 @@
 - 使用方法
 
   ```shell
-  python run_amazon_electronics.py # run DIN model on sample data
+  python run_amazon_electronics.py --model_name din          # run DIN model
+  python run_amazon_electronics.py --model_name interformer  # run InterFormer model
   ```
 
 
@@ -127,8 +128,7 @@ test:用于测试模型预测的1天广告数据，约四百六十万。
 | Model/Dataset | Amazon | Taobao(CTR) |
 | ------------- | ------ | ----------- |
 | DIN           | 0.8691 |             |
-|               |        |             |
-|               |        |             |
+| InterFormer   |        |             |
 
 # 多任务学习排序
 

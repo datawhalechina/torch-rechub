@@ -1,4 +1,4 @@
-__all__ = ['WideDeep', 'DeepFM', 'DCN', 'DCNv2', 'EDCN', 'AFM', 'FiBiNet', 'DeepFFM', 'BST', 'DIN', 'DIEN', 'FatDeepFFM', 'AutoInt']
+__all__ = ['WideDeep', 'DeepFM', 'DCN', 'DCNv2', 'EDCN', 'AFM', 'FiBiNet', 'DeepFFM', 'BST', 'DIN', 'DIEN', 'FatDeepFFM', 'AutoInt', 'InterFormer']
 
 from .afm import AFM
 from .autoint import AutoInt
@@ -11,4 +11,5 @@ from .dien import DIEN
 from .din import DIN
 from .edcn import EDCN
 from .fibinet import FiBiNet
+from .interformer import InterFormer
 from .widedeep import WideDeep
