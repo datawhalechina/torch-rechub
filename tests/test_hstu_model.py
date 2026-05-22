@@ -174,9 +174,13 @@ def test_vocab_mask_drops_per_user_history():
 
 def test_seqtrainer_next_token_loss_masks_left_pad_positions():
     trainer = SeqTrainer(
-        nn.Linear(1, 1),
+        nn.Linear(1,
+                  1),
         device='cpu',
-        loss_params={"ignore_index": 0, "reduction": "sum"},
+        loss_params={
+            "ignore_index": 0,
+            "reduction": "sum"
+        },
     )
     logits = torch.zeros(1, 4, 10)
     seq_tokens = torch.tensor([[0, 0, 5, 6]])

@@ -280,9 +280,24 @@ class MovieLensHSTUPreprocessor:
         item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
 
         splits = {
-            'train': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
-            'val': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
-            'test': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
+            'train': {
+                'seq_tokens': [],
+                'seq_positions': [],
+                'seq_time_diffs': [],
+                'targets': []
+            },
+            'val': {
+                'seq_tokens': [],
+                'seq_positions': [],
+                'seq_time_diffs': [],
+                'targets': []
+            },
+            'test': {
+                'seq_tokens': [],
+                'seq_positions': [],
+                'seq_time_diffs': [],
+                'targets': []
+            },
         }
 
         positions_template = list(range(self.max_seq_len))

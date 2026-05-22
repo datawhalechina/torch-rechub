@@ -227,7 +227,8 @@ class HSTUModel(nn.Module):
         """
         batch_size, seq_len = x.shape
         if seq_len > self.max_seq_len:
-            raise ValueError(f"Input seq_len ({seq_len}) exceeds max_seq_len ({self.max_seq_len}). " f"Either truncate the input or rebuild the model with a larger max_seq_len.")
+            raise ValueError(f"Input seq_len ({seq_len}) exceeds max_seq_len ({self.max_seq_len}). "
+                             f"Either truncate the input or rebuild the model with a larger max_seq_len.")
 
         padding_mask = x.ne(0)  # (B, L) — True for valid tokens
 

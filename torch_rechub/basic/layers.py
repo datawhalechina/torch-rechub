@@ -948,8 +948,7 @@ class HSTUBlock(nn.Module):
                     time_bucket_fn=time_bucket_fn,
                     time_bucket_divisor=time_bucket_divisor,
                     time_bucket_unit=time_bucket_unit,
-                )
-                for _ in range(n_layers)
+                ) for _ in range(n_layers)
             ]
         )
 

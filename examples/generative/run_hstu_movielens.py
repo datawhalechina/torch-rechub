@@ -235,10 +235,12 @@ def main(
         optimizer_params={
             "lr": learning_rate,
             "weight_decay": weight_decay,
-            "betas": (0.9, 0.98),
+            "betas": (0.9,
+                      0.98),
         },
         n_epoch=epoch,
-        earlystop_patience=max(epoch + 1, 10),
+        earlystop_patience=max(epoch + 1,
+                               10),
         device=device,
         model_path=save_dir,
     )
