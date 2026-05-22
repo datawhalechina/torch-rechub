@@ -4,6 +4,11 @@ import os
 import pickle
 import sys
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import numpy as np
 import torch
 import tqdm
@@ -13,11 +18,6 @@ from torch_rechub.models.generative.hstu import HSTUModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator
 from torch_rechub.utils.hstu_utils import VocabMask
-
-sys.path.append("../..")
-
-# 获取脚本所在目录的绝对路径
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_movielens_data(data_dir=None):

@@ -11,6 +11,11 @@ import os
 import pickle
 import sys
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import numpy as np
 import torch
 import tqdm
@@ -20,10 +25,6 @@ from torch_rechub.models.generative.hstu import HSTUModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator, pad_sequences
 from torch_rechub.utils.hstu_utils import VocabMask
-
-sys.path.append("../..")
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_amazon_books_data(data_dir=None, max_seq_len=50):
