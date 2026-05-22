@@ -253,174 +253,106 @@ class MovieLensHSTUPreprocessor:
 
         return user_sequences, user_timestamps
 
-    def generate_training_samples_sliding_window(self, user_sequences, user_timestamps, vocab):
-        """Generate training samples using a sliding window (with timestamps).
+    def generate_leave_last_out_samples(self, user_sequences, user_timestamps, vocab):
+        """Generate train/val/test samples using **leave-last-out per user**.
 
-        Key ideas:
-        * For each user sequence, generate multiple prefix-target pairs via a
-          sliding window, greatly increasing the number of training samples.
-        * Compute time differences relative to the query time (last event in
-          the prefix) and store them for time-aware positional encoding.
+        Standard SASRec / HSTU evaluation protocol:
 
-        Example:
-            User sequence: [item1, item2, item3, item4, item5]
-            Timestamps: [t1, t2, t3, t4, t5]
-            Generated samples:
-                ([item1], item2, time_diffs=[0, t2 - t1])
-                ([item1, item2], item3, time_diffs=[0, t2 - t1, t3 - t2])
-                ([item1, item2, item3], item4, time_diffs=[0, t2 - t1, t3 - t2, t4 - t3])
-                ([item1, item2, item3, item4], item5,
-                 time_diffs=[0, t2 - t1, t3 - t2, t4 - t3, t5 - t4])
+        - Test sample (per user): ``input = items[:-1]``, ``target = items[-1]``.
+        - Val sample (per user): ``input = items[:-2]``, ``target = items[-2]``.
+        - Train samples (per user): sliding window over the remaining prefix.
+          For ``i`` in ``[1, N-3]``, sample = ``(items[:i], items[i])``. This
+          gives ``N - 3`` training samples per user without leaking the val or
+          test targets.
 
-        Args:
-            user_sequences (dict): User sequences {user_id: [movie_id1, ...]}.
-            user_timestamps (dict): User timestamps {user_id: [timestamp1, ...]}.
-            vocab (dict): Vocabulary with ``item_to_idx`` and ``idx_to_item`` mappings.
+        Time diffs follow the Meta reference: per-position seconds delta from
+        the prefix's last (query) timestamp, padded on the left to
+        ``max_seq_len``.
 
-        Returns:
-            tuple: ``(seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)``.
+        Returns
+        -------
+        dict
+            ``{'train', 'val', 'test'}`` each containing numpy arrays for
+            ``seq_tokens``, ``seq_positions``, ``seq_time_diffs``, ``targets``.
         """
-        print("\n使用滑动窗口生成训练样本（支持时间戳）...")
+        print("\n按留一法生成 train/val/test 样本（滑动窗口 + 时间戳）...")
         item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
 
-        seq_tokens_list = []
-        seq_positions_list = []
-        seq_time_diffs_list = []  # 新增：时间差列表
-        targets_list = []
-        user_ids_list = []
-
-        total_samples = 0
-        for user_id, sequence in user_sequences.items():
-            timestamps = user_timestamps[user_id]
-
-            # 从每个用户序列生成多个样本
-            # 对于长度为N的序列，生成N-1个样本
-            for end_idx in range(1, len(sequence)):
-                # 历史序列：从开始到end_idx（不包含）
-                history = sequence[:end_idx]
-                history_timestamps = timestamps[:end_idx]
-                # 目标：end_idx位置的item
-                target = sequence[end_idx]
-
-                # 转换为token
-                seq_tokens = [item_to_idx.get(movie_id, 0) for movie_id in history]
-                target_token = item_to_idx.get(target, 0)
-
-                # 计算时间差（秒）- 相对于查询时间（序列最后一个时间戳）
-                # 参考Meta官方实现：query_time - timestamps
-                query_timestamp = history_timestamps[-1]  # 序列最后一个时间戳作为查询时间
-                seq_time_diffs = [query_timestamp - ts for ts in history_timestamps]
-                # 例如：[100, 200, 300, 400] → [300, 200, 100, 0]
-
-                # 截断到max_seq_len（保留最近的历史）
-                if len(seq_tokens) > self.max_seq_len:
-                    seq_tokens = seq_tokens[-self.max_seq_len:]
-                    seq_time_diffs = seq_time_diffs[-self.max_seq_len:]
-
-                # 填充到max_seq_len
-                seq_len = len(seq_tokens)
-                pad_len = self.max_seq_len - seq_len
-                seq_tokens = [0] * pad_len + seq_tokens
-                seq_time_diffs = [0] * pad_len + seq_time_diffs  # time difference is 0 at padding positions
-
-                # 位置编码
-                seq_positions = list(range(self.max_seq_len))
-
-                seq_tokens_list.append(seq_tokens)
-                seq_positions_list.append(seq_positions)
-                seq_time_diffs_list.append(seq_time_diffs)
-                targets_list.append(target_token)
-                user_ids_list.append(user_id)
-                total_samples += 1
-
-        seq_tokens = np.array(seq_tokens_list, dtype=np.int32)
-        seq_positions = np.array(seq_positions_list, dtype=np.int32)
-        seq_time_diffs = np.array(seq_time_diffs_list, dtype=np.int32)  # time differences per position
-        targets = np.array(targets_list, dtype=np.int32)
-        user_ids = np.array(user_ids_list, dtype=np.int32)
-
-        # 统计时间差信息
-        non_zero_time_diffs = seq_time_diffs[seq_time_diffs > 0]
-        if len(non_zero_time_diffs) > 0:
-            print("时间差统计（秒）:")
-            print(f"  平均: {np.mean(non_zero_time_diffs):.1f}")
-            print(f"  中位数: {np.median(non_zero_time_diffs):.1f}")
-            print(f"  最小: {np.min(non_zero_time_diffs)}")
-            print(f"  最大: {np.max(non_zero_time_diffs)}")
-            print(f"  平均（小时）: {np.mean(non_zero_time_diffs) / 3600:.1f}")
-            print(f"  平均（天）: {np.mean(non_zero_time_diffs) / 86400:.1f}")
-
-        print(f"生成样本数: {total_samples}")
-        print(f"数据增强倍数: {total_samples / len(user_sequences):.1f}x")
-
-        return seq_tokens, seq_positions, seq_time_diffs, targets, user_ids
-
-    def split_data_by_user(self, seq_tokens, seq_positions, seq_time_diffs, targets, user_ids, train_ratio=0.7, val_ratio=0.1):
-        """Split data into train/val/test sets at the user level.
-
-        Important: we split on users instead of individual samples to avoid
-        information leakage (the same user's interactions appearing in both
-        train and test sets).
-
-        Args:
-            seq_tokens (ndarray): Sequence tokens.
-            seq_positions (ndarray): Position indices.
-            seq_time_diffs (ndarray): Time-difference sequences.
-            targets (ndarray): Target tokens.
-            user_ids (ndarray): User IDs per sample.
-            train_ratio (float): Fraction of users assigned to the training set.
-            val_ratio (float): Fraction of users assigned to the validation set.
-
-        Returns:
-            dict: A dictionary with ``train``, ``val`` and ``test`` splits.
-        """
-        print("\n按用户分割数据集...")
-
-        # 获取唯一用户
-        unique_users = np.unique(user_ids)
-        n_users = len(unique_users)
-
-        # 随机打乱用户
-        np.random.shuffle(unique_users)
-
-        # 分割用户
-        train_size = int(n_users * train_ratio)
-        val_size = int(n_users * val_ratio)
-
-        train_users = set(unique_users[:train_size])
-        val_users = set(unique_users[train_size:train_size + val_size])
-        test_users = set(unique_users[train_size + val_size:])
-
-        # 根据用户分割样本
-        train_mask = np.array([uid in train_users for uid in user_ids])
-        val_mask = np.array([uid in val_users for uid in user_ids])
-        test_mask = np.array([uid in test_users for uid in user_ids])
-
-        data_split = {
-            'train': {
-                'seq_tokens': seq_tokens[train_mask],
-                'seq_positions': seq_positions[train_mask],
-                'seq_time_diffs': seq_time_diffs[train_mask],  # time differences for each prefix
-                'targets': targets[train_mask]
-            },
-            'val': {
-                'seq_tokens': seq_tokens[val_mask],
-                'seq_positions': seq_positions[val_mask],
-                'seq_time_diffs': seq_time_diffs[val_mask],  # time differences for each prefix
-                'targets': targets[val_mask]
-            },
-            'test': {
-                'seq_tokens': seq_tokens[test_mask],
-                'seq_positions': seq_positions[test_mask],
-                'seq_time_diffs': seq_time_diffs[test_mask],  # time differences for each prefix
-                'targets': targets[test_mask]
-            }
+        splits = {
+            'train': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
+            'val': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
+            'test': {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []},
         }
 
-        print(f"用户分割: Train={len(train_users)}, Val={len(val_users)}, Test={len(test_users)}")
-        print(f"样本分割: Train={train_mask.sum()}, Val={val_mask.sum()}, Test={test_mask.sum()}")
+        positions_template = list(range(self.max_seq_len))
 
-        return data_split
+        def _append(bucket, history, history_ts, target):
+            seq_tokens = [item_to_idx.get(m, 0) for m in history]
+            target_token = item_to_idx.get(target, 0)
+
+            # Time diffs relative to the prefix's last timestamp (query time),
+            # matching the Meta reference `query_time - timestamps`.
+            query_ts = history_ts[-1]
+            seq_time_diffs = [query_ts - t for t in history_ts]
+
+            # Truncate to max_seq_len keeping the most recent history.
+            if len(seq_tokens) > self.max_seq_len:
+                seq_tokens = seq_tokens[-self.max_seq_len:]
+                seq_time_diffs = seq_time_diffs[-self.max_seq_len:]
+
+            # Left-pad to max_seq_len with PAD=0 / time_diff=0.
+            pad_len = self.max_seq_len - len(seq_tokens)
+            seq_tokens = [0] * pad_len + seq_tokens
+            seq_time_diffs = [0] * pad_len + seq_time_diffs
+
+            bucket['seq_tokens'].append(seq_tokens)
+            bucket['seq_positions'].append(positions_template)
+            bucket['seq_time_diffs'].append(seq_time_diffs)
+            bucket['targets'].append(target_token)
+
+        kept_users = 0
+        skipped_users = 0
+        for user_id, sequence in user_sequences.items():
+            timestamps = user_timestamps[user_id]
+            N = len(sequence)
+            # Need at least 4 items for 1 train + 1 val + 1 test sample.
+            if N < 4:
+                skipped_users += 1
+                continue
+            kept_users += 1
+
+            # Train: prefixes ending at items[1..N-3], excluding val/test targets.
+            for end_idx in range(1, N - 2):
+                _append(splits['train'], sequence[:end_idx], timestamps[:end_idx], sequence[end_idx])
+
+            # Val: input items[:N-2], target items[N-2].
+            _append(splits['val'], sequence[:N - 2], timestamps[:N - 2], sequence[N - 2])
+
+            # Test: input items[:N-1], target items[N-1].
+            _append(splits['test'], sequence[:N - 1], timestamps[:N - 1], sequence[N - 1])
+
+        for name in splits:
+            for key in ('seq_tokens', 'seq_positions', 'seq_time_diffs', 'targets'):
+                dtype = np.int64 if key == 'seq_time_diffs' else np.int32
+                splits[name][key] = np.array(splits[name][key], dtype=dtype)
+
+        # Time-difference statistics over training prefixes.
+        train_td = splits['train']['seq_time_diffs']
+        non_zero_td = train_td[train_td > 0]
+        if non_zero_td.size > 0:
+            print("时间差统计（秒，train 集）:")
+            print(f"  平均: {np.mean(non_zero_td):.1f}")
+            print(f"  中位数: {np.median(non_zero_td):.1f}")
+            print(f"  最小: {np.min(non_zero_td)}")
+            print(f"  最大: {np.max(non_zero_td)}")
+            print(f"  平均（小时）: {np.mean(non_zero_td) / 3600:.1f}")
+            print(f"  平均（天）: {np.mean(non_zero_td) / 86400:.1f}")
+
+        print(f"保留用户: {kept_users} | 跳过 (<4 items): {skipped_users}")
+        print(f"样本数: train={len(splits['train']['targets'])}, "
+              f"val={len(splits['val']['targets'])}, test={len(splits['test']['targets'])}")
+
+        return splits
 
     def save_data(self, data_split, vocab):
         """Save processed data splits and vocabulary to disk.
@@ -465,24 +397,20 @@ class MovieLensHSTUPreprocessor:
         # 4. 构建用户序列（包含时间戳）
         user_sequences, user_timestamps = self.build_user_sequences(ratings_filtered)
 
-        # 5. 使用滑动窗口生成训练样本（包含时间差）
-        seq_tokens, seq_positions, seq_time_diffs, targets, user_ids = self.generate_training_samples_sliding_window(user_sequences, user_timestamps, vocab)
+        # 5. 按留一法生成 train/val/test 样本
+        data_split = self.generate_leave_last_out_samples(user_sequences, user_timestamps, vocab)
 
-        # 6. 按用户分割数据
-        data_split = self.split_data_by_user(seq_tokens, seq_positions, seq_time_diffs, targets, user_ids)
-
-        # 7. 保存数据
+        # 6. 保存数据
         self.save_data(data_split, vocab)
 
         print("=" * 80)
         print("预处理完成！")
         print("=" * 80)
         print("\n关键改进:")
-        print("✅ 采用滑动窗口策略，大幅提升数据量")
+        print("✅ 采用留一法 (leave-last-out per user): 末位=test, 倒数第二=val, 余下做训练前缀")
+        print("✅ 训练前缀采用滑动窗口，覆盖每个用户的全部上下文")
         print("✅ 添加冷启动过滤，提高数据质量")
-        print("✅ 按用户分割数据，避免数据泄露")
-        print("✅ 序列长度统计，便于调优")
-        print("✅ 支持时间戳处理，计算时间差用于时间感知建模")  # 新增
+        print("✅ 支持时间戳处理，计算时间差用于时间感知建模")
 
 
 if __name__ == '__main__':

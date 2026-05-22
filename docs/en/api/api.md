@@ -607,103 +607,97 @@ No docstring provided.
 
 #### `HSTULayer`
 
-Single HSTU layer.
+Single HSTU "sequential transduction unit" layer (paper-faithful).
 
-This layer implements the core HSTU "sequential transduction unit": a
-multi-head self-attention block with gating and a position-wise FFN, plus
-residual connections and LayerNorm.
+Implements HSTU Eq. 2-4 from *Actions Speak Louder than Words*:
+
+- Eq. 2 — ``U, V, Q, K = Split(SiLU(f_1(LayerNorm(x))))``: a **single**
+  ``SiLU`` is applied to the joint projection **before** the split, so all
+  four of ``U, V, Q, K`` go through the non-linearity.
+- Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T * alpha + rab^{p,t}) / N) V(x)``: the
+  learnable bucketed (position-diff, time-diff) bias ``rab^{p,t}`` is added
+  to scores **before** the ``SiLU/N`` activation.
+- Eq. 4 — ``Y(x) = f_2(LayerNorm(A V) * U)``: a single linear ``f_2`` is
+  applied to the gated attention output.
+
+The external residual ``x + Layer(x)`` is added by :class:`HSTUBlock`.
 
 **Parameters**
 
-- `d_model` (`int`): Hidden dimension of the model. Default: 512.
-- `n_heads` (`int`): Number of attention heads. Default: 8.
-- `dqk` (`int`): Dimension of query/key per head. Default: 64.
-- `dv` (`int`): Dimension of value per head. Default: 64.
-- `dropout` (`float`): Dropout rate applied in the layer. Default: 0.1.
-- `use_rel_pos_bias` (`bool`): Whether to use relative position bias.
+- `d_model` (`Hidden dimension. Must be divisible by ``n_heads``.`)
+- `n_heads` (`Number of attention heads.`)
+- `dqk` (`Query/key dim per head.`)
+- `dv` (`Value/u dim per head.`)
+- `dropout` (`Dropout applied to the gated attention output before the`): final projection.
+- `max_seq_len` (`Used for the ``silu(scores) / max_seq_len`` scaling and`): for sizing the relative-position table inside ``rab``.
+- `num_time_buckets` (`Number of time-difference buckets in ``rab``.`)
+- `time_bucket_fn` (```'sqrt'`` or ``'log'`` bucketization in ``rab``.`)
+- `time_bucket_divisor` (`Bucket-range divisor in ``rab``.`)
 
 **Shape**
 
-    - Input: ``(batch_size, seq_len, d_model)``
-    - Output: ``(batch_size, seq_len, d_model)``
-
-**Examples**
-
-```python
->>> layer = HSTULayer(d_model=512, n_heads=8)
->>> x = torch.randn(32, 256, 512)
->>> output = layer(x)
->>> output.shape
-```
-    torch.Size([32, 256, 512])
+    - ``x``: ``(batch_size, seq_len, d_model)``.
+    - ``padding_mask``: ``(batch_size, seq_len)`` bool, ``True`` for valid
+      tokens. Optional; when provided, padded key positions are masked.
+    - ``time_diffs``: ``(batch_size, seq_len)`` seconds delta from a single
+      anchor. Optional; when ``None``, ``rab`` falls back to position-only
+      bias.
+    - Output: ``(batch_size, seq_len, d_model)``.
 
 ##### `HSTULayer.forward`
 
 ```python
-forward(self, x, rel_pos_bias = None)
+forward(self, x, padding_mask = None, time_diffs = None)
 ```
 
-Forward pass of a single HSTU layer.
+Forward pass of one HSTU Eq. 2-4 layer.
 
 **Parameters**
 
-- `x` (`Tensor`): Input tensor of shape ``(batch_size, seq_len, d_model)``.
-- `rel_pos_bias` (`Tensor, optional`): Relative position bias of shape
-  ``(1, n_heads, seq_len, seq_len)``.
+- `x` (`Tensor`): Hidden states, shape ``(batch_size, seq_len, d_model)``.
+- `padding_mask` (`Tensor, optional`): Boolean mask with shape
+  ``(batch_size, seq_len)``; ``True`` marks valid tokens.
+- `time_diffs` (`Tensor, optional`): Per-position seconds delta from a
+  single anchor, shape ``(batch_size, seq_len)``. Used by
+  ``rab^{p,t}``; when omitted, attention receives position-only
+  relative bias.
 
 **Returns**
 
-- `Tensor` (`Output tensor of shape ``(batch_size, seq_len, d_model)``.`)
+- `Tensor` (`Layer output before the external residual, shape ``(batch_size, seq_len, d_model)``.`)
 
 #### `HSTUBlock`
 
-Stacked HSTU block.
+Stack of :class:`HSTULayer` modules with **external residual** wiring.
 
-This block stacks multiple :class:`HSTULayer` layers to form a deep HSTU
-encoder for sequential recommendation.
-
-**Parameters**
-
-- `d_model` (`int`): Hidden dimension of the model. Default: 512.
-- `n_heads` (`int`): Number of attention heads. Default: 8.
-- `n_layers` (`int`): Number of stacked HSTU layers. Default: 4.
-- `dqk` (`int`): Dimension of query/key per head. Default: 64.
-- `dv` (`int`): Dimension of value per head. Default: 64.
-- `dropout` (`float`): Dropout rate applied in each layer. Default: 0.1.
-- `use_rel_pos_bias` (`bool`): Whether to use relative position bias.
+Each layer is wrapped as ``x = x + Layer(x)``, matching the HSTU paper /
+Meta reference. ``num_time_buckets`` / ``time_bucket_fn`` /
+``time_bucket_divisor`` are forwarded to every layer's ``rab`` module.
 
 **Shape**
 
     - Input: ``(batch_size, seq_len, d_model)``
     - Output: ``(batch_size, seq_len, d_model)``
 
-**Examples**
-
-```python
->>> block = HSTUBlock(d_model=512, n_heads=8, n_layers=4)
->>> x = torch.randn(32, 256, 512)
->>> output = block(x)
->>> output.shape
-```
-    torch.Size([32, 256, 512])
-
 ##### `HSTUBlock.forward`
 
 ```python
-forward(self, x, rel_pos_bias = None)
+forward(self, x, padding_mask = None, time_diffs = None)
 ```
 
-Forward pass through all stacked HSTULayer modules.
+Apply stacked HSTU layers with external residuals.
 
 **Parameters**
 
-- `x` (`Tensor`): Input tensor of shape ``(batch_size, seq_len, d_model)``.
-- `rel_pos_bias` (`Tensor, optional`): Relative position bias shared across
-  all layers.
+- `x` (`Tensor`): Hidden states, shape ``(batch_size, seq_len, d_model)``.
+- `padding_mask` (`Tensor, optional`): Boolean mask with shape
+  ``(batch_size, seq_len)``; ``True`` marks valid tokens.
+- `time_diffs` (`Tensor, optional`): Per-position seconds delta from a
+  single anchor, shape ``(batch_size, seq_len)``.
 
 **Returns**
 
-- `Tensor` (`Output tensor of shape ``(batch_size, seq_len, d_model)``.`)
+- `Tensor` (`Output hidden states, shape ``(batch_size, seq_len, d_model)``.`)
 
 #### `InteractingLayer`
 
@@ -1417,22 +1411,52 @@ Module: `torch_rechub.models.generative.hstu`
 HSTU: Hierarchical Sequential Transduction Units.
 
 Autoregressive generative recommender that stacks ``HSTUBlock`` layers to
-capture long-range dependencies and predict the next item.
+capture long-range dependencies and predict the next item. The layer
+internals follow the HSTU paper (Eq. 2-4) and Meta's reference
+implementation (`meta-recsys/generative-recommenders`):
+
+- Token embedding + absolute position embedding + (optional) time-bucket
+  embedding on the input side.
+- Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
+  projection **before** splitting (Eq. 2), so all four streams go through
+  the non-linearity.
+- Attention uses ``alpha = 1/sqrt(dqk)`` scaling and adds a per-head
+  bucketed (position-diff, time-diff) bias ``rab^{p,t}`` to scores
+  **before** the ``silu(scores) / max_seq_len`` activation (Eq. 3).
+- Gated output ``LayerNorm(A V) * U`` projected by a single linear
+  ``f_2`` (Eq. 4); no concat-u/x bypass and no separate FFN.
+- External residual ``x + Layer(x)`` is applied around each layer in
+  :class:`HSTUBlock`.
+- Output projection is **tied** with the token embedding by default.
 
 **Parameters**
 
-- `vocab_size` (`int`): Vocabulary size (items incl. PAD).
+- `vocab_size` (`int`): Vocabulary size (items incl. PAD=0).
 - `d_model` (`int, default=512`): Hidden dimension.
 - `n_heads` (`int, default=8`): Attention heads.
 - `n_layers` (`int, default=4`): Number of stacked HSTU layers.
 - `dqk` (`int, default=64`): Query/key dim per head.
-- `dv` (`int, default=64`): Value dim per head.
-- `max_seq_len` (`int, default=256`): Maximum sequence length.
+- `dv` (`int, default=64`): Value/u dim per head.
+- `max_seq_len` (`int, default=256`): Maximum sequence length. ``forward`` raises ``ValueError`` if input
+  ``seq_len`` exceeds this.
 - `dropout` (`float, default=0.1`): Dropout rate.
-- `use_rel_pos_bias` (`bool, default=True`): Use relative position bias.
 - `use_time_embedding` (`bool, default=True`): Use time-difference embeddings.
-- `num_time_buckets` (`int, default=2048`): Number of time buckets for time embeddings.
-- `time_bucket_fn` (`{'sqrt', 'log'}, default='sqrt'`): Bucketization function for time differences.
+- `num_time_buckets` (`int, default=128`): Number of time buckets.
+- `time_bucket_fn` (`{'sqrt', 'log'}, default='sqrt'`): Bucketization function for time differences (in minutes). Shared by
+  the input-side time embedding and the per-layer ``rab^{p,t}``.
+- `time_bucket_divisor` (`float, default=1.0`): Divisor applied after ``sqrt``/``log`` so the bucket index range
+  actually utilizes ``[0, num_time_buckets - 1]``. Tune to your dataset's
+  time-difference distribution. Shared by the input-side time embedding
+  and the per-layer ``rab^{p,t}``.
+- `tie_embeddings` (`bool, default=True`): Tie the output projection weight to the token embedding weight.
+
+**Notes**
+
+``time_diffs`` semantics: per-position seconds delta from a single anchor
+(e.g. ``query_time - timestamps[i]``), following the Meta reference.
+Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
+distribution will be different — set ``time_bucket_divisor`` accordingly.
+``time_diffs=None`` falls back to all-zero deltas (no temporal signal).
 
 **Shape**
 
@@ -1441,17 +1465,6 @@ capture long-range dependencies and predict the next item.
   - `time_diffs` (```(batch_size, seq_len)``, optional (seconds).`)
 - **Output**
   - `logits` (```(batch_size, seq_len, vocab_size)```)
-
-**Examples**
-
-```python
->>> model = HSTUModel(vocab_size=100000, d_model=512)
->>> x = torch.randint(0, 100000, (32, 256))
->>> time_diffs = torch.randint(0, 86400, (32, 256))
->>> logits = model(x, time_diffs)
->>> logits.shape
-```
-torch.Size([32, 256, 100000])
 
 ###### `HSTUModel.forward`
 
@@ -1463,14 +1476,16 @@ Forward pass.
 
 **Parameters**
 
-- `x` (`Tensor`): Input token ids of shape ``(batch_size, seq_len)``.
-- `time_diffs` (`Tensor, optional`): Time differences in seconds,
-  shape ``(batch_size, seq_len)``. If ``None`` and
-  ``use_time_embedding=True``, all-zero time differences are used.
+- `x` (`Tensor`): Input token ids, shape ``(batch_size, seq_len)``. ``0``
+  is treated as PAD.
+- `time_diffs` (`Tensor, optional`): Time differences in seconds, shape
+  ``(batch_size, seq_len)``. If ``None`` and
+  ``use_time_embedding=True``, all-zero deltas are used (no
+  temporal signal).
 
 **Returns**
 
-- `Tensor` (`Logits over the vocabulary of shape`): ``(batch_size, seq_len, vocab_size)``.
+- `Tensor` (`Logits over the vocabulary, shape`): ``(batch_size, seq_len, vocab_size)``.
 
 #### `rqvae`
 
@@ -4459,7 +4474,12 @@ Module: `torch_rechub.utils.hstu_utils`
 
 #### `RelPosBias`
 
-Relative position bias for attention.
+Legacy relative-position bias for attention.
+
+Used by ``HLLMTransformerBlock`` and kept for backward-compatible
+experiments. ``HSTUModel`` uses
+:class:`RelativeBucketedTimeAndPositionBias` instead, because HSTU Eq. 3
+adds a per-head bucketed ``rab^{p,t}`` term directly to attention scores.
 
 **Parameters**
 
@@ -4471,22 +4491,13 @@ Relative position bias for attention.
 
 Output: ``(1, n_heads, seq_len, seq_len)``
 
-**Examples**
-
-```python
->>> rel_pos_bias = RelPosBias(n_heads=8, max_seq_len=256)
->>> bias = rel_pos_bias(256)
->>> bias.shape
-```
-torch.Size([1, 8, 256, 256])
-
 ##### `RelPosBias.forward`
 
 ```python
 forward(self, seq_len)
 ```
 
-Compute relative position bias for a given sequence length.
+Compute legacy relative-position bias.
 
 **Parameters**
 
@@ -4494,24 +4505,54 @@ Compute relative position bias for a given sequence length.
 
 **Returns**
 
-- `Tensor` (`Relative position bias of shape ``(1, n_heads, L, L)``.`)
+- `Tensor` (`Relative-position bias with shape ``(1, n_heads, L, L)``.`)
+
+#### `RelativeBucketedTimeAndPositionBias`
+
+HSTU ``rab^{p,t}``: per-head bias on attention scores from (position-diff,
+time-diff) pairs, following the HSTU paper (Eq. 3) and Meta's reference
+``RelativeBucketedTimeAndPositionBasedBias``.
+
+The bias is added to ``Q K^T`` **before** the ``SiLU/N`` activation.
+
+**Parameters**
+
+- `n_heads` (`int`): Number of attention heads (per-head bias).
+- `max_seq_len` (`int`): Maximum sequence length. Sizes the position table to
+  ``2 * max_seq_len - 1`` slots.
+- `num_time_buckets` (`int, default=128`): Number of time-difference buckets; an extra OOB slot is appended so the
+  bucket index range is ``[0, num_time_buckets]`` inclusive.
+- `time_bucket_fn` (`{'sqrt', 'log'}, default='sqrt'`): Bucketization function applied to ``|dt|`` in minutes.
+- `time_bucket_divisor` (`float, default=1.0`): Divisor applied after ``sqrt``/``log`` so the bucket index range
+  actually utilizes ``[0, num_time_buckets]``.
+
+##### `RelativeBucketedTimeAndPositionBias.forward`
+
+```python
+forward(self, time_diffs = None, seq_len = None)
+```
+
+Return relative bias for adding to attention scores.
+
+``time_diffs`` follows the preprocessing convention where each entry is
+``anchor - timestamp[i]`` (or 0 at PAD). The pairwise difference
+``time_diffs[i] - time_diffs[j]`` recovers ``ts[j] - ts[i]``, so the
+anchor cancels.
+
+**Returns**
+
+- `Tensor`: ``(B, H, L, L)`` when ``time_diffs`` is given;
+  ``(1, H, L, L)`` (position-only) when ``time_diffs`` is ``None``.
 
 #### `VocabMask`
 
-Vocabulary mask to block invalid items at inference.
+Vocabulary mask to block invalid items at inference / ranking.
 
 **Parameters**
 
 - `vocab_size` (`int`): Vocabulary size.
-- `invalid_items` (`list, optional`): IDs to mask out.
-
-**Examples**
-
-```python
->>> mask = VocabMask(vocab_size=1000, invalid_items=[0, 1, 2])
->>> logits = torch.randn(32, 1000)
->>> masked_logits = mask.apply_mask(logits)
-```
+- `invalid_items` (`list, optional`): Token ids to mask out. ``[0]`` is the typical choice to drop PAD from
+  next-item recommendations.
 
 ##### `VocabMask.apply_mask`
 
@@ -4519,68 +4560,7 @@ Vocabulary mask to block invalid items at inference.
 apply_mask(self, logits)
 ```
 
-Apply mask to logits.
-
-**Parameters**
-
-- `logits` (`Tensor`): Model logits, shape ``(..., vocab_size)``.
-
-**Returns**
-
-- `Tensor`: Masked logits.
-
-#### `VocabMapper`
-
-Identity mapper between ``item_id`` and ``token_id``.
-
-Useful for sequence generation where items are treated as tokens.
-
-**Parameters**
-
-- `vocab_size` (`int`): Vocabulary size.
-- `pad_id` (`int, default=0`): PAD token id.
-- `unk_id` (`int, default=1`): Unknown token id.
-
-**Examples**
-
-```python
->>> mapper = VocabMapper(vocab_size=1000)
->>> item_ids = np.array([10, 20, 30])
->>> token_ids = mapper.encode(item_ids)
->>> decoded_ids = mapper.decode(token_ids)
-```
-
-##### `VocabMapper.encode`
-
-```python
-encode(self, item_ids)
-```
-
-Convert item_ids to token_ids.
-
-**Parameters**
-
-- `item_ids` (`np.ndarray`): Item ids.
-
-**Returns**
-
-- `np.ndarray`: Token ids.
-
-##### `VocabMapper.decode`
-
-```python
-decode(self, token_ids)
-```
-
-Convert token_ids back to item_ids.
-
-**Parameters**
-
-- `token_ids` (`np.ndarray`): Token ids.
-
-**Returns**
-
-- `np.ndarray`: Item ids.
+Return ``logits`` with invalid item positions pushed to ``-1e9``.
 
 ### `match`
 

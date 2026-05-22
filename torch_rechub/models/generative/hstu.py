@@ -11,19 +11,23 @@ class HSTUModel(nn.Module):
     """HSTU: Hierarchical Sequential Transduction Units.
 
     Autoregressive generative recommender that stacks ``HSTUBlock`` layers to
-    capture long-range dependencies and predict the next item. Aligned with the
-    Meta reference implementation
-    (`meta-recsys/generative-recommenders`):
+    capture long-range dependencies and predict the next item. The layer
+    internals follow the HSTU paper (Eq. 2-4) and Meta's reference
+    implementation (`meta-recsys/generative-recommenders`):
 
-    - Absolute learnable position embedding + optional learnable time-bucket
-      embedding; **no** relative position bias on attention scores.
-    - HSTU layers use ``alpha = 1/sqrt(dqk)`` attention scaling and
-      ``silu(scores) / max_seq_len`` activation; no L2 norm, no FFN.
-    - Time-difference bucketization mirrors the reference
-      ``add_timestamp_positional_embeddings``: seconds-to-minutes →
-      ``sqrt``/``log`` → divide by ``time_bucket_divisor``.
-    - Output projection is **tied** with the token embedding by default,
-      matching common practice in generative recommenders.
+    - Token embedding + absolute position embedding + (optional) time-bucket
+      embedding on the input side.
+    - Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
+      projection **before** splitting (Eq. 2), so all four streams go through
+      the non-linearity.
+    - Attention uses ``alpha = 1/sqrt(dqk)`` scaling and adds a per-head
+      bucketed (position-diff, time-diff) bias ``rab^{p,t}`` to scores
+      **before** the ``silu(scores) / max_seq_len`` activation (Eq. 3).
+    - Gated output ``LayerNorm(A V) * U`` projected by a single linear
+      ``f_2`` (Eq. 4); no concat-u/x bypass and no separate FFN.
+    - External residual ``x + Layer(x)`` is applied around each layer in
+      :class:`HSTUBlock`.
+    - Output projection is **tied** with the token embedding by default.
 
     Parameters
     ----------
@@ -49,11 +53,13 @@ class HSTUModel(nn.Module):
     num_time_buckets : int, default=128
         Number of time buckets.
     time_bucket_fn : {'sqrt', 'log'}, default='sqrt'
-        Bucketization function for time differences (in minutes).
+        Bucketization function for time differences (in minutes). Shared by
+        the input-side time embedding and the per-layer ``rab^{p,t}``.
     time_bucket_divisor : float, default=1.0
         Divisor applied after ``sqrt``/``log`` so the bucket index range
         actually utilizes ``[0, num_time_buckets - 1]``. Tune to your dataset's
-        time-difference distribution.
+        time-difference distribution. Shared by the input-side time embedding
+        and the per-layer ``rab^{p,t}``.
     tie_embeddings : bool, default=True
         Tie the output projection weight to the token embedding weight.
 
@@ -94,7 +100,7 @@ class HSTUModel(nn.Module):
             # Bucket 0 is the smallest legal time-diff bucket, not PAD.
             self.time_embedding = nn.Embedding(num_time_buckets, d_model)
 
-        self.hstu_block = HSTUBlock(d_model=d_model, n_heads=n_heads, n_layers=n_layers, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len)
+        self.hstu_block = HSTUBlock(d_model=d_model, n_heads=n_heads, n_layers=n_layers, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor)
 
         if tie_embeddings:
             # Reuse ``token_embedding.weight``; only the bias is a separate param.
@@ -183,7 +189,7 @@ class HSTUModel(nn.Module):
 
         embeddings = self.dropout(embeddings)
 
-        hstu_output = self.hstu_block(embeddings, padding_mask=padding_mask)
+        hstu_output = self.hstu_block(embeddings, padding_mask=padding_mask, time_diffs=time_diffs)
         hstu_output = hstu_output * padding_mask.unsqueeze(-1).to(hstu_output.dtype)
 
         if self.tie_embeddings:

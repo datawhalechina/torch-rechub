@@ -11,58 +11,57 @@ Generative recommendation models are an emerging approach that leverages generat
 
 ### Description
 
-HSTU (Hierarchical Sequence Transformer Unit) is a hierarchical sequence transformation unit designed for large-scale sequence recommendation, capable of supporting trillion-parameter recommendation systems.
+HSTU (Hierarchical Sequential Transduction Units) is an autoregressive sequence recommender for next-item prediction. In Torch-RecHub, `HSTUModel` consumes padded item-token sequences plus optional per-position time-difference features and returns logits over the item vocabulary at every sequence position.
 
 ### Core Principles
 
-- **Hierarchical Structure**: Uses hierarchical design to decompose long sequences into multiple sub-sequences, improving model parallelism and scalability
-- **Transformer Architecture**: Based on Transformer architecture, capable of capturing long-range dependencies
-- **Large-scale Pretraining**: Supports large-scale pretraining, learning universal representations from massive data
-- **Efficient Inference**: Optimized inference process, supporting real-time recommendations
+- **Eq. 2 UVQK projection**: applies one `SiLU` to the joint `UVQK` projection before splitting, so `U`, `V`, `Q`, and `K` all pass through the same non-linearity.
+- **Eq. 3 attention bias**: adds per-head bucketed relative position/time bias `rab^{p,t}` to attention scores before `silu(scores) / max_seq_len`.
+- **Eq. 4 gated output**: projects `LayerNorm(A V) * U` through one output linear layer, without concat-u/x bypasses or a separate FFN.
+- **External residuals**: each layer is wrapped as `x = x + HSTULayer(x)` in `HSTUBlock`.
+- **Generative training**: predicts the next token in the sequence and masks PAD token `0` in the loss.
 
 ### Usage
 
 ```python
+import torch
+
 from torch_rechub.models.generative import HSTUModel
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
 
-# Define features
-user_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SequenceFeature(name="user_history", vocab_size=100000, embed_dim=32, pooling="mean")
-]
-
-item_features = [
-    SparseFeature(name="item_id", vocab_size=100000, embed_dim=32),
-    SparseFeature(name="category", vocab_size=1000, embed_dim=16)
-]
-
-# Create model
 model = HSTUModel(
-    user_features=user_features,
-    item_features=item_features,
-    transformer_params={
-        "num_layers": 2,
-        "num_heads": 4,
-        "hidden_size": 128,
-        "intermediate_size": 256,
-        "dropout": 0.2
-    },
-    hierarchical_params={
-        "level1_window_size": 10,
-        "level2_window_size": 5
-    }
+    vocab_size=100000,
+    d_model=128,
+    n_heads=4,
+    n_layers=2,
+    dqk=32,
+    dv=32,
+    max_seq_len=200,
+    num_time_buckets=128,
 )
+
+seq_tokens = torch.randint(1, 100000, (32, 200))
+time_diffs = torch.zeros_like(seq_tokens)  # seconds from query time
+logits = model(seq_tokens, time_diffs)
+print(logits.shape)  # torch.Size([32, 200, 100000])
 ```
 
 ### Parameters
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| user_features | list | User feature list | None |
-| item_features | list | Item feature list | None |
-| transformer_params | dict | Transformer parameters | None |
-| hierarchical_params | dict | Hierarchical structure parameters | None |
+| vocab_size | int | Item vocabulary size, with PAD reserved as token `0` | required |
+| d_model | int | Hidden dimension | 512 |
+| n_heads | int | Number of attention heads | 8 |
+| n_layers | int | Number of stacked HSTU layers | 4 |
+| dqk | int | Query/key dimension per head | 64 |
+| dv | int | Value/U dimension per head | 64 |
+| max_seq_len | int | Maximum supported sequence length | 256 |
+| dropout | float | Dropout rate | 0.1 |
+| use_time_embedding | bool | Add input-side time-bucket embedding; `time_diffs` is still used by `rab^{p,t}` | True |
+| num_time_buckets | int | Number of time buckets for embeddings and attention bias | 128 |
+| time_bucket_fn | {"sqrt", "log"} | Time bucketization function | "sqrt" |
+| time_bucket_divisor | float | Divisor applied after bucketization | 1.0 |
+| tie_embeddings | bool | Tie output projection to token embedding weights | True |
 
 ### Use Cases
 
@@ -156,76 +155,70 @@ model = HLLMModel(
 ## 5. Complete Training Example
 
 ```python
+import pickle
+import torch
+
 from torch_rechub.models.generative import HSTUModel
-from torch_rechub.trainers import GenRecTrainer
-from torch_rechub.utils.data import DataGenerator
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
+from torch_rechub.trainers import SeqTrainer
+from torch_rechub.utils.data import SequenceDataGenerator
 
-# 1. Define features
-user_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SequenceFeature(name="user_history", vocab_size=100000, embed_dim=32, pooling="mean")
-]
+with open("examples/generative/data/ml-1m/processed/train_data.pkl", "rb") as f:
+    train_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/val_data.pkl", "rb") as f:
+    val_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/test_data.pkl", "rb") as f:
+    test_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/vocab.pkl", "rb") as f:
+    vocab = pickle.load(f)
 
-item_features = [
-    SparseFeature(name="item_id", vocab_size=100000, embed_dim=32),
-    SparseFeature(name="category", vocab_size=1000, embed_dim=16)
-]
+train_gen = SequenceDataGenerator(
+    train_data["seq_tokens"],
+    train_data["seq_positions"],
+    train_data["targets"],
+    train_data["seq_time_diffs"],
+)
+val_gen = SequenceDataGenerator(
+    val_data["seq_tokens"],
+    val_data["seq_positions"],
+    val_data["targets"],
+    val_data["seq_time_diffs"],
+)
+test_gen = SequenceDataGenerator(
+    test_data["seq_tokens"],
+    test_data["seq_positions"],
+    test_data["targets"],
+    test_data["seq_time_diffs"],
+)
 
-# 2. Prepare data
-# Assume x and y are preprocessed feature and label data
-x = {
-    "user_id": user_id_data,
-    "user_history": user_history_data,
-    "item_id": item_id_data,
-    "category": category_data
-}
-y = label_data  # click/no-click labels
+train_dl = train_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
+val_dl = val_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
+test_dl = test_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
 
-# 3. Create data generator
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-# 4. Create model
+vocab_size = len(vocab["item_to_idx"]) if "item_to_idx" in vocab else len(vocab)
 model = HSTUModel(
-    user_features=user_features,
-    item_features=item_features,
-    transformer_params={
-        "num_layers": 2,
-        "num_heads": 4,
-        "hidden_size": 128,
-        "intermediate_size": 256,
-        "dropout": 0.2
-    },
-    hierarchical_params={
-        "level1_window_size": 10,
-        "level2_window_size": 5
-    }
+    vocab_size=vocab_size,
+    d_model=128,
+    n_heads=4,
+    n_layers=2,
+    dqk=32,
+    dv=32,
+    max_seq_len=200,
+    dropout=0.1,
 )
 
-# 5. Create trainer
-trainer = GenRecTrainer(
-    model=model,
+trainer = SeqTrainer(
+    model,
+    optimizer_fn=torch.optim.Adam,
     optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
-    n_epoch=50,
+    n_epoch=10,
     earlystop_patience=10,
-    device="cuda:0",
-    model_path="saved/hstu"
+    device="cuda" if torch.cuda.is_available() else "cpu",
+    model_path="saved/hstu",
 )
 
-# 6. Train model
 trainer.fit(train_dl, val_dl)
-
-# 7. Evaluate model
-auc = trainer.evaluate(trainer.model, test_dl)
-print(f"Test AUC: {auc}")
-
-# 8. Export model
-trainer.export_onnx("hstu.onnx")
-
-# 9. Model prediction
-preds = trainer.predict(trainer.model, test_dl)
-print(f"Predictions shape: {preds.shape}")
+test_loss, top1_acc = trainer.evaluate(test_dl)
+print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
 ## 6. FAQ

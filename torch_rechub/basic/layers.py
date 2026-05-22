@@ -790,19 +790,20 @@ class CEN(nn.Module):
 
 
 class HSTULayer(nn.Module):
-    """Single HSTU "sequential transduction unit" layer.
+    """Single HSTU "sequential transduction unit" layer (paper-faithful).
 
-    Aligned with the Meta reference implementation
-    (`meta-recsys/generative-recommenders`):
+    Implements HSTU Eq. 2-4 from *Actions Speak Louder than Words*:
 
-    1. ``LayerNorm(x)`` then a single UVQK projection producing ``(u, v, q, k)``.
-    2. Scaled dot-product attention with ``attn_alpha = 1/sqrt(dqk)``; no L2
-       normalization on Q/K, no relative-position bias inside the layer.
-    3. ``SiLU`` on the scores then divide by ``max_seq_len`` to keep output
-       magnitudes invariant to ``L``.
-    4. HSTU gate: ``LayerNorm(attn_output) * SiLU(u)``.
-    5. Concat ``[u, x, gated]`` (the ``concat_u=True, concat_x=True`` path) and
-       project back to ``d_model`` — no separate FFN.
+    - Eq. 2 — ``U, V, Q, K = Split(SiLU(f_1(LayerNorm(x))))``: a **single**
+      ``SiLU`` is applied to the joint projection **before** the split, so all
+      four of ``U, V, Q, K`` go through the non-linearity.
+    - Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T * alpha + rab^{p,t}) / N) V(x)``: the
+      learnable bucketed (position-diff, time-diff) bias ``rab^{p,t}`` is added
+      to scores **before** the ``SiLU/N`` activation.
+    - Eq. 4 — ``Y(x) = f_2(LayerNorm(A V) * U)``: a single linear ``f_2`` is
+      applied to the gated attention output.
+
+    The external residual ``x + Layer(x)`` is added by :class:`HSTUBlock`.
 
     Args:
         d_model: Hidden dimension. Must be divisible by ``n_heads``.
@@ -811,19 +812,29 @@ class HSTULayer(nn.Module):
         dv: Value/u dim per head.
         dropout: Dropout applied to the gated attention output before the
             final projection.
-        max_seq_len: Used for the ``silu(scores) / max_seq_len`` scaling.
+        max_seq_len: Used for the ``silu(scores) / max_seq_len`` scaling and
+            for sizing the relative-position table inside ``rab``.
+        num_time_buckets: Number of time-difference buckets in ``rab``.
+        time_bucket_fn: ``'sqrt'`` or ``'log'`` bucketization in ``rab``.
+        time_bucket_divisor: Bucket-range divisor in ``rab``.
 
     Shape:
         - ``x``: ``(batch_size, seq_len, d_model)``.
         - ``padding_mask``: ``(batch_size, seq_len)`` bool, ``True`` for valid
           tokens. Optional; when provided, padded key positions are masked.
+        - ``time_diffs``: ``(batch_size, seq_len)`` seconds delta from a single
+          anchor. Optional; when ``None``, ``rab`` falls back to position-only
+          bias.
         - Output: ``(batch_size, seq_len, d_model)``.
     """
 
-    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, max_seq_len=200):
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0):
         super().__init__()
         if d_model % n_heads != 0:
             raise ValueError(f"d_model ({d_model}) must be divisible by n_heads ({n_heads}).")
+
+        # Import here to avoid a circular import (utils → basic).
+        from ..utils.hstu_utils import RelativeBucketedTimeAndPositionBias
 
         self.d_model = d_model
         self.n_heads = n_heads
@@ -835,27 +846,43 @@ class HSTULayer(nn.Module):
         self.norm_in = nn.LayerNorm(d_model)
         self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv)
 
-        self.norm_attn = nn.LayerNorm(n_heads * dv)
+        self.rab = RelativeBucketedTimeAndPositionBias(n_heads=n_heads, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor)
 
-        # concat_u + concat_x style output projection: [u, x, gated] -> d_model
-        self.proj2 = nn.Linear(2 * n_heads * dv + d_model, d_model)
+        self.norm_attn = nn.LayerNorm(n_heads * dv)
+        self.proj2 = nn.Linear(n_heads * dv, d_model)
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, padding_mask=None):
+    def forward(self, x, padding_mask=None, time_diffs=None):
+        """Forward pass of one HSTU Eq. 2-4 layer.
+
+        Args:
+            x (Tensor): Hidden states, shape ``(batch_size, seq_len, d_model)``.
+            padding_mask (Tensor, optional): Boolean mask with shape
+                ``(batch_size, seq_len)``; ``True`` marks valid tokens.
+            time_diffs (Tensor, optional): Per-position seconds delta from a
+                single anchor, shape ``(batch_size, seq_len)``. Used by
+                ``rab^{p,t}``; when omitted, attention receives position-only
+                relative bias.
+
+        Returns:
+            Tensor: Layer output before the external residual, shape ``(batch_size, seq_len, d_model)``.
+        """
         batch_size, seq_len, _ = x.shape
         H = self.n_heads
 
-        residual = x  # raw input for the concat_x path
         x_normed = self.norm_in(x)
 
-        proj_out = self.proj1(x_normed)
+        # Eq. 2: SiLU on the whole UVQK projection BEFORE split.
+        proj_out = F.silu(self.proj1(x_normed))
         q = proj_out[..., :H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
         k = proj_out[..., H * self.dqk:2 * H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
         u = proj_out[..., 2 * H * self.dqk:2 * H * self.dqk + H * self.dv].reshape(batch_size, seq_len, H, self.dv)
         v = proj_out[..., 2 * H * self.dqk + H * self.dv:].reshape(batch_size, seq_len, H, self.dv).transpose(1, 2)
 
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.attn_alpha  # (B, H, L, L)
+        # Eq. 3: rab^{p,t} is added to scores BEFORE the SiLU/N activation.
+        scores = scores + self.rab(time_diffs=time_diffs, seq_len=seq_len)
 
         causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
         valid_mask = causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, L, L)
@@ -873,32 +900,48 @@ class HSTULayer(nn.Module):
         attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_len, H * self.dv)
         u_flat = u.reshape(batch_size, seq_len, H * self.dv)
 
-        gated = self.norm_attn(attn_output) * F.silu(u_flat)
+        # Eq. 4: U is already SiLU'd via the joint pre-split SiLU above; no
+        # second activation on the U side of the gate.
+        gated = self.norm_attn(attn_output) * u_flat
         gated = self.dropout(gated)
-
-        combined = torch.cat([u_flat, residual, gated], dim=-1)  # (B, L, 2*H*dv + d_model)
-        return self.proj2(combined)
+        return self.proj2(gated)
 
 
 class HSTUBlock(nn.Module):
-    """Stack of :class:`HSTULayer` modules.
+    """Stack of :class:`HSTULayer` modules with **external residual** wiring.
+
+    Each layer is wrapped as ``x = x + Layer(x)``, matching the HSTU paper /
+    Meta reference. ``num_time_buckets`` / ``time_bucket_fn`` /
+    ``time_bucket_divisor`` are forwarded to every layer's ``rab`` module.
 
     Shape:
         - Input: ``(batch_size, seq_len, d_model)``
         - Output: ``(batch_size, seq_len, d_model)``
     """
 
-    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, max_seq_len=200):
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
         self.n_layers = n_layers
 
-        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len) for _ in range(n_layers)])
+        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor) for _ in range(n_layers)])
 
-    def forward(self, x, padding_mask=None):
+    def forward(self, x, padding_mask=None, time_diffs=None):
+        """Apply stacked HSTU layers with external residuals.
+
+        Args:
+            x (Tensor): Hidden states, shape ``(batch_size, seq_len, d_model)``.
+            padding_mask (Tensor, optional): Boolean mask with shape
+                ``(batch_size, seq_len)``; ``True`` marks valid tokens.
+            time_diffs (Tensor, optional): Per-position seconds delta from a
+                single anchor, shape ``(batch_size, seq_len)``.
+
+        Returns:
+            Tensor: Output hidden states, shape ``(batch_size, seq_len, d_model)``.
+        """
         for layer in self.layers:
-            x = layer(x, padding_mask=padding_mask)
+            x = x + layer(x, padding_mask=padding_mask, time_diffs=time_diffs)
         return x
 
 
