@@ -166,6 +166,26 @@ class SeqTrainer(object):
             return list(self.model_logger)
         return [self.model_logger]
 
+    def _compute_next_token_loss(self, logits, seq_tokens, targets):
+        """Cross-entropy over the whole sequence (autoregressive next-token).
+
+        ``logits[:, i, :]`` predicts ``next_tokens[:, i]`` where
+        ``next_tokens = concat(seq_tokens[:, 1:], targets.unsqueeze(-1))``,
+        i.e. for positions ``0..L-2`` the next token comes from within the
+        sequence, and for the last position it is the held-out target. PAD
+        positions are ignored based on the *current* token. This matters for
+        left-padded sequences: the last PAD slot may have the first real item as
+        its shifted label, but the model should not learn a PAD -> item
+        transition.
+        """
+        vocab_size = logits.size(-1)
+        next_tokens = torch.cat([seq_tokens[:, 1:], targets.unsqueeze(-1)], dim=1)
+        next_tokens = next_tokens.masked_fill(seq_tokens.eq(0), 0)
+        if vocab_size > 0:
+            logits = logits.clone()
+            logits[..., 0] = -1e9
+        return self.loss_fn(logits.reshape(-1, vocab_size), next_tokens.reshape(-1))
+
     def train_one_epoch(self, data_loader, log_interval=10):
         """Train the model for a single epoch.
 
@@ -181,24 +201,18 @@ class SeqTrainer(object):
         epoch_loss = 0
         batch_count = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
-        for i, (seq_tokens, seq_positions, seq_time_diffs, targets) in enumerate(tk0):
-            # Move tensors to the target device
+        for i, (seq_tokens, _seq_positions, seq_time_diffs, targets) in enumerate(tk0):
+            # Move tensors to the target device. ``seq_positions`` is unused by
+            # ``HSTUModel`` (which derives positions internally); keep the
+            # dataloader API stable but drop it here.
             seq_tokens = seq_tokens.to(self.device)
-            seq_positions = seq_positions.to(self.device)
             seq_time_diffs = seq_time_diffs.to(self.device)
             targets = targets.to(self.device).squeeze(-1)
 
-            # Forward pass
             logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-            # Compute loss
-            # For next-item prediction we only use the last position in the sequence
-            # logits[:, -1, :] selects the prediction at the last step for each sequence
-            last_logits = logits[:, -1, :]  # (B, V)
+            loss = self._compute_next_token_loss(logits, seq_tokens, targets)
 
-            loss = self.loss_fn(last_logits, targets)
-
-            # 反向传播
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -210,14 +224,14 @@ class SeqTrainer(object):
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
-        # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
     def evaluate(self, data_loader):
         """Evaluate the model on a validation/test data loader.
 
-        Args:
-            data_loader (DataLoader): Validation or test data loader.
+        Loss is the full-sequence next-token CE (matching training);
+        accuracy is top-1 hit on the held-out next item only (useful as a
+        ranking-style proxy metric).
 
         Returns:
             tuple: ``(avg_loss, top1_accuracy)``.
@@ -228,31 +242,26 @@ class SeqTrainer(object):
         total_samples = 0
 
         with torch.no_grad():
-            for seq_tokens, seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
-                # Move tensors to the target device
+            for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
                 seq_tokens = seq_tokens.to(self.device)
-                seq_positions = seq_positions.to(self.device)
                 seq_time_diffs = seq_time_diffs.to(self.device)
                 targets = targets.to(self.device).squeeze(-1)
 
-                # Forward pass
                 logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
 
-                # Compute loss using only the last position (next-item prediction)
-                last_logits = logits[:, -1, :]  # (B, V)
-
-                loss = self.loss_fn(last_logits, targets)
+                loss = self._compute_next_token_loss(logits, seq_tokens, targets)
                 total_loss += loss.item()
 
-                # Compute top-1 accuracy
-                predictions = torch.argmax(last_logits, dim=-1)  # (B,)
-                correct = (predictions == targets).sum().item()
-                total_correct += correct
+                # Top-1 hit on the held-out next item.
+                last_logits = logits[:, -1, :].clone()
+                if last_logits.size(-1) > 0:
+                    last_logits[:, 0] = -1e9
+                predictions = torch.argmax(last_logits, dim=-1)
+                total_correct += (predictions == targets).sum().item()
                 total_samples += targets.numel()
 
         avg_loss = total_loss / len(data_loader)
-        accuracy = total_correct / total_samples
-
+        accuracy = total_correct / total_samples if total_samples > 0 else 0.0
         return avg_loss, accuracy
 
     def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False, onnx_export_kwargs=None):

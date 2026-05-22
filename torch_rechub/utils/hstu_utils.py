@@ -1,12 +1,18 @@
-"""Utility classes and functions for the HSTU model."""
+"""Utility classes for HSTU / HLLM."""
 
-import numpy as np
+import math
+
 import torch
 import torch.nn as nn
 
 
 class RelPosBias(nn.Module):
-    """Relative position bias for attention.
+    """Legacy relative-position bias for attention.
+
+    Used by ``HLLMTransformerBlock`` and kept for backward-compatible
+    experiments. ``HSTUModel`` uses
+    :class:`RelativeBucketedTimeAndPositionBias` instead, because HSTU Eq. 3
+    adds a per-head bucketed ``rab^{p,t}`` term directly to attention scores.
 
     Parameters
     ----------
@@ -20,13 +26,6 @@ class RelPosBias(nn.Module):
     Shape
     -----
     Output: ``(1, n_heads, seq_len, seq_len)``
-
-    Examples
-    --------
-    >>> rel_pos_bias = RelPosBias(n_heads=8, max_seq_len=256)
-    >>> bias = rel_pos_bias(256)
-    >>> bias.shape
-    torch.Size([1, 8, 256, 256])
     """
 
     def __init__(self, n_heads, max_seq_len, num_buckets=32):
@@ -35,175 +34,189 @@ class RelPosBias(nn.Module):
         self.max_seq_len = max_seq_len
         self.num_buckets = num_buckets
 
-        # 相对位置偏置表: (num_buckets, n_heads)
-        self.rel_pos_bias_table = nn.Parameter(torch.randn(num_buckets, n_heads))
+        # Uniform init bounded by sqrt(1/num_buckets); avoids the large
+        # additive bias on attention scores that `torch.randn` produces.
+        bound = math.sqrt(1.0 / num_buckets)
+        self.rel_pos_bias_table = nn.Parameter(torch.empty(num_buckets, n_heads).uniform_(-bound, bound))
 
     def _relative_position_bucket(self, relative_position):
-        """Map relative positions to bucket indices.
-
-        Args:
-            relative_position (Tensor): Relative position tensor ``(L, L)``.
-
-        Returns:
-            Tensor: Integer bucket indices with the same ``(L, L)`` shape.
-        """
+        """Map relative positions to bucket indices in ``[0, num_buckets-1]``."""
         num_buckets = self.num_buckets
         max_distance = self.max_seq_len
 
-        # Use absolute distance and linearly map it to bucket indices
-        relative_position = torch.abs(relative_position)
+        # Clamp to max_distance BEFORE bucketization so out-of-range positions
+        # do not silently overflow into the last bucket via post-hoc clamp.
+        relative_position = torch.abs(relative_position).clamp(max=max_distance)
 
-        bucket = torch.clamp(
-            relative_position * (num_buckets - 1) // max_distance,
-            0,
-            num_buckets - 1,
-        )
-
+        bucket = relative_position * (num_buckets - 1) // max_distance
         return bucket.long()
 
     def forward(self, seq_len):
-        """Compute relative position bias for a given sequence length.
+        """Compute legacy relative-position bias.
 
         Args:
             seq_len (int): Sequence length ``L``.
 
         Returns:
-            Tensor: Relative position bias of shape ``(1, n_heads, L, L)``.
+            Tensor: Relative-position bias with shape ``(1, n_heads, L, L)``.
         """
-        # 创建位置索引
         positions = torch.arange(seq_len, dtype=torch.long, device=self.rel_pos_bias_table.device)
-
-        # 计算相对位置: (seq_len, seq_len)
         relative_positions = positions.unsqueeze(0) - positions.unsqueeze(1)
-
-        # 映射到bucket
         buckets = self._relative_position_bucket(relative_positions)
-
-        # 查表获取偏置: (seq_len, seq_len, n_heads)
-        bias = self.rel_pos_bias_table[buckets]
-
-        # 转置为 (1, n_heads, seq_len, seq_len)
-        bias = bias.permute(2, 0, 1).unsqueeze(0)
-
+        bias = self.rel_pos_bias_table[buckets]  # (L, L, n_heads)
+        bias = bias.permute(2, 0, 1).unsqueeze(0)  # (1, n_heads, L, L)
         return bias
 
 
+class RelativeBucketedTimeAndPositionBias(nn.Module):
+    """HSTU ``rab^{p,t}``: per-head bias on attention scores from (position-diff,
+    time-diff) pairs, following the HSTU paper (Eq. 3) and Meta's reference
+    ``RelativeBucketedTimeAndPositionBasedBias``.
+
+    The bias is added to ``Q K^T`` **before** the ``SiLU/N`` activation.
+
+    Parameters
+    ----------
+    n_heads : int
+        Number of attention heads (per-head bias).
+    max_seq_len : int
+        Maximum sequence length. Sizes the position table to
+        ``2 * max_seq_len - 1`` slots.
+    num_time_buckets : int, default=128
+        Number of time-difference buckets; an extra OOB slot is appended so the
+        bucket index range is ``[0, num_time_buckets]`` inclusive.
+    time_bucket_fn : {'sqrt', 'log'}, default='sqrt'
+        Bucketization function applied to ``|dt|`` in minutes.
+    time_bucket_divisor : float, default=1.0
+        Divisor applied after ``sqrt``/``log`` so the bucket index range
+        actually utilizes ``[0, num_time_buckets]``.
+    time_bucket_unit : {'minutes', 'seconds'}, default='minutes'
+        Unit used before bucketization. ``'seconds'`` matches Meta's public
+        HSTU code path for MovieLens timestamps; ``'minutes'`` preserves the
+        earlier Torch-Rechub behavior.
+    """
+
+    def __init__(self, n_heads, max_seq_len, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0, time_bucket_unit='minutes'):
+        super().__init__()
+        if time_bucket_fn not in ('sqrt', 'log'):
+            raise ValueError(f"Unsupported time_bucket_fn: {time_bucket_fn}")
+        if time_bucket_unit not in ('minutes', 'seconds'):
+            raise ValueError(f"Unsupported time_bucket_unit: {time_bucket_unit}")
+        self.n_heads = n_heads
+        self.max_seq_len = max_seq_len
+        self.num_time_buckets = num_time_buckets
+        self.time_bucket_fn = time_bucket_fn
+        self.time_bucket_divisor = time_bucket_divisor
+        self.time_bucket_unit = time_bucket_unit
+
+        bound_pos = math.sqrt(1.0 / (2 * max_seq_len - 1))
+        self.pos_w = nn.Parameter(torch.empty(2 * max_seq_len - 1, n_heads).uniform_(-bound_pos, bound_pos))
+        bound_ts = math.sqrt(1.0 / (num_time_buckets + 1))
+        self.ts_w = nn.Parameter(torch.empty(num_time_buckets + 1, n_heads).uniform_(-bound_ts, bound_ts))
+
+    def _bucketize_time(self, dt):
+        """Map signed seconds deltas to bucket indices in ``[0, num_time_buckets]``."""
+        dt = dt.float().abs()
+        if self.time_bucket_unit == 'minutes':
+            dt = dt / 60.0
+        dt = torch.clamp(dt, min=1e-6)
+        if self.time_bucket_fn == 'sqrt':
+            buckets = torch.sqrt(dt)
+        else:
+            buckets = torch.log(dt)
+        return (buckets / self.time_bucket_divisor).clamp(min=0, max=self.num_time_buckets).long()
+
+    def forward(self, time_diffs=None, seq_len=None):
+        """Return relative bias for adding to attention scores.
+
+        ``time_diffs`` follows the preprocessing convention where each entry is
+        ``anchor - timestamp[i]`` (or 0 at PAD). The pairwise difference
+        ``time_diffs[i] - time_diffs[j]`` recovers ``ts[j] - ts[i]``, so the
+        anchor cancels.
+
+        Returns
+        -------
+        Tensor
+            ``(B, H, L, L)`` when ``time_diffs`` is given;
+            ``(1, H, L, L)`` (position-only) when ``time_diffs`` is ``None``.
+        """
+        if time_diffs is None:
+            if seq_len is None:
+                raise ValueError("Provide either `time_diffs` or `seq_len`.")
+            L = seq_len
+            device = self.pos_w.device
+        else:
+            _, L = time_diffs.shape
+            device = time_diffs.device
+
+        if L > self.max_seq_len:
+            raise ValueError(f"seq_len ({L}) exceeds max_seq_len ({self.max_seq_len}).")
+
+        positions = torch.arange(L, device=device)
+        # rel = i - j in [-(L-1), L-1]; offset into pos_w's [0, 2*max_seq_len-2] range.
+        rel_pos_idx = positions.unsqueeze(0) - positions.unsqueeze(1) + (self.max_seq_len - 1)
+        pos_bias = self.pos_w[rel_pos_idx].permute(2, 0, 1)  # (H, L, L)
+
+        if time_diffs is None:
+            return pos_bias.unsqueeze(0)  # (1, H, L, L)
+
+        dt_pairwise = time_diffs.unsqueeze(2) - time_diffs.unsqueeze(1)  # (B, L, L)
+        time_bias = self.ts_w[self._bucketize_time(dt_pairwise)]  # (B, L, L, H)
+        time_bias = time_bias.permute(0, 3, 1, 2)  # (B, H, L, L)
+        return pos_bias.unsqueeze(0) + time_bias  # (B, H, L, L)
+
+
 class VocabMask(nn.Module):
-    """Vocabulary mask to block invalid items at inference.
+    """Vocabulary mask to block invalid items at inference / ranking.
 
     Parameters
     ----------
     vocab_size : int
         Vocabulary size.
     invalid_items : list, optional
-        IDs to mask out.
-
-    Examples
-    --------
-    >>> mask = VocabMask(vocab_size=1000, invalid_items=[0, 1, 2])
-    >>> logits = torch.randn(32, 1000)
-    >>> masked_logits = mask.apply_mask(logits)
+        Token ids to mask out. ``[0]`` is the typical choice to drop PAD from
+        next-item recommendations.
     """
 
     def __init__(self, vocab_size, invalid_items=None):
         super().__init__()
         self.vocab_size = vocab_size
 
-        # Create a boolean mask over the vocabulary
         self.register_buffer(
             'mask',
             torch.ones(vocab_size,
                        dtype=torch.bool),
         )
 
-        # Mark invalid items
         if invalid_items is not None:
             for item_id in invalid_items:
                 if 0 <= item_id < vocab_size:
                     self.mask[item_id] = False
 
-    def apply_mask(self, logits):
-        """Apply mask to logits.
+    def apply_mask(self, logits, invalid_ids=None):
+        """Return ``logits`` with invalid item positions pushed to ``-1e9``.
 
-        Parameters
-        ----------
-        logits : Tensor
-            Model logits, shape ``(..., vocab_size)``.
-
-        Returns
-        -------
-        Tensor
-            Masked logits.
+        Args:
+            logits (Tensor): Score tensor with item vocabulary on the last
+                dimension. Ranking code typically passes ``(B, V)``.
+            invalid_ids (Tensor, optional): Per-row item ids to suppress, e.g.
+                a batch of users' historical item ids with shape ``(B, L)``.
+                A 1-D tensor is broadcast to every row.
         """
-        # 将无效item的logits设置为极小值
         masked_logits = logits.clone()
         masked_logits[..., ~self.mask] = -1e9
+        if invalid_ids is None:
+            return masked_logits
 
+        invalid_ids = invalid_ids.to(device=masked_logits.device, dtype=torch.long)
+        if invalid_ids.dim() == 1:
+            invalid_ids = invalid_ids.unsqueeze(0).expand(masked_logits.size(0), -1)
+        if masked_logits.dim() != 2 or invalid_ids.dim() != 2:
+            raise ValueError("dynamic invalid_ids masking expects logits (B, V) and invalid_ids (B, N)")
+        if invalid_ids.size(0) != masked_logits.size(0):
+            raise ValueError("invalid_ids batch size must match logits batch size")
+
+        valid = (invalid_ids >= 0) & (invalid_ids < self.vocab_size)
+        safe_ids = invalid_ids.masked_fill(~valid, 0)
+        masked_logits.scatter_(dim=-1, index=safe_ids, value=-1e9)
         return masked_logits
-
-
-class VocabMapper(object):
-    """Identity mapper between ``item_id`` and ``token_id``.
-
-    Useful for sequence generation where items are treated as tokens.
-
-    Parameters
-    ----------
-    vocab_size : int
-        Vocabulary size.
-    pad_id : int, default=0
-        PAD token id.
-    unk_id : int, default=1
-        Unknown token id.
-
-    Examples
-    --------
-    >>> mapper = VocabMapper(vocab_size=1000)
-    >>> item_ids = np.array([10, 20, 30])
-    >>> token_ids = mapper.encode(item_ids)
-    >>> decoded_ids = mapper.decode(token_ids)
-    """
-
-    def __init__(self, vocab_size, pad_id=0, unk_id=1):
-        super().__init__()
-        self.vocab_size = vocab_size
-        self.pad_id = pad_id
-        self.unk_id = unk_id
-
-        # 创建映射表（简单的恒等映射）
-        self.item2token = np.arange(vocab_size)
-        self.token2item = np.arange(vocab_size)
-
-    def encode(self, item_ids):
-        """Convert item_ids to token_ids.
-
-        Parameters
-        ----------
-        item_ids : np.ndarray
-            Item ids.
-
-        Returns
-        -------
-        np.ndarray
-            Token ids.
-        """
-        # 处理超出范围的item_id
-        token_ids = np.where((item_ids >= 0) & (item_ids < self.vocab_size), item_ids, self.unk_id)
-        return token_ids
-
-    def decode(self, token_ids):
-        """Convert token_ids back to item_ids.
-
-        Parameters
-        ----------
-        token_ids : np.ndarray
-            Token ids.
-
-        Returns
-        -------
-        np.ndarray
-            Item ids.
-        """
-        # 处理超出范围的token_id
-        item_ids = np.where((token_ids >= 0) & (token_ids < self.vocab_size), token_ids, self.unk_id)
-        return item_ids

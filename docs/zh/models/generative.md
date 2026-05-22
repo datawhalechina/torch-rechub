@@ -11,58 +11,57 @@ description: Torch-RecHub 生成式推荐模型详细介绍
 
 ### 功能描述
 
-HSTU（Hierarchical Sequence Transformer Unit）是一种层级序列转换单元，专为大规模序列推荐设计，能够支撑万亿参数推荐系统。
+HSTU（Hierarchical Sequential Transduction Units）是面向 next-item prediction 的自回归序列推荐模型。Torch-RecHub 中的 `HSTUModel` 接收 padding 后的 item token 序列，以及可选的逐位置时间差特征，并在每个序列位置输出 item 词表上的 logits。
 
 ### 核心原理
 
-- **层级结构**：采用层级设计，将长序列分解为多个子序列，提高模型的并行性和扩展性
-- **Transformer 架构**：基于 Transformer 架构，能够捕获长距离依赖关系
-- **大规模预训练**：支持大规模预训练，能够从海量数据中学习通用表示
-- **高效推理**：优化了推理过程，支持实时推荐
+- **Eq. 2 UVQK 投影**：对联合 `UVQK` 投影先整体做一次 `SiLU`，再 split，因此 `U`、`V`、`Q`、`K` 都经过同一个非线性。
+- **Eq. 3 注意力偏置**：将 per-head 的桶化相对位置/时间偏置 `rab^{p,t}` 加到 attention scores，再做 `silu(scores) / max_seq_len`。
+- **Eq. 4 门控输出**：使用 `LayerNorm(A V) * U` 后接一个输出线性层，不再使用 concat-u/x 旁路，也没有额外 FFN。
+- **外部残差**：`HSTUBlock` 中每层按 `x = x + HSTULayer(x)` 包裹。
+- **生成式训练**：按 next-token 目标训练，并在 loss 中忽略 PAD token `0`。
 
 ### 使用方法
 
 ```python
+import torch
+
 from torch_rechub.models.generative import HSTUModel
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
 
-# 定义特征
-user_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SequenceFeature(name="user_history", vocab_size=100000, embed_dim=32, pooling="mean")
-]
-
-item_features = [
-    SparseFeature(name="item_id", vocab_size=100000, embed_dim=32),
-    SparseFeature(name="category", vocab_size=1000, embed_dim=16)
-]
-
-# 创建模型
 model = HSTUModel(
-    user_features=user_features,
-    item_features=item_features,
-    transformer_params={
-        "num_layers": 2,
-        "num_heads": 4,
-        "hidden_size": 128,
-        "intermediate_size": 256,
-        "dropout": 0.2
-    },
-    hierarchical_params={
-        "level1_window_size": 10,
-        "level2_window_size": 5
-    }
+    vocab_size=100000,
+    d_model=128,
+    n_heads=4,
+    n_layers=2,
+    dqk=32,
+    dv=32,
+    max_seq_len=200,
+    num_time_buckets=128,
 )
+
+seq_tokens = torch.randint(1, 100000, (32, 200))
+time_diffs = torch.zeros_like(seq_tokens)  # 相对查询时间的秒级时间差
+logits = model(seq_tokens, time_diffs)
+print(logits.shape)  # torch.Size([32, 200, 100000])
 ```
 
 ### 参数说明
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| user_features | list | 用户特征列表 | None |
-| item_features | list | 物品特征列表 | None |
-| transformer_params | dict | Transformer 参数 | None |
-| hierarchical_params | dict | 层级结构参数 | None |
+| vocab_size | int | item 词表大小，`0` 保留为 PAD | 必填 |
+| d_model | int | 隐藏维度 | 512 |
+| n_heads | int | 注意力头数 | 8 |
+| n_layers | int | 堆叠 HSTU 层数 | 4 |
+| dqk | int | 每个 head 的 Query/Key 维度 | 64 |
+| dv | int | 每个 head 的 Value/U 维度 | 64 |
+| max_seq_len | int | 最大支持序列长度 | 256 |
+| dropout | float | Dropout 比例 | 0.1 |
+| use_time_embedding | bool | 是否加入输入侧时间桶 embedding；`time_diffs` 仍会用于 `rab^{p,t}` | True |
+| num_time_buckets | int | 时间 embedding 和 attention bias 使用的桶数 | 128 |
+| time_bucket_fn | {"sqrt", "log"} | 时间差桶化函数 | "sqrt" |
+| time_bucket_divisor | float | 桶化后再除以该值，用于调节 bucket 范围 | 1.0 |
+| tie_embeddings | bool | 输出投影是否与 token embedding 共享权重 | True |
 
 ### 适用场景
 
@@ -156,76 +155,70 @@ model = HLLMModel(
 ## 5. 代码示例：完整的生成式推荐模型训练流程
 
 ```python
+import pickle
+import torch
+
 from torch_rechub.models.generative import HSTUModel
-from torch_rechub.trainers import GenRecTrainer
-from torch_rechub.utils.data import DataGenerator
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
+from torch_rechub.trainers import SeqTrainer
+from torch_rechub.utils.data import SequenceDataGenerator
 
-# 1. 定义特征
-user_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SequenceFeature(name="user_history", vocab_size=100000, embed_dim=32, pooling="mean")
-]
+with open("examples/generative/data/ml-1m/processed/train_data.pkl", "rb") as f:
+    train_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/val_data.pkl", "rb") as f:
+    val_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/test_data.pkl", "rb") as f:
+    test_data = pickle.load(f)
+with open("examples/generative/data/ml-1m/processed/vocab.pkl", "rb") as f:
+    vocab = pickle.load(f)
 
-item_features = [
-    SparseFeature(name="item_id", vocab_size=100000, embed_dim=32),
-    SparseFeature(name="category", vocab_size=1000, embed_dim=16)
-]
+train_gen = SequenceDataGenerator(
+    train_data["seq_tokens"],
+    train_data["seq_positions"],
+    train_data["targets"],
+    train_data["seq_time_diffs"],
+)
+val_gen = SequenceDataGenerator(
+    val_data["seq_tokens"],
+    val_data["seq_positions"],
+    val_data["targets"],
+    val_data["seq_time_diffs"],
+)
+test_gen = SequenceDataGenerator(
+    test_data["seq_tokens"],
+    test_data["seq_positions"],
+    test_data["targets"],
+    test_data["seq_time_diffs"],
+)
 
-# 2. 准备数据
-# 假设 x 和 y 是已经处理好的特征和标签数据
-x = {
-    "user_id": user_id_data,
-    "user_history": user_history_data,
-    "item_id": item_id_data,
-    "category": category_data
-}
-y = label_data  # 点击/不点击标签
+train_dl = train_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
+val_dl = val_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
+test_dl = test_gen.generate_dataloader(batch_size=512, num_workers=0)[0]
 
-# 3. 创建数据生成器
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-# 4. 创建模型
+vocab_size = len(vocab["item_to_idx"]) if "item_to_idx" in vocab else len(vocab)
 model = HSTUModel(
-    user_features=user_features,
-    item_features=item_features,
-    transformer_params={
-        "num_layers": 2,
-        "num_heads": 4,
-        "hidden_size": 128,
-        "intermediate_size": 256,
-        "dropout": 0.2
-    },
-    hierarchical_params={
-        "level1_window_size": 10,
-        "level2_window_size": 5
-    }
+    vocab_size=vocab_size,
+    d_model=128,
+    n_heads=4,
+    n_layers=2,
+    dqk=32,
+    dv=32,
+    max_seq_len=200,
+    dropout=0.1,
 )
 
-# 5. 创建训练器
-trainer = GenRecTrainer(
-    model=model,
+trainer = SeqTrainer(
+    model,
+    optimizer_fn=torch.optim.Adam,
     optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
-    n_epoch=50,
+    n_epoch=10,
     earlystop_patience=10,
-    device="cuda:0",
-    model_path="saved/hstu"
+    device="cuda" if torch.cuda.is_available() else "cpu",
+    model_path="saved/hstu",
 )
 
-# 6. 训练模型
 trainer.fit(train_dl, val_dl)
-
-# 7. 评估模型
-auc = trainer.evaluate(trainer.model, test_dl)
-print(f"Test AUC: {auc}")
-
-# 8. 导出模型
-trainer.export_onnx("hstu.onnx")
-
-# 9. 模型预测
-preds = trainer.predict(trainer.model, test_dl)
-print(f"Predictions shape: {preds.shape}")
+test_loss, top1_acc = trainer.evaluate(test_dl)
+print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
 ## 6. 常见问题与解决方案

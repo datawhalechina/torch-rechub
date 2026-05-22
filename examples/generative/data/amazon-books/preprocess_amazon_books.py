@@ -293,58 +293,55 @@ def build_sequences(ratings, max_seq_len=200, min_seq_len=5):
     return sequences, vocab
 
 
-def split_data(sequences, train_ratio=0.8, val_ratio=0.1):
-    """Split sequences into train/val/test sets using leave-one-out strategy."""
-    print(f"\n✂️ Splitting data (train={train_ratio}, val={val_ratio})...")
+def split_data(sequences):
+    """Split sequences into train/val/test sets using **leave-last-out per user**.
+
+    For each user with N interactions (N >= 4):
+    - Test: ``input = items[:N-1]``, ``target = items[N-1]``.
+    - Val:  ``input = items[:N-2]``, ``target = items[N-2]``.
+    - Train: sliding window over prefixes ``items[:i]`` predicting ``items[i]``
+      for ``i in [2, N-3]``, so the val/test targets never appear as a train
+      target.
+
+    Users with fewer than 4 interactions are skipped (no room for at least one
+    train + val + test sample).
+    """
+    print("\n✂️ Splitting data (leave-last-out per user)...")
 
     train_data = {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []}
     val_data = {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []}
     test_data = {'seq_tokens': [], 'seq_positions': [], 'seq_time_diffs': [], 'targets': []}
 
+    def _append(bucket, seq, times, target):
+        bucket['seq_tokens'].append(seq)
+        bucket['seq_positions'].append(list(range(len(seq))))
+        bucket['seq_time_diffs'].append([int(times[-1] - t) for t in times])
+        bucket['targets'].append(target)
+
+    skipped = 0
     for seq in tqdm.tqdm(sequences, desc="Splitting"):
         item_indices = seq['item_indices']
         timestamps = seq['timestamps']
+        N = len(item_indices)
 
-        if len(item_indices) < 3:
+        if N < 4:
+            skipped += 1
             continue
 
-        # Test: last item as target
-        test_target = item_indices[-1]
-        test_seq = item_indices[:-1]
-        test_times = timestamps[:-1]
+        # Train: prefixes ending at items[2..N-3] (excludes val/test targets).
+        for i in range(2, N - 2):
+            _append(train_data, item_indices[:i], timestamps[:i], item_indices[i])
 
-        # Validation: second-to-last item as target
-        val_target = item_indices[-2]
-        val_seq = item_indices[:-2]
-        val_times = timestamps[:-2]
+        # Val: predict items[N-2] from items[:N-2].
+        _append(val_data, item_indices[:N - 2], timestamps[:N - 2], item_indices[N - 2])
 
-        # Train: all preceding items
-        for i in range(2, len(item_indices) - 1):
-            train_target = item_indices[i]
-            train_seq = item_indices[:i]
-            train_times = timestamps[:i]
-
-            train_data['seq_tokens'].append(train_seq)
-            train_data['seq_positions'].append(list(range(len(train_seq))))
-            train_data['seq_time_diffs'].append([int(train_times[-1] - t) for t in train_times])
-            train_data['targets'].append(train_target)
-
-        # Add validation sample
-        if len(val_seq) >= 2:
-            val_data['seq_tokens'].append(val_seq)
-            val_data['seq_positions'].append(list(range(len(val_seq))))
-            val_data['seq_time_diffs'].append([int(val_times[-1] - t) for t in val_times])
-            val_data['targets'].append(val_target)
-
-        # Add test sample
-        test_data['seq_tokens'].append(test_seq)
-        test_data['seq_positions'].append(list(range(len(test_seq))))
-        test_data['seq_time_diffs'].append([int(test_times[-1] - t) for t in test_times])
-        test_data['targets'].append(test_target)
+        # Test: predict items[N-1] from items[:N-1].
+        _append(test_data, item_indices[:N - 1], timestamps[:N - 1], item_indices[N - 1])
 
     print(f"  Train samples: {len(train_data['targets'])}")
     print(f"  Val samples: {len(val_data['targets'])}")
     print(f"  Test samples: {len(test_data['targets'])}")
+    print(f"  Skipped users (<4 items): {skipped}")
 
     return train_data, val_data, test_data
 
