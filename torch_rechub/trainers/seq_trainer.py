@@ -173,10 +173,17 @@ class SeqTrainer(object):
         ``next_tokens = concat(seq_tokens[:, 1:], targets.unsqueeze(-1))``,
         i.e. for positions ``0..L-2`` the next token comes from within the
         sequence, and for the last position it is the held-out target. PAD
-        (``0``) is ignored via ``ignore_index`` on the loss.
+        positions are ignored based on the *current* token. This matters for
+        left-padded sequences: the last PAD slot may have the first real item as
+        its shifted label, but the model should not learn a PAD -> item
+        transition.
         """
         vocab_size = logits.size(-1)
         next_tokens = torch.cat([seq_tokens[:, 1:], targets.unsqueeze(-1)], dim=1)
+        next_tokens = next_tokens.masked_fill(seq_tokens.eq(0), 0)
+        if vocab_size > 0:
+            logits = logits.clone()
+            logits[..., 0] = -1e9
         return self.loss_fn(logits.reshape(-1, vocab_size), next_tokens.reshape(-1))
 
     def train_one_epoch(self, data_loader, log_interval=10):
@@ -246,7 +253,9 @@ class SeqTrainer(object):
                 total_loss += loss.item()
 
                 # Top-1 hit on the held-out next item.
-                last_logits = logits[:, -1, :]
+                last_logits = logits[:, -1, :].clone()
+                if last_logits.size(-1) > 0:
+                    last_logits[:, 0] = -1e9
                 predictions = torch.argmax(last_logits, dim=-1)
                 total_correct += (predictions == targets).sum().item()
                 total_samples += targets.numel()

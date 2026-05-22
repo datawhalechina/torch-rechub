@@ -817,6 +817,8 @@ class HSTULayer(nn.Module):
         num_time_buckets: Number of time-difference buckets in ``rab``.
         time_bucket_fn: ``'sqrt'`` or ``'log'`` bucketization in ``rab``.
         time_bucket_divisor: Bucket-range divisor in ``rab``.
+        time_bucket_unit: ``'minutes'`` or ``'seconds'`` for time-diff
+            bucketization in ``rab``.
 
     Shape:
         - ``x``: ``(batch_size, seq_len, d_model)``.
@@ -828,7 +830,7 @@ class HSTULayer(nn.Module):
         - Output: ``(batch_size, seq_len, d_model)``.
     """
 
-    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0):
+    def __init__(self, d_model=512, n_heads=8, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0, time_bucket_unit='minutes'):
         super().__init__()
         if d_model % n_heads != 0:
             raise ValueError(f"d_model ({d_model}) must be divisible by n_heads ({n_heads}).")
@@ -846,7 +848,14 @@ class HSTULayer(nn.Module):
         self.norm_in = nn.LayerNorm(d_model)
         self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv)
 
-        self.rab = RelativeBucketedTimeAndPositionBias(n_heads=n_heads, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor)
+        self.rab = RelativeBucketedTimeAndPositionBias(
+            n_heads=n_heads,
+            max_seq_len=max_seq_len,
+            num_time_buckets=num_time_buckets,
+            time_bucket_fn=time_bucket_fn,
+            time_bucket_divisor=time_bucket_divisor,
+            time_bucket_unit=time_bucket_unit,
+        )
 
         self.norm_attn = nn.LayerNorm(n_heads * dv)
         self.proj2 = nn.Linear(n_heads * dv, d_model)
@@ -912,20 +921,37 @@ class HSTUBlock(nn.Module):
 
     Each layer is wrapped as ``x = x + Layer(x)``, matching the HSTU paper /
     Meta reference. ``num_time_buckets`` / ``time_bucket_fn`` /
-    ``time_bucket_divisor`` are forwarded to every layer's ``rab`` module.
+    ``time_bucket_divisor`` / ``time_bucket_unit`` are forwarded to every
+    layer's ``rab`` module.
 
     Shape:
         - Input: ``(batch_size, seq_len, d_model)``
         - Output: ``(batch_size, seq_len, d_model)``
     """
 
-    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0):
+    def __init__(self, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, dropout=0.1, max_seq_len=200, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0, time_bucket_unit='minutes'):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
         self.n_layers = n_layers
 
-        self.layers = nn.ModuleList([HSTULayer(d_model=d_model, n_heads=n_heads, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor) for _ in range(n_layers)])
+        self.layers = nn.ModuleList(
+            [
+                HSTULayer(
+                    d_model=d_model,
+                    n_heads=n_heads,
+                    dqk=dqk,
+                    dv=dv,
+                    dropout=dropout,
+                    max_seq_len=max_seq_len,
+                    num_time_buckets=num_time_buckets,
+                    time_bucket_fn=time_bucket_fn,
+                    time_bucket_divisor=time_bucket_divisor,
+                    time_bucket_unit=time_bucket_unit,
+                )
+                for _ in range(n_layers)
+            ]
+        )
 
     def forward(self, x, padding_mask=None, time_diffs=None):
         """Apply stacked HSTU layers with external residuals.

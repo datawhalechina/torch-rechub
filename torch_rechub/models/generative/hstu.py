@@ -60,15 +60,30 @@ class HSTUModel(nn.Module):
         actually utilizes ``[0, num_time_buckets - 1]``. Tune to your dataset's
         time-difference distribution. Shared by the input-side time embedding
         and the per-layer ``rab^{p,t}``.
+    time_bucket_unit : {'minutes', 'seconds'}, default='minutes'
+        Unit used before time bucketization. ``'seconds'`` matches Meta's
+        public HSTU MovieLens configs; ``'minutes'`` preserves the earlier
+        Torch-Rechub behavior.
     tie_embeddings : bool, default=True
         Tie the output projection weight to the token embedding weight.
+    score_norm : {'none', 'l2'}, default='none'
+        Optional normalization before item scoring. ``'l2'`` matches the
+        public HSTU configs' normalized dot-product retrieval setting.
+    temperature : float, default=1.0
+        Logit temperature applied after item scoring.
+    use_output_bias : bool, default=True
+        Whether to include an output bias in item logits.
+    scale_input_embedding : bool, default=False
+        Whether to multiply token embeddings by ``sqrt(d_model)`` before
+        adding positional/time embeddings.
 
     Notes
     -----
     ``time_diffs`` semantics: per-position seconds delta from a single anchor
     (e.g. ``query_time - timestamps[i]``), following the Meta reference.
     Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
-    distribution will be different — set ``time_bucket_divisor`` accordingly.
+    distribution will be different; set ``time_bucket_divisor`` and
+    ``time_bucket_unit`` accordingly.
     ``time_diffs=None`` falls back to all-zero deltas (no temporal signal).
 
     Shape
@@ -80,8 +95,33 @@ class HSTUModel(nn.Module):
         logits : ``(batch_size, seq_len, vocab_size)``
     """
 
-    def __init__(self, vocab_size, d_model=512, n_heads=8, n_layers=4, dqk=64, dv=64, max_seq_len=256, dropout=0.1, use_time_embedding=True, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0, tie_embeddings=True):
+    def __init__(
+        self,
+        vocab_size,
+        d_model=512,
+        n_heads=8,
+        n_layers=4,
+        dqk=64,
+        dv=64,
+        max_seq_len=256,
+        dropout=0.1,
+        use_time_embedding=True,
+        num_time_buckets=128,
+        time_bucket_fn='sqrt',
+        time_bucket_divisor=1.0,
+        time_bucket_unit='minutes',
+        tie_embeddings=True,
+        score_norm='none',
+        temperature=1.0,
+        use_output_bias=True,
+        scale_input_embedding=False,
+        l2_norm_eps=1e-6,
+    ):
         super().__init__()
+        if score_norm not in ('none', 'l2'):
+            raise ValueError("score_norm must be 'none' or 'l2'")
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.n_heads = n_heads
@@ -91,7 +131,13 @@ class HSTUModel(nn.Module):
         self.num_time_buckets = num_time_buckets
         self.time_bucket_fn = time_bucket_fn
         self.time_bucket_divisor = time_bucket_divisor
+        self.time_bucket_unit = time_bucket_unit
         self.tie_embeddings = tie_embeddings
+        self.score_norm = score_norm
+        self.temperature = temperature
+        self.use_output_bias = use_output_bias
+        self.scale_input_embedding = scale_input_embedding
+        self.l2_norm_eps = l2_norm_eps
 
         self.token_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)
         self.position_embedding = nn.Embedding(max_seq_len, d_model)
@@ -100,14 +146,26 @@ class HSTUModel(nn.Module):
             # Bucket 0 is the smallest legal time-diff bucket, not PAD.
             self.time_embedding = nn.Embedding(num_time_buckets, d_model)
 
-        self.hstu_block = HSTUBlock(d_model=d_model, n_heads=n_heads, n_layers=n_layers, dqk=dqk, dv=dv, dropout=dropout, max_seq_len=max_seq_len, num_time_buckets=num_time_buckets, time_bucket_fn=time_bucket_fn, time_bucket_divisor=time_bucket_divisor)
+        self.hstu_block = HSTUBlock(
+            d_model=d_model,
+            n_heads=n_heads,
+            n_layers=n_layers,
+            dqk=dqk,
+            dv=dv,
+            dropout=dropout,
+            max_seq_len=max_seq_len,
+            num_time_buckets=num_time_buckets,
+            time_bucket_fn=time_bucket_fn,
+            time_bucket_divisor=time_bucket_divisor,
+            time_bucket_unit=time_bucket_unit,
+        )
 
         if tie_embeddings:
             # Reuse ``token_embedding.weight``; only the bias is a separate param.
-            self.output_bias = nn.Parameter(torch.zeros(vocab_size))
+            self.output_bias = nn.Parameter(torch.zeros(vocab_size)) if use_output_bias else None
             self.output_projection = None
         else:
-            self.output_projection = nn.Linear(d_model, vocab_size)
+            self.output_projection = nn.Linear(d_model, vocab_size, bias=use_output_bias)
             self.output_bias = None
 
         self.dropout = nn.Dropout(dropout)
@@ -133,11 +191,13 @@ class HSTUModel(nn.Module):
     def _time_diff_to_bucket(self, time_diffs):
         """Map raw time differences (seconds) to bucket indices.
 
-        Following the Meta reference, time deltas are first divided by 60
-        (seconds → minutes), passed through ``sqrt`` or ``log``, then divided
-        by ``time_bucket_divisor`` and clipped to ``[0, num_time_buckets-1]``.
+        Time deltas are optionally converted to minutes, passed through
+        ``sqrt`` or ``log``, then divided by ``time_bucket_divisor`` and
+        clipped to ``[0, num_time_buckets-1]``.
         """
-        time_diffs = time_diffs.float() / 60.0
+        time_diffs = time_diffs.float()
+        if self.time_bucket_unit == 'minutes':
+            time_diffs = time_diffs / 60.0
         time_diffs = torch.clamp(time_diffs, min=1e-6)
 
         if self.time_bucket_fn == 'sqrt':
@@ -172,6 +232,8 @@ class HSTUModel(nn.Module):
         padding_mask = x.ne(0)  # (B, L) — True for valid tokens
 
         token_emb = self.token_embedding(x)  # (B, L, D)
+        if self.scale_input_embedding:
+            token_emb = token_emb * (self.d_model**0.5)
         positions = torch.arange(seq_len, dtype=torch.long, device=x.device)
         pos_emb = self.position_embedding(positions)  # (L, D)
 
@@ -193,8 +255,18 @@ class HSTUModel(nn.Module):
         hstu_output = hstu_output * padding_mask.unsqueeze(-1).to(hstu_output.dtype)
 
         if self.tie_embeddings:
-            logits = F.linear(hstu_output, self.token_embedding.weight, self.output_bias)
+            output_weight = self.token_embedding.weight
+            output_bias = self.output_bias
         else:
-            logits = self.output_projection(hstu_output)
+            output_weight = self.output_projection.weight
+            output_bias = self.output_projection.bias
+
+        if self.score_norm == 'l2':
+            hstu_output = F.normalize(hstu_output, p=2, dim=-1, eps=self.l2_norm_eps)
+            output_weight = F.normalize(output_weight, p=2, dim=-1, eps=self.l2_norm_eps)
+
+        logits = F.linear(hstu_output, output_weight, output_bias)
+        if self.temperature != 1.0:
+            logits = logits / self.temperature
 
         return logits

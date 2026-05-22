@@ -1,5 +1,7 @@
 """Correctness tests for HSTUModel / HSTULayer / RelPosBias / SeqTrainer."""
 
+import math
+
 import pytest
 import torch
 import torch.nn as nn
@@ -110,6 +112,27 @@ def test_untied_embedding_keeps_separate_projection():
     assert model.output_projection.weight.shape == (50, 32)
 
 
+def test_l2_scoring_without_output_bias_runs():
+    model = HSTUModel(
+        vocab_size=50,
+        d_model=32,
+        n_heads=4,
+        n_layers=1,
+        dqk=8,
+        dv=8,
+        max_seq_len=16,
+        score_norm='l2',
+        temperature=0.05,
+        use_output_bias=False,
+        scale_input_embedding=True,
+    )
+    assert model.output_bias is None
+    tokens = torch.tensor([[5, 7, 1, 2]], dtype=torch.long)
+    logits = model(tokens, torch.zeros_like(tokens))
+    assert logits.shape == (1, 4, 50)
+    assert torch.isfinite(logits).all()
+
+
 def test_relpos_bias_bucket_bounds_under_overflow():
     bias = RelPosBias(n_heads=4, max_seq_len=16, num_buckets=8)
     # seq_len > max_seq_len: buckets must still be in [0, num_buckets-1].
@@ -134,6 +157,35 @@ def test_vocab_mask_drops_pad():
     assert (masked[..., 0] <= -1e8).all()
     # Other ids unchanged
     assert torch.allclose(masked[..., 1:], logits[..., 1:])
+
+
+def test_vocab_mask_drops_per_user_history():
+    mask = VocabMask(vocab_size=10, invalid_items=[0])
+    logits = torch.randn(2, 10)
+    history = torch.tensor([[1, 3, 0], [2, 5, 0]])
+    masked = mask.apply_mask(logits, invalid_ids=history)
+    assert (masked[:, 0] <= -1e8).all()
+    assert masked[0, 1] <= -1e8
+    assert masked[0, 3] <= -1e8
+    assert masked[1, 2] <= -1e8
+    assert masked[1, 5] <= -1e8
+    assert torch.allclose(masked[0, 2], logits[0, 2])
+
+
+def test_seqtrainer_next_token_loss_masks_left_pad_positions():
+    trainer = SeqTrainer(
+        nn.Linear(1, 1),
+        device='cpu',
+        loss_params={"ignore_index": 0, "reduction": "sum"},
+    )
+    logits = torch.zeros(1, 4, 10)
+    seq_tokens = torch.tensor([[0, 0, 5, 6]])
+    targets = torch.tensor([7])
+
+    loss = trainer._compute_next_token_loss(logits, seq_tokens, targets)
+
+    # Only positions with current non-PAD tokens (5 and 6) should contribute.
+    assert torch.allclose(loss, torch.tensor(2.0 * math.log(9.0)), atol=1e-6)
 
 
 def test_seqtrainer_next_token_loss_ignores_pad():

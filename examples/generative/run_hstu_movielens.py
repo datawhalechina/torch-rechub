@@ -85,11 +85,12 @@ def get_movielens_data(data_dir=None):
     return train_data, val_data, test_data, vocab_size
 
 
-def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,)):
+def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,), filter_seen=True):
     """Evaluate top-K ranking metrics on the test set.
 
-    PAD (token id 0) and any other ids in ``invalid_items`` are masked out
-    before top-K so they never enter recommendations.
+    PAD (token id 0), any ids in ``invalid_items``, and optionally each user's
+    historical items are masked out before top-K. Filtering history matches the
+    Meta public evaluation protocol for HSTU/SASRec.
     """
     model = model.to(device)
     model.eval()
@@ -106,7 +107,8 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_it
             targets = targets.cpu().numpy()
 
             logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
-            last_logits = vocab_mask.apply_mask(logits[:, -1, :])  # (B, V)
+            seen_ids = seq_tokens if filter_seen else None
+            last_logits = vocab_mask.apply_mask(logits[:, -1, :], invalid_ids=seen_ids)  # (B, V)
 
             max_k = max(topKs)
             _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
@@ -121,7 +123,32 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_it
     return topk_metrics(y_true, y_pred, topKs=topKs)
 
 
-def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batch_size=512, weight_decay=1e-5, device='cuda', save_dir='./', seed=2022, max_seq_len=200):
+def main(
+    dataset_path=None,
+    model_name='hstu',
+    epoch=101,
+    learning_rate=1e-3,
+    batch_size=128,
+    weight_decay=0.0,
+    device='cuda',
+    save_dir='./',
+    seed=2022,
+    max_seq_len=200,
+    d_model=50,
+    n_heads=1,
+    n_layers=2,
+    dqk=50,
+    dv=50,
+    dropout=0.2,
+    score_norm='l2',
+    temperature=0.05,
+    use_time_embedding=False,
+    time_bucket_fn='log',
+    time_bucket_divisor=0.301,
+    time_bucket_unit='seconds',
+    use_output_bias=False,
+    scale_input_embedding=True,
+):
     """Main training and evaluation entry point.
 
     Args:
@@ -142,15 +169,14 @@ def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batc
     print("HSTU Model Example on MovieLens")
     print("=" * 80)
 
-    # Model hyper-parameters
-    d_model = 256
-    n_heads = 8
-    n_layers = 2
-
     print(f"\nDevice: {device}")
     print(f"Hidden dim: {d_model}")
     print(f"Num heads: {n_heads}")
     print(f"Num layers: {n_layers}")
+    print(f"dqk/dv: {dqk}/{dv}")
+    print(f"Dropout: {dropout}")
+    print(f"Score norm: {score_norm}, temperature: {temperature}")
+    print(f"Use input time embedding: {use_time_embedding}")
     print(f"Max sequence length: {max_seq_len}")
 
     # Load data
@@ -163,8 +189,8 @@ def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batc
     train_data, val_data, test_data, vocab_size = result
 
     # Build data loaders (with time-aware features)
-    print("\nBuilding data loaders (with time-aware features)...")
-    print("✅ Using time-aware positional encoding")
+    print("\nBuilding data loaders (with timestamp features)...")
+    print("Using relative time/position bias")
 
     train_gen = SequenceDataGenerator(train_data['seq_tokens'], train_data['seq_positions'], train_data['targets'], train_data['seq_time_diffs'])
     val_gen = SequenceDataGenerator(val_data['seq_tokens'], val_data['seq_positions'], val_data['targets'], val_data['seq_time_diffs'])
@@ -186,8 +212,18 @@ def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batc
         d_model=d_model,
         n_heads=n_heads,
         n_layers=n_layers,
+        dqk=dqk,
+        dv=dv,
         max_seq_len=max_seq_len,
-        dropout=0.1,
+        dropout=dropout,
+        use_time_embedding=use_time_embedding,
+        time_bucket_fn=time_bucket_fn,
+        time_bucket_divisor=time_bucket_divisor,
+        time_bucket_unit=time_bucket_unit,
+        score_norm=score_norm,
+        temperature=temperature,
+        use_output_bias=use_output_bias,
+        scale_input_embedding=scale_input_embedding,
     )
     print(f"Number of parameters: {sum(p.numel() for p in model.parameters()):,}")
 
@@ -195,13 +231,14 @@ def main(dataset_path=None, model_name='hstu', epoch=5, learning_rate=1e-3, batc
     print("\nCreating trainer...")
     trainer = SeqTrainer(
         model,
-        optimizer_fn=torch.optim.Adam,
+        optimizer_fn=torch.optim.AdamW,
         optimizer_params={
             "lr": learning_rate,
-            "weight_decay": weight_decay
+            "weight_decay": weight_decay,
+            "betas": (0.9, 0.98),
         },
         n_epoch=epoch,
-        earlystop_patience=10,
+        earlystop_patience=max(epoch + 1, 10),
         device=device,
         model_path=save_dir,
     )
@@ -238,14 +275,53 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HSTU Model Training on MovieLens-1M Dataset')
     parser.add_argument('--dataset_path', default=None, help='Path to preprocessed data directory (default: auto-detect relative to script)')
     parser.add_argument('--model_name', default='hstu', help='Model name')
-    parser.add_argument('--epoch', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--epoch', type=int, default=101, help='Number of training epochs')
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=512, help='Batch size')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+    parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay')
     parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
     parser.add_argument('--save_dir', default='./', help='Directory to save model')
     parser.add_argument('--seed', type=int, default=2022, help='Random seed')
     parser.add_argument('--max_seq_len', type=int, default=200, help='Maximum sequence length')
+    parser.add_argument('--d_model', type=int, default=50, help='Hidden dimension')
+    parser.add_argument('--n_heads', type=int, default=1, help='Number of attention heads')
+    parser.add_argument('--n_layers', type=int, default=2, help='Number of HSTU layers')
+    parser.add_argument('--dqk', type=int, default=50, help='Query/key dimension per head')
+    parser.add_argument('--dv', type=int, default=50, help='Value/U dimension per head')
+    parser.add_argument('--dropout', type=float, default=0.2, help='Dropout rate')
+    parser.add_argument('--score_norm', default='l2', choices=['none', 'l2'], help='Output scoring normalization')
+    parser.add_argument('--temperature', type=float, default=0.05, help='Output logit temperature')
+    parser.add_argument('--use_time_embedding', action='store_true', help='Add input-side time bucket embeddings')
+    parser.add_argument('--time_bucket_fn', default='log', choices=['sqrt', 'log'], help='Time bucketization function')
+    parser.add_argument('--time_bucket_divisor', type=float, default=0.301, help='Time bucket divisor')
+    parser.add_argument('--time_bucket_unit', default='seconds', choices=['seconds', 'minutes'], help='Unit for time bucketization')
+    parser.add_argument('--use_output_bias', action='store_true', help='Use output bias in item logits')
+    parser.add_argument('--no_scale_input_embedding', action='store_true', help='Disable sqrt(d_model) input embedding scale')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len)
+    main(
+        args.dataset_path,
+        args.model_name,
+        args.epoch,
+        args.learning_rate,
+        args.batch_size,
+        args.weight_decay,
+        args.device,
+        args.save_dir,
+        args.seed,
+        args.max_seq_len,
+        args.d_model,
+        args.n_heads,
+        args.n_layers,
+        args.dqk,
+        args.dv,
+        args.dropout,
+        args.score_norm,
+        args.temperature,
+        args.use_time_embedding,
+        args.time_bucket_fn,
+        args.time_bucket_divisor,
+        args.time_bucket_unit,
+        args.use_output_bias,
+        not args.no_scale_input_embedding,
+    )

@@ -99,11 +99,12 @@ def get_amazon_books_data(data_dir=None, max_seq_len=50):
     return train_data, val_data, test_data, vocab_size
 
 
-def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,)):
+def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,), filter_seen=True):
     """Evaluate top-K ranking metrics on the test set.
 
-    PAD (token id 0) and any other ids in ``invalid_items`` are masked out
-    before top-K so they never enter recommendations.
+    PAD (token id 0), any ids in ``invalid_items``, and optionally each user's
+    historical items are masked out before top-K. Filtering history matches the
+    Meta public evaluation protocol for HSTU/SASRec.
     """
     model = model.to(device)
     model.eval()
@@ -120,7 +121,8 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_it
             targets = targets.cpu().numpy()
 
             logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
-            last_logits = vocab_mask.apply_mask(logits[:, -1, :])  # (B, V)
+            seen_ids = seq_tokens if filter_seen else None
+            last_logits = vocab_mask.apply_mask(logits[:, -1, :], invalid_ids=seen_ids)  # (B, V)
 
             max_k = max(topKs)
             _, top_items = torch.topk(last_logits, k=max_k, dim=-1)

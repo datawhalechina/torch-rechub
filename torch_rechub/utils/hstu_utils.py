@@ -90,17 +90,24 @@ class RelativeBucketedTimeAndPositionBias(nn.Module):
     time_bucket_divisor : float, default=1.0
         Divisor applied after ``sqrt``/``log`` so the bucket index range
         actually utilizes ``[0, num_time_buckets]``.
+    time_bucket_unit : {'minutes', 'seconds'}, default='minutes'
+        Unit used before bucketization. ``'seconds'`` matches Meta's public
+        HSTU code path for MovieLens timestamps; ``'minutes'`` preserves the
+        earlier Torch-Rechub behavior.
     """
 
-    def __init__(self, n_heads, max_seq_len, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0):
+    def __init__(self, n_heads, max_seq_len, num_time_buckets=128, time_bucket_fn='sqrt', time_bucket_divisor=1.0, time_bucket_unit='minutes'):
         super().__init__()
         if time_bucket_fn not in ('sqrt', 'log'):
             raise ValueError(f"Unsupported time_bucket_fn: {time_bucket_fn}")
+        if time_bucket_unit not in ('minutes', 'seconds'):
+            raise ValueError(f"Unsupported time_bucket_unit: {time_bucket_unit}")
         self.n_heads = n_heads
         self.max_seq_len = max_seq_len
         self.num_time_buckets = num_time_buckets
         self.time_bucket_fn = time_bucket_fn
         self.time_bucket_divisor = time_bucket_divisor
+        self.time_bucket_unit = time_bucket_unit
 
         bound_pos = math.sqrt(1.0 / (2 * max_seq_len - 1))
         self.pos_w = nn.Parameter(torch.empty(2 * max_seq_len - 1, n_heads).uniform_(-bound_pos, bound_pos))
@@ -109,7 +116,9 @@ class RelativeBucketedTimeAndPositionBias(nn.Module):
 
     def _bucketize_time(self, dt):
         """Map signed seconds deltas to bucket indices in ``[0, num_time_buckets]``."""
-        dt = dt.float().abs() / 60.0
+        dt = dt.float().abs()
+        if self.time_bucket_unit == 'minutes':
+            dt = dt / 60.0
         dt = torch.clamp(dt, min=1e-6)
         if self.time_bucket_fn == 'sqrt':
             buckets = torch.sqrt(dt)
@@ -184,8 +193,30 @@ class VocabMask(nn.Module):
                 if 0 <= item_id < vocab_size:
                     self.mask[item_id] = False
 
-    def apply_mask(self, logits):
-        """Return ``logits`` with invalid item positions pushed to ``-1e9``."""
+    def apply_mask(self, logits, invalid_ids=None):
+        """Return ``logits`` with invalid item positions pushed to ``-1e9``.
+
+        Args:
+            logits (Tensor): Score tensor with item vocabulary on the last
+                dimension. Ranking code typically passes ``(B, V)``.
+            invalid_ids (Tensor, optional): Per-row item ids to suppress, e.g.
+                a batch of users' historical item ids with shape ``(B, L)``.
+                A 1-D tensor is broadcast to every row.
+        """
         masked_logits = logits.clone()
         masked_logits[..., ~self.mask] = -1e9
+        if invalid_ids is None:
+            return masked_logits
+
+        invalid_ids = invalid_ids.to(device=masked_logits.device, dtype=torch.long)
+        if invalid_ids.dim() == 1:
+            invalid_ids = invalid_ids.unsqueeze(0).expand(masked_logits.size(0), -1)
+        if masked_logits.dim() != 2 or invalid_ids.dim() != 2:
+            raise ValueError("dynamic invalid_ids masking expects logits (B, V) and invalid_ids (B, N)")
+        if invalid_ids.size(0) != masked_logits.size(0):
+            raise ValueError("invalid_ids batch size must match logits batch size")
+
+        valid = (invalid_ids >= 0) & (invalid_ids < self.vocab_size)
+        safe_ids = invalid_ids.masked_fill(~valid, 0)
+        masked_logits.scatter_(dim=-1, index=safe_ids, value=-1e9)
         return masked_logits

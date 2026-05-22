@@ -146,8 +146,8 @@ class MovieLensHSTUPreprocessor:
         # Core preprocessing hyperparameters
         self.min_seq_len = 5  # Minimum sequence length per user
         self.max_seq_len = 200  # Maximum sequence length (for truncation/padding)
-        self.rating_threshold = 3  # Ratings >= threshold are treated as positive
-        self.min_item_count = 5  # Item must appear at least this many times
+        self.rating_threshold = 0  # Keep all MovieLens ratings by default.
+        self.min_item_count = 1  # Keep all interacted items by default.
 
     def load_data(self):
         """Load raw MovieLens-1M rating and movie metadata files."""
@@ -168,8 +168,9 @@ class MovieLensHSTUPreprocessor:
     def filter_data(self, ratings):
         """Filter ratings by threshold and apply cold-start heuristics.
 
-        The procedure keeps only high-rated interactions, removes very rare
-        items, and users with too few interactions.
+        The default procedure keeps all MovieLens interactions and all
+        interacted items, matching the public HSTU/SASRec preprocessing setup.
+        The threshold/count fields remain configurable in code for ablations.
 
         Args:
             ratings (pd.DataFrame): Raw ratings dataframe.
