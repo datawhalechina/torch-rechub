@@ -633,6 +633,7 @@ The external residual ``x + Layer(x)`` is added by :class:`HSTUBlock`.
 - `num_time_buckets` (`Number of time-difference buckets in ``rab``.`)
 - `time_bucket_fn` (```'sqrt'`` or ``'log'`` bucketization in ``rab``.`)
 - `time_bucket_divisor` (`Bucket-range divisor in ``rab``.`)
+- `time_bucket_unit` (```'minutes'`` or ``'seconds'`` for time-diff`): bucketization in ``rab``.
 
 **Shape**
 
@@ -672,7 +673,8 @@ Stack of :class:`HSTULayer` modules with **external residual** wiring.
 
 Each layer is wrapped as ``x = x + Layer(x)``, matching the HSTU paper /
 Meta reference. ``num_time_buckets`` / ``time_bucket_fn`` /
-``time_bucket_divisor`` are forwarded to every layer's ``rab`` module.
+``time_bucket_divisor`` / ``time_bucket_unit`` are forwarded to every
+layer's ``rab`` module.
 
 **Shape**
 
@@ -1369,8 +1371,8 @@ Reference:
 
 - `item_embeddings` (`Tensor or str`): Pre-computed item embeddings of shape
   (vocab_size, d_model), or path to a .pt file containing embeddings.
-  Generated using the last token's hidden state from an LLM.
-- `vocab_size` (`int`): Vocabulary size (number of items).
+  Row ``i`` must correspond to vocab token ``i`` and row 0 is PAD.
+- `vocab_size` (`int`): Vocabulary size including PAD.
 - `d_model` (`int`): Hidden dimension. Should match item embedding dimension.
   Default: 512. TinyLlama uses 2048, Baichuan2 uses 4096.
 - `n_heads` (`int`): Number of attention heads. Default: 8.
@@ -1382,8 +1384,12 @@ Reference:
 - `use_time_embedding` (`bool`): Whether to use time embeddings. Default: True.
 - `num_time_buckets` (`int`): Number of time buckets. Default: 2048.
 - `time_bucket_fn` (`str`): Time bucketization function ('sqrt' or 'log'). Default: 'sqrt'.
-- `temperature` (`float`): Temperature for NCE scoring. Default: 1.0.
-  Official uses logit_scale = log(1/0.07) ≈ 2.66.
+- `temperature` (`float`): Temperature for cos-sim logits. Default: 0.07
+  (matches official ByteDance HLLM logit_scale = log(1/0.07)).
+  item_embeddings and user representation are both L2-normalized,
+  so logits = cos(x, emb) / temperature, bounded in [-1/T, +1/T].
+  Loss functions should be configured with their own temperature=1.0
+  to avoid double scaling.
 
 ###### `HLLMModel.forward`
 
@@ -1448,14 +1454,24 @@ implementation (`meta-recsys/generative-recommenders`):
   actually utilizes ``[0, num_time_buckets - 1]``. Tune to your dataset's
   time-difference distribution. Shared by the input-side time embedding
   and the per-layer ``rab^{p,t}``.
+- `time_bucket_unit` (`{'minutes', 'seconds'}, default='minutes'`): Unit used before time bucketization. ``'seconds'`` matches Meta's
+  public HSTU MovieLens configs; ``'minutes'`` preserves the earlier
+  Torch-Rechub behavior.
 - `tie_embeddings` (`bool, default=True`): Tie the output projection weight to the token embedding weight.
+- `score_norm` (`{'none', 'l2'}, default='none'`): Optional normalization before item scoring. ``'l2'`` matches the
+  public HSTU configs' normalized dot-product retrieval setting.
+- `temperature` (`float, default=1.0`): Logit temperature applied after item scoring.
+- `use_output_bias` (`bool, default=True`): Whether to include an output bias in item logits.
+- `scale_input_embedding` (`bool, default=False`): Whether to multiply token embeddings by ``sqrt(d_model)`` before
+  adding positional/time embeddings.
 
 **Notes**
 
 ``time_diffs`` semantics: per-position seconds delta from a single anchor
 (e.g. ``query_time - timestamps[i]``), following the Meta reference.
 Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
-distribution will be different — set ``time_bucket_divisor`` accordingly.
+distribution will be different; set ``time_bucket_divisor`` and
+``time_bucket_unit`` accordingly.
 ``time_diffs=None`` falls back to all-zero deltas (no temporal signal).
 
 **Shape**
@@ -2702,6 +2718,7 @@ Behavior Sequence Transformer
 - `nhead` (`int`): the number of heads in the multi-head-attention models.
 - `dropout` (`float`): the dropout value in the multi-head-attention models.
 - `num_layers` (`Any`): the number of sub-encoder-layers in the encoder.
+- `max_seq_len` (`int`): maximum sequence length (history + 1 target). Used for positional encoding table size.
 
 ###### `BST.forward`
 
@@ -2832,6 +2849,18 @@ No docstring provided.
 
 Module: `torch_rechub.models.ranking.dien`
 
+##### `AUGRU_Cell`
+
+No docstring provided.
+
+###### `AUGRU_Cell.forward`
+
+```python
+forward(self, x, h_1, a)
+```
+
+No docstring provided.
+
 ##### `AUGRU`
 
 No docstring provided.
@@ -2839,62 +2868,46 @@ No docstring provided.
 ###### `AUGRU.forward`
 
 ```python
-forward(self, x, item)
+forward(self, x, item, mask = None)
 ```
-
-:param x: 输入的序列向量，维度为 [ batch_size, seq_lens, embed_dim ]
-:param item: 目标物品的向量
-:return: outs: 所有AUGRU单元输出的隐藏向量[ batch_size, seq_lens, embed_dim ]
-         h: 最后一个AUGRU单元输出的隐藏向量[ batch_size, embed_dim ]
-
-##### `AUGRU_Cell`
 
 No docstring provided.
 
-###### `AUGRU_Cell.attention`
-
-```python
-attention(self, x, item)
-```
-
-:param x: 输入的序列中第t个向量 [ batch_size, embed_dim ]
-:param item: 目标物品的向量 [ batch_size, embed_dim ]
-:return: 注意力权重 [ batch_size, 1 ]
-
-###### `AUGRU_Cell.forward`
-
-```python
-forward(self, x, h_1, item)
-```
-
-:param x:  输入的序列中第t个物品向量 [ batch_size, embed_dim ]
-:param h_1:  上一个AUGRU单元输出的隐藏向量 [ batch_size, embed_dim ]
-:param item: 目标物品的向量 [ batch_size, embed_dim ]
-:return: h 当前层输出的隐藏向量 [ batch_size, embed_dim ]
-
 ##### `DIEN`
 
-Deep Interest Evolution Network
+Deep Interest Evolution Network (AAAI 2019).
 
 **Parameters**
 
-- `features` (`list`): the list of `Feature Class`. training by MLP. It means the user profile features and context features in origin paper, exclude history and target features.
-- `history_features` (`list`): the list of `Feature Class`,training by ActivationUnit. It means the user behaviour sequence features, eg.item id sequence, shop id sequence.
-- `target_features` (`list`): the list of `Feature Class`, training by ActivationUnit. It means the target feature which will execute target-attention with history feature.
-- `mlp_params` (`dict`): the params of the last MLP module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}
-- `history_labels` (`list`): the list of history_features whether it is clicked history or not. It should be 0 or 1.
-- `alpha` (`float`): the weighting of auxiliary loss.
+- `features` (`list`): user profile / context features fed into the top MLP.
+- `history_features` (`list`): positive behaviour sequence features (SequenceFeature, pooling="concat").
+  Must set padding_idx=0 and shared_with=<target_feature_name> so the embedding table
+  is owned by the corresponding target feature.
+- `neg_history_features` (`list`): negative-sampled behaviour sequence features, one per history feature.
+  Must set padding_idx=0 and shared_with=<target_feature_name> (same root as history_features).
+  EmbeddingLayer only registers features with shared_with=None as root keys in embed_dict,
+  so shared_with must point to the target feature, NOT the history feature.
+- `target_features` (`list`): target item features used by the AUGRU attention.
+  Must set padding_idx=0 so the shared embedding table's row 0 is a true zero vector.
+- `mlp_params` (`dict`): params for the top MLP, e.g. {"dims": [256, 128]}.
+  activation is fixed to "dice" as in the paper.
+- `alpha` (`float`): weight of the auxiliary loss. Default 0.2.
+- `Returns` (`forward`): tuple(prediction: Tensor[B], aux_loss: Tensor[])
+
+**Notes**
+
+    - Sequences are padded with 0 (convention from generate_seq_feature).
+    - Samples with all-padding history keep zero hidden state throughout GRU and AUGRU.
+    - Auxiliary loss uses next-step positive/negative supervision (paper Eq.7), skipping padding positions.
+    - AUGRU attention is softmax-normalised over the full valid sequence (paper Eq.14-15).
 
 ###### `DIEN.auxiliary`
 
 ```python
-auxiliary(self, outs, history_features, history_labels)
+auxiliary(self, outs, pos_emb, neg_emb, mask = None)
 ```
 
-:param history_features: 历史序列物品的向量 [ batch_size, len_seqs, dim ]
-:param outs: 兴趣抽取层GRU网络输出的outs [ batch_size, len_seqs, dim ]
-:param history_labels: 历史序列物品标注 [ batch_size, len_seqs, 1 ]
-:return: 辅助损失函数
+No docstring provided.
 
 ###### `DIEN.forward`
 
@@ -3903,27 +3916,44 @@ Module: `torch_rechub.trainers.seq_trainer`
 
 #### `SeqTrainer`
 
-Sequence Generation Model Trainer.
+序列生成模型训练器.
 
-Used for training HSTU, HLLM, and RQVAE models.
-Supports CrossEntropyLoss, NCE Loss, and RQVAE-specific losses.
+用于训练HSTU等序列生成模型。
+支持CrossEntropyLoss损失函数和生成式评估指标。
 
 **Parameters**
 
-- `model` (`nn.Module`): Model to be trained.
-- `optimizer_fn` (`torch.optim`): Optimizer constructor, default torch.optim.Adam.
-- `optimizer_params` (`dict`): Optimizer parameters.
-- `scheduler_fn` (`torch.optim.lr_scheduler`): Torch scheduler class.
-- `scheduler_params` (`dict`): Scheduler parameters.
-- `n_epoch` (`int`): Number of training epochs, default 10.
-- `earlystop_patience` (`int`): Early stopping patience, default 10.
-- `device` (`str`): Device 'cpu' or 'cuda', default 'cpu'.
-- `gpus` (`list`): List of GPU ids for parallel training, default [].
-- `model_path` (`str`): Path to save model checkpoints, default './'.
-- `loss_type` (`str`): Loss function type ('cross_entropy', 'nce', 'mse', 'l1').
-- `loss_params` (`dict`): Parameters for loss function.
-- `model_logger` (`object`): Logger instance.
-- `eval_step` (`int`): Evaluation interval in epochs (for RQVAE), default 50.
+- `model` (`nn.Module`): 要训练的模型
+- `optimizer_fn` (`torch.optim`): 优化器函数，默认为torch.optim.Adam
+- `optimizer_params` (`dict`): 优化器参数
+- `scheduler_fn` (`torch.optim.lr_scheduler`): torch调度器类
+- `scheduler_params` (`dict`): 调度器参数
+- `n_epoch` (`int`): 训练轮数，默认10
+- `earlystop_patience` (`int`): 早停耐心值，默认10
+- `device` (`str`): 设备，'cpu'或'cuda'，默认'cpu'
+- `gpus` (`list`): 多GPU的id列表，默认为[]
+- `model_path` (`str`): 模型保存路径，默认为'./'
+
+**Methods**
+
+- `fit` (`训练模型`)
+- `evaluate` (`评估模型`)
+- `predict` (`生成预测`)
+
+**Examples**
+
+```python
+>>> trainer = SeqTrainer(
+...     model=model,
+...     optimizer_fn=torch.optim.Adam,
+...     optimizer_params={'lr': 1e-3, 'weight_decay': 1e-5},
+...     device='cuda'
+... )
+>>> trainer.fit(
+...     train_loader=train_loader,
+...     val_loader=val_loader
+... )
+```
 
 ##### `SeqTrainer.fit`
 
@@ -3931,32 +3961,16 @@ Supports CrossEntropyLoss, NCE Loss, and RQVAE-specific losses.
 fit(self, train_dataloader, val_dataloader = None)
 ```
 
-Train the model.
+训练模型.
 
 **Parameters**
 
-- `train_dataloader` (`DataLoader`): Training data loader.
-- `val_dataloader` (`DataLoader`): Validation data loader.
+- `train_dataloader` (`DataLoader`): 训练数据加载器
+- `val_dataloader` (`DataLoader`): 验证数据加载器
 
 **Returns**
 
-- `dict or tuple: Training history or (best_loss, best_collision_rate) for RQVAE.`
-
-##### `SeqTrainer.train_rqvae_one_epoch`
-
-```python
-train_rqvae_one_epoch(self, data_loader)
-```
-
-Train one epoch for RQVAE model.
-
-##### `SeqTrainer.evaluate_rqvae`
-
-```python
-evaluate_rqvae(self, data_loader)
-```
-
-Evaluate RQVAE model (calculate collision rate).
+- `dict` (`训练历史`)
 
 ##### `SeqTrainer.train_one_epoch`
 
@@ -3983,9 +3997,9 @@ evaluate(self, data_loader)
 
 Evaluate the model on a validation/test data loader.
 
-**Parameters**
-
-- `data_loader` (`DataLoader`): Validation or test data loader.
+Loss is the full-sequence next-token CE (matching training);
+accuracy is top-1 hit on the held-out next item only (useful as a
+ranking-style proxy metric).
 
 **Returns**
 
@@ -4525,6 +4539,9 @@ The bias is added to ``Q K^T`` **before** the ``SiLU/N`` activation.
 - `time_bucket_fn` (`{'sqrt', 'log'}, default='sqrt'`): Bucketization function applied to ``|dt|`` in minutes.
 - `time_bucket_divisor` (`float, default=1.0`): Divisor applied after ``sqrt``/``log`` so the bucket index range
   actually utilizes ``[0, num_time_buckets]``.
+- `time_bucket_unit` (`{'minutes', 'seconds'}, default='minutes'`): Unit used before bucketization. ``'seconds'`` matches Meta's public
+  HSTU code path for MovieLens timestamps; ``'minutes'`` preserves the
+  earlier Torch-Rechub behavior.
 
 ##### `RelativeBucketedTimeAndPositionBias.forward`
 
@@ -4557,10 +4574,18 @@ Vocabulary mask to block invalid items at inference / ranking.
 ##### `VocabMask.apply_mask`
 
 ```python
-apply_mask(self, logits)
+apply_mask(self, logits, invalid_ids = None)
 ```
 
 Return ``logits`` with invalid item positions pushed to ``-1e9``.
+
+**Parameters**
+
+- `logits` (`Tensor`): Score tensor with item vocabulary on the last
+  dimension. Ranking code typically passes ``(B, V)``.
+- `invalid_ids` (`Tensor, optional`): Per-row item ids to suppress, e.g.
+  a batch of users' historical item ids with shape ``(B, L)``.
+  A 1-D tensor is broadcast to every row.
 
 ### `match`
 
