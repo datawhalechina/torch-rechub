@@ -11,6 +11,13 @@ class TIGERModel(T5ForConditionalGeneration):
 
         super().__init__(config)
 
+        # ``forward`` keeps the legacy T5 model-parallel guards
+        # (``if self.model_parallel``). transformers>=5 no longer initializes
+        # these attributes, so set them here to keep the custom forward working
+        # on both single- and multi-GPU (DataParallel) setups.
+        self.model_parallel = False
+        self.device_map = None
+
         # You can add parameters out here.
         self.temperature = 1.0
 

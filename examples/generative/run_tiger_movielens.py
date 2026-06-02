@@ -1,44 +1,57 @@
-"""TIGER Model Example on Amazon-Books Dataset.
+"""TIGER Model Example on MovieLens-1M Dataset.
 
 TIGER fine-tunes a T5 seq2seq model to autoregressively generate the semantic
 ID of the next item. A semantic ID is a short tuple of codebook tokens (e.g.
-``<a_1><b_10>``) produced by RQ-VAE over item embeddings.
+``<a_1><b_3><c_5>``) produced by RQ-VAE over item embeddings.
+
+This example needs two json files:
+
+``inter.json``
+    ``{user_id: [item_id, item_id, ...]}`` — each user's chronologically
+    ordered item-id history. Item ids are 1-based; 0 is reserved for padding.
+``semantic_ids.json``
+    ``{item_id: ["<a_..>", "<b_..>", ...]}`` — the RQ-VAE semantic id for every
+    item id that appears in ``inter.json``.
 
 Run modes (``--mode``)
 ----------------------
 ``generate-toy-data``
-    Write a tiny synthetic ``inter.json`` + ``semantic_ids.json`` to the exact
-    paths the loader reads from, so the example is runnable end to end.
-``train``
-    Register the semantic-id tokens, resize the embedding table, fine-tune T5,
-    and save tokenizer/config/model to ``--output_dir``.
-``test``
-    Load tokenizer/config/model from ``--ckpt_path`` (defaults to
-    ``--output_dir``) and report hit@k / ndcg@k with constrained beam search.
-``all``
-    ``generate-toy-data`` -> ``train`` -> ``test`` (default).
+    Write a small synthetic MovieLens-shaped ``inter.json`` + ``semantic_ids.json``
+    to the exact paths the loader reads from, so the example runs end to end on
+    CPU without any external data.
+``prepare-data``
+    Build a real ``inter.json`` from MovieLens-1M ``ratings.dat`` (grouped by
+    user, ordered by timestamp) and a ``movie_id`` -> ``item_id`` map. You still
+    need a matching ``semantic_ids.json`` from RQ-VAE (see note below).
+``train`` / ``test`` / ``all``
+    Same as the other generative examples; ``all`` runs
+    ``generate-toy-data`` -> ``train`` -> ``test``.
+
+Real-data pipeline
+------------------
+1. ``python run_tiger_movielens.py --mode prepare-data`` to build ``inter.json``
+   and ``movie_id_map.json`` from ``ratings.dat``.
+2. Generate item embeddings for the same item ids (e.g. the text/ID embeddings
+   used by HLLM preprocessing) and run ``run_rqvae_amazon_books.py`` style
+   RQ-VAE on them to produce ``semantic_ids.json``. The RQ-VAE output must be
+   keyed by the *same* item ids written in step 1, otherwise ``inter.json`` and
+   ``semantic_ids.json`` will not line up.
+3. ``python run_tiger_movielens.py --mode train`` then ``--mode test``.
 
 Examples
 --------
 Toy end-to-end smoke run::
 
-    python run_tiger_amazon_books.py --mode all --epochs 5 --per_device_batch_size 4
-
-Real data: first obtain ``semantic_ids.json`` from RQ-VAE
-(``run_rqvae_amazon_books.py``) and an ``inter.json`` of user item-id
-sequences, then::
-
-    python run_tiger_amazon_books.py --mode train \
-        --data_inter_path ./data/amazon-books/inter.json \
-        --data_indice_path ./data/amazon-books/semantic_ids.json
-    python run_tiger_amazon_books.py --mode test --ckpt_path ./ckpt
+    python run_tiger_movielens.py --mode all --epochs 5 --per_device_batch_size 8
 """
 
 import argparse
 import json
 import math
 import os
+import random
 import sys
+from collections import defaultdict
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
@@ -54,63 +67,98 @@ from transformers import EarlyStoppingCallback, T5Config, T5Tokenizer
 from torch_rechub.models.generative.tiger import TIGERModel
 from torch_rechub.utils.data import TigerSeqDataset, Trie
 
-RUN_MODES = ("generate-toy-data", "train", "test", "all")
+RUN_MODES = ("generate-toy-data", "prepare-data", "train", "test", "all")
 
 
 # =========================================================
 # Toy data
 # =========================================================
 def generate_toy_data(args):
-    """Write a tiny Amazon-Books-style toy dataset.
+    """Write a small synthetic MovieLens-shaped toy dataset.
 
-    The files are written to the *exact* paths the dataset loader reads from
+    Item ids 1..``--toy_num_items`` each get a unique 3-level semantic id
+    (codebook size 8 per level). Users get random-length item histories. Files
+    are written to the *exact* paths the loader reads from
     (``--data_inter_path`` / ``--data_indice_path``), so generated and read
     filenames are guaranteed to match.
     """
-    inter_data = {
-        "0": [1,
-              2,
-              3,
-              4,
-              1,
-              2,
-              3,
-              4],
-        "1": [2,
-              3,
-              4,
-              1,
-              2,
-              3,
-              4],
-        "2": [3,
-              4,
-              6,
-              1,
-              2,
-              3],
-    }
-    index_data = {
-        "1": ["<a_1>",
-              "<b_10>"],
-        "2": ["<a_1>",
-              "<b_20>"],
-        "3": ["<a_2>",
-              "<b_30>"],
-        "4": ["<a_2>",
-              "<b_40>"],
-        "5": ["<a_3>",
-              "<b_50>"],
-        "6": ["<a_3>",
-              "<b_60>"],
-        "7": ["<a_4>",
-              "<b_70>"],
-    }
+    rng = random.Random(args.toy_seed)
+    num_items = args.toy_num_items
+    base = 8  # codebook size per semantic-id level
+
+    index_data = {}
+    for item_id in range(1, num_items + 1):
+        idx = item_id - 1
+        a, b, c = idx // (base * base), (idx // base) % base, idx % base
+        index_data[str(item_id)] = [f"<a_{a}>", f"<b_{b}>", f"<c_{c}>"]
+
+    inter_data = {}
+    for user_id in range(args.toy_num_users):
+        length = rng.randint(5, 12)
+        inter_data[str(user_id)] = [rng.randint(1, num_items) for _ in range(length)]
+
     _write_json(args.data_inter_path, inter_data)
     _write_json(args.data_indice_path, index_data)
-    print("Toy Amazon-Books dataset generated:")
+    print("Toy MovieLens-shaped dataset generated:")
+    print(f"  users={args.toy_num_users}, items={num_items}")
     print(f"  inter        -> {args.data_inter_path}")
     print(f"  semantic_ids -> {args.data_indice_path}")
+
+
+# =========================================================
+# Real data preparation
+# =========================================================
+def prepare_data(args):
+    """Build ``inter.json`` + ``movie_id_map.json`` from MovieLens-1M ratings.
+
+    Reads ``ratings.dat`` (``UserID::MovieID::Rating::Timestamp``), keeps only
+    users with at least ``--min_seq_len`` interactions, orders each user's items
+    by timestamp, and remaps movie ids to contiguous 1-based item ids. Does
+    *not* produce ``semantic_ids.json`` — that comes from RQ-VAE (see the module
+    docstring).
+    """
+    ratings_path = args.ratings_path
+    if not os.path.isfile(ratings_path):
+        raise FileNotFoundError(f"ratings.dat not found at {ratings_path}. Pass --ratings_path or run the ml-1m download first.")
+
+    user_items = defaultdict(list)  # user -> [(timestamp, movie_id), ...]
+    with open(ratings_path, "r", encoding="latin-1") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            user_id, movie_id, _rating, timestamp = line.split("::")
+            user_items[user_id].append((int(timestamp), int(movie_id)))
+
+    # Stable movie_id -> item_id mapping (1-based; 0 reserved for PAD).
+    movie_ids = sorted({mid for items in user_items.values() for _, mid in items})
+    movie_to_item = {mid: i + 1 for i, mid in enumerate(movie_ids)}
+
+    inter_data = {}
+    kept_users = 0
+    for user_id, items in user_items.items():
+        if len(items) < args.min_seq_len:
+            continue
+        items.sort(key=lambda x: x[0])  # chronological
+        seq = [movie_to_item[mid] for _, mid in items]
+        if args.max_his_len > 0:
+            # Keep the most recent (max_his_len + 2) so train/valid/test splits
+            # have enough history; the dataset truncates further per-sample.
+            seq = seq[-(args.max_his_len + 2):]
+        inter_data[user_id] = seq
+        kept_users += 1
+
+    _write_json(args.data_inter_path, inter_data)
+    map_path = os.path.join(os.path.dirname(args.data_inter_path) or ".", "movie_id_map.json")
+    _write_json(map_path, {str(mid): item_id for mid, item_id in movie_to_item.items()})
+
+    print("MovieLens-1M interaction data prepared:")
+    print(f"  users kept  : {kept_users} (>= {args.min_seq_len} interactions)")
+    print(f"  unique items: {len(movie_ids)}")
+    print(f"  inter        -> {args.data_inter_path}")
+    print(f"  movie_id_map -> {map_path}")
+    print("\nNext: produce semantic_ids.json from RQ-VAE keyed by the SAME item ids,")
+    print(f"      and save it to {args.data_indice_path}")
 
 
 def _write_json(path, obj):
@@ -345,18 +393,27 @@ def hit_k(topk_results, k):
 # Argument parsing & dispatch
 # =========================================================
 def parse_args():
-    parser = argparse.ArgumentParser(description="TIGER on Amazon-Books")
+    parser = argparse.ArgumentParser(description="TIGER on MovieLens-1M")
     parser.add_argument("--mode", type=str, default="all", choices=RUN_MODES, help="Which stage(s) to run")
 
     # global
     parser.add_argument("--base_model", type=str, default="t5-small", help="Base T5 model name or path")
-    parser.add_argument("--output_dir", type=str, default="./ckpt/tiger_amazon", help="Directory to save tokenizer/config/checkpoints")
+    parser.add_argument("--output_dir", type=str, default="./ckpt/tiger_ml", help="Directory to save tokenizer/config/checkpoints")
 
     # dataset
-    parser.add_argument("--data_inter_path", type=str, default="./data/amazon-books/inter.json", help="User item-id sequence file")
-    parser.add_argument("--data_indice_path", type=str, default="./data/amazon-books/semantic_ids.json", help="Item semantic-id file")
+    parser.add_argument("--data_inter_path", type=str, default="./data/ml-1m/tiger/inter.json", help="User item-id sequence file")
+    parser.add_argument("--data_indice_path", type=str, default="./data/ml-1m/tiger/semantic_ids.json", help="Item semantic-id file")
     parser.add_argument("--max_his_len", type=int, default=20, help="Max items in history, -1 means no limit")
     parser.add_argument("--add_prefix", action="store_true", default=False, help="Reserved: add a sequential prefix in history")
+
+    # toy-data
+    parser.add_argument("--toy_num_users", type=int, default=80, help="Number of synthetic users for generate-toy-data")
+    parser.add_argument("--toy_num_items", type=int, default=60, help="Number of synthetic items for generate-toy-data")
+    parser.add_argument("--toy_seed", type=int, default=42, help="Random seed for generate-toy-data")
+
+    # prepare-data (real ml-1m)
+    parser.add_argument("--ratings_path", type=str, default="./data/ml-1m/ratings.dat", help="MovieLens-1M ratings.dat path")
+    parser.add_argument("--min_seq_len", type=int, default=5, help="Minimum interactions per user for prepare-data")
 
     # train
     parser.add_argument("--optim", type=str, default="adamw_torch", help="Optimizer name")
@@ -387,6 +444,9 @@ def parse_args():
 
 
 def main(args):
+    if args.mode == "prepare-data":
+        prepare_data(args)
+        return
     if args.mode in ("generate-toy-data", "all"):
         generate_toy_data(args)
     if args.mode in ("train", "all"):
