@@ -52,15 +52,16 @@ TIGER 需要两个 JSON 文件：
 | --- | --- |
 | `generate-toy-data` | 生成一份小规模合成数据，写到 `--data_inter_path` / `--data_indice_path`（与读取路径完全一致） |
 | `prepare-data` | 仅 MovieLens：从真实 `ratings.dat` 构建 `inter.json` 和 `movie_id_map.json` |
-| `train` | 加入语义 ID token、`resize_token_embeddings`、微调 T5，保存 tokenizer / config / 模型到 `--output_dir` |
+| `train` | 加入语义 ID token、`resize_token_embeddings`、从头训练 T5（随机初始化，不加载预训练权重），保存 tokenizer / config / 模型到 `--output_dir` |
 | `test` | 从 `--ckpt_path`（默认回退到 `--output_dir`）加载，做受限 beam search 并报告 hit@k / ndcg@k |
 | `all` | 依次执行 `generate-toy-data` → `train` → `test`（默认） |
 
 关键实现细节：
 
+- **从头训练，不加载预训练权重**：TIGER 论文中 T5 编码器-解码器是随机初始化、从头训练的（语义 ID 词表不是自然语言，预训练的 NL 权重无意义）。`train()` 用 `TIGERModel(config)` 从 `--base_model` 的 config 构建架构并随机初始化，`--base_model` 只提供架构/config 与 tokenizer，不加载预训练权重。
 - **训练前必须加入语义 ID token**：`train()` 会 `tokenizer.add_tokens(dataset.get_new_tokens())` 后再 `resize_token_embeddings`，否则 `<a_1>` 这类 token 会被 T5 切成子词，训练无意义。
 - **生成与读取路径一致**：`generate-toy-data` 直接写到数据集读取的同一路径，避免"生成文件名 ≠ 读取文件名"。
-- **test 从 checkpoint 加载词表**：tokenizer / config / 模型都从 `--ckpt_path` 读取，保证语义 ID 词表与训练时一致；若 checkpoint 缺少某些语义 ID token，会自动补齐并 resize 后再评估。
+- **test 从 checkpoint 加载词表与权重**：用 checkpoint 自身的 config 加载模型（避免把扩词表后的 `vocab_size` 传进 `from_pretrained` 触发 embedding 尺寸不匹配），再按 tokenizer 对齐；若 checkpoint 缺少某些语义 ID token，会自动补齐并 resize 后再评估。
 
 ---
 

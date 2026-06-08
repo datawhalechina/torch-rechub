@@ -1,8 +1,12 @@
 """TIGER Model Example on MovieLens-1M Dataset.
 
-TIGER fine-tunes a T5 seq2seq model to autoregressively generate the semantic
-ID of the next item. A semantic ID is a short tuple of codebook tokens (e.g.
-``<a_1><b_3><c_5>``) produced by RQ-VAE over item embeddings.
+TIGER trains a T5 seq2seq model **from scratch** to autoregressively generate
+the semantic ID of the next item. A semantic ID is a short tuple of codebook
+tokens (e.g. ``<a_1><b_3><c_5>``) produced by RQ-VAE over item embeddings.
+Following the TIGER paper, ``--base_model`` only supplies the T5
+*architecture/config* and tokenizer; the transformer weights are randomly
+initialized, not loaded from a pretrained NL checkpoint (the semantic-ID
+vocabulary is not natural language).
 
 This example needs two json files:
 
@@ -29,14 +33,22 @@ Run modes (``--mode``)
 
 Real-data pipeline
 ------------------
-1. ``python run_tiger_movielens.py --mode prepare-data`` to build ``inter.json``
-   and ``movie_id_map.json`` from ``ratings.dat``.
-2. Generate item embeddings for the same item ids (e.g. the text/ID embeddings
-   used by HLLM preprocessing) and run ``run_rqvae_amazon_books.py`` style
-   RQ-VAE on them to produce ``semantic_ids.json``. The RQ-VAE output must be
-   keyed by the *same* item ids written in step 1, otherwise ``inter.json`` and
-   ``semantic_ids.json`` will not line up.
-3. ``python run_tiger_movielens.py --mode train`` then ``--mode test``.
+1. Build the shared vocab + item embeddings with the HSTU/HLLM preprocessing
+   (``preprocess_ml_hstu.py`` then ``preprocess_hllm_data.py``). This produces
+   ``processed/vocab.pkl`` (``movie_id -> token_id``) and
+   ``processed/item_embeddings_*.pt`` (row-indexed by token id, row 0 = PAD).
+2. ``python run_tiger_movielens.py --mode prepare-data --vocab_path
+   ./data/ml-1m/processed/vocab.pkl`` to build ``inter.json`` whose item ids are
+   the *same token ids* as the embeddings (so everything lines up).
+3. Run RQ-VAE on those item embeddings to produce ``semantic_ids.json`` keyed by
+   the same token ids (e.g. an ``run_rqvae_amazon_books.py``-style RQ-VAE pointed
+   at the ml-1m embeddings).
+4. ``python run_tiger_movielens.py --mode train`` then ``--mode test``.
+
+Without ``--vocab_path``, ``prepare-data`` falls back to a standalone
+``movie_id -> 1..N`` mapping; then your RQ-VAE semantic ids must be keyed by
+those same ids, otherwise ``inter.json`` and ``semantic_ids.json`` will not line
+up.
 
 Examples
 --------
@@ -77,8 +89,11 @@ def generate_toy_data(args):
     """Write a small synthetic MovieLens-shaped toy dataset.
 
     Item ids 1..``--toy_num_items`` each get a unique 3-level semantic id
-    (codebook size 8 per level). Users get random-length item histories. Files
-    are written to the *exact* paths the loader reads from
+    (codebook size 8 per level). Each user's history is a deterministic
+    ``+1`` walk (``i -> i+1`` with wrap-around) so the next item is actually
+    *predictable*; this lets the toy ``--mode all`` run show non-trivial
+    hit@k / ndcg@k once training works, rather than random-level accuracy.
+    Files are written to the *exact* paths the loader reads from
     (``--data_inter_path`` / ``--data_indice_path``), so generated and read
     filenames are guaranteed to match.
     """
@@ -94,8 +109,10 @@ def generate_toy_data(args):
 
     inter_data = {}
     for user_id in range(args.toy_num_users):
-        length = rng.randint(5, 12)
-        inter_data[str(user_id)] = [rng.randint(1, num_items) for _ in range(length)]
+        length = rng.randint(6, 12)
+        start = rng.randint(1, num_items)
+        # Deterministic next-item rule: item i is followed by item i+1 (wrap).
+        inter_data[str(user_id)] = [(start - 1 + step) % num_items + 1 for step in range(length)]
 
     _write_json(args.data_inter_path, inter_data)
     _write_json(args.data_indice_path, index_data)
@@ -109,17 +126,43 @@ def generate_toy_data(args):
 # Real data preparation
 # =========================================================
 def prepare_data(args):
-    """Build ``inter.json`` + ``movie_id_map.json`` from MovieLens-1M ratings.
+    """Build ``inter.json`` (+ ``movie_id_map.json``) from MovieLens-1M ratings.
 
-    Reads ``ratings.dat`` (``UserID::MovieID::Rating::Timestamp``), keeps only
-    users with at least ``--min_seq_len`` interactions, orders each user's items
-    by timestamp, and remaps movie ids to contiguous 1-based item ids. Does
-    *not* produce ``semantic_ids.json`` — that comes from RQ-VAE (see the module
-    docstring).
+    Reads ``ratings.dat`` (``UserID::MovieID::Rating::Timestamp``), keeps users
+    with at least ``--min_seq_len`` interactions, and orders each user's items by
+    timestamp. The ``movie_id -> item_id`` mapping has two modes:
+
+    - **``--vocab_path`` given (recommended for real data)**: reuse the shared
+      HSTU/HLLM ``vocab.pkl`` (``item_to_idx``: ``movie_id -> token_id``) so the
+      ``inter.json`` item ids are the *same token ids* used by the item
+      embeddings and the RQ-VAE semantic ids. This is what keeps TIGER aligned
+      with the embeddings/semantic ids and consistent with the HSTU/HLLM
+      pipelines (all three share one id space). Movies absent from the vocab are
+      skipped.
+    - **otherwise**: build a standalone ``movie_id -> 1..N`` mapping. Only valid
+      if the semantic ids are generated from features indexed the same way.
+
+    Does not produce ``semantic_ids.json`` — that comes from running RQ-VAE on
+    the matching item embeddings; see the module docstring.
     """
     ratings_path = args.ratings_path
     if not os.path.isfile(ratings_path):
         raise FileNotFoundError(f"ratings.dat not found at {ratings_path}. Pass --ratings_path or run the ml-1m download first.")
+
+    # Optional: reuse the shared vocab so item ids == token ids (aligned with
+    # the HSTU/HLLM embeddings and the RQ-VAE semantic ids).
+    vocab_path = getattr(args, "vocab_path", None)
+    movie_to_item = None
+    if vocab_path:
+        if not os.path.isfile(vocab_path):
+            raise FileNotFoundError(f"vocab.pkl not found at {vocab_path}.")
+        import pickle
+
+        with open(vocab_path, "rb") as f:
+            vocab = pickle.load(f)
+        item_to_idx = vocab["item_to_idx"] if isinstance(vocab, dict) and "item_to_idx" in vocab else vocab
+        movie_to_item = {int(mid): int(tid) for mid, tid in item_to_idx.items() if int(tid) != 0}
+        print(f"Using shared vocab mapping from {vocab_path}: {len(movie_to_item)} items (token-id aligned)")
 
     user_items = defaultdict(list)  # user -> [(timestamp, movie_id), ...]
     with open(ratings_path, "r", encoding="latin-1") as f:
@@ -128,11 +171,17 @@ def prepare_data(args):
             if not line:
                 continue
             user_id, movie_id, _rating, timestamp = line.split("::")
-            user_items[user_id].append((int(timestamp), int(movie_id)))
+            movie_id = int(movie_id)
+            # When aligning to a vocab, drop interactions whose movie has no token
+            # (and therefore no embedding / semantic id).
+            if movie_to_item is not None and movie_id not in movie_to_item:
+                continue
+            user_items[user_id].append((int(timestamp), movie_id))
 
-    # Stable movie_id -> item_id mapping (1-based; 0 reserved for PAD).
-    movie_ids = sorted({mid for items in user_items.values() for _, mid in items})
-    movie_to_item = {mid: i + 1 for i, mid in enumerate(movie_ids)}
+    if movie_to_item is None:
+        # Stable standalone movie_id -> item_id mapping (1-based; 0 reserved for PAD).
+        movie_ids = sorted({mid for items in user_items.values() for _, mid in items})
+        movie_to_item = {mid: i + 1 for i, mid in enumerate(movie_ids)}
 
     inter_data = {}
     kept_users = 0
@@ -148,17 +197,22 @@ def prepare_data(args):
         inter_data[user_id] = seq
         kept_users += 1
 
+    referenced = {i for seq in inter_data.values() for i in seq}
     _write_json(args.data_inter_path, inter_data)
     map_path = os.path.join(os.path.dirname(args.data_inter_path) or ".", "movie_id_map.json")
     _write_json(map_path, {str(mid): item_id for mid, item_id in movie_to_item.items()})
 
     print("MovieLens-1M interaction data prepared:")
-    print(f"  users kept  : {kept_users} (>= {args.min_seq_len} interactions)")
-    print(f"  unique items: {len(movie_ids)}")
+    print(f"  users kept     : {kept_users} (>= {args.min_seq_len} interactions)")
+    print(f"  items referenced: {len(referenced)}")
     print(f"  inter        -> {args.data_inter_path}")
     print(f"  movie_id_map -> {map_path}")
-    print("\nNext: produce semantic_ids.json from RQ-VAE keyed by the SAME item ids,")
-    print(f"      and save it to {args.data_indice_path}")
+    if vocab_path:
+        print("\nNext: run RQ-VAE on the item embeddings (same vocab) to produce")
+        print(f"      semantic_ids.json (keyed by token id) at {args.data_indice_path}")
+    else:
+        print("\nNext: produce semantic_ids.json from RQ-VAE keyed by the SAME item ids,")
+        print(f"      and save it to {args.data_indice_path}")
 
 
 def _write_json(path, obj):
@@ -179,12 +233,16 @@ def load_inters_and_indices(args):
 # Train
 # =========================================================
 def train(args):
-    """Fine-tune TIGER on semantic-id sequences.
+    """Train TIGER from scratch on semantic-id sequences.
 
-    Adds the dataset's semantic-id tokens to the tokenizer *before* resizing the
-    embedding table, so tokens such as ``<a_1>`` map to single ids instead of
-    being split into subwords. Tokenizer and config are saved to ``--output_dir``
-    so ``test`` reloads the exact vocabulary.
+    Per the TIGER paper the T5 encoder-decoder is trained from scratch:
+    ``TIGERModel(config)`` builds the architecture from ``--base_model``'s config
+    with randomly initialized weights (no pretrained NL checkpoint is loaded,
+    since the semantic-ID vocabulary is not natural language). The dataset's
+    semantic-id tokens are added to the tokenizer *before* resizing the embedding
+    table, so tokens such as ``<a_1>`` map to single ids instead of being split
+    into subwords. Tokenizer and config are saved to ``--output_dir`` so ``test``
+    reloads the exact vocabulary.
     """
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -267,23 +325,26 @@ def test(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     tokenizer = T5Tokenizer.from_pretrained(ckpt, model_max_length=args.model_max_length)
-    config = T5Config.from_pretrained(ckpt)
 
     inters_json, indices_json = load_inters_and_indices(args)
     sample_num = args.sample_num if args.sample_num and args.sample_num > 0 else 0
     test_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="test", sample_num=sample_num)
 
+    # Load the model with the checkpoint's OWN config so the embedding size matches
+    # the saved weights. Passing a grown vocab_size into from_pretrained would raise
+    # an embedding-size mismatch before we ever reached resize_token_embeddings.
+    model = TIGERModel.from_pretrained(ckpt, low_cpu_mem_usage=False)
+
     # Defensive: if the checkpoint tokenizer is missing any semantic-id token
-    # (e.g. a vanilla T5 checkpoint), add them and resize before scoring.
+    # (e.g. a vanilla T5 checkpoint), add them and then resize the loaded model.
     num_added = tokenizer.add_tokens(test_data.get_new_tokens())
     if num_added:
         print(f"Checkpoint tokenizer was missing {num_added} semantic-id tokens; added them.")
-    config.vocab_size = len(tokenizer)
-
-    model = TIGERModel.from_pretrained(ckpt, config=config, low_cpu_mem_usage=False)
     if model.get_input_embeddings().weight.size(0) != len(tokenizer):
         model.resize_token_embeddings(len(tokenizer))
+
     model.to(device)
+    model.config.use_cache = True  # speed up constrained beam search
     model.eval()
 
     all_items = test_data.get_all_items()
@@ -414,6 +475,7 @@ def parse_args():
     # prepare-data (real ml-1m)
     parser.add_argument("--ratings_path", type=str, default="./data/ml-1m/ratings.dat", help="MovieLens-1M ratings.dat path")
     parser.add_argument("--min_seq_len", type=int, default=5, help="Minimum interactions per user for prepare-data")
+    parser.add_argument("--vocab_path", type=str, default=None, help="Shared HSTU/HLLM vocab.pkl; reuse its movie_id->token_id so inter.json item ids align with the item embeddings / RQ-VAE semantic ids")
 
     # train
     parser.add_argument("--optim", type=str, default="adamw_torch", help="Optimizer name")

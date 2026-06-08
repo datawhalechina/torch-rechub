@@ -52,15 +52,16 @@ Both scripts use `--mode` to select the stage(s):
 | --- | --- |
 | `generate-toy-data` | Write a small synthetic dataset to `--data_inter_path` / `--data_indice_path` (the exact paths the loader reads) |
 | `prepare-data` | MovieLens only: build `inter.json` and `movie_id_map.json` from the real `ratings.dat` |
-| `train` | Add semantic-ID tokens, `resize_token_embeddings`, fine-tune T5, save tokenizer / config / model to `--output_dir` |
+| `train` | Add semantic-ID tokens, `resize_token_embeddings`, train T5 from scratch (random init, no pretrained weights), save tokenizer / config / model to `--output_dir` |
 | `test` | Load from `--ckpt_path` (defaults to `--output_dir`), run constrained beam search, report hit@k / ndcg@k |
 | `all` | Run `generate-toy-data` → `train` → `test` (default) |
 
 Key implementation details:
 
+- **Trained from scratch, no pretrained weights**: per the TIGER paper the T5 encoder-decoder is randomly initialized and trained from scratch (the semantic-ID vocabulary is not natural language, so pretrained NL weights are not useful). `train()` builds the architecture from `--base_model`'s config via `TIGERModel(config)`; `--base_model` only supplies the architecture/config and tokenizer, not pretrained weights.
 - **Semantic-ID tokens must be added before training**: `train()` calls `tokenizer.add_tokens(dataset.get_new_tokens())` and then `resize_token_embeddings`; otherwise tokens like `<a_1>` are split into sub-words and training is meaningless.
 - **Generated and read paths are identical**: `generate-toy-data` writes to the same paths the dataset reads, avoiding a "generated filename ≠ read filename" mismatch.
-- **`test` loads the vocabulary from the checkpoint**: tokenizer / config / model all come from `--ckpt_path`, keeping the semantic-ID vocabulary consistent with training. If the checkpoint is missing some semantic-ID tokens, they are added and the embedding table is resized before evaluation.
+- **`test` loads weights with the checkpoint's own config**: this avoids passing a grown `vocab_size` into `from_pretrained` (which would raise an embedding-size mismatch); the tokenizer is then reconciled and the model resized only if needed before evaluation.
 
 ---
 

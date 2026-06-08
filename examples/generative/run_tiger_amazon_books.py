@@ -1,8 +1,11 @@
 """TIGER Model Example on Amazon-Books Dataset.
 
-TIGER fine-tunes a T5 seq2seq model to autoregressively generate the semantic
-ID of the next item. A semantic ID is a short tuple of codebook tokens (e.g.
-``<a_1><b_10>``) produced by RQ-VAE over item embeddings.
+TIGER trains a T5 seq2seq model **from scratch** to autoregressively generate
+the semantic ID of the next item. A semantic ID is a short tuple of codebook
+tokens (e.g. ``<a_1><b_10>``) produced by RQ-VAE over item embeddings. Following
+the TIGER paper, ``--base_model`` only supplies the T5 *architecture/config* and
+tokenizer; the transformer weights are randomly initialized, not loaded from a
+pretrained NL checkpoint (the semantic-ID vocabulary is not natural language).
 
 Run modes (``--mode``)
 ----------------------
@@ -10,8 +13,8 @@ Run modes (``--mode``)
     Write a tiny synthetic ``inter.json`` + ``semantic_ids.json`` to the exact
     paths the loader reads from, so the example is runnable end to end.
 ``train``
-    Register the semantic-id tokens, resize the embedding table, fine-tune T5,
-    and save tokenizer/config/model to ``--output_dir``.
+    Register the semantic-id tokens, resize the embedding table, train T5 from
+    scratch, and save tokenizer/config/model to ``--output_dir``.
 ``test``
     Load tokenizer/config/model from ``--ckpt_path`` (defaults to
     ``--output_dir``) and report hit@k / ndcg@k with constrained beam search.
@@ -131,12 +134,16 @@ def load_inters_and_indices(args):
 # Train
 # =========================================================
 def train(args):
-    """Fine-tune TIGER on semantic-id sequences.
+    """Train TIGER from scratch on semantic-id sequences.
 
-    Adds the dataset's semantic-id tokens to the tokenizer *before* resizing the
-    embedding table, so tokens such as ``<a_1>`` map to single ids instead of
-    being split into subwords. Tokenizer and config are saved to ``--output_dir``
-    so ``test`` reloads the exact vocabulary.
+    Per the TIGER paper the T5 encoder-decoder is trained from scratch:
+    ``TIGERModel(config)`` builds the architecture from ``--base_model``'s config
+    with randomly initialized weights (no pretrained NL checkpoint is loaded,
+    since the semantic-ID vocabulary is not natural language). The dataset's
+    semantic-id tokens are added to the tokenizer *before* resizing the embedding
+    table, so tokens such as ``<a_1>`` map to single ids instead of being split
+    into subwords. Tokenizer and config are saved to ``--output_dir`` so ``test``
+    reloads the exact vocabulary.
     """
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -219,23 +226,26 @@ def test(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     tokenizer = T5Tokenizer.from_pretrained(ckpt, model_max_length=args.model_max_length)
-    config = T5Config.from_pretrained(ckpt)
 
     inters_json, indices_json = load_inters_and_indices(args)
     sample_num = args.sample_num if args.sample_num and args.sample_num > 0 else 0
     test_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="test", sample_num=sample_num)
 
+    # Load the model with the checkpoint's OWN config so the embedding size matches
+    # the saved weights. Passing a grown vocab_size into from_pretrained would raise
+    # an embedding-size mismatch before we ever reached resize_token_embeddings.
+    model = TIGERModel.from_pretrained(ckpt, low_cpu_mem_usage=False)
+
     # Defensive: if the checkpoint tokenizer is missing any semantic-id token
-    # (e.g. a vanilla T5 checkpoint), add them and resize before scoring.
+    # (e.g. a vanilla T5 checkpoint), add them and then resize the loaded model.
     num_added = tokenizer.add_tokens(test_data.get_new_tokens())
     if num_added:
         print(f"Checkpoint tokenizer was missing {num_added} semantic-id tokens; added them.")
-    config.vocab_size = len(tokenizer)
-
-    model = TIGERModel.from_pretrained(ckpt, config=config, low_cpu_mem_usage=False)
     if model.get_input_embeddings().weight.size(0) != len(tokenizer):
         model.resize_token_embeddings(len(tokenizer))
+
     model.to(device)
+    model.config.use_cache = True  # speed up constrained beam search
     model.eval()
 
     all_items = test_data.get_all_items()

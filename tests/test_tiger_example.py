@@ -219,6 +219,39 @@ def test_movielens_prepare_data_from_ratings(tmp_path):
     assert inters["1"] == [3, 2, 1]
 
 
+@pytest.mark.skipif(not HAS_TRANSFORMERS, reason="transformers is not installed")
+def test_movielens_prepare_data_aligns_to_vocab(tmp_path):
+    """With --vocab_path, inter.json item ids are the vocab token ids (not a
+    standalone sorted mapping), and movies absent from the vocab are skipped."""
+    module = _load_example("run_tiger_movielens.py")
+    import json
+    import pickle
+
+    # Non-contiguous movie->token mapping proves we use the vocab, not sorting.
+    vocab = {"item_to_idx": {10: 1, 20: 2, 30: 3}, "idx_to_item": {1: 10, 2: 20, 3: 30}}
+    vocab_path = tmp_path / "vocab.pkl"
+    with open(vocab_path, "wb") as f:
+        pickle.dump(vocab, f)
+
+    ratings = tmp_path / "ratings.dat"
+    # u1: movies 30,10,20 (ts 3,1,2) -> chronological 10,20,30 -> token ids 1,2,3.
+    # movie 99 has no token -> dropped.
+    ratings.write_text("1::30::5::3\n1::10::4::1\n1::20::3::2\n1::99::5::4\n")
+    inter_path = tmp_path / "inter.json"
+    args = SimpleNamespace(
+        ratings_path=str(ratings),
+        data_inter_path=str(inter_path),
+        data_indice_path=str(tmp_path / "semantic_ids.json"),
+        vocab_path=str(vocab_path),
+        min_seq_len=3,
+        max_his_len=20,
+    )
+    module.prepare_data(args)
+
+    inters = json.loads(inter_path.read_text())
+    assert inters["1"] == [1, 2, 3]  # vocab token ids, chronological, movie 99 skipped
+
+
 @pytest.mark.slow
 @pytest.mark.skipif(not HAS_TRANSFORMERS, reason="transformers is not installed")
 def test_movielens_toy_end_to_end(tmp_path, monkeypatch):
