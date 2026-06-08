@@ -123,14 +123,60 @@ model = HLLMModel(
 - 需要生成式推荐的场景
 - 多模态推荐场景
 
-## 3. 模型比较
+## 3. TIGERModel
+
+### 功能描述
+
+TIGER（Transformer Index for GEnerative Recommenders）把推荐建模成"生成下一个 item 的语义 ID"的序列到序列任务。每个 item 先由 RQ-VAE 量化成一串 codebook token（语义 ID，如 `<a_1><b_3><c_5>`），TIGER 基于 T5 自回归地生成下一个 item 的语义 ID，再通过前缀受限的 beam search 约束到合法 item 上。`TIGERModel` 继承自 `transformers` 的 `T5ForConditionalGeneration`。
+
+### 核心原理
+
+- **语义 ID**：用 RQ-VAE 对 item embedding 做多级残差量化，得到每个 item 的 codebook token 序列，相似 item 共享前缀，天然带有层次结构。
+- **序列到序列**：输入是用户历史 item 的语义 ID 拼接，标签是下一个 item 的语义 ID，按 T5 的 teacher-forcing 交叉熵训练。
+- **新增 token**：训练前把所有语义 ID token 加入 tokenizer 并调用 `resize_token_embeddings`，否则 `<a_1>` 这类 token 会被 T5 切成子词。
+- **受限生成**：推理时用 `Trie` 构建 `prefix_allowed_tokens_fn`，保证 beam search 只生成语义 ID 表中合法的 item。
+
+### 使用方法
+
+完整工作流（生成 toy 数据 / 训练 / 测试，以及真实数据的 RQ-VAE → TIGER 流水线）见 [TIGER 复现说明](/zh/blog/tiger_reproduction) 与示例脚本 `examples/generative/run_tiger_movielens.py`、`run_tiger_amazon_books.py`。模型最小用法：
+
+```python
+from transformers import T5Config, T5Tokenizer
+
+from torch_rechub.models.generative.tiger import TIGERModel
+
+tokenizer = T5Tokenizer.from_pretrained("t5-small")
+tokenizer.add_tokens(["<a_1>", "<b_3>", "<c_5>"])  # 语义 ID token
+
+config = T5Config.from_pretrained("t5-small")
+config.vocab_size = len(tokenizer)
+model = TIGERModel(config)
+model.set_hyper(temperature=1.0)
+model.resize_token_embeddings(len(tokenizer))
+```
+
+### 参数说明
+
+| 参数 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| config | T5Config | T5 配置，其中 `vocab_size` 需为加入语义 ID token 之后的词表大小 | 必填 |
+| temperature | float | 通过 `set_hyper` 设置，用于缩放 logits 的温度 | 1.0 |
+
+### 适用场景
+
+- 基于语义 ID 的生成式检索
+- item 数量极大、需要压缩 item 表示的场景
+- 希望相似 item 共享前缀、提升冷启动与泛化的场景
+
+## 4. 模型比较
 
 | 模型 | 复杂度 | 表达能力 | 计算效率 | 适用场景 |
 | --- | --- | --- | --- | --- |
 | HSTUModel | 高 | 高 | 中 | 大规模序列推荐、长序列建模 |
 | HLLMModel | 高 | 高 | 低 | 融合LLM能力、文本信息丰富的场景 |
+| TIGERModel | 高 | 高 | 中 | 基于语义 ID 的生成式检索、超大 item 空间 |
 
-## 4. 使用建议
+## 5. 使用建议
 
 1. **根据业务需求选择模型**：
    - 大规模序列推荐场景推荐使用 HSTUModel
@@ -152,7 +198,7 @@ model = HLLMModel(
    - 采用服务化部署，支持高并发请求
    - 考虑使用边缘计算，将模型部署到边缘设备
 
-## 5. 代码示例：完整的生成式推荐模型训练流程
+## 6. 代码示例：完整的生成式推荐模型训练流程
 
 ```python
 import pickle
@@ -221,7 +267,7 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 6. 常见问题与解决方案
+## 7. 常见问题与解决方案
 
 ### Q: 如何处理大规模数据？
 A: 可以尝试以下方法：
@@ -251,7 +297,7 @@ A: 可以尝试以下方法：
 - 使用迁移学习，从其他相关领域迁移知识
 - 采用元学习，快速适应新用户或新物品
 
-## 7. 生成式推荐的应用场景
+## 8. 生成式推荐的应用场景
 
 1. **个性化内容生成**：
    - 生成个性化的推荐理由
@@ -273,7 +319,7 @@ A: 可以尝试以下方法：
    - 生成场景化的推荐内容
    - 支持复杂场景的推荐
 
-## 8. 未来发展趋势
+## 9. 未来发展趋势
 
 1. **大语言模型与推荐系统的深度融合**：
    - 更紧密地结合LLM和推荐系统的优势

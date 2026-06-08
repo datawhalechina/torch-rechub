@@ -123,14 +123,60 @@ model = HLLMModel(
 - Scenarios requiring generative recommendations
 - Multi-modal recommendation scenarios
 
-## 3. Model Comparison
+## 3. TIGERModel
+
+### Description
+
+TIGER (Transformer Index for GEnerative Recommenders) frames recommendation as a sequence-to-sequence task: "generate the semantic ID of the next item". Each item is first quantized by RQ-VAE into a short tuple of codebook tokens (a *semantic ID*, e.g. `<a_1><b_3><c_5>`); TIGER autoregressively generates the next item's semantic ID on top of T5, then constrains beam search to legal items via a prefix trie. `TIGERModel` subclasses `transformers`' `T5ForConditionalGeneration`.
+
+### Core Principles
+
+- **Semantic IDs**: RQ-VAE applies multi-level residual quantization over item embeddings, giving each item a tuple of codebook tokens. Similar items share prefixes, producing a natural hierarchy.
+- **Seq-to-seq**: the input is the concatenated semantic IDs of a user's history; the label is the next item's semantic ID, trained with T5 teacher-forcing cross-entropy.
+- **New tokens**: all semantic-ID tokens are added to the tokenizer and `resize_token_embeddings` is called *before* training, otherwise tokens like `<a_1>` are split into sub-words.
+- **Constrained generation**: at inference a `Trie` builds a `prefix_allowed_tokens_fn` so beam search only emits semantic IDs that exist in the item table.
+
+### Usage
+
+The full workflow (generate toy data / train / test, plus the RQ-VAE → TIGER pipeline for real data) is documented in the [TIGER Reproduction Notes](/blog/tiger_reproduction) and the example scripts `examples/generative/run_tiger_movielens.py` / `run_tiger_amazon_books.py`. Minimal model usage:
+
+```python
+from transformers import T5Config, T5Tokenizer
+
+from torch_rechub.models.generative.tiger import TIGERModel
+
+tokenizer = T5Tokenizer.from_pretrained("t5-small")
+tokenizer.add_tokens(["<a_1>", "<b_3>", "<c_5>"])  # semantic-ID tokens
+
+config = T5Config.from_pretrained("t5-small")
+config.vocab_size = len(tokenizer)
+model = TIGERModel(config)
+model.set_hyper(temperature=1.0)
+model.resize_token_embeddings(len(tokenizer))
+```
+
+### Parameters
+
+| Parameter | Type | Description | Default |
+| --- | --- | --- | --- |
+| config | T5Config | T5 config; `vocab_size` must match the tokenizer size *after* adding semantic-ID tokens | required |
+| temperature | float | Logit temperature, set via `set_hyper` | 1.0 |
+
+### Use Cases
+
+- Semantic-ID based generative retrieval
+- Very large item catalogs that benefit from compressed item representations
+- Scenarios where prefix-sharing across similar items improves cold-start and generalization
+
+## 4. Model Comparison
 
 | Model | Complexity | Expressiveness | Efficiency | Use Cases |
 | --- | --- | --- | --- | --- |
 | HSTUModel | High | High | Medium | Large-scale sequence recommendation, long sequence modeling |
 | HLLMModel | High | High | Low | LLM integration, text-rich scenarios |
+| TIGERModel | High | High | Medium | Semantic-ID generative retrieval, very large item spaces |
 
-## 4. Usage Recommendations
+## 5. Usage Recommendations
 
 1. **Choose models based on business requirements**:
    - For large-scale sequence recommendation, use HSTUModel
@@ -152,7 +198,7 @@ model = HLLMModel(
    - Use service-oriented deployment to support high-concurrency requests
    - Consider edge computing to deploy models on edge devices
 
-## 5. Complete Training Example
+## 6. Complete Training Example
 
 ```python
 import pickle
@@ -221,7 +267,7 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 6. FAQ
+## 7. FAQ
 
 ### Q: How to handle large-scale data?
 A: Try the following approaches:
@@ -251,7 +297,7 @@ A: Try the following approaches:
 - Use transfer learning to transfer knowledge from related domains
 - Use meta-learning to quickly adapt to new users or items
 
-## 7. Application Scenarios
+## 8. Application Scenarios
 
 1. **Personalized Content Generation**:
    - Generate personalized recommendation reasons
@@ -273,7 +319,7 @@ A: Try the following approaches:
    - Generate context-aware recommendation content
    - Support complex scenario recommendations
 
-## 8. Future Trends
+## 9. Future Trends
 
 1. **Deep Integration of LLMs and Recommendation Systems**:
    - More tightly combine the advantages of LLMs and recommendation systems
