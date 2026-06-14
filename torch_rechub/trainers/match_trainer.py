@@ -7,6 +7,7 @@ from sklearn.metrics import roc_auc_score
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import BPRLoss, RegularizationLoss
 from ..utils.match import gather_inbatch_logits, inbatch_negative_sampling
+from .trainer_utils import build_scheduler, get_current_lr, step_scheduler
 
 
 class MatchTrainer(object):
@@ -91,9 +92,7 @@ class MatchTrainer(object):
         else:
             raise ValueError("mode only contain value in %s, but got %s" % ([0, 1, 2], mode))
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
-        self.scheduler = None
-        if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+        self.scheduler = build_scheduler(self.optimizer, scheduler_fn, scheduler_params)
         self.evaluate_fn = roc_auc_score  # default evaluate function
         self.n_epoch = n_epoch
         self.early_stopper = EarlyStopper(patience=earlystop_patience)
@@ -184,12 +183,7 @@ class MatchTrainer(object):
             train_loss = self.train_one_epoch(train_dataloader)
 
             for logger in self._iter_loggers():
-                logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
-
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  # update lr in epoch level by scheduler
+                logger.log_metrics({'train/loss': train_loss, 'learning_rate': get_current_lr(self.optimizer)}, step=epoch_i)
 
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
@@ -198,10 +192,15 @@ class MatchTrainer(object):
                 for logger in self._iter_loggers():
                     logger.log_metrics({'val/auc': auc}, step=epoch_i)
 
+                if self.scheduler is not None and step_scheduler(self.scheduler, auc):
+                    print("Current lr : {}".format(get_current_lr(self.optimizer)))
+
                 if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
+            elif self.scheduler is not None and step_scheduler(self.scheduler):
+                print("Current lr : {}".format(get_current_lr(self.optimizer)))
 
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
 

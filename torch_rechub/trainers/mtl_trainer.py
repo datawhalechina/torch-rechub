@@ -10,6 +10,7 @@ from ..basic.loss_func import RegularizationLoss
 from ..models.multi_task import ESMM
 from ..utils.data import get_loss_func, get_metric_func
 from ..utils.mtl import MetaBalance, gradnorm, shared_task_layers
+from .trainer_utils import build_scheduler, step_scheduler
 
 
 class MTLTrainer(object):
@@ -86,9 +87,9 @@ class MTLTrainer(object):
                 self.model.add_module("loss weight", self.loss_weight)
         if self.adaptive_method != "metabalance":
             self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default Adam optimizer
-        self.scheduler = None
-        if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+        if self.adaptive_method == "metabalance" and scheduler_fn is not None:
+            raise ValueError("scheduler_fn is not supported with adaptive_params={'method': 'metabalance'} because it uses separate task/share optimizers.")
+        self.scheduler = build_scheduler(getattr(self, "optimizer", None), scheduler_fn, scheduler_params)
         self.loss_fns = [get_loss_func(task_type) for task_type in task_types]
         self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
         self.n_epoch = n_epoch
@@ -113,10 +114,11 @@ class MTLTrainer(object):
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for iter_i, (x_dict, ys) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
-            ys = ys.to(self.device)
+            ys = self._prepare_targets(ys)
             y_preds = self.model(x_dict)
             loss_list = [self.loss_fns[i](y_preds[:, i], ys[:, i].float()) for i in range(self.n_task)]
-            if isinstance(self.model, ESMM):
+            base_model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
+            if isinstance(base_model, ESMM):
                 # ESSM only compute loss for ctr and ctcvr task
                 loss = sum(loss_list[1:])
             else:
@@ -178,13 +180,11 @@ class MTLTrainer(object):
             if lr_value is not None:
                 logs['learning_rate'] = lr_value
 
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  # update lr in epoch level by scheduler
-
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
+
+            if self.scheduler is not None and step_scheduler(self.scheduler, scores[self.earlystop_taskid]):
+                print("Current lr : {}".format(self._current_lr()))
 
             for task_id, score in enumerate(scores):
                 logs[f'val/task_{task_id}_score'] = score
@@ -235,6 +235,38 @@ class MTLTrainer(object):
             return self.optimizer.param_groups[0]['lr']
         return None
 
+    def _prepare_targets(self, ys):
+        """Normalize batched multi-task labels to shape ``[batch_size, n_task]``."""
+        if torch.is_tensor(ys):
+            targets = ys.to(self.device)
+        elif isinstance(ys, (list, tuple)):
+            target_list = []
+            for y in ys:
+                if not torch.is_tensor(y):
+                    y = torch.as_tensor(y)
+                y = y.to(self.device)
+                if y.dim() == 0:
+                    y = y.view(1, 1)
+                elif y.dim() == 1:
+                    y = y.view(-1, 1)
+                else:
+                    y = y.view(y.size(0), -1)
+                target_list.append(y)
+            targets = torch.cat(target_list, dim=1)
+        else:
+            targets = torch.as_tensor(ys, device=self.device)
+
+        if targets.dim() == 1:
+            if targets.numel() % self.n_task != 0:
+                raise ValueError(f"Cannot reshape targets of shape {tuple(targets.shape)} into {self.n_task} tasks.")
+            targets = targets.view(-1, self.n_task)
+        elif targets.dim() > 2:
+            targets = targets.view(targets.size(0), -1)
+
+        if targets.size(1) != self.n_task:
+            raise ValueError(f"Expected {self.n_task} task targets, got shape {tuple(targets.shape)}.")
+        return targets
+
     def evaluate(self, model, data_loader):
         model.eval()
         targets, predicts = list(), list()
@@ -242,7 +274,7 @@ class MTLTrainer(object):
             tk0 = tqdm.tqdm(data_loader, desc="validation", smoothing=0, mininterval=1.0)
             for i, (x_dict, ys) in enumerate(tk0):
                 x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
-                ys = ys.to(self.device)
+                ys = self._prepare_targets(ys)
                 y_preds = self.model(x_dict)
                 targets.extend(ys.tolist())
                 predicts.extend(y_preds.tolist())
