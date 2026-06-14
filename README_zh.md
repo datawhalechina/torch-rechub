@@ -311,7 +311,7 @@ model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_par
 
 mtl_trainer = MTLTrainer(model)
 mtl_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+auc = mtl_trainer.evaluate(mtl_trainer.model, test_dataloader)
 mtl_trainer.export_onnx("mmoe.onnx")
 ```
 
@@ -340,7 +340,7 @@ match_trainer.fit(train_dl)
 match_trainer.export_onnx("dssm.onnx")
 # 双塔模型可分别导出用户塔和物品塔:
 # match_trainer.export_onnx("user_tower.onnx", mode="user")
-# match_trainer.export_onnx("dssm_item.onnx", tower="item")
+# match_trainer.export_onnx("item_tower.onnx", mode="item")
 ```
 
 ### 模型可视化

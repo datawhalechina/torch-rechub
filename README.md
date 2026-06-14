@@ -307,7 +307,7 @@ model = MMOE(features, task_types, 8, expert_params={"dims": [32,16]}, tower_par
 
 mtl_trainer = MTLTrainer(model)
 mtl_trainer.fit(train_dataloader, val_dataloader)
-auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
+auc = mtl_trainer.evaluate(mtl_trainer.model, test_dataloader)
 mtl_trainer.export_onnx("mmoe.onnx")
 ```
 

@@ -30,6 +30,41 @@ def test_inbatch_negative_sampling_hard_negative():
     assert torch.equal(neg_idx.squeeze(1), torch.tensor([2, 2, 1]))
 
 
+def test_dssm_temperature_scales_similarity_score():
+    torch.manual_seed(7)
+    user_features = [SparseFeature("user_id", vocab_size=16, embed_dim=8)]
+    item_features = [SparseFeature("item_id", vocab_size=16, embed_dim=8)]
+
+    base_model = DSSM(
+        user_features,
+        item_features,
+        user_params={"dims": [8], "dropout": 0.0},
+        item_params={"dims": [8], "dropout": 0.0},
+        temperature=1.0,
+    )
+    scaled_model = DSSM(
+        user_features,
+        item_features,
+        user_params={"dims": [8], "dropout": 0.0},
+        item_params={"dims": [8], "dropout": 0.0},
+        temperature=0.05,
+    )
+    scaled_model.load_state_dict(base_model.state_dict())
+    base_model.eval()
+    scaled_model.eval()
+
+    x = {
+        "user_id": torch.tensor([1, 2, 3, 4]),
+        "item_id": torch.tensor([4, 3, 2, 1]),
+    }
+
+    with torch.no_grad():
+        base_output = base_model(x)
+        scaled_output = scaled_model(x)
+
+    assert not torch.allclose(base_output, scaled_output)
+
+
 def _build_small_match_dataloader():
     np.random.seed(42)
     n_users, n_items, n_samples = 12, 24, 80
