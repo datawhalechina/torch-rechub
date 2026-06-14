@@ -48,7 +48,7 @@ class DSSM(torch.nn.Module):
 
 # calculate cosine score
         y = torch.mul(user_embedding, item_embedding).sum(dim=1)
-        # y = y / self.temperature
+        y = y / self.temperature
         return torch.sigmoid(y)
 
     def user_tower(self, x):

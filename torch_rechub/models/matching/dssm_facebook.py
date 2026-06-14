@@ -18,8 +18,8 @@ class FaceBookDSSM(torch.nn.Module):
 
     Args:
         user_features (list[Feature Class]): training by the user tower module.
-        pos_item_features (list[Feature Class]): negative sample features, training by the item tower module.
-        neg_item_features (list[Feature Class]): positive sample features, training by the item tower module.
+        pos_item_features (list[Feature Class]): positive sample features, training by the item tower module.
+        neg_item_features (list[Feature Class]): negative sample features, training by the item tower module.
         temperature (float): temperature factor for similarity score, default to 1.0.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
