@@ -82,8 +82,8 @@ def test_scalar_int_arrays(dtype: pa.DataType) -> None:
 
     # Then
     assert isinstance(tensor, torch.Tensor)
-    assert tensor.dtype == torch.float32
-    assert np.allclose(tensor.tolist(), [1.0, 2.0, 3.0])
+    assert tensor.dtype == torch.int64
+    assert tensor.tolist() == [1, 2, 3]
 
     # Given
     array = pa.array([None, None, 3], type=dtype)
@@ -95,6 +95,19 @@ def test_scalar_int_arrays(dtype: pa.DataType) -> None:
     assert isinstance(tensor, torch.Tensor)
     assert tensor.dtype == torch.float32
     assert np.allclose(tensor.tolist(), [np.nan, np.nan, 3.0], equal_nan=True)
+
+
+def test_scalar_large_int_arrays_keep_precision() -> None:
+    # Given: 2**24 + 1 cannot be represented exactly as float32.
+    value = 16_777_217
+    array = pa.array([value], type=pa.int64())
+
+    # When
+    tensor = pa_array_to_tensor(array)
+
+    # Then
+    assert tensor.dtype == torch.int64
+    assert tensor.tolist() == [value]
 
 
 ###############
@@ -174,8 +187,8 @@ def test_nested_int_arrays(dtype: pa.DataType) -> None:
 
     # Then
     assert isinstance(tensor, torch.Tensor)
-    assert tensor.dtype == torch.float32
-    assert np.allclose(tensor.tolist(), [[1.0], [2.0]])
+    assert tensor.dtype == torch.int64
+    assert tensor.tolist() == [[1], [2]]
 
     # Given
     array = pa.array([[None], [None]], type=pa.list_(dtype))

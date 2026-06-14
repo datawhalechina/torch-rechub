@@ -28,7 +28,7 @@ def pa_array_to_tensor(arr: pa.Array) -> torch.Tensor:
         if the nested array is ragged (unequal lengths of each row).
     """
     if _is_supported_scalar(arr.type):
-        arr = pc.cast(arr, pa.float32())
+        arr = _cast_array_for_tensor(arr)
         return torch.from_numpy(_to_writable_numpy(arr))
 
     if not _is_supported_list(arr.type):
@@ -40,7 +40,8 @@ def pa_array_to_tensor(arr: pa.Array) -> torch.Tensor:
     if len(pc.unique(pc.list_value_length(arr))) > 1:
         raise ValueError("Cannot convert the ragged nested array.")
 
-    arr = pc.cast(arr, pa.list_(pa.float32()))
+    value_type = _target_value_type_for_tensor(arr.type.value_type, _has_nulls(arr.values))  # type: ignore[attr-defined]
+    arr = pc.cast(arr, pa.list_(value_type))
     np_arr = _to_writable_numpy(arr.values)  # type: ignore[attr-defined]
 
     # For empty list-of-lists, define output shape as (0, 0); otherwise infer width.
@@ -58,6 +59,21 @@ def _is_supported_list(t: pa.DataType) -> bool:
 def _is_supported_scalar(t: pa.DataType) -> bool:
     """Check if the given PyArrow data type is a supported scalar type."""
     return pt.is_boolean(t) or pt.is_floating(t) or pt.is_integer(t) or pt.is_null(t)
+
+
+def _cast_array_for_tensor(arr: pa.Array) -> pa.Array:
+    """Cast Arrow arrays to tensor-friendly types without losing integer IDs."""
+    return pc.cast(arr, _target_value_type_for_tensor(arr.type, _has_nulls(arr)))
+
+
+def _has_nulls(arr: pa.Array) -> bool:
+    return bool(pc.any(pc.is_null(arr)).as_py())
+
+
+def _target_value_type_for_tensor(t: pa.DataType, has_nulls: bool) -> pa.DataType:
+    if pt.is_integer(t) and not has_nulls:
+        return pa.int64()
+    return pa.float32()
 
 
 def _to_writable_numpy(arr: pa.Array) -> npt.NDArray:
