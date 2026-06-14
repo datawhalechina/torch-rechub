@@ -107,5 +107,26 @@ def test_ranking_e2e(model_class, ranking_data):
         assert 0.0 <= auc <= 1.0, f"AUC for {model_name} is out of range: {auc}"
 
 
+def test_ctr_trainer_accepts_scheduler_without_step_size(ranking_data):
+    """Schedulers such as CosineAnnealingLR do not expose ``step_size``."""
+    model = rk.WideDeep(
+        wide_features=ranking_data["dense_feats"],
+        deep_features=ranking_data["sparse_feats"],
+        mlp_params={"dims": [32]},
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        trainer = CTRTrainer(
+            model,
+            optimizer_params={"lr": 0.01},
+            scheduler_fn=torch.optim.lr_scheduler.CosineAnnealingLR,
+            scheduler_params={"T_max": 2},
+            n_epoch=1,
+            device='cpu',
+            model_path=temp_dir,
+        )
+        trainer.fit(ranking_data["train_dl"], ranking_data["val_dl"])
+
+
 if __name__ == '__main__':
     pytest.main(['-v', __file__])

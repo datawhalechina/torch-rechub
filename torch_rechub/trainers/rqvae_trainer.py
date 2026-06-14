@@ -5,6 +5,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from .trainer_utils import build_scheduler
+
 
 class Trainer(object):
     """Training utility class for PyTorch models.
@@ -63,9 +65,7 @@ class Trainer(object):
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
-        self.scheduler = None
-        if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+        self.scheduler = build_scheduler(self.optimizer, scheduler_fn, scheduler_params)
         self.model_path = model_path
         self.model_logger = model_logger
         self.eval_step = eval_step

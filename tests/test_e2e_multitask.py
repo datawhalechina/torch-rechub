@@ -94,5 +94,33 @@ def test_multitask_e2e(model_class, mtl_data):
             break  # Run only one batch for speed
 
 
+def test_mtl_trainer_accepts_list_targets(mtl_data):
+    """Default DataLoader collate can return multi-task labels as a list."""
+    features = mtl_data["features"]
+    task_types = mtl_data["task_types"]
+    n_tasks = mtl_data["n_tasks"]
+
+    model = mtl.SharedBottom(
+        features=features,
+        task_types=task_types,
+        bottom_params={"dims": [32]},
+        tower_params_list=[{"dims": [16]}] * n_tasks,
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        trainer = MTLTrainer(
+            model,
+            task_types=task_types,
+            optimizer_params={"lr": 0.01},
+            n_epoch=1,
+            device='cpu',
+            model_path=temp_dir,
+        )
+        loss_list = trainer.train_one_epoch(mtl_data["dataloader"])
+
+    assert len(loss_list) == n_tasks
+    assert all(isinstance(loss, float) for loss in loss_list)
+
+
 if __name__ == '__main__':
     pytest.main(['-v', __file__])

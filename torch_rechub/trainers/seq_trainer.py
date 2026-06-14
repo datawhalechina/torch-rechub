@@ -8,6 +8,7 @@ import tqdm
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import NCELoss
+from .trainer_utils import build_scheduler, get_current_lr, step_scheduler
 
 
 class SeqTrainer(object):
@@ -75,9 +76,7 @@ class SeqTrainer(object):
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
-        self.scheduler = None
-        if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+        self.scheduler = build_scheduler(self.optimizer, scheduler_fn, scheduler_params)
 
         # 损失函数
         if loss_type == 'nce':
@@ -117,12 +116,7 @@ class SeqTrainer(object):
             history['train_loss'].append(train_loss)
 
             # Collect metrics
-            logs = {'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}
-
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  # update lr in epoch level by scheduler
+            logs = {'train/loss': train_loss, 'learning_rate': get_current_lr(self.optimizer)}
 
             # 验证阶段
             if val_dataloader:
@@ -136,11 +130,16 @@ class SeqTrainer(object):
 
                 print(f"epoch: {epoch_i}, validation: loss: {val_loss:.4f}, accuracy: {val_accuracy:.4f}")
 
+                if self.scheduler is not None and step_scheduler(self.scheduler, val_loss):
+                    print("Current lr : {}".format(get_current_lr(self.optimizer)))
+
                 # 早停
                 if self.early_stopper.stop_training(val_accuracy, self.model.state_dict()):
                     print(f'validation: best accuracy: {self.early_stopper.best_auc}')
                     self.model.load_state_dict(self.early_stopper.best_weights)
                     break
+            elif self.scheduler is not None and step_scheduler(self.scheduler):
+                print("Current lr : {}".format(get_current_lr(self.optimizer)))
 
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_i)
