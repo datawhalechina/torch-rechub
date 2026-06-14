@@ -65,13 +65,14 @@ class DataGenerator(object):
         self.dataset = TorchDataset(x, y)
         self.length = len(self.dataset)
 
-    def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16, num_workers=0):
+    def generate_dataloader(self, x_val=None, y_val=None, x_test=None, y_test=None, split_ratio=None, batch_size=16, num_workers=0, seed=None, generator=None):
         if split_ratio is not None:
             train_length = int(self.length * split_ratio[0])
             val_length = int(self.length * split_ratio[1])
             test_length = self.length - train_length - val_length
             print("the samples of train : val : test are  %d : %d : %d" % (train_length, val_length, test_length))
-            train_dataset, val_dataset, test_dataset = random_split(self.dataset, (train_length, val_length, test_length))
+            split_generator = _resolve_generator(seed=seed, generator=generator)
+            train_dataset, val_dataset, test_dataset = random_split(self.dataset, (train_length, val_length, test_length), generator=split_generator)
         else:
             train_dataset = self.dataset
             val_dataset = TorchDataset(x_val, y_val)
@@ -81,6 +82,16 @@ class DataGenerator(object):
         val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return train_dataloader, val_dataloader, test_dataloader
+
+
+def _resolve_generator(seed=None, generator=None):
+    if seed is not None and generator is not None:
+        raise ValueError("seed and generator cannot be used at the same time")
+    if generator is not None:
+        return generator
+    if seed is None:
+        return None
+    return torch.Generator().manual_seed(seed)
 
 
 def get_auto_embedding_dim(num_classes):
@@ -484,7 +495,7 @@ class SequenceDataGenerator(object):
         # Underlying dataset
         self.dataset = SeqDataset(seq_tokens, seq_positions, targets, seq_time_diffs)
 
-    def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None, shuffle=True):
+    def generate_dataloader(self, batch_size=32, num_workers=0, split_ratio=None, shuffle=True, seed=None, generator=None):
         """Generate dataloader(s) from the dataset.
 
         Parameters
@@ -500,6 +511,10 @@ class SequenceDataGenerator(object):
         shuffle : bool, default=True
             Whether to shuffle data. Only applies when split_ratio is None.
             When split_ratio is provided, train data is always shuffled.
+        seed : int or None, default=None
+            Random seed used by ``random_split`` when ``split_ratio`` is provided.
+        generator : torch.Generator or None, default=None
+            Explicit generator used by ``random_split``. Cannot be used together with ``seed``.
 
         Returns
         -------
@@ -531,7 +546,8 @@ class SequenceDataGenerator(object):
         val_size = int(total_size * split_ratio[1])
         test_size = total_size - train_size - val_size
 
-        train_dataset, val_dataset, test_dataset = random_split(self.dataset, [train_size, val_size, test_size])
+        split_generator = _resolve_generator(seed=seed, generator=generator)
+        train_dataset, val_dataset, test_dataset = random_split(self.dataset, [train_size, val_size, test_size], generator=split_generator)
 
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
