@@ -609,6 +609,27 @@ class MultiInterestSA(nn.Module):
         return multi_interest_emb
 
 
+def dynamic_interest_mask(mask, interest_num):
+    """Per-user active-interest mask following the MIND paper's heuristic.
+
+    Sizes the number of interests by history length
+    ``K'_u = max(1, min(interest_num, floor(log2(|I_u|))))`` where ``|I_u|`` is
+    each user's interacted-item count (``mask.sum(-1)``).
+
+    Args:
+        mask (Tensor): history mask ``(B, L)`` with 1 for real items, 0 for padding.
+        interest_num (int): upper bound ``K`` on the number of interests.
+
+    Returns:
+        Tensor: boolean ``(B, interest_num)`` mask, ``True`` for the first
+        ``K'_u`` (active) interests of each user.
+    """
+    hist_len = mask.sum(dim=1).float().clamp(min=1.0)  # |I_u|, >=1 to keep log2 finite
+    k_u = torch.floor(torch.log2(hist_len)).clamp(min=1, max=interest_num)  # (B,)
+    idx = torch.arange(interest_num, device=mask.device).view(1, -1)  # (1, K)
+    return idx < k_u.unsqueeze(1)  # (B, K)
+
+
 class CapsuleNetwork(nn.Module):
     """Capsule network for multi-interest (MIND/Comirec).
 
@@ -621,11 +642,16 @@ class CapsuleNetwork(nn.Module):
     bilinear_type : {0, 1, 2}, default 2
         0 for MIND, 2 for ComirecDR.
     interest_num : int, default 4
-        Number of interests.
+        Number of interests (the upper bound ``K`` when ``dynamic_interest``).
     routing_times : int, default 3
         Routing iterations.
     relu_layer : bool, default False
         Whether to apply ReLU after routing.
+    dynamic_interest : bool, default False
+        If ``True``, size the active interests per user by the MIND paper's
+        heuristic ``K'_u = max(1, min(interest_num, floor(log2(|I_u|))))``
+        (|I_u| = history length from ``mask``); surplus capsules are zeroed.
+        If ``False`` (default), every user gets the full ``interest_num``.
 
     Shape
     -----
@@ -636,13 +662,14 @@ class CapsuleNetwork(nn.Module):
         ``(B, interest_num, D)``
     """
 
-    def __init__(self, embedding_dim, seq_len, bilinear_type=2, interest_num=4, routing_times=3, relu_layer=False):
+    def __init__(self, embedding_dim, seq_len, bilinear_type=2, interest_num=4, routing_times=3, relu_layer=False, dynamic_interest=False):
         super(CapsuleNetwork, self).__init__()
         self.embedding_dim = embedding_dim  # h
         self.seq_len = seq_len  # s
         self.bilinear_type = bilinear_type
         self.interest_num = interest_num
         self.routing_times = routing_times
+        self.dynamic_interest = dynamic_interest
 
         self.relu_layer = relu_layer
         self.stop_grad = True
@@ -678,12 +705,19 @@ class CapsuleNetwork(nn.Module):
         else:
             capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
 
+        # Per-user active-interest mask (paper's K'_u); None keeps the fixed-K behaviour.
+        interest_mask = dynamic_interest_mask(mask, self.interest_num).unsqueeze(-1).float() if self.dynamic_interest else None
+
         for i in range(self.routing_times):  # 动态路由传播3次
             atten_mask = torch.unsqueeze(mask, 1).repeat(1, self.interest_num, 1)
             paddings = torch.zeros_like(atten_mask, dtype=torch.float)
 
             capsule_softmax_weight = F.softmax(capsule_weight, dim=-1)
             capsule_softmax_weight = torch.where(torch.eq(atten_mask, 0), paddings, capsule_softmax_weight)
+            if interest_mask is not None:
+                # Zero the routing weight of surplus (inactive) capsules so they
+                # receive no item mass and collapse to zero interest vectors.
+                capsule_softmax_weight = capsule_softmax_weight * interest_mask
             capsule_softmax_weight = torch.unsqueeze(capsule_softmax_weight, 2)
 
             if i < 2:
@@ -704,6 +738,9 @@ class CapsuleNetwork(nn.Module):
                 interest_capsule = scalar_factor * interest_capsule
 
         interest_capsule = torch.reshape(interest_capsule, (-1, self.interest_num, self.embedding_dim))
+
+        if interest_mask is not None:
+            interest_capsule = interest_capsule * interest_mask
 
         if self.relu_layer:
             interest_capsule = self.relu(interest_capsule)
