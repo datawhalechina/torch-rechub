@@ -6,7 +6,7 @@
 
   使用其中带label的`train.txt`。
 
-- 全量csv数据下载：https://cowtransfer.com/s/3f5e873a254b43
+- 全量csv数据下载：https://aistudio.baidu.com/dataset/detail/389642
 
 - 使用方法
 
@@ -29,7 +29,7 @@
 
 - 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Electronics数据集
 
-- 预处理后的全量数据下载地址：https://cowtransfer.com/s/e911569fbb1043 
+- 预处理后的全量数据下载地址：https://aistudio.baidu.com/dataset/detail/355993
 
 - 使用方法
 
@@ -45,8 +45,8 @@
 
 该数据集对不同种类商品进行了分类，Beauty数据集该类目包含120W个用户、24W条商品的信息，共计200W条数据。
 
-- 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Beauty中ratings数据集；
-- 预处理后的全量数据下载地址：https://cowtransfer.com/s/0765971f36e44d
+- 原始数据地址：https://cseweb.ucsd.edu/~jmcauley/datasets/amazon/links.html  进入之后选择Beauty中ratings数据集；
+- 预处理后的全量数据下载地址：https://aistudio.baidu.com/dataset/detail/391611
 
 
 
@@ -56,8 +56,8 @@
 
 该数据集对不同种类商品进行了分类，Beauty数据集该类目包含800W个用户、200W条商品的信息，共计2000W条数据。
 
-- 原始数据地址：http://jmcauley.ucsd.edu/data/amazon/index_2014.html  进入之后选择Books中ratings数据集；
-- 预处理后的全量数据下载地址：https://cowtransfer.com/s/2c73f60d514049
+- 原始数据地址：https://cseweb.ucsd.edu/~jmcauley/datasets/amazon/links.html  进入之后选择Books中ratings数据集；
+- 预处理后的全量数据下载地址：https://aistudio.baidu.com/dataset/detail/391614
 
 
 
@@ -136,9 +136,9 @@ test:用于测试模型预测的1天广告数据，约四百六十万。
 
 阿里速卖通数据，一共有16个sparse特征，63个dense特征，包含“曝光”、“点击”、“转化”三个标签，原始数据已对dense特征进行归一化预处理。原始数据一共有5个csv，这里只使用US地区数据进行测试。
 
-- 原始数据地址:https://tianchi.aliyun.com/dataset/dataDetail?dataId=74690&lang=en-us
+- 原始数据地址:https://aistudio.baidu.com/datasetdetail/172300
 
-- 预处理后数据：https://cowtransfer.com/s/7080e52e5f4f4a
+- 预处理后数据：https://aistudio.baidu.com/aistudio/datasetdetail/321095
 
 ## Census-Income
 
@@ -148,8 +148,8 @@ test:用于测试模型预测的1天广告数据，约四百六十万。
   - 在论文MMOE的实验组1与PLE中，均将收入预测作为主任务，婚姻状态预测作为辅助任务。
   - 为了统一对所有多任务模型进行实验，我们按ESMM的设定，将收入预测作为CTR任务，将婚姻状态预测作为CVR任务。
   - 对原始数据的处理参考`preprocess_census.py`
-- 原始数据地址：http://archive.ics.uci.edu/ml/datasets/Census-Income+(KDD)
-- 预处理之后的数据下载地址：https://cowtransfer.com/s/e8b67418ce044c
+- 原始数据地址：https://archive.ics.uci.edu/dataset/117/census+income+kdd
+- 预处理之后的数据下载地址：https://aistudio.baidu.com/dataset/detail/390912
 - 使用方法
 
 ```shell
