@@ -57,7 +57,7 @@ generative = [
     "transformers>=4.46.3",
 ]
 bigdata = [
-    "pyarrow>=21,<23",
+    "pyarrow>=21,<25",
 ]
 onnx = [
     "ml-dtypes>=0.5.0",
@@ -88,7 +88,7 @@ all = [
     "pymilvus>=2.6.5",
     "accelerate>=1.0.1",
     "transformers>=4.46.3",
-    "pyarrow>=21,<23",
+    "pyarrow>=21,<25",
     "ml-dtypes>=0.5.0",
     "onnx>=1.14.0",
     "onnxscript>=0.1.0",
