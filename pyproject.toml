@@ -50,7 +50,7 @@ dependencies = [
 
 [project.optional-dependencies]
 annoy = ["annoy>=1.17.2"]
-faiss = ["faiss-cpu==1.13.0"]
+faiss = ["faiss-cpu==1.14.3"]
 milvus = ["pymilvus>=2.6.5"]
 generative = [
     "accelerate>=1.0.1",
@@ -84,7 +84,7 @@ benchmark = [
 ]
 all = [
     "annoy>=1.17.2",
-    "faiss-cpu==1.13.0",
+    "faiss-cpu==1.14.3",
     "pymilvus>=2.6.5",
     "accelerate>=1.0.1",
     "transformers>=4.46.3",
