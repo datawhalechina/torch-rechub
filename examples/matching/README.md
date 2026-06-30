@@ -96,6 +96,6 @@
 |  NARM |          0.6746         |          0.2827         |          0.7028         |          0.2909         |        0.5829       |        0.2603       |
 | STAMP |          0.6675         |          0.2859         |          0.7079         |          0.3074         |        0.5578       |        0.2303       |
 
-* __Neural Attentive Session-based Recommendation__ ([Li et al., CIKM'17](https://dl.acm.
+* __Neural Attentive Session-based Recommendation__ ([Li et al., CIKM'17](https://arxiv.org/abs/1711.04725.
 * __STAMP: Short-Term Attention/Memory Priority Model for Session-based Recommendation__  ([Liu et al., KDD'18](https://dl.acm.org/doi/10.1145/3219819.3219950))
 * 注：以上指标可使用论文中实验章节提到的训练参数测试得到。排序指标 `top_k` 则需要调整成 `20`。
