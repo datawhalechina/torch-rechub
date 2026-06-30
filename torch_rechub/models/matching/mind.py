@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from ...basic.layers import MLP, CapsuleNetwork, EmbeddingLayer, MultiInterestSA
+from ...basic.layers import MLP, CapsuleNetwork, EmbeddingLayer, MultiInterestSA, dynamic_interest_mask
 
 
 class MIND(torch.nn.Module):
@@ -26,10 +26,13 @@ class MIND(torch.nn.Module):
         neg_item_feature (list[Feature Class]): training by the embedding table, it's the negative items id feature.
         max_length (int): max sequence length of input item sequence
         temperature (float): temperature factor for similarity score, default to 1.0.
-        interest_num （int): interest num
+        interest_num （int): interest num (the upper bound ``K`` when ``dynamic_interest``).
+        dynamic_interest (bool): if ``True``, size the active interests per user by the
+            paper's heuristic ``K'_u = max(1, min(interest_num, floor(log2(|I_u|))))``
+            instead of a fixed ``interest_num``. Defaults to ``False`` (unchanged behaviour).
     """
 
-    def __init__(self, user_features, history_features, item_features, neg_item_feature, max_length, temperature=1.0, interest_num=4):
+    def __init__(self, user_features, history_features, item_features, neg_item_feature, max_length, temperature=1.0, interest_num=4, dynamic_interest=False):
         super().__init__()
         self.user_features = user_features
         self.item_features = item_features
@@ -37,11 +40,12 @@ class MIND(torch.nn.Module):
         self.neg_item_feature = neg_item_feature
         self.temperature = temperature
         self.interest_num = interest_num
+        self.dynamic_interest = dynamic_interest
         self.max_length = max_length
         self.user_dims = sum([fea.embed_dim for fea in user_features + history_features])
 
         self.embedding = EmbeddingLayer(user_features + item_features + history_features)
-        self.capsule = CapsuleNetwork(self.history_features[0].embed_dim, self.max_length, bilinear_type=0, interest_num=self.interest_num)
+        self.capsule = CapsuleNetwork(self.history_features[0].embed_dim, self.max_length, bilinear_type=0, interest_num=self.interest_num, dynamic_interest=self.dynamic_interest)
         self.convert_user_weight = nn.Parameter(torch.rand(self.user_dims, self.history_features[0].embed_dim), requires_grad=True)
         self.mode = None
 
@@ -55,6 +59,10 @@ class MIND(torch.nn.Module):
 
         pos_item_embedding = item_embedding[:, 0, :]
         dot_res = torch.bmm(user_embedding, pos_item_embedding.squeeze(1).unsqueeze(-1))
+        if self.dynamic_interest:
+            # Never route the label-aware attention to a surplus (inactive) interest.
+            interest_mask = dynamic_interest_mask(self.gen_mask(x), self.interest_num)
+            dot_res = dot_res.masked_fill(~interest_mask.unsqueeze(-1), float("-inf"))
         k_index = torch.argmax(dot_res, dim=1).squeeze(-1)
         batch_index = torch.arange(user_embedding.shape[0], device=user_embedding.device)
         best_interest_emb = user_embedding[batch_index, k_index, :].unsqueeze(1)
@@ -78,6 +86,10 @@ class MIND(torch.nn.Module):
         # #[batch_size, interest_num, embed_dim]
         user_embedding = torch.matmul(input_user, self.convert_user_weight)
         user_embedding = F.normalize(user_embedding, p=2, dim=-1)  # L2 normalize
+        if self.dynamic_interest:
+            # Zero the surplus interests so downstream selection/retrieval sees only K'_u.
+            interest_mask = dynamic_interest_mask(mask, self.interest_num)
+            user_embedding = user_embedding * interest_mask.unsqueeze(-1)
         if self.mode == "user":
             # inference embedding mode -> [batch_size, interest_num, embed_dim]
             return user_embedding
