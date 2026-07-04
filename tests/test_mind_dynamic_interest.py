@@ -18,6 +18,7 @@ import torch
 from torch_rechub.basic.features import SequenceFeature, SparseFeature
 from torch_rechub.basic.layers import CapsuleNetwork
 from torch_rechub.models.matching import MIND
+from torch_rechub.models.matching.mind import dynamic_interest_mask
 
 
 def _expected_k(hist_len, interest_num):
@@ -29,18 +30,21 @@ def _active_capsule_counts(interest_capsule, eps=1e-6):
     return (interest_capsule.norm(dim=-1) > eps).sum(dim=1)
 
 
-def test_capsule_dynamic_interest_scales_with_history_length():
+def test_capsule_applies_caller_supplied_interest_mask():
+    # CapsuleNetwork only *applies* a per-user active-interest mask; the number
+    # of active capsules matches the mask (here the paper's K'_u).
     torch.manual_seed(0)
     seq_len, dim, interest_num = 16, 8, 4
     hist_lens = [1, 3, 8, 16]  # -> K'_u = [1, 1, 3, 4]
 
-    capsule = CapsuleNetwork(dim, seq_len, bilinear_type=0, interest_num=interest_num, dynamic_interest=True)
+    capsule = CapsuleNetwork(dim, seq_len, bilinear_type=0, interest_num=interest_num)
     item_eb = torch.randn(len(hist_lens), seq_len, dim)
     mask = torch.zeros(len(hist_lens), seq_len, dtype=torch.long)
     for row, length in enumerate(hist_lens):
         mask[row, :length] = 1
 
-    out = capsule(item_eb, mask)
+    interest_mask = dynamic_interest_mask(mask, interest_num)
+    out = capsule(item_eb, mask, interest_mask=interest_mask)
     assert out.shape == (len(hist_lens), interest_num, dim)
 
     counts = _active_capsule_counts(out).tolist()
