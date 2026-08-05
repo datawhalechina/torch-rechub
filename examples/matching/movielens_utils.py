@@ -27,6 +27,10 @@ def match_evaluation(user_embedding, item_embedding, test_user, all_item, user_c
             items_idx = []
             items_scores = []
             for i in range(user_emb.shape[0]):
+                # MIND's dynamic_interest zeroes each user's inactive interests;
+                # a zero vector would return arbitrary neighbors, so skip it.
+                if float(np.linalg.norm(user_emb[i])) == 0.0:
+                    continue
                 temp_items_idx, temp_items_scores = annoy.query(v=user_emb[i], n=topk)  # the index of topk match items
                 items_idx += temp_items_idx
                 items_scores += temp_items_scores

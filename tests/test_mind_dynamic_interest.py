@@ -30,26 +30,26 @@ def _active_capsule_counts(interest_capsule, eps=1e-6):
     return (interest_capsule.norm(dim=-1) > eps).sum(dim=1)
 
 
-def test_capsule_applies_caller_supplied_interest_mask():
-    # CapsuleNetwork only *applies* a per-user active-interest mask; the number
-    # of active capsules matches the mask (here the paper's K'_u).
-    torch.manual_seed(0)
-    seq_len, dim, interest_num = 16, 8, 4
+def test_dynamic_interest_mask_matches_paper_heuristic():
+    # The heuristic lives in MIND (not the shared CapsuleNetwork): each user gets
+    # the first K'_u = max(1, min(K, floor(log2(|I_u|)))) interests marked active.
+    seq_len, interest_num = 16, 4
     hist_lens = [1, 3, 8, 16]  # -> K'_u = [1, 1, 3, 4]
 
-    capsule = CapsuleNetwork(dim, seq_len, bilinear_type=0, interest_num=interest_num)
-    item_eb = torch.randn(len(hist_lens), seq_len, dim)
     mask = torch.zeros(len(hist_lens), seq_len, dtype=torch.long)
     for row, length in enumerate(hist_lens):
         mask[row, :length] = 1
 
     interest_mask = dynamic_interest_mask(mask, interest_num)
-    out = capsule(item_eb, mask, interest_mask=interest_mask)
-    assert out.shape == (len(hist_lens), interest_num, dim)
+    assert interest_mask.shape == (len(hist_lens), interest_num)
+    assert interest_mask.dtype == torch.bool
 
-    counts = _active_capsule_counts(out).tolist()
+    counts = interest_mask.sum(dim=1).tolist()
     expected = [_expected_k(length, interest_num) for length in hist_lens]
     assert counts == expected, f"active interests {counts} != paper K'_u {expected}"
+    # Active interests are always the leading contiguous block (first K'_u True).
+    for row, k in enumerate(expected):
+        assert interest_mask[row, :k].all() and not interest_mask[row, k:].any()
 
 
 def test_capsule_fixed_interest_is_default_and_unchanged():
@@ -98,3 +98,16 @@ def test_mind_user_tower_emits_dynamic_interests():
     counts = _active_capsule_counts(user_emb).tolist()
     expected = [_expected_k(length, interest_num) for length in hist_lens]
     assert counts == expected, f"user-tower interests {counts} != paper K'_u {expected}"
+
+
+def test_mind_item_inference_without_history_features():
+    # Item inference batches only carry item features. forward() must return the
+    # item tower before touching the history-dependent active-interest mask, even
+    # with dynamic_interest=True (regression for the KeyError: 'hist_movie_id').
+    torch.manual_seed(0)
+    model = _build_mind(max_length=16, interest_num=4, dynamic_interest=True)
+    model.mode = "item"
+
+    x = {"movie_id": torch.arange(1, 6)}  # no 'hist_movie_id' key
+    item_emb = model(x)
+    assert item_emb.shape[0] == 5

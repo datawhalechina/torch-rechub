@@ -78,16 +78,19 @@ class MIND(torch.nn.Module):
         self.mode = None
 
     def forward(self, x):
-        # Compute the per-user active-interest mask once and reuse it for routing
-        # (via the user tower), label-aware selection, and inference.
+        # Item inference only carries item features, so return before touching the
+        # history-dependent user tower / active-interest mask (avoids a KeyError).
+        if self.mode == "item":
+            return self.item_tower(x)
+
+        # Compute the per-user active-interest mask once and reuse it for the user
+        # tower, label-aware selection, and inference.
         interest_mask = self.active_interest_mask(x)
         user_embedding = self.user_tower(x, interest_mask=interest_mask)
-        item_embedding = self.item_tower(x)
         if self.mode == "user":
             return user_embedding
-        if self.mode == "item":
-            return item_embedding
 
+        item_embedding = self.item_tower(x)
         pos_item_embedding = item_embedding[:, 0, :]
         dot_res = torch.bmm(user_embedding, pos_item_embedding.squeeze(1).unsqueeze(-1))
         if interest_mask is not None:
@@ -112,7 +115,7 @@ class MIND(torch.nn.Module):
         # passes it in so it is computed only once per step.
         if self.dynamic_interest and interest_mask is None:
             interest_mask = self.active_interest_mask(x)
-        multi_interest_emb = self.capsule(history_emb, mask, interest_mask=interest_mask)
+        multi_interest_emb = self.capsule(history_emb, mask)
 
         input_user = torch.cat([input_user, multi_interest_emb], dim=-1)
 
@@ -121,7 +124,9 @@ class MIND(torch.nn.Module):
         user_embedding = torch.matmul(input_user, self.convert_user_weight)
         user_embedding = F.normalize(user_embedding, p=2, dim=-1)  # L2 normalize
         if interest_mask is not None:
-            # Zero the surplus interests so downstream selection/retrieval sees only K'_u.
+            # The capsule routes are independent across the K interests, so zeroing
+            # the surplus interests here is equivalent to masking inside the routing
+            # layer -- keep it in MIND and leave the shared CapsuleNetwork untouched.
             user_embedding = user_embedding * interest_mask.unsqueeze(-1)
         if self.mode == "user":
             # inference embedding mode -> [batch_size, interest_num, embed_dim]

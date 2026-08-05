@@ -621,8 +621,7 @@ class CapsuleNetwork(nn.Module):
     bilinear_type : {0, 1, 2}, default 2
         0 for MIND, 2 for ComirecDR.
     interest_num : int, default 4
-        Number of interests ``K`` (the upper bound when an ``interest_mask`` is
-        supplied to ``forward``).
+        Number of interests.
     routing_times : int, default 3
         Routing iterations.
     relu_layer : bool, default False
@@ -631,11 +630,8 @@ class CapsuleNetwork(nn.Module):
     Shape
     -----
     Input
-        item_eb : ``(B, L, D)``
-        mask : ``(B, L)`` — 1 for real items, 0 for padding.
-        interest_mask : ``(B, interest_num)`` or ``None`` — optional per-user
-            boolean mask of active interests. Inactive interests receive no item
-            mass and collapse to zero vectors. ``None`` keeps all ``interest_num``.
+        seq_emb : ``(B, L, D)``
+        mask : ``(B, L, 1)``
     Output
         ``(B, interest_num, D)``
     """
@@ -658,7 +654,7 @@ class CapsuleNetwork(nn.Module):
         else:
             self.w = nn.Parameter(torch.Tensor(1, self.seq_len, self.interest_num * self.embedding_dim, self.embedding_dim))
 
-    def forward(self, item_eb, mask, interest_mask=None):
+    def forward(self, item_eb, mask):
         if self.bilinear_type == 0:
             item_eb_hat = self.linear(item_eb)
             item_eb_hat = item_eb_hat.repeat(1, 1, self.interest_num)
@@ -682,20 +678,12 @@ class CapsuleNetwork(nn.Module):
         else:
             capsule_weight = torch.randn(item_eb_hat.shape[0], self.interest_num, self.seq_len, device=item_eb.device, requires_grad=False)
 
-        # Optional caller-supplied per-user active-interest mask (B, interest_num).
-        # None keeps the fixed-K behaviour; the layer owns no model-specific rule.
-        imask = interest_mask.unsqueeze(-1).float() if interest_mask is not None else None
-
         for i in range(self.routing_times):  # 动态路由传播3次
             atten_mask = torch.unsqueeze(mask, 1).repeat(1, self.interest_num, 1)
             paddings = torch.zeros_like(atten_mask, dtype=torch.float)
 
             capsule_softmax_weight = F.softmax(capsule_weight, dim=-1)
             capsule_softmax_weight = torch.where(torch.eq(atten_mask, 0), paddings, capsule_softmax_weight)
-            if imask is not None:
-                # Zero the routing weight of surplus (inactive) capsules so they
-                # receive no item mass and collapse to zero interest vectors.
-                capsule_softmax_weight = capsule_softmax_weight * imask
             capsule_softmax_weight = torch.unsqueeze(capsule_softmax_weight, 2)
 
             if i < 2:
@@ -716,9 +704,6 @@ class CapsuleNetwork(nn.Module):
                 interest_capsule = scalar_factor * interest_capsule
 
         interest_capsule = torch.reshape(interest_capsule, (-1, self.interest_num, self.embedding_dim))
-
-        if imask is not None:
-            interest_capsule = interest_capsule * imask
 
         if self.relu_layer:
             interest_capsule = self.relu(interest_capsule)
