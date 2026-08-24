@@ -13,8 +13,10 @@ the default (fixed) behaviour byte-identical.
 
 import math
 
+import numpy as np
 import torch
 
+from examples.matching import movielens_utils
 from torch_rechub.basic.features import SequenceFeature, SparseFeature
 from torch_rechub.basic.layers import CapsuleNetwork
 from torch_rechub.models.matching import MIND
@@ -111,3 +113,39 @@ def test_mind_item_inference_without_history_features():
     x = {"movie_id": torch.arange(1, 6)}  # no 'hist_movie_id' key
     item_emb = model(x)
     assert item_emb.shape[0] == 5
+
+
+def test_match_evaluation_skips_zero_interests_without_numpy(monkeypatch, tmp_path):
+    queries = []
+
+    class FakeAnnoy:
+
+        def __init__(self, n_trees):
+            pass
+
+        def fit(self, item_embedding):
+            pass
+
+        def query(self, v, n):
+            queries.append(v)
+            return [0], [0.0]
+
+    def reject_tensor_norm(value):
+        raise AssertionError("interest norms must stay in PyTorch")
+
+    monkeypatch.setattr(movielens_utils, "Annoy", FakeAnnoy)
+    monkeypatch.setattr(movielens_utils.np.linalg, "norm", reject_tensor_norm)
+    monkeypatch.setattr(movielens_utils, "topk_metrics", lambda **kwargs: {})
+
+    raw_id_maps = tmp_path / "raw_id_maps.npy"
+    np.save(raw_id_maps, np.array([{0: "user-0"}, {0: "item-0"}], dtype=object), allow_pickle=True)
+
+    user_embedding = torch.tensor([[[0.0, 0.0], [1.0, 0.0]]])
+    item_embedding = torch.tensor([[1.0, 0.0]])
+    test_user = {"user_id": [0], "movie_id": [0]}
+    all_item = {"movie_id": np.array([0])}
+
+    movielens_utils.match_evaluation(user_embedding, item_embedding, test_user, all_item, raw_id_maps=raw_id_maps, topk=1)
+
+    assert len(queries) == 1
+    assert torch.equal(queries[0], user_embedding[0, 1])
