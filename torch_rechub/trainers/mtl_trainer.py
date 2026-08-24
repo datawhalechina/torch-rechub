@@ -25,10 +25,12 @@ class MTLTrainer(object):
         adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
         n_epoch (int): epoch number of training.
         earlystop_taskid (int): task id of earlystop metrics relies between multi task (default = 0).
-        earlystop_patience (int): how long to wait after last time validation auc improved (default = 10).
+        earlystop_patience (int): how long to wait after the validation metric last improved (default = 10).
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+        earlystop_mode (str): ``"max"`` when a larger validation score is better,
+            or ``"min"`` when a smaller score is better (default = ``"max"``).
     """
 
     def __init__(
@@ -48,6 +50,7 @@ class MTLTrainer(object):
         gpus=None,
         model_path="./",
         model_logger=None,
+        earlystop_mode="max",
     ):
         self.model = model
         if gpus is None:
@@ -93,7 +96,7 @@ class MTLTrainer(object):
         self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
         self.n_epoch = n_epoch
         self.earlystop_taskid = earlystop_taskid
-        self.early_stopper = EarlyStopper(patience=earlystop_patience)
+        self.early_stopper = EarlyStopper(patience=earlystop_patience, mode=earlystop_mode)
 
         self.gpus = gpus
         if len(gpus) > 1:
@@ -202,7 +205,7 @@ class MTLTrainer(object):
                 logger.log_metrics(logs, step=epoch_i)
 
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
-                print('validation best auc of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
+                print('validation best score of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
                 self.model.load_state_dict(self.early_stopper.best_weights)
                 break
 
