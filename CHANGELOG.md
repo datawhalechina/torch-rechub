@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### ✨ 新特性 / Features
+* Add RPG ([KDD 2025](https://arxiv.org/abs/2506.05781)), a generative recommender that predicts long unordered semantic IDs in parallel: `RPGModel`, `OPQTokenizer`, `RPGSeqDataset`, `RPGTrainer`, plus an Amazon Reviews 2014 example and preprocessing script.
+
+---
+
 ## [0.8.0] - 2026-05-12
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->

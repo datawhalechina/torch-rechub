@@ -884,3 +884,107 @@ class Trie(object):
 
     def __getitem__(self, value):
         return self.get(value)
+
+
+class RPGSeqDataset(Dataset):
+    """Leave-one-out sequential dataset for :class:`~torch_rechub.models.generative.rpg.RPGModel`.
+
+    The last item of every user sequence is the test target, the second-to-last
+    is the validation target, and the remaining prefix is used for training.
+
+    Training histories are packed so that a sequence costs as few forward
+    passes as possible: any prefix that fits in ``max_seq_len + 1`` items
+    becomes a single sample where *every* position is supervised, and the
+    remaining targets are covered by sliding windows that carry a label only
+    at their last position.
+
+    Parameters
+    ----------
+    item_seqs : dict or list
+        User item-id sequences. A dict is read by value, so
+        ``{user: [item_id, ...]}`` and ``[[item_id, ...], ...]`` both work.
+        Item ids must be positive; ``0`` is reserved for padding.
+    max_seq_len : int, default=50
+        Maximum number of items fed to the model at once.
+    mode : {'train', 'valid', 'test'}, default='train'
+        Which split to build.
+
+    Examples
+    --------
+    >>> data = RPGSeqDataset({"u0": [1, 2, 3, 4]}, max_seq_len=50, mode="test")
+    >>> data[0]["input_ids"]
+    [1, 2, 3]
+    >>> data[0]["target"]
+    4
+    """
+
+    def __init__(self, item_seqs, max_seq_len=50, mode='train'):
+        super().__init__()
+        if mode not in ('train', 'valid', 'test'):
+            raise ValueError(f"mode must be 'train', 'valid' or 'test', got {mode!r}")
+        self.max_seq_len = max_seq_len
+        self.mode = mode
+
+        sequences = item_seqs.values() if isinstance(item_seqs, dict) else item_seqs
+        self.samples = []
+        for items in sequences:
+            self.samples.extend(self._build_samples(list(items)))
+
+    def _build_samples(self, items):
+        if self.mode == 'train':
+            return self._train_samples(items[:-2])
+        history = items[:-2] if self.mode == 'valid' else items[:-1]
+        if len(history) == 0:
+            return []
+        return [self._last_target_sample(history[-self.max_seq_len:], items[-2] if self.mode == 'valid' else items[-1])]
+
+    def _train_samples(self, items):
+        """Split a training prefix into (history, per-position labels) samples."""
+        window = items[:self.max_seq_len + 1]
+        if len(window) < 2:
+            return []
+
+        # Every position of the first window predicts the item that follows it.
+        samples = [{"input_ids": window[:-1], "labels": window[1:], "target": window[-1]}]
+        for target_idx in range(self.max_seq_len + 1, len(items)):
+            history = items[target_idx - self.max_seq_len:target_idx]
+            samples.append(self._last_target_sample(history, items[target_idx]))
+        return samples
+
+    @staticmethod
+    def _last_target_sample(history, target):
+        return {"input_ids": history, "labels": [-100] * (len(history) - 1) + [target], "target": target}
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        return self.samples[index]
+
+    @staticmethod
+    def collate_fn(batch):
+        """Right-pad a batch of samples into model inputs.
+
+        Right padding keeps the real items at the front, so ``seq_lens - 1``
+        indexes the position whose hidden state predicts the next item.
+
+        Returns
+        -------
+        dict
+            ``input_ids``, ``attention_mask``, ``labels`` (``-100`` on ignored
+            positions), ``seq_lens`` and ``target``.
+        """
+        max_len = max(len(d["input_ids"]) for d in batch)
+        pad = [(d, max_len - len(d["input_ids"])) for d in batch]
+        return {
+            "input_ids": torch.tensor([d["input_ids"] + [0] * n for d, n in pad],
+                                      dtype=torch.long),
+            "attention_mask": torch.tensor([[1] * len(d["input_ids"]) + [0] * n for d, n in pad],
+                                           dtype=torch.long),
+            "labels": torch.tensor([d["labels"] + [-100] * n for d, n in pad],
+                                   dtype=torch.long),
+            "seq_lens": torch.tensor([len(d["input_ids"]) for d in batch],
+                                     dtype=torch.long),
+            "target": torch.tensor([d["target"] for d in batch],
+                                   dtype=torch.long),
+        }

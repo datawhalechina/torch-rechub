@@ -240,13 +240,14 @@ The framework currently supports **30+** mainstream recommendation models:
 
 <details>
 
-### Generative Recommendation - 3
+### Generative Recommendation - 4
 
 | Model      | Paper                                             | Description                                              |
 | ---------- | ------------------------------------------------- | -------------------------------------------------------- |
 | **HSTU**  | [Meta 2024](https://arxiv.org/abs/2402.17152)    | Hierarchical Sequential Transduction Units, powering Meta's trillion-parameter RecSys |
 | **HLLM**  | [2024](https://arxiv.org/abs/2409.12740)         | Hierarchical LLM for recommendation, combining LLM semantic understanding |
 | **TIGER** | [NeurIPS 2023](https://arxiv.org/abs/2305.05065) | T5-based generative retrieval for recommendation with semantic ID generation |
+| **RPG**   | [KDD 2025](https://arxiv.org/abs/2506.05781)     | Parallel prediction of long unordered semantic IDs, with graph-constrained decoding |
 
 </details>
 

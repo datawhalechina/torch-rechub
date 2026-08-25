@@ -168,15 +168,70 @@ model.resize_token_embeddings(len(tokenizer))
 - Very large item catalogs that benefit from compressed item representations
 - Scenarios where prefix-sharing across similar items improves cold-start and generalization
 
-## 4. Model Comparison
+## 4. RPGModel
+
+### Description
+
+RPG (Recommendation with Parallel Generation) keeps TIGER's semantic-ID idea but drops the ordering between digits. Each item is quantized by OPQ into `n_digit` **unordered** codes, so no digit refines another and all of them can be predicted in a single forward pass. Removing autoregressive decoding is what lets semantic IDs grow from 4 tokens to 32 or 64, which is where the accuracy gain comes from.
+
+### Core Principles
+
+- **Unordered semantic IDs**: `OPQTokenizer` runs whitened PCA over item embeddings and quantizes them with FAISS `OPQ{m},IVF1,PQ{m}x{bits}`. Digit `j` quantizes its own subspace, so the digits are independent rather than residual.
+- **One position per item**: an item is represented by mean-pooling the embeddings of its `n_digit` tokens, so a history of `L` items is `L` positions rather than `L * n_digit`.
+- **Multi-token prediction**: `n_digit` independent `ResBlock` heads (identity at initialization) produce one query per digit. Each query is scored against its own codebook by cosine similarity divided by `temperature`, and the heads are trained with one cross-entropy per digit, averaged.
+- **Graph-constrained decoding**: item similarity is derived from the learned codebooks, and only the `n_edges` nearest neighbours of each item are kept. Retrieval starts from a random beam and walks this graph for `propagation_steps` rounds, so only a fraction of the catalog is ever scored. Scoring the whole catalog stays available and is what validation uses.
+
+### Usage
+
+The full workflow (preprocess / tokenize / train / test) is in `examples/generative/run_rpg_amazon_2014.py`. Minimal model usage:
+
+```python
+import numpy as np
+
+from torch_rechub.models.generative import RPGModel
+from torch_rechub.utils.opq import OPQTokenizer
+
+item_embeddings = np.load("item_embeddings.npy")  # (n_items - 1, dim)
+tokenizer = OPQTokenizer(n_codebook=32, codebook_size=256, pca_dim=128)
+tokenizer.fit(item_embeddings)
+
+model = RPGModel(tokenizer.item_tokens(), codebook_size=256, temperature=0.03)
+states, loss = model(input_ids, attention_mask, labels)
+
+model.build_decoding_graph(n_edges=200)
+preds = model.generate(input_ids, attention_mask, seq_lens, topk=10, use_graph=True)
+```
+
+### Parameters
+
+| Parameter | Type | Description | Default |
+| --- | --- | --- | --- |
+| item_tokens | LongTensor | `(n_items, n_digit)` token table from `OPQTokenizer.item_tokens()`; row `0` is PAD | required |
+| codebook_size | int | Codes per digit | 256 |
+| n_embd | int | Hidden dimension | 448 |
+| n_layer | int | Transformer layers | 2 |
+| n_head | int | Attention heads | 4 |
+| n_inner | int | Feed-forward dimension | 1024 |
+| max_seq_len | int | Maximum items per sequence | 50 |
+| embd_pdrop / attn_pdrop | float | Embedding / attention dropout; the paper relies on heavy dropout to regularize a small backbone | 0.5 |
+| temperature | float | Divides the cosine logits | 0.07 |
+
+### Use Cases
+
+- Very large item catalogs where TIGER's beam search over digits is the inference bottleneck
+- Settings that benefit from long semantic IDs (32-64 tokens) rather than the usual 4
+- Latency- or memory-constrained retrieval, thanks to graph-constrained decoding
+
+## 5. Model Comparison
 
 | Model | Complexity | Expressiveness | Efficiency | Use Cases |
 | --- | --- | --- | --- | --- |
 | HSTUModel | High | High | Medium | Large-scale sequence recommendation, long sequence modeling |
 | HLLMModel | High | High | Low | LLM integration, text-rich scenarios |
 | TIGERModel | High | High | Medium | Semantic-ID generative retrieval, very large item spaces |
+| RPGModel | Medium | High | High | Long semantic IDs, low-latency generative retrieval |
 
-## 5. Usage Recommendations
+## 6. Usage Recommendations
 
 1. **Choose models based on business requirements**:
    - For large-scale sequence recommendation, use HSTUModel
@@ -198,7 +253,7 @@ model.resize_token_embeddings(len(tokenizer))
    - Use service-oriented deployment to support high-concurrency requests
    - Consider edge computing to deploy models on edge devices
 
-## 6. Complete Training Example
+## 7. Complete Training Example
 
 ```python
 import pickle
@@ -267,7 +322,7 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 7. FAQ
+## 8. FAQ
 
 ### Q: How to handle large-scale data?
 A: Try the following approaches:
@@ -297,7 +352,7 @@ A: Try the following approaches:
 - Use transfer learning to transfer knowledge from related domains
 - Use meta-learning to quickly adapt to new users or items
 
-## 8. Application Scenarios
+## 9. Application Scenarios
 
 1. **Personalized Content Generation**:
    - Generate personalized recommendation reasons
@@ -319,7 +374,7 @@ A: Try the following approaches:
    - Generate context-aware recommendation content
    - Support complex scenario recommendations
 
-## 9. Future Trends
+## 10. Future Trends
 
 1. **Deep Integration of LLMs and Recommendation Systems**:
    - More tightly combine the advantages of LLMs and recommendation systems

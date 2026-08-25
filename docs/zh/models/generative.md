@@ -168,15 +168,70 @@ model.resize_token_embeddings(len(tokenizer))
 - item 数量极大、需要压缩 item 表示的场景
 - 希望相似 item 共享前缀、提升冷启动与泛化的场景
 
-## 4. 模型比较
+## 4. RPGModel
+
+### 功能描述
+
+RPG（Recommendation with Parallel Generation）沿用 TIGER 的语义 ID 思路，但去掉了 digit 之间的顺序。每个 item 由 OPQ 量化成 `n_digit` 个**无序**码字，任何一位都不是前一位的细化，因此所有位可以在一次前向中并行预测。省掉自回归解码后，语义 ID 才得以从 4 位扩展到 32 甚至 64 位，效果提升正来自于此。
+
+### 核心原理
+
+- **无序语义 ID**：`OPQTokenizer` 先对 item embedding 做白化 PCA，再用 FAISS `OPQ{m},IVF1,PQ{m}x{bits}` 量化。第 `j` 位量化自己那块子空间，各位相互独立而非残差关系。
+- **一个 item 占一个位置**：item 表示是它 `n_digit` 个 token embedding 的均值池化，所以长度为 `L` 的历史只占 `L` 个位置，而不是 `L * n_digit`。
+- **多 token 预测**：`n_digit` 个独立的 `ResBlock` 头（初始化时是恒等映射）各产生一个 query，与自己那一位的 codebook 做余弦相似度并除以 `temperature`，每一位算一个交叉熵后取平均。
+- **图约束解码**：item 相似度由学到的 codebook 导出，每个 item 只保留 `n_edges` 个最近邻。检索从随机 beam 出发，在这张图上走 `propagation_steps` 轮，因此只需给一小部分候选打分。全量打分依然可用，验证阶段就走这条路径。
+
+### 使用方法
+
+完整流程（预处理 / 分词 / 训练 / 测试）见示例脚本 `examples/generative/run_rpg_amazon_2014.py`。模型最小用法：
+
+```python
+import numpy as np
+
+from torch_rechub.models.generative import RPGModel
+from torch_rechub.utils.opq import OPQTokenizer
+
+item_embeddings = np.load("item_embeddings.npy")  # (n_items - 1, dim)
+tokenizer = OPQTokenizer(n_codebook=32, codebook_size=256, pca_dim=128)
+tokenizer.fit(item_embeddings)
+
+model = RPGModel(tokenizer.item_tokens(), codebook_size=256, temperature=0.03)
+states, loss = model(input_ids, attention_mask, labels)
+
+model.build_decoding_graph(n_edges=200)
+preds = model.generate(input_ids, attention_mask, seq_lens, topk=10, use_graph=True)
+```
+
+### 参数说明
+
+| 参数 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| item_tokens | LongTensor | `(n_items, n_digit)` token 表，来自 `OPQTokenizer.item_tokens()`，第 0 行为 PAD | 必填 |
+| codebook_size | int | 每一位的码字数 | 256 |
+| n_embd | int | 隐藏维度 | 448 |
+| n_layer | int | Transformer 层数 | 2 |
+| n_head | int | 注意力头数 | 4 |
+| n_inner | int | 前馈层维度 | 1024 |
+| max_seq_len | int | 单条序列最多包含的 item 数 | 50 |
+| embd_pdrop / attn_pdrop | float | embedding / attention dropout；论文靠大 dropout 正则化这个小 backbone | 0.5 |
+| temperature | float | 用于缩放余弦 logits | 0.07 |
+
+### 适用场景
+
+- item 规模极大、TIGER 的逐位 beam search 成为推理瓶颈的场景
+- 需要长语义 ID（32~64 位）而非常见 4 位的场景
+- 对延迟或显存敏感的检索场景，可借助图约束解码
+
+## 5. 模型比较
 
 | 模型 | 复杂度 | 表达能力 | 计算效率 | 适用场景 |
 | --- | --- | --- | --- | --- |
 | HSTUModel | 高 | 高 | 中 | 大规模序列推荐、长序列建模 |
 | HLLMModel | 高 | 高 | 低 | 融合LLM能力、文本信息丰富的场景 |
 | TIGERModel | 高 | 高 | 中 | 基于语义 ID 的生成式检索、超大 item 空间 |
+| RPGModel | 中 | 高 | 高 | 长语义 ID、低延迟生成式检索 |
 
-## 5. 使用建议
+## 6. 使用建议
 
 1. **根据业务需求选择模型**：
    - 大规模序列推荐场景推荐使用 HSTUModel
@@ -198,7 +253,7 @@ model.resize_token_embeddings(len(tokenizer))
    - 采用服务化部署，支持高并发请求
    - 考虑使用边缘计算，将模型部署到边缘设备
 
-## 6. 代码示例：完整的生成式推荐模型训练流程
+## 7. 代码示例：完整的生成式推荐模型训练流程
 
 ```python
 import pickle
@@ -267,7 +322,7 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 7. 常见问题与解决方案
+## 8. 常见问题与解决方案
 
 ### Q: 如何处理大规模数据？
 A: 可以尝试以下方法：
@@ -297,7 +352,7 @@ A: 可以尝试以下方法：
 - 使用迁移学习，从其他相关领域迁移知识
 - 采用元学习，快速适应新用户或新物品
 
-## 8. 生成式推荐的应用场景
+## 9. 生成式推荐的应用场景
 
 1. **个性化内容生成**：
    - 生成个性化的推荐理由
@@ -319,7 +374,7 @@ A: 可以尝试以下方法：
    - 生成场景化的推荐内容
    - 支持复杂场景的推荐
 
-## 9. 未来发展趋势
+## 10. 未来发展趋势
 
 1. **大语言模型与推荐系统的深度融合**：
    - 更紧密地结合LLM和推荐系统的优势
