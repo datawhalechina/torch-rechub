@@ -230,7 +230,61 @@ model.resize_token_embeddings(len(tokenizer))
 - item 数量极大、需要压缩 item 表示的场景
 - 希望用多段离散 token 表示 item 的序列推荐实验
 
-## 5. 模型比较
+## 5. RPGModel
+
+### 功能描述
+
+RPG（Recommendation with Parallel Generation）沿用 TIGER 的语义 ID 思路，但去掉了 digit 之间的顺序。每个 item 由 OPQ 量化成 `n_digit` 个**无序**码字，任何一位都不是前一位的细化，因此所有位可以在一次前向中并行预测。省掉自回归解码后，语义 ID 才得以从 4 位扩展到 32 甚至 64 位，效果提升正来自于此。
+
+### 核心原理
+
+- **无序语义 ID**：`OPQTokenizer` 先对 item embedding 做白化 PCA，再用 FAISS `OPQ{m},IVF1,PQ{m}x{bits}` 量化。第 `j` 位量化自己那块子空间，各位相互独立而非残差关系。
+- **一个 item 占一个位置**：item 表示是它 `n_digit` 个 token embedding 的均值池化，所以长度为 `L` 的历史只占 `L` 个位置，而不是 `L * n_digit`。
+- **多 token 预测**：`n_digit` 个独立的 `ResBlock` 头（初始化时是恒等映射）各产生一个 query，与自己那一位的 codebook 做余弦相似度并除以 `temperature`，每一位算一个交叉熵后取平均。
+- **图约束解码**：item 相似度由学到的 codebook 导出，每个 item 只保留 `n_edges` 个最近邻。检索从随机 beam 出发，在这张图上走 `propagation_steps` 轮，因此只需给一小部分候选打分。全量打分依然可用，验证阶段就走这条路径。
+
+### 使用方法
+
+完整流程（预处理 / 分词 / 训练 / 测试）见示例脚本 `examples/generative/run_rpg_amazon_2014.py`。模型最小用法：
+
+```python
+import numpy as np
+
+from torch_rechub.models.generative import RPGModel
+from torch_rechub.utils.opq import OPQTokenizer
+
+item_embeddings = np.load("item_embeddings.npy")  # (n_items - 1, dim)
+tokenizer = OPQTokenizer(n_codebook=32, codebook_size=256, pca_dim=128)
+tokenizer.fit(item_embeddings)
+
+model = RPGModel(tokenizer.item_tokens(), codebook_size=256, temperature=0.03)
+states, loss = model(input_ids, attention_mask, labels)
+
+model.build_decoding_graph(n_edges=200)
+preds = model.generate(input_ids, attention_mask, seq_lens, topk=10, use_graph=True)
+```
+
+### 参数说明
+
+| 参数 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| item_tokens | LongTensor | `(n_items, n_digit)` token 表，来自 `OPQTokenizer.item_tokens()`，第 0 行为 PAD | 必填 |
+| codebook_size | int | 每一位的码字数 | 256 |
+| n_embd | int | 隐藏维度 | 448 |
+| n_layer | int | Transformer 层数 | 2 |
+| n_head | int | 注意力头数 | 4 |
+| n_inner | int | 前馈层维度 | 1024 |
+| max_seq_len | int | 单条序列最多包含的 item 数 | 50 |
+| embd_pdrop / attn_pdrop | float | embedding / attention dropout；论文靠大 dropout 正则化这个小 backbone | 0.5 |
+| temperature | float | 用于缩放余弦 logits | 0.07 |
+
+### 适用场景
+
+- item 规模极大、TIGER 的逐位 beam search 成为推理瓶颈的场景
+- 需要长语义 ID（32~64 位）而非常见 4 位的场景
+- 对延迟或显存敏感的检索场景，可借助图约束解码
+
+## 6. 模型比较
 
 | 模型 | 复杂度 | 表达能力 | 计算效率 | 适用场景 |
 | --- | --- | --- | --- | --- |
@@ -238,15 +292,17 @@ model.resize_token_embeddings(len(tokenizer))
 | HLLMModel | 中 | 中 | 中 | 使用预计算 LLM item embedding 的序列推荐 |
 | RQVAEModel | 中 | 中 | 中 | 将连续 item embedding 量化为 TIGER 语义 ID |
 | TIGERModel | 高 | 高 | 中 | 基于语义 ID 的生成式检索、超大 item 空间 |
+| RPGModel | 中 | 高 | 高 | 长语义 ID、低延迟生成式检索 |
 
-## 6. 使用建议
+## 7. 使用建议
 
 1. 直接对 item token 做 next-item 预测时，使用 HSTUModel。
 2. 已有按 token ID 对齐的 item embedding，且希望冻结 item 语义空间时，使用 HLLMModel。
 3. 使用 TIGER 前，先用 RQVAEModel 生成语义 ID；量化和生成两个阶段必须复用同一份 item 行号映射。
 4. HSTU/HLLM 的输出是 `[batch, seq_len, vocab_size]`，词表较大时需先估算 logits 的显存占用。
+5. 关注解码延迟时优先选择 RPGModel：所有 digit 在一次前向中并行预测，语义 ID 变长不会增加解码步数。
 
-## 7. 代码示例：完整的生成式推荐模型训练流程
+## 8. 代码示例：完整的生成式推荐模型训练流程
 
 ```python
 import os
@@ -319,9 +375,10 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 8. 当前实现边界
+## 9. 当前实现边界
 
 - `SeqTrainer` 训练 HSTU/HLLM，并报告 loss 与 token-level top-1 accuracy；它没有内置 Recall@K、NDCG@K、BLEU 或 ROUGE 评估。
 - RQ-VAE 与 TIGER 是两阶段流程：先离线量化 item embedding，再训练 TIGER。项目不会自动生成原始 item embedding。
+- RPG 同样是两阶段流程：先离线用 `OPQTokenizer` 拟合 item embedding，再用得到的 token 训练模型。其中 OPQ 步骤依赖 `faiss`，且 `RPGTrainer` 报告的是 Recall@K 与 NDCG@K，而非 token-level accuracy。
 - 当前训练器可选用单机 `DataParallel`，但没有 DDP、多机分布式、流水线并行或自动混合精度训练流程。
 - 本模块没有内置生产服务、TensorRT、边缘部署、自然语言内容生成或多模态推荐能力。需要这些能力时，应在项目外自行实现并验证。

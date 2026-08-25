@@ -230,7 +230,61 @@ model.resize_token_embeddings(len(tokenizer))
 - Very large item catalogs that benefit from compressed item representations
 - Sequence-recommendation experiments that represent each item with multiple discrete tokens
 
-## 5. Model Comparison
+## 5. RPGModel
+
+### Description
+
+RPG (Recommendation with Parallel Generation) keeps TIGER's semantic-ID idea but drops the ordering between digits. Each item is quantized by OPQ into `n_digit` **unordered** codes, so no digit refines another and all of them can be predicted in a single forward pass. Removing autoregressive decoding is what lets semantic IDs grow from 4 tokens to 32 or 64, which is where the accuracy gain comes from.
+
+### Core Principles
+
+- **Unordered semantic IDs**: `OPQTokenizer` runs whitened PCA over item embeddings and quantizes them with FAISS `OPQ{m},IVF1,PQ{m}x{bits}`. Digit `j` quantizes its own subspace, so the digits are independent rather than residual.
+- **One position per item**: an item is represented by mean-pooling the embeddings of its `n_digit` tokens, so a history of `L` items is `L` positions rather than `L * n_digit`.
+- **Multi-token prediction**: `n_digit` independent `ResBlock` heads (identity at initialization) produce one query per digit. Each query is scored against its own codebook by cosine similarity divided by `temperature`, and the heads are trained with one cross-entropy per digit, averaged.
+- **Graph-constrained decoding**: item similarity is derived from the learned codebooks, and only the `n_edges` nearest neighbours of each item are kept. Retrieval starts from a random beam and walks this graph for `propagation_steps` rounds, so only a fraction of the catalog is ever scored. Scoring the whole catalog stays available and is what validation uses.
+
+### Usage
+
+The full workflow (preprocess / tokenize / train / test) is in `examples/generative/run_rpg_amazon_2014.py`. Minimal model usage:
+
+```python
+import numpy as np
+
+from torch_rechub.models.generative import RPGModel
+from torch_rechub.utils.opq import OPQTokenizer
+
+item_embeddings = np.load("item_embeddings.npy")  # (n_items - 1, dim)
+tokenizer = OPQTokenizer(n_codebook=32, codebook_size=256, pca_dim=128)
+tokenizer.fit(item_embeddings)
+
+model = RPGModel(tokenizer.item_tokens(), codebook_size=256, temperature=0.03)
+states, loss = model(input_ids, attention_mask, labels)
+
+model.build_decoding_graph(n_edges=200)
+preds = model.generate(input_ids, attention_mask, seq_lens, topk=10, use_graph=True)
+```
+
+### Parameters
+
+| Parameter | Type | Description | Default |
+| --- | --- | --- | --- |
+| item_tokens | LongTensor | `(n_items, n_digit)` token table from `OPQTokenizer.item_tokens()`; row `0` is PAD | required |
+| codebook_size | int | Codes per digit | 256 |
+| n_embd | int | Hidden dimension | 448 |
+| n_layer | int | Transformer layers | 2 |
+| n_head | int | Attention heads | 4 |
+| n_inner | int | Feed-forward dimension | 1024 |
+| max_seq_len | int | Maximum items per sequence | 50 |
+| embd_pdrop / attn_pdrop | float | Embedding / attention dropout; the paper relies on heavy dropout to regularize a small backbone | 0.5 |
+| temperature | float | Divides the cosine logits | 0.07 |
+
+### Use Cases
+
+- Very large item catalogs where TIGER's beam search over digits is the inference bottleneck
+- Settings that benefit from long semantic IDs (32-64 tokens) rather than the usual 4
+- Latency- or memory-constrained retrieval, thanks to graph-constrained decoding
+
+## 6. Model Comparison
 
 | Model | Complexity | Expressiveness | Efficiency | Use Cases |
 | --- | --- | --- | --- | --- |
@@ -238,15 +292,17 @@ model.resize_token_embeddings(len(tokenizer))
 | HLLMModel | Medium | Medium | Medium | Sequence recommendation with precomputed LLM item embeddings |
 | RQVAEModel | Medium | Medium | Medium | Quantizing continuous item embeddings into TIGER semantic IDs |
 | TIGERModel | High | High | Medium | Semantic-ID generative retrieval, very large item spaces |
+| RPGModel | Medium | High | High | Long semantic IDs, low-latency generative retrieval |
 
-## 6. Usage Recommendations
+## 7. Usage Recommendations
 
 1. Use HSTUModel for direct next-item prediction over item tokens.
 2. Use HLLMModel when you already have item embeddings aligned by token ID and want to freeze the item semantic space.
 3. Before TIGER, use RQVAEModel to generate semantic IDs. Quantization and generation must share exactly the same item-row mapping.
 4. HSTU/HLLM return `[batch, seq_len, vocab_size]`; estimate the memory required by these logits before using a large vocabulary.
+5. Prefer RPGModel over TIGER when decoding latency matters: it predicts every digit in one pass, so long semantic IDs cost no extra decoding steps.
 
-## 7. Complete Training Example
+## 8. Complete Training Example
 
 ```python
 import os
@@ -319,9 +375,10 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 8. Current Implementation Boundaries
+## 9. Current Implementation Boundaries
 
 - `SeqTrainer` trains HSTU/HLLM and reports loss plus token-level top-1 accuracy. It does not provide built-in Recall@K, NDCG@K, BLEU, or ROUGE evaluation.
 - RQ-VAE and TIGER form a two-stage pipeline: quantize item embeddings offline, then train TIGER. The project does not generate the original item embeddings automatically.
+- RPG is a two-stage pipeline as well: fit `OPQTokenizer` on item embeddings offline, then train the model on the resulting tokens. Its OPQ step needs `faiss`, and `RPGTrainer` reports Recall@K and NDCG@K rather than token-level accuracy.
 - Trainers can optionally use single-machine `DataParallel`, but there is no DDP, multi-machine distributed training, pipeline parallelism, or automatic mixed-precision workflow.
 - This module does not include production serving, TensorRT, edge deployment, natural-language content generation, or multimodal recommendation. Those capabilities must be implemented and validated outside the project.

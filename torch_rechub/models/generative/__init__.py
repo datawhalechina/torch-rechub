@@ -4,7 +4,7 @@ from .hllm import HLLMModel
 from .hstu import HSTUModel
 from .rqvae import RQVAEModel
 
-__all__ = ['HSTUModel', 'HLLMModel', 'RQVAEModel', 'TIGERModel']
+__all__ = ['HSTUModel', 'HLLMModel', 'RQVAEModel', 'TIGERModel', 'RPGModel']
 
 
 def __getattr__(name):
@@ -16,4 +16,12 @@ def __getattr__(name):
                 raise ImportError("TIGERModel requires the optional generative dependencies. Install with `pip install torch-rechub[generative]`.") from exc
             raise
         return TIGERModel
+    if name == 'RPGModel':
+        try:
+            from .rpg import RPGModel
+        except ModuleNotFoundError as exc:
+            if exc.name == 'transformers':
+                raise ImportError("RPGModel requires the optional generative dependencies. Install with `pip install torch-rechub[generative]`.") from exc
+            raise
+        return RPGModel
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

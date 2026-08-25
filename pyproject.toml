@@ -55,6 +55,8 @@ milvus = ["pymilvus>=2.6.5"]
 generative = [
     "accelerate>=1.0.1",
     "transformers>=4.46.3",
+    "faiss-cpu==1.13.0",
+    "sentence-transformers>=3.0.0",
 ]
 bigdata = [
     "pyarrow>=21,<26",
@@ -88,6 +90,7 @@ all = [
     "pymilvus>=2.6.5",
     "accelerate>=1.0.1",
     "transformers>=4.46.3",
+    "sentence-transformers>=3.0.0",
     "pyarrow>=21,<26",
     "ml-dtypes>=0.5.0",
     "onnx>=1.14.0",
