@@ -74,6 +74,14 @@ sequence_feature = SequenceFeature(
 - `padding_idx`：填充索引，在InputMask层中会被掩码为0
 - `initializer`：嵌入层权重初始化器
 
+由于 `concat` 返回保留序列维度的结果，不能在一次 `EmbeddingLayer` 调用中把使用 `pooling="concat"` 的 `SequenceFeature` 与稀疏特征或已池化的序列特征混用。序列嵌入应与普通特征嵌入分开获取：
+
+```python
+input_user = embedding(x, user_features, squeeze_dim=True)  # (B, D)
+history_emb = embedding(x, history_features)                 # (B, H, L, D)
+single_history_emb = history_emb.squeeze(1)                  # (B, L, D)，仅当 H == 1
+```
+
 ## 模型输入约定
 
 Feature 对象只定义模型如何解读字段，不会自动对原始数据做类别编码或序列补齐。传入模型的字典需满足：

@@ -56,6 +56,14 @@ sequence_feature = SequenceFeature(
 
 Parameters: `name`, `vocab_size`, `embed_dim` (auto if None), `pooling` (mean/sum/concat), `shared_with`, `padding_idx`, `initializer`. `mean` and `sum` reduce `(batch_size, seq_len, embed_dim)` to `(batch_size, embed_dim)`; `concat` preserves the sequence dimension.
 
+Because `concat` returns sequence-shaped output, do not mix concat-pooled `SequenceFeature` objects with sparse or reduced sequence features in one `EmbeddingLayer` call. Request sequence embeddings separately from ordinary feature embeddings:
+
+```python
+input_user = embedding(x, user_features, squeeze_dim=True)  # (B, D)
+history_emb = embedding(x, history_features)                 # (B, H, L, D)
+single_history_emb = history_emb.squeeze(1)                  # (B, L, D), only when H == 1
+```
+
 ## Model Input Contract
 
 Feature objects describe how a model interprets fields; they do not encode raw categories or pad sequences for you. Input dictionaries normally follow this contract:
@@ -159,4 +167,3 @@ sequence_features = [
 
 all_features = dense_features + sparse_features + sequence_features
 ```
-

@@ -54,6 +54,7 @@ class EmbeddingLayer(nn.Module):
         - Dense only: ``(B, num_dense)``.
         - Sparse: ``(B, num_features, embed_dim)`` or flattened.
         - Sequence: same as sparse or ``(B, num_seq, L, embed_dim)`` when ``pooling="concat"``.
+          Concat-pooled sequences cannot be combined with sparse or reduced sequence embeddings.
         - Mixed: flattened sparse plus dense when ``squeeze_dim=True``.
     """
 
@@ -75,6 +76,14 @@ class EmbeddingLayer(nn.Module):
                 self.n_dense += 1
 
     def forward(self, x, features, squeeze_dim=False):
+        concat_features = [fea.name for fea in features if isinstance(fea, SequenceFeature) and fea.pooling == "concat"]
+        reduced_features = [fea.name for fea in features if isinstance(fea, SparseFeature) or (isinstance(fea, SequenceFeature) and fea.pooling != "concat")]
+        if concat_features and reduced_features:
+            raise ValueError(
+                'SequenceFeature with pooling="concat" preserves the sequence dimension and cannot be mixed with SparseFeature or reduced sequence features in one EmbeddingLayer call. '
+                f"Request concat-pooled sequence features separately; got concat features {concat_features} and incompatible features {reduced_features}."
+            )
+
         sparse_emb, dense_values = [], []
         sparse_exists, dense_exists = False, False
         for fea in features:
