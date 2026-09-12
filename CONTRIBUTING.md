@@ -211,7 +211,7 @@ If you encounter issues during contribution:
 2. **Create new Issue**: Describe your problem clearly
 3. **Join discussions**: Ask questions in relevant Issues or PRs
 4. **Contact maintainers**: Through GitHub or email
-5. **Check documentation**: Review [SUPPORT.md](SUPPORT.md) for detailed help
+5. **Check documentation**: Review the [FAQ](docs/en/community/faq.md) for common questions and troubleshooting
 
 ## 🏆 Recognition
 
