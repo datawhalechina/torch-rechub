@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-09-14
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* Fix HLLM embedding/vocab alignment; add generative data download workflow by @TyndaleLym in https://github.com/datawhalechina/torch-rechub/pull/241
+* fix: 让 TIGER 示例可运行并新增 MovieLens 脚本 by @TyndaleLym in https://github.com/datawhalechina/torch-rechub/pull/245
+* fix: 替换 4 处失效的奶牛快传数据链接（承接 #201） by @ksk2023 in https://github.com/datawhalechina/torch-rechub/pull/263
+* fix: support min-mode early stopping by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/266
+### 🔧 模型更新 / Models
+* Align HSTU with Meta reference; fix training/eval correctness by @TyndaleLym in https://github.com/datawhalechina/torch-rechub/pull/244
+* feat(mind): dynamic per-user interest count (issue #240) by @nsiddharth in https://github.com/datawhalechina/torch-rechub/pull/251
+### ✨ 新特性 / Features
+* 修改了census-Income，aliexpress，amazon-beauty，amazon-books，amazon-electro… by @Luxorion-12 in https://github.com/datawhalechina/torch-rechub/pull/252
+### 📝 文档更新 / Documentation
+* Update features.md by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/259
+* Update docs files by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/260
+
+## New Contributors
+* @TyndaleLym made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/241
+* @ksk2023 made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/263
+* @nsiddharth made their first contribution in https://github.com/datawhalechina/torch-rechub/pull/251
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.8.0...v0.9.0
+
+---
+
+
+
 ## [0.8.0] - 2026-05-12
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
