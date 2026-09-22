@@ -19,7 +19,9 @@ class DSSM(torch.nn.Module):
     Args:
         user_features (list[Feature Class]): training by the user tower module.
         item_features (list[Feature Class]): training by the item tower module.
-        temperature (float): temperature factor for similarity score, default to 1.0.
+        temperature (float): positive temperature for MatchTrainer's full-batch
+            in-batch cross entropy, default to 1.0. The point-wise forward path
+            continues to return sigmoid(cosine_similarity) without temperature scaling.
         user_params (dict): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
         item_params (dict): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
     """

@@ -1,6 +1,9 @@
+import math
 import os
+import warnings
 
 import torch
+import torch.nn.functional as F
 import tqdm
 from sklearn.metrics import roc_auc_score
 
@@ -24,7 +27,11 @@ class MatchTrainer(object):
         device (str): `"cpu"` or `"cuda:0"`
         gpus (list): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
         model_path (str): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
-        in_batch_neg (bool): whether to use in-batch negative sampling instead of global negatives.
+        in_batch_neg (bool): use positive-only user/item pairs on a single device.
+            With mode=0 or 2 and default sampling options, use full-batch cross entropy
+            on normalized tower embeddings, scaled by model.temperature (default=1.0).
+            Labels are ignored during training; validation AUC still requires binary labels.
+            Other rows are treated as negatives, including repeated item IDs.
         in_batch_neg_ratio (int): number of negatives to draw from the batch per positive sample when in_batch_neg is True.
         hard_negative (bool): whether to choose hardest negatives within batch (top-k by score) instead of uniform random.
         sampler_seed (int): optional random seed for in-batch sampler to ease reproducibility/testing.
@@ -53,6 +60,13 @@ class MatchTrainer(object):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
+        if in_batch_neg and (len(gpus) > 1 or isinstance(model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel))):
+            raise ValueError("In-batch training supports a single device. Pass an unwrapped model and use device='cpu' or device='cuda:0'.")
+        self._full_inbatch = in_batch_neg and mode in (0, 2) and in_batch_neg_ratio is None and not hard_negative
+        if self._full_inbatch:
+            self._inbatch_temperature = getattr(model, 'temperature', 1.0)
+            if not math.isfinite(self._inbatch_temperature) or self._inbatch_temperature <= 0:
+                raise ValueError("model.temperature must be finite and greater than zero for full-batch training.")
         self.gpus = gpus
         if len(gpus) > 1:
             print('parallel running on these gpus:', gpus)
@@ -73,8 +87,8 @@ class MatchTrainer(object):
             if not hasattr(base_model, 'user_tower') or not hasattr(base_model, 'item_tower'):
                 raise ValueError(
                     f"Model {type(base_model).__name__} does not support in-batch negative sampling. "
-                    "Only two-tower models with user_tower() and item_tower() methods are supported, "
-                    "such as DSSM, YoutubeDNN, MIND, GRU4Rec, SINE, ComiRec, SASRec, NARM, STAMP, etc."
+                    "The towers must return one user vector and one positive item vector per row, "
+                    "both with shape [batch_size, embedding_dim], as in DSSM."
                 )
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
@@ -107,8 +121,14 @@ class MatchTrainer(object):
         total_loss = 0
         epoch_loss = 0
         batch_count = 0
+        skipped_batches = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (x_dict, y) in enumerate(tk0):
+            if self.in_batch_neg and y.size(0) < 2:
+                # Skip before running the towers: a singleton has no negatives
+                # and may also fail in training-mode BatchNorm.
+                skipped_batches += 1
+                continue
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             y = y.to(self.device)
             if self.mode == 0:
@@ -127,15 +147,25 @@ class MatchTrainer(object):
                     item_embedding = item_embedding.squeeze(1)
                 if user_embedding.dim() != 2 or item_embedding.dim() != 2:
                     raise ValueError(f"In-batch negative sampling requires 2D embeddings, got shapes {user_embedding.shape} and {item_embedding.shape}")
+                if user_embedding.shape != item_embedding.shape:
+                    raise ValueError("In-batch user and positive item embeddings must have the same [batch_size, embedding_dim] shape.")
 
-                scores = torch.matmul(user_embedding, item_embedding.t())  # bs x bs
-                neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
-                logits = gather_inbatch_logits(scores, neg_indices)
-                if self.mode == 1:  # pair_wise
-                    loss = self.criterion(logits[:, 0], logits[:, 1:], in_batch_neg=True)
-                else:  # point-wise/list-wise -> cross entropy on sampled logits
-                    targets = torch.zeros(logits.size(0), dtype=torch.long, device=self.device)
+                if self._full_inbatch:
+                    user_embedding = F.normalize(user_embedding, dim=-1)
+                    item_embedding = F.normalize(item_embedding, dim=-1)
+                    logits = user_embedding @ item_embedding.t() / self._inbatch_temperature
+                    targets = torch.arange(logits.size(0), device=logits.device)
                     loss = self.criterion(logits, targets)
+                else:
+                    # Retain the existing explicit sampling and pair-wise paths.
+                    scores = torch.matmul(user_embedding, item_embedding.t())
+                    neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
+                    logits = gather_inbatch_logits(scores, neg_indices)
+                    if self.mode == 1:
+                        loss = self.criterion(logits[:, 0], logits[:, 1:], in_batch_neg=True)
+                    else:
+                        targets = torch.zeros(logits.size(0), dtype=torch.long, device=self.device)
+                        loss = self.criterion(logits, targets)
             else:
                 if self.mode == 1:  # pair_wise
                     pos_score, neg_score = self.model(x_dict)
@@ -168,10 +198,14 @@ class MatchTrainer(object):
             total_loss += loss.item()
             epoch_loss += loss.item()
             batch_count += 1
-            if (i + 1) % log_interval == 0:
+            if batch_count % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
+        if self.in_batch_neg and batch_count == 0:
+            raise ValueError("No usable in-batch training batches. Use batch_size >= 2 and provide at least two positive pairs.")
+        if skipped_batches:
+            warnings.warn(f"Skipped {skipped_batches} in-batch training batch(es) with fewer than two samples.", RuntimeWarning, stacklevel=2)
         # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
