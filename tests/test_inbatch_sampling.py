@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 import torch
+import torch.nn.functional as F
 
 from torch_rechub.basic.features import SequenceFeature, SparseFeature
 from torch_rechub.models.matching import DSSM
@@ -77,3 +79,62 @@ def test_match_trainer_inbatch_flow_runs_and_updates():
 
     grads = [p.grad for p in model.parameters() if p.requires_grad]
     assert any(g is not None for g in grads)
+
+
+@pytest.mark.parametrize("mode, temperature", [(0, 0.05), (2, 1.0)])
+def test_full_inbatch_matches_reference_and_updates_both_towers(monkeypatch, mode, temperature):
+    train_dl, model = _build_small_match_dataloader()
+    model.temperature = temperature
+    x, y = next(iter(train_dl))
+    trainer = MatchTrainer(model, mode=mode, in_batch_neg=True, optimizer_fn=torch.optim.SGD, optimizer_params={"lr": 0.01})
+
+    def unexpected_sampling(*args, **kwargs):
+        raise AssertionError("Full-batch training must not sample or gather negative indices")
+
+    monkeypatch.setattr("torch_rechub.trainers.match_trainer.inbatch_negative_sampling", unexpected_sampling)
+    monkeypatch.setattr("torch_rechub.trainers.match_trainer.gather_inbatch_logits", unexpected_sampling)
+    with torch.no_grad():
+        user_emb = F.normalize(model.user_tower(x), dim=-1)
+        item_emb = F.normalize(model.item_tower(x), dim=-1)
+        logits = user_emb @ item_emb.T / temperature
+        expected_loss = F.cross_entropy(logits, torch.arange(len(y))).item()
+    user_before = [p.detach().clone() for p in model.user_mlp.parameters()]
+    item_before = [p.detach().clone() for p in model.item_mlp.parameters()]
+    singleton = ({key: value[:1] for key, value in x.items()}, y[:1])
+
+    with pytest.warns(RuntimeWarning, match="Skipped 1"):
+        actual_loss = trainer.train_one_epoch([(x, y), singleton])
+
+    assert actual_loss == pytest.approx(expected_loss, rel=1e-5)
+    assert any(not torch.equal(before, after) for before, after in zip(user_before, model.user_mlp.parameters()))
+    assert any(not torch.equal(before, after) for before, after in zip(item_before, model.item_mlp.parameters()))
+    assert all(p.grad is None or torch.isfinite(p.grad).all() for p in model.parameters())
+
+
+def test_full_inbatch_rejects_an_epoch_without_negatives():
+    train_dl, model = _build_small_match_dataloader()
+    x, y = next(iter(train_dl))
+    trainer = MatchTrainer(model, in_batch_neg=True)
+    before = {key: value.clone() for key, value in model.state_dict().items()}
+    singleton = ({key: value[:1] for key, value in x.items()}, y[:1])
+
+    with pytest.raises(ValueError, match="No usable in-batch"):
+        trainer.train_one_epoch([singleton])
+    assert all(torch.equal(before[key], value) for key, value in model.state_dict().items())
+
+
+def test_full_inbatch_validates_temperature_and_single_device():
+    _, model = _build_small_match_dataloader()
+    for temperature in (0.0, -0.1, float("nan"), float("inf")):
+        model.temperature = temperature
+        with pytest.raises(ValueError, match="temperature"):
+            MatchTrainer(model, in_batch_neg=True)
+
+    model.temperature = 1.0
+    with pytest.raises(ValueError, match="single device"):
+        MatchTrainer(model, in_batch_neg=True, gpus=[0, 1])
+
+    # Point-wise DSSM still uses its original BCE path without temperature scaling.
+    model.temperature = 0.0
+    trainer = MatchTrainer(model)
+    assert isinstance(trainer.criterion, torch.nn.BCELoss)

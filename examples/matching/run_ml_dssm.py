@@ -16,7 +16,11 @@ from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
 sys.path.append("../..")
 
 
-def get_movielens_data(data_path, load_cache=False):
+def get_movielens_data(data_path, load_cache=False, in_batch_neg=False):
+    cache_dir = "./data/ml-1m/saved/"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_name = "data_preprocess_inbatch.npy" if in_batch_neg else "data_preprocess.npy"
+    cache_path = os.path.join(cache_dir, cache_name)
     data = pd.read_csv(data_path)
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', "cate_id"]
@@ -37,14 +41,16 @@ def get_movielens_data(data_path, load_cache=False):
     item_profile = data[["movie_id", "cate_id"]].drop_duplicates('movie_id')
 
     if load_cache:  # if you have run this script before and saved the preprocessed data
-        x_train, y_train, x_test, y_test = np.load("./data/ml-1m/saved/data_preprocess.npy", allow_pickle=True)
+        x_train, y_train, x_test, y_test = np.load(cache_path, allow_pickle=True)
     else:
-        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=3, min_item=0)
+        # In-batch training consumes positive pairs only; labels are placeholders.
+        neg_ratio = 0 if in_batch_neg else 3
+        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=neg_ratio, min_item=0)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         y_train = x_train["label"]
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         y_test = x_test["label"]
-        np.save("./data/ml-1m/saved/data_preprocess.npy", np.array((x_train, y_train, x_test, y_test), dtype=object))
+        np.save(cache_path, np.array((x_train, y_train, x_test, y_test), dtype=object))
 
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
     item_cols = ['movie_id', "cate_id"]
@@ -59,17 +65,19 @@ def get_movielens_data(data_path, load_cache=False):
     return user_features, item_features, x_train, y_train, all_item, test_user
 
 
-def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False, temperature=0.02):
+    if in_batch_neg and batch_size < 2:
+        raise ValueError("In-batch training requires batch_size >= 2.")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.manual_seed(seed)
-    user_features, item_features, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path)
+    user_features, item_features, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path, in_batch_neg=in_batch_neg)
     dg = MatchDataGenerator(x=x_train, y=y_train)
 
     model = DSSM(
         user_features,
         item_features,
-        temperature=0.02,
+        temperature=temperature,
         user_params={
             "dims": [256, 128, 64],
             "activation": 'prelu',  # important!!
@@ -79,9 +87,9 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
             "activation": 'prelu',  # important!!
         })
 
-    trainer = MatchTrainer(model, mode=0, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir)
+    trainer = MatchTrainer(model, mode=0, in_batch_neg=in_batch_neg, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir)
 
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size, num_workers=0)
     trainer.fit(train_dl)
 
     print("inference embedding")
@@ -104,9 +112,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./data/ml-1m/saved/')
     parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Train on positive pairs using full-batch cross entropy on one device')
+    parser.add_argument('--temperature', type=float, default=0.02, help='Temperature for in-batch logits; unused by point-wise BCE')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.in_batch_neg, args.temperature)
 """
 python run_ml_dssm.py
 """

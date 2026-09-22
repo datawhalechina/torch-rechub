@@ -145,7 +145,7 @@ from torch_rechub.models.matching import DSSM
 model = DSSM(
     user_features=user_features,
     item_features=item_features,
-    temperature=1.0,  # 当前 DSSM 实现保留该参数，但 forward 尚未使用
+    temperature=1.0,  # 用于全 batch in-batch 训练，不影响 point-wise BCE
     user_params={
         "dims": [256, 128, 64],
         "activation": "prelu"      # PReLU 激活函数效果更好
@@ -163,12 +163,12 @@ model = DSSM(
 |------|------|------|--------|
 | `user_features` | `list[Feature]` | 用户侧特征列表 | 用户属性 + 行为序列 |
 | `item_features` | `list[Feature]` | 物品侧特征列表 | 物品ID + 属性 |
-| `temperature` | `float` | 保留参数；当前 DSSM `forward` 未将它应用到分数 | 1.0 |
+| `temperature` | `float` | 全 batch in-batch 交叉熵的温度，必须为正且有限；不影响 point-wise BCE | 默认 1.0，示例 0.02 |
 | `user_params.dims` | `list[int]` | User Tower MLP 维度 | `[256, 128, 64]` |
 | `item_params.dims` | `list[int]` | Item Tower MLP 维度 | `[256, 128, 64]` |
 | `*_params.activation` | `str` | 激活函数 | `"prelu"` 推荐 |
 
-> 不要通过调整 `temperature` 期待改变当前 DSSM 的结果：源码中的温度缩放行尚未启用。
+> `temperature` 由 `MatchTrainer` 的默认全 batch in-batch 路径使用。DSSM 的 point-wise `forward` 仍返回未缩放余弦分数的 sigmoid。
 
 ---
 
@@ -208,6 +208,22 @@ trainer.fit(train_dl)
 | 2 | List-wise | Softmax Loss | 需要模型返回 `[B, 1+n_neg]` logits，如 `YoutubeDNN` / `MIND` |
 
 `mode` 是训练器的损失契约，不能在同一个 DSSM 实例上任意切换。本页 DSSM 的标量概率输出应使用 `mode=0`。
+
+### 4.3 单卡 in-batch 训练
+
+在 `examples/matching` 目录运行：
+
+```bash
+python run_ml_dssm.py --in_batch_neg --batch_size 256 --temperature 0.02 --device cpu
+```
+
+使用一张 GPU 时将 `--device cpu` 改为 `--device cuda:0`。示例会自动以 `neg_ratio=0` 构造正交互，并使用独立的数据缓存；不加 `--in_batch_neg` 时保留原来的离线负采样与 BCE 训练。
+
+自己准备数据时，每行必须是一个真实的用户—物品正交互，不能混入离线负样本。调用 `MatchTrainer(model, in_batch_neg=True)` 即可使用默认全 batch 路径：归一化两塔向量，计算 `user_emb @ item_emb.T / model.temperature`，再以对角线位置 `arange(B)` 为标签计算交叉熵。传入的训练 `y` 仅作占位，不决定正负；已有随机/困难负采样或 BPR 的显式配置保留原路径。
+
+该简单版本把所有非对角线位置当作负样本，不屏蔽重复物品，也不做采样概率修正。同 batch 出现相同物品时可能产生假负例。`batch_size` 至少为 2，只有一条样本的尾批会跳过并提示；整个 epoch 都没有有效 batch 时会报错。
+
+训练后沿用下一节的向量召回评估。正样本训练集不能直接作为 AUC 验证集；`fit(..., val_dataloader=...)` 的 AUC 验证仍需要真实的 0/1 标签。
 
 ---
 
@@ -495,7 +511,7 @@ SequenceFeature("hist_movie_id", vocab_size=n_movie,
 3. 通过 ANN 检索最相似的 Top-K Item
 
 ### Q4: temperature 会影响当前 DSSM 吗？
-不会。构造参数仍被保留，但当前 `DSSM.forward()` 未执行温度缩放。
+默认全 batch in-batch 训练会使用它缩放 logits；point-wise BCE 不受影响，`DSSM.forward()` 仍不执行温度缩放。
 
 ### Q5: Annoy、Faiss、Milvus 如何选择？
 
