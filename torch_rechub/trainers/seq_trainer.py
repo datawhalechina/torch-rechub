@@ -1,9 +1,11 @@
 """Sequence Generation Model Trainer."""
 
 import os
+from numbers import Integral
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import tqdm
 
 from ..basic.callback import EarlyStopper
@@ -27,6 +29,14 @@ class SeqTrainer(object):
         device (str): 设备，'cpu'或'cuda'，默认'cpu'
         gpus (list): 多GPU的id列表，默认为[]
         model_path (str): 模型保存路径，默认为'./'
+        loss_type (str): cross_entropy (default), legacy nce (full vocabulary),
+            or sampled_softmax (positive plus sampled catalog negatives).
+        loss_params (dict): For sampled_softmax: num_negatives=128 and optional
+            negative_similarity_threshold for normalized HLLM item vectors.
+        accumulation_steps (int): Microbatches per update, default 1.
+        amp (bool): CUDA float16 autocast/scaling, disabled by default.
+        max_grad_norm (float, optional): Clip unscaled gradients.
+        eval_chunk_size (int): Candidate scoring chunk size, default 4096.
 
     Methods:
         fit: 训练模型
@@ -60,7 +70,11 @@ class SeqTrainer(object):
         model_path='./',
         loss_type='cross_entropy',
         loss_params=None,
-        model_logger=None
+        model_logger=None,
+        accumulation_steps=1,
+        amp=False,
+        max_grad_norm=None,
+        eval_chunk_size=4096,
     ):
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
@@ -72,22 +86,53 @@ class SeqTrainer(object):
         # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
         self.model.to(self.device)
+        if not isinstance(accumulation_steps, Integral) or accumulation_steps < 1:
+            raise ValueError("accumulation_steps must be a positive integer")
+        if not isinstance(eval_chunk_size, Integral) or eval_chunk_size < 1:
+            raise ValueError("eval_chunk_size must be a positive integer")
+        if max_grad_norm is not None and max_grad_norm <= 0:
+            raise ValueError("max_grad_norm must be positive")
+        self.accumulation_steps = accumulation_steps
+        self.amp = bool(amp and self.device.type == 'cuda')
+        # Small-temperature cosine scores amplify gradients; a modest initial
+        # scale avoids skipping all updates in short tutorial runs.
+        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp, init_scale=1024) if hasattr(torch, 'amp') and hasattr(torch.amp, 'GradScaler') else torch.cuda.amp.GradScaler(enabled=self.amp, init_scale=1024)
+        self.max_grad_norm = max_grad_norm
+        self.eval_chunk_size = eval_chunk_size
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
         self.scheduler = None
         if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
 
         # 损失函数
-        if loss_type == 'nce':
+        if loss_type == 'sampled_softmax':
+            params = dict(loss_params or {})
+            self.num_negatives = params.pop('num_negatives', 128)
+            self.negative_similarity_threshold = params.pop('negative_similarity_threshold', None)
+            if self.negative_similarity_threshold is not None:
+                if not 0 <= self.negative_similarity_threshold <= 1 or not hasattr(self.model, 'get_item_embeddings'):
+                    raise ValueError("negative_similarity_threshold requires normalized get_item_embeddings() and a value in [0, 1]")
+            if params or not isinstance(self.num_negatives, Integral) or self.num_negatives < 1:
+                raise ValueError("Unknown sampled_softmax parameters or invalid num_negatives")
+            if len(gpus) > 1:
+                raise ValueError("sampled_softmax currently supports one device; use the separate multi-GPU branch")
+            if not all(hasattr(self.model, method) for method in ('encode', 'score_items', 'vocab_size')):
+                raise ValueError("sampled_softmax requires encode(), score_items() and vocab_size")
+            if self.model.vocab_size < 3:
+                raise ValueError("sampled_softmax requires at least two real items plus PAD")
+            self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)
+        elif loss_type == 'nce':
             if loss_params is None:
                 loss_params = {"temperature": 0.1, "ignore_index": 0}
             self.loss_fn = NCELoss(**loss_params)
-        else:  # default to cross_entropy
+        elif loss_type == 'cross_entropy':
             if loss_params is None:
                 loss_params = {"ignore_index": 0}
             self.loss_fn = nn.CrossEntropyLoss(**loss_params)
+        else:
+            raise ValueError("loss_type must be cross_entropy, nce or sampled_softmax")
 
         self.loss_type = loss_type
         self.n_epoch = n_epoch
@@ -106,6 +151,10 @@ class SeqTrainer(object):
             dict: 训练历史
         """
         history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
+        best_score, best_loss, best_weights = float('-inf'), float('inf'), None
+        os.makedirs(self.model_path, exist_ok=True)
+        if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and val_dataloader is None:
+            raise ValueError("ReduceLROnPlateau requires validation data")
 
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_type': self.loss_type})
@@ -119,13 +168,8 @@ class SeqTrainer(object):
             # Collect metrics
             logs = {'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}
 
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
-                self.scheduler.step()  # update lr in epoch level by scheduler
-
             # 验证阶段
-            if val_dataloader:
+            if val_dataloader is not None:
                 val_loss, val_accuracy = self.evaluate(val_dataloader)
                 history['val_loss'].append(val_loss)
                 history['val_accuracy'].append(val_accuracy)
@@ -135,16 +179,27 @@ class SeqTrainer(object):
                 logs['auc'] = val_accuracy  # For compatibility with EarlyStopper
 
                 print(f"epoch: {epoch_i}, validation: loss: {val_loss:.4f}, accuracy: {val_accuracy:.4f}")
+                if val_accuracy > best_score or (val_accuracy == best_score and val_loss < best_loss):
+                    best_score = val_accuracy
+                    best_loss = val_loss
+                    # Keep the best snapshot off GPU, especially for a frozen
+                    # LLM item table. Loading copies it back to model devices.
+                    best_weights = {name: value.detach().cpu().clone() for name, value in self.model.state_dict().items()}
 
                 # 早停
-                if self.early_stopper.stop_training(val_accuracy, self.model.state_dict()):
+                if self.early_stopper.stop_training(val_accuracy, best_weights):
                     print(f'validation: best accuracy: {self.early_stopper.best_auc}')
-                    self.model.load_state_dict(self.early_stopper.best_weights)
                     break
 
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_i)
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(val_accuracy if self.scheduler.mode == 'max' else val_loss)
+            elif self.scheduler is not None:
+                self.scheduler.step()
 
+        if best_weights is not None:
+            self.model.load_state_dict(best_weights)
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best model
 
         for logger in self._iter_loggers():
@@ -169,21 +224,19 @@ class SeqTrainer(object):
     def _compute_next_token_loss(self, logits, seq_tokens, targets):
         """Cross-entropy over the whole sequence (autoregressive next-token).
 
-        ``logits[:, i, :]`` predicts ``next_tokens[:, i]`` where
-        ``next_tokens = concat(seq_tokens[:, 1:], targets.unsqueeze(-1))``,
-        i.e. for positions ``0..L-2`` the next token comes from within the
-        sequence, and for the last position it is the held-out target. PAD
+        ``logits[:, i, :]`` predicts the following real token; the final
+        non-PAD position predicts the held-out target. This works with left
+        and right padding (not just the final physical array slot). PAD
         positions are ignored based on the *current* token. This matters for
         left-padded sequences: the last PAD slot may have the first real item as
         its shifted label, but the model should not learn a PAD -> item
         transition.
         """
         vocab_size = logits.size(-1)
-        next_tokens = torch.cat([seq_tokens[:, 1:], targets.unsqueeze(-1)], dim=1)
-        next_tokens = next_tokens.masked_fill(seq_tokens.eq(0), 0)
+        next_tokens = self._next_tokens(seq_tokens, targets)
         if vocab_size > 0:
             logits = logits.clone()
-            logits[..., 0] = -1e9
+            logits[..., 0] = torch.finfo(logits.dtype).min
         return self.loss_fn(logits.reshape(-1, vocab_size), next_tokens.reshape(-1))
 
     def train_one_epoch(self, data_loader, log_interval=10):
@@ -201,21 +254,32 @@ class SeqTrainer(object):
         epoch_loss = 0
         batch_count = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
+        self.optimizer.zero_grad()
         for i, (seq_tokens, _seq_positions, seq_time_diffs, targets) in enumerate(tk0):
             # Move tensors to the target device. ``seq_positions`` is unused by
             # ``HSTUModel`` (which derives positions internally); keep the
             # dataloader API stable but drop it here.
             seq_tokens = seq_tokens.to(self.device)
             seq_time_diffs = seq_time_diffs.to(self.device)
-            targets = targets.to(self.device).squeeze(-1)
+            targets = targets.to(self.device).reshape(-1)
 
-            logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
-
-            loss = self._compute_next_token_loss(logits, seq_tokens, targets)
-
-            self.model.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            with torch.autocast(device_type=self.device.type, enabled=self.amp):
+                if self.loss_type == 'sampled_softmax':
+                    loss = self._sampled_loss(self.model.encode(seq_tokens, seq_time_diffs), seq_tokens, targets)
+                else:
+                    logits = self.model(seq_tokens, seq_time_diffs)
+                    loss = self._compute_next_token_loss(logits, seq_tokens, targets)
+            # Scale by the actual microbatch count, including the short tail.
+            group_start = (i // self.accumulation_steps) * self.accumulation_steps
+            group_size = min(self.accumulation_steps, len(data_loader) - group_start)
+            self.scaler.scale(loss / group_size).backward()
+            if (i + 1) % self.accumulation_steps == 0 or i + 1 == len(data_loader):
+                self.scaler.unscale_(self.optimizer)
+                if self.max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.optimizer.zero_grad()
 
             total_loss += loss.item()
             epoch_loss += loss.item()
@@ -229,7 +293,8 @@ class SeqTrainer(object):
     def evaluate(self, data_loader):
         """Evaluate the model on a validation/test data loader.
 
-        Loss is the full-sequence next-token CE (matching training);
+        Loss matches training: full-vocabulary CE or sampled candidate CE.
+        Sampled loss uses fixed validation draws and is not full-vocabulary CE.
         accuracy is top-1 hit on the held-out next item only (useful as a
         ranking-style proxy metric).
 
@@ -240,29 +305,128 @@ class SeqTrainer(object):
         total_loss = 0.0
         total_correct = 0
         total_samples = 0
+        # Fixed validation candidates make loss comparisons reproducible and
+        # do not consume the training sampler's random stream.
+        generator = torch.Generator(device=self.device).manual_seed(0)
 
         with torch.no_grad():
             for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating", smoothing=0, mininterval=1.0):
                 seq_tokens = seq_tokens.to(self.device)
                 seq_time_diffs = seq_time_diffs.to(self.device)
-                targets = targets.to(self.device).squeeze(-1)
+                targets = targets.to(self.device).reshape(-1)
 
-                logits = self.model(seq_tokens, seq_time_diffs)  # (B, L, V)
-
-                loss = self._compute_next_token_loss(logits, seq_tokens, targets)
+                if self.loss_type == 'sampled_softmax':
+                    states = self.model.encode(seq_tokens, seq_time_diffs)
+                    loss = self._sampled_loss(states, seq_tokens, targets, generator=generator)
+                    last = self._last_positions(seq_tokens)
+                    last_states = states[torch.arange(states.size(0), device=self.device), last]
+                    predictions = self._top1(last_states)
+                else:
+                    logits = self.model(seq_tokens, seq_time_diffs)
+                    loss = self._compute_next_token_loss(logits, seq_tokens, targets)
+                    last_logits = logits[torch.arange(logits.size(0), device=self.device), self._last_positions(seq_tokens)].clone()
+                    last_logits[:, 0] = torch.finfo(last_logits.dtype).min
+                    predictions = torch.argmax(last_logits, dim=-1)
                 total_loss += loss.item()
-
-                # Top-1 hit on the held-out next item.
-                last_logits = logits[:, -1, :].clone()
-                if last_logits.size(-1) > 0:
-                    last_logits[:, 0] = -1e9
-                predictions = torch.argmax(last_logits, dim=-1)
                 total_correct += (predictions == targets).sum().item()
                 total_samples += targets.numel()
 
-        avg_loss = total_loss / len(data_loader)
+        avg_loss = total_loss / max(1, len(data_loader))
         accuracy = total_correct / total_samples if total_samples > 0 else 0.0
         return avg_loss, accuracy
+
+    def _last_positions(self, seq_tokens):
+        valid = seq_tokens.ne(0)
+        if not valid.any(dim=1).all():
+            raise ValueError("Every sequence must contain at least one non-PAD item")
+        positions = torch.arange(seq_tokens.size(1), device=seq_tokens.device).expand_as(seq_tokens)
+        last = positions.masked_fill(~valid, -1).max(dim=1).values
+        first = positions.masked_fill(~valid, seq_tokens.size(1)).min(dim=1).values
+        if not (last - first + 1).eq(valid.sum(dim=1)).all():
+            raise ValueError("Use contiguous histories with left or right padding, not internal PAD gaps")
+        return last
+
+    def _next_tokens(self, seq_tokens, targets):
+        if targets.numel() != seq_tokens.size(0) or targets.le(0).any():
+            raise ValueError("Provide one non-PAD target per history")
+        last = self._last_positions(seq_tokens)
+        next_tokens = torch.cat([seq_tokens[:, 1:], torch.zeros_like(seq_tokens[:, :1])], dim=1)
+        next_tokens.scatter_(1, last.unsqueeze(1), targets.reshape(-1, 1))
+        return next_tokens.masked_fill(seq_tokens.eq(0), 0)
+
+    def _sampled_loss(self, states, seq_tokens, targets, generator=None):
+        labels = self._next_tokens(seq_tokens, targets)
+        valid = labels.ne(0)
+        positive_ids = labels[valid]
+        states = states[valid]
+        # Uniform catalog negatives shared across valid positions. Unlike the
+        # reference's per-position draws, this trades diversity for efficiency.
+        # Repeated positives are never treated as their own negatives.
+        negatives = torch.randint(1, self.model.vocab_size, (self.num_negatives,), device=self.device, generator=generator)
+        # Compute matched positive scores in small blocks, not an N x N matrix
+        # of every valid position against every positive in the batch.
+        positive_scores = torch.cat([self.model.score_items(states[start:start + 64], positive_ids[start:start + 64]).diagonal() for start in range(0, states.size(0), 64)]).unsqueeze(1)
+        negative_scores = self.model.score_items(states, negatives)
+        negative_scores = negative_scores.masked_fill(positive_ids[:, None].eq(negatives[None, :]), torch.finfo(negative_scores.dtype).min)
+        if self.negative_similarity_threshold is not None:
+            with torch.no_grad():
+                similarity = self.model.get_item_embeddings(positive_ids) @ self.model.get_item_embeddings(negatives).t()
+            negative_scores = negative_scores.masked_fill(similarity > self.negative_similarity_threshold, torch.finfo(negative_scores.dtype).min)
+        # CE is computed in float32 for small-temperature/AMP stability.
+        return F.cross_entropy(torch.cat([positive_scores, negative_scores], dim=1).float(), torch.zeros(states.size(0), dtype=torch.long, device=self.device))
+
+    def _top1(self, states):
+        best_scores = torch.full((states.size(0),), float('-inf'), device=self.device)
+        best_ids = torch.ones(states.size(0), dtype=torch.long, device=self.device)
+        for start in range(1, self.model.vocab_size, self.eval_chunk_size):
+            item_ids = torch.arange(start, min(start + self.eval_chunk_size, self.model.vocab_size), device=self.device)
+            scores, indices = self.model.score_items(states, item_ids).max(dim=-1)
+            improved = scores > best_scores
+            best_scores = torch.where(improved, scores, best_scores)
+            best_ids = torch.where(improved, item_ids[indices], best_ids)
+        return best_ids
+
+    @torch.no_grad()
+    def predict(self, data_loader, top_k=10, filter_seen=False):
+        """Return exact catalog top-k IDs with bounded scoring memory.
+
+        PAD is always excluded. History filtering is opt-in because a repeated
+        interaction may be the true next item. This is not sampled evaluation.
+        """
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+        if not isinstance(top_k, Integral) or top_k < 1:
+            raise ValueError("top_k must be a positive integer")
+        top_k = min(top_k, model.vocab_size - 1)
+        was_training = self.model.training
+        self.model.eval()
+        predictions = []
+        try:
+            for seq_tokens, _positions, time_diffs, _targets in data_loader:
+                seq_tokens, time_diffs = seq_tokens.to(self.device), time_diffs.to(self.device)
+                states = model.encode(seq_tokens, time_diffs)
+                states = states[torch.arange(states.size(0), device=self.device), self._last_positions(seq_tokens)]
+                best_scores = torch.empty(states.size(0), 0, device=self.device)
+                best_ids = torch.empty(states.size(0), 0, device=self.device, dtype=torch.long)
+                for start in range(1, model.vocab_size, self.eval_chunk_size):
+                    ids = torch.arange(start, min(start + self.eval_chunk_size, model.vocab_size), device=self.device)
+                    scores = model.score_items(states, ids)
+                    if filter_seen:
+                        seen = torch.zeros(states.size(0), ids.size(0), dtype=torch.bool, device=self.device)
+                        # Mark history IDs only within the current catalog chunk.
+                        rows, positions = torch.where((seq_tokens >= start) & (seq_tokens < start + ids.size(0)))
+                        seen[rows, seq_tokens[rows, positions] - start] = True
+                        scores = scores.masked_fill(seen, float('-inf'))
+                    scores = torch.cat([best_scores, scores], dim=-1)
+                    candidates = torch.cat([best_ids, ids.expand(states.size(0), -1)], dim=-1)
+                    best_scores, positions = scores.topk(min(top_k, scores.size(1)), dim=-1)
+                    best_ids = candidates.gather(1, positions)
+                # Not enough eligible items: -1, never a seen item pretending
+                # to be a legal recommendation.
+                best_ids = best_ids.masked_fill(~torch.isfinite(best_scores), -1)
+                predictions.append(best_ids.cpu())
+        finally:
+            self.model.train(was_training)
+        return torch.cat(predictions) if predictions else torch.empty(0, top_k, dtype=torch.long)
 
     def export_onnx(self, output_path, batch_size=2, seq_length=50, vocab_size=None, opset_version=14, dynamic_batch=True, device=None, verbose=False, onnx_export_kwargs=None):
         """Export the trained sequence generation model to ONNX format.
@@ -302,8 +466,8 @@ class SeqTrainer(object):
 
         # Handle DataParallel wrapped model
         model = self.model.module if hasattr(self.model, 'module') else self.model
-        model.eval()
-        model.to(export_device)
+        original_device = next(model.parameters()).device
+        original_training = model.training
 
         # Get vocab_size from model if not provided
         if vocab_size is None:
@@ -330,6 +494,8 @@ class SeqTrainer(object):
             os.makedirs(output_dir)
 
         try:
+            model.to(export_device)
+            model.eval()
             with torch.no_grad():
                 import inspect
 
@@ -376,6 +542,10 @@ class SeqTrainer(object):
         except Exception as e:
             warnings.warn(f"ONNX export failed: {str(e)}")
             raise RuntimeError(f"Failed to export ONNX model: {str(e)}") from e
+        finally:
+            # Export is an inspection step, not a permanent device/mode switch.
+            model.to(original_device)
+            model.train(original_training)
 
     def visualization(self, seq_length=50, vocab_size=None, batch_size=2, depth=3, show_shapes=True, expand_nested=True, save_path=None, graph_name="model", device=None, dpi=300, **kwargs):
         """Visualize the model's computation graph.
@@ -481,12 +651,16 @@ class SeqTrainer(object):
         dummy_seq_tokens = torch.randint(0, vocab_size, (batch_size, seq_length), device=viz_device)
         dummy_seq_time_diffs = torch.zeros(batch_size, seq_length, dtype=torch.float32, device=viz_device)
 
-        # Move model to device
-        model = model.to(viz_device)
-        model.eval()
-
-        # Call torchview.draw_graph
-        graph = draw_graph(model, input_data=(dummy_seq_tokens, dummy_seq_time_diffs), graph_name=graph_name, depth=depth, device=viz_device, expand_nested=expand_nested, show_shapes=show_shapes, save_graph=False, **kwargs)
+        original_device = next(model.parameters()).device
+        original_training = model.training
+        try:
+            model.to(viz_device)
+            model.eval()
+            graph = draw_graph(model, input_data=(dummy_seq_tokens, dummy_seq_time_diffs), graph_name=graph_name, depth=depth, device=viz_device, expand_nested=expand_nested, show_shapes=show_shapes, save_graph=False, **kwargs)
+        finally:
+            # A CPU diagram must not move the next CUDA training batch to CPU.
+            model.to(original_device)
+            model.train(original_training)
 
         # Set DPI for high-quality output
         graph.visual_graph.graph_attr['dpi'] = str(dpi)

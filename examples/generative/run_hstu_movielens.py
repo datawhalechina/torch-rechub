@@ -94,6 +94,7 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_it
     """
     model = model.to(device)
     model.eval()
+    topKs = sorted({min(k, model.vocab_size - 1) for k in topKs})
     vocab_mask = VocabMask(model.vocab_size, invalid_items=list(invalid_items)).to(device)
 
     y_true = {}
@@ -106,12 +107,16 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_it
             seq_time_diffs = seq_time_diffs.to(device)
             targets = targets.cpu().numpy()
 
-            logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
+            states = model.encode(seq_tokens, seq_time_diffs)
+            last = torch.arange(seq_tokens.size(1), device=seq_tokens.device).expand_as(seq_tokens).masked_fill(seq_tokens.eq(0), -1).max(dim=1).values
+            states = states[torch.arange(states.size(0), device=states.device), last]
+            logits = model.score_items(states, torch.arange(model.vocab_size, device=states.device))
             seen_ids = seq_tokens if filter_seen else None
-            last_logits = vocab_mask.apply_mask(logits[:, -1, :], invalid_ids=seen_ids)  # (B, V)
+            last_logits = vocab_mask.apply_mask(logits, invalid_ids=seen_ids)
 
-            max_k = max(topKs)
+            max_k = min(max(topKs), model.vocab_size - 1)
             _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
+            top_items = top_items.masked_fill(last_logits.gather(1, top_items) <= -1e8, -1)
             top_items = top_items.cpu().numpy()
 
             for i in range(top_items.shape[0]):
@@ -148,6 +153,10 @@ def main(
     time_bucket_unit='seconds',
     use_output_bias=False,
     scale_input_embedding=True,
+    loss_type='cross_entropy',
+    num_negatives=128,
+    accumulation_steps=1,
+    amp=False,
 ):
     """Main training and evaluation entry point.
 
@@ -243,6 +252,10 @@ def main(
                                10),
         device=device,
         model_path=save_dir,
+        loss_type=loss_type,
+        loss_params={'num_negatives': num_negatives} if loss_type == 'sampled_softmax' else None,
+        accumulation_steps=accumulation_steps,
+        amp=amp,
     )
 
     # Train model
@@ -299,6 +312,10 @@ if __name__ == '__main__':
     parser.add_argument('--time_bucket_unit', default='seconds', choices=['seconds', 'minutes'], help='Unit for time bucketization')
     parser.add_argument('--use_output_bias', action='store_true', help='Use output bias in item logits')
     parser.add_argument('--no_scale_input_embedding', action='store_true', help='Disable sqrt(d_model) input embedding scale')
+    parser.add_argument('--loss_type', default='cross_entropy', choices=['cross_entropy', 'sampled_softmax'])
+    parser.add_argument('--num_negatives', type=int, default=128)
+    parser.add_argument('--accumulation_steps', type=int, default=1)
+    parser.add_argument('--amp', action='store_true')
 
     args = parser.parse_args()
     main(
@@ -326,4 +343,8 @@ if __name__ == '__main__':
         args.time_bucket_unit,
         args.use_output_bias,
         not args.no_scale_input_embedding,
+        args.loss_type,
+        args.num_negatives,
+        args.accumulation_steps,
+        args.amp,
     )

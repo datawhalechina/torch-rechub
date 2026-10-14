@@ -13,6 +13,10 @@ import os
 import pickle
 import sys
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import numpy as np
 import torch
 import tqdm
@@ -21,8 +25,6 @@ from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hllm import HLLMModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator
-
-sys.path.append("../..")
 
 # Get the directory where this script is located
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,16 +72,8 @@ def check_training_environment(device, model_type, dataset_path):
         total_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         print(f"   总显存: {total_memory:.2f} GB")
 
-        # HLLM training requires at least 6GB
-        required_vram = 6
-        if total_memory < required_vram:
-            print(f"⚠️  警告：HLLM 训练建议至少 {required_vram}GB 显存，但系统仅有 {total_memory:.2f}GB")
-            print("   建议：减小 batch_size（如 --batch_size 256）")
-            response = input("   是否继续？(y/n): ").strip().lower()
-            if response != 'y':
-                return False
-        else:
-            print(f"✅ 显存充足（需要 {required_vram}GB，实际 {total_memory:.2f}GB）")
+        print("   显存取决于物品目录、编码器宽度和序列长度，不能只按卡容量保证。")
+        print("   小显存可尝试 --d_model 256 --batch_size 8 --max_seq_len 50 --loss_type sampled_softmax --amp")
     else:
         print("✅ 使用 CPU 进行训练（速度会很慢）")
 
@@ -182,6 +176,7 @@ def load_item_embeddings(data_dir, model_type='tinyllama'):
 def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
     """Evaluate top-K ranking metrics on the test set."""
     model.eval()
+    topKs = sorted({min(k, model.vocab_size - 1) for k in topKs})
     y_true = {}
     y_pred = {}
 
@@ -192,11 +187,14 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
             seq_time_diffs = seq_time_diffs.to(device)
             targets = targets.cpu().numpy()
 
-            logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
-            last_logits = logits[:, -1, :]  # (B, V)
+            states = model.encode(seq_tokens, seq_time_diffs)
+            last = torch.arange(seq_tokens.size(1), device=seq_tokens.device).expand_as(seq_tokens).masked_fill(seq_tokens.eq(0), -1).max(dim=1).values
+            states = states[torch.arange(states.size(0), device=states.device), last]
+            last_logits = model.score_items(states, torch.arange(model.vocab_size, device=states.device))
+            last_logits[:, 0] = float('-inf')
 
             batch_size = last_logits.shape[0]
-            max_k = max(topKs)
+            max_k = min(max(topKs), model.vocab_size - 1)
 
             _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
             top_items = top_items.cpu().numpy()
@@ -211,7 +209,7 @@ def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200]):
     return results
 
 
-def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, max_seq_len, loss_type='nce'):
+def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, max_seq_len, loss_type='nce', d_model=None, num_negatives=128, accumulation_steps=1, amp=False, learn_temperature=False):
     """Main training and evaluation entry point."""
     torch.manual_seed(seed)
 
@@ -242,7 +240,7 @@ def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_deca
         return
 
     # Auto-detect d_model from item embeddings dimension
-    d_model = item_embeddings.shape[1]
+    d_model = item_embeddings.shape[1] if d_model is None else d_model
     print(f"✅ 自动检测到 embedding 维度: {d_model}")
 
     # Model hyper-parameters
@@ -286,13 +284,17 @@ def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_deca
         n_layers=n_layers,
         max_seq_len=max_seq_len,
         dropout=0.1,
+        project_items=True,
+        learn_temperature=learn_temperature,
     )
     print(f"Number of parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     # Create trainer
     print("\nCreating trainer...")
     # Configure loss function parameters
-    if loss_type == 'nce':
+    if loss_type == 'sampled_softmax':
+        loss_params = {'num_negatives': num_negatives, 'negative_similarity_threshold': 0.99}
+    elif loss_type == 'nce':
         loss_params = {"temperature": 1.0, "ignore_index": 0}
     else:
         loss_params = {"ignore_index": 0}
@@ -310,6 +312,8 @@ def main(dataset_path, model_type, epoch, learning_rate, batch_size, weight_deca
         model_path=save_dir,
         loss_type=loss_type,
         loss_params=loss_params,
+        accumulation_steps=accumulation_steps,
+        amp=amp,
     )
     print(f"✅ 使用 {loss_type.upper()} Loss 函数")
 
@@ -363,11 +367,33 @@ Examples:
     parser.add_argument('--save_dir', default='./', help='Directory to save model')
     parser.add_argument('--seed', type=int, default=2022, help='Random seed')
     parser.add_argument('--max_seq_len', type=int, default=200, help='Maximum sequence length')
-    parser.add_argument('--loss_type', default='nce', choices=['cross_entropy', 'nce'], help='Loss function type: cross_entropy or nce (default: nce)')
+    parser.add_argument('--loss_type', default='nce', choices=['cross_entropy', 'nce', 'sampled_softmax'], help='Legacy nce uses full vocabulary; sampled_softmax uses sampled negatives')
+    parser.add_argument('--d_model', type=int, default=None, help='Optional small encoder width, e.g. 256; default matches item embeddings')
+    parser.add_argument('--num_negatives', type=int, default=128)
+    parser.add_argument('--accumulation_steps', type=int, default=1)
+    parser.add_argument('--amp', action='store_true')
+    parser.add_argument('--learn_temperature', action='store_true')
 
     args = parser.parse_args()
 
     # Use default path if not provided
     dataset_path = args.dataset_path if args.dataset_path else _DEFAULT_DATA_DIR
 
-    main(dataset_path, args.model_type, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len, args.loss_type)
+    main(
+        dataset_path,
+        args.model_type,
+        args.epoch,
+        args.learning_rate,
+        args.batch_size,
+        args.weight_decay,
+        args.device,
+        args.save_dir,
+        args.seed,
+        args.max_seq_len,
+        args.loss_type,
+        args.d_model,
+        args.num_negatives,
+        args.accumulation_steps,
+        args.amp,
+        args.learn_temperature
+    )

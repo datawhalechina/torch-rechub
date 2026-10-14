@@ -337,6 +337,9 @@ class ResidualVectorQuantizer(nn.Module):
         self.kmeans_iters = kmeans_iters
         self.sk_epsilons = sk_epsilons
         self.sk_iters = sk_iters
+        sk_epsilons = [0.0] * len(n_e_list) if sk_epsilons is None else sk_epsilons
+        if len(sk_epsilons) != len(n_e_list):
+            raise ValueError("sk_epsilons must have one value per codebook")
         self.vq_layers = nn.ModuleList([VectorQuantizer(n_e, e_dim, beta=self.beta, kmeans_init=self.kmeans_init, kmeans_iters=self.kmeans_iters, sk_epsilon=sk_epsilon, sk_iters=sk_iters) for n_e, sk_epsilon in zip(n_e_list, sk_epsilons)])
 
     def get_codebook(self):
@@ -484,7 +487,7 @@ class RQVAEModel(nn.Module):
         self.sk_epsilons = sk_epsilons
         self.sk_iters = sk_iters
         self.encode_layer_dims = [self.in_dim] + self.layers + [self.e_dim]
-        self.encoder = MLP(input_dim=self.encode_layer_dims[0], dims=self.encode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu")
+        self.encoder = MLP(input_dim=self.encode_layer_dims[0], dims=self.encode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu", batchnorm=self.bn)
         self.rq = ResidualVectorQuantizer(
             num_emb_list,
             e_dim,
@@ -496,7 +499,7 @@ class RQVAEModel(nn.Module):
         )
 
         self.decode_layer_dims = self.encode_layer_dims[::-1]
-        self.decoder = MLP(input_dim=self.decode_layer_dims[0], dims=self.decode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu")
+        self.decoder = MLP(input_dim=self.decode_layer_dims[0], dims=self.decode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu", batchnorm=self.bn)
 
     def forward(self, x, use_sk=True):
         """Forward pass.
@@ -609,90 +612,53 @@ class RQVAEModel(nn.Module):
         return collision_item_groups
 
     @torch.no_grad()
-    def generate_semantic_ids(self, data, data_loader, prefix=["<a_{}>", "<b_{}>", "<c_{}>", "<d_{}>", "<e_{}>"], use_sk=False, device='cuda'):
+    def generate_semantic_ids(self, data, data_loader, prefix=None, use_sk=False, device='cuda', item_ids=None):
+        """Export row-aligned, unique semantic IDs using a collision suffix.
+
+        The loader must visit every row exactly once in dataset order. Optional
+        item_ids maps those rows to business IDs; otherwise keys are row indices.
+        Re-export the complete catalog after changing RQ-VAE or catalog order.
         """
-        Generate semantic IDs for a dataset using the residual vector quantizer.
+        import warnings
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            Input dataset of shape (num_samples, in_dim)
-        data_loader : torch.utils.data.DataLoader
-            DataLoader for iterating over the dataset in batches
-        prefix : list of str, default=["<a_{}>","<b_{}>","<c_{}>","<d_{}>","<e_{}>"]
-            Prefix template for generating semantic ID strings for each quantizer stage
-        use_sk : bool, default=False
-            Whether to use Sinkhorn-based soft assignment for collisions
-        device : str, default='cuda'
-            Device to perform computation on
+        from torch.utils.data import SequentialSampler
 
-        Returns
-        -------
-        all_indices_dict : dict
-            Dictionary mapping item index to list of semantic ID strings from each quantization stage
+        if not isinstance(data_loader.sampler, SequentialSampler) or data_loader.drop_last:
+            raise ValueError("Semantic ID export requires shuffle=False and drop_last=False")
+        if len(data) != len(data_loader.dataset) or len(data) == 0:
+            raise ValueError("data and loader must describe the same non-empty catalog")
+        prefix = prefix or ["<a_{}>", "<b_{}>", "<c_{}>", "<d_{}>", "<e_{}>"]
+        stages = len(self.num_emb_list)
+        if len(prefix) < stages:
+            raise ValueError("prefix must cover every quantization stage")
+        item_ids = list(range(len(data))) if item_ids is None else list(item_ids)
+        if len(item_ids) != len(data) or len({str(item) for item in item_ids}) != len(item_ids):
+            raise ValueError("item_ids must be unique and aligned with catalog rows")
+        if use_sk:
+            warnings.warn("Export uses nearest codes plus a collision suffix; use_sk is retained for compatibility")
+        codes = []
+        was_training = self.training
+        self.eval()
+        try:
+            for batch in tqdm(data_loader, desc="export semantic IDs"):
+                indices = self.get_indices(batch.to(device), use_sk=False).cpu().tolist()
+                codes.extend([tuple(index) for index in indices])
+        finally:
+            self.train(was_training)
+        if len(codes) != len(item_ids):
+            raise ValueError("Loader did not visit each catalog row exactly once")
 
-        Examples
-        --------
-        >>> all_indices_dict = model.generate_semantic_ids(data, data_loader)
-        >>> len(all_indices_dict)
-        num_samples
-        """
-        all_sids = []
-        all_sids_str = []
-        if len(prefix) < len(self.num_emb_list):
-            raise ValueError("The length of prefix should be no less than that of num_emb_list")
-
-        for d in tqdm(data_loader):
-            d = d.to(device)
-            indices = self.get_indices(d, use_sk=False)
-            indices = indices.view(-1, indices.shape[-1]).cpu().numpy()
-            for index in indices:
-                code = []
-                for i, ind in enumerate(index):
-                    code.append(prefix[i].format(int(ind)))
-
-                all_sids.append(code)
-                all_sids_str.append(str(code))
-            # break
-
-        all_sids = np.array(all_sids)
-        all_sids_str = np.array(all_sids_str)
-
-        for vq in self.rq.vq_layers[:-1]:
-            vq.sk_epsilon = 0.0
-        # model.rq.vq_layers[-1].sk_epsilon = 0.005
-        if self.rq.vq_layers[-1].sk_epsilon == 0.0:
-            self.rq.vq_layers[-1].sk_epsilon = 0.003
-
-        tt = 0
-        #There are often duplicate items in the dataset, and we no longer differentiate them
-        while True:
-            if tt >= 20 or self._check_collision(all_sids_str):
-                break
-
-            collision_item_groups = self._get_collision_item(all_sids_str)
-            print(collision_item_groups)
-            print(len(collision_item_groups))
-            for collision_items in collision_item_groups:
-                d = data[collision_items].to(device)
-                indices = self.get_indices(d, use_sk=True)
-                indices = indices.view(-1, indices.shape[-1]).cpu().numpy()
-                for item, index in zip(collision_items, indices):
-                    code = []
-                    for i, ind in enumerate(index):
-                        code.append(prefix[i].format(int(ind)))
-                    all_sids[item] = code
-                    all_sids_str[item] = str(code)
-            tt += 1
-
-        print("All indices number: ", len(all_sids))
-        print("Max number of conflicts: ", max(self._get_sids_count(all_sids_str).values()))
-
-        tot_item = len(all_sids_str)
-        tot_indice = len(set(all_sids_str.tolist()))
-        print("Collision Rate", (tot_item - tot_indice) / tot_item)
-
-        all_indices_dict = {}
-        for item, indices in enumerate(all_sids.tolist()):
-            all_indices_dict[item] = list(indices)
-        return all_indices_dict
+        # Stable within a fixed catalog, independent of training batch order.
+        # No Sinkhorn retries and no mutation of quantizer sk_epsilon at export.
+        suffix_template = prefix[stages] if len(prefix) > stages else "<collision_{}>"
+        counts = collections.defaultdict(int)
+        result = {}
+        for row in sorted(range(len(item_ids)), key=lambda row: str(item_ids[row])):
+            code = codes[row]
+            suffix = counts[code]
+            counts[code] += 1
+            result[item_ids[row]] = [prefix[stage].format(value) for stage, value in enumerate(code)] + [suffix_template.format(suffix)]
+        if len({tuple(code) for code in result.values()}) != len(result):
+            raise ValueError("prefix templates do not distinguish quantization stages/collisions")
+        print(f"Exported {len(result)} unique semantic IDs; raw collision rate: {(len(codes) - len(counts)) / len(codes):.4f}")
+        return result

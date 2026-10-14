@@ -266,6 +266,9 @@ class MLP(nn.Module):
         Dropout probability.
     activation : str, default 'relu'
         Activation function (sigmoid, relu, prelu, dice, softmax).
+    batchnorm : bool, default True
+        Include BatchNorm after each hidden Linear. Disable for tiny RQ-VAE
+        batches; the default preserves existing ranking/matching behaviour.
 
     Shape
     -----
@@ -273,14 +276,15 @@ class MLP(nn.Module):
     Output: ``(B, 1)`` or ``(B, dims[-1])``
     """
 
-    def __init__(self, input_dim, output_layer=True, dims=None, dropout=0, activation="relu"):
+    def __init__(self, input_dim, output_layer=True, dims=None, dropout=0, activation="relu", batchnorm=True):
         super().__init__()
         if dims is None:
             dims = []
         layers = list()
         for i_dim in dims:
             layers.append(nn.Linear(input_dim, i_dim))
-            layers.append(nn.BatchNorm1d(i_dim))
+            if batchnorm:
+                layers.append(nn.BatchNorm1d(i_dim))
             layers.append(activation_layer(activation))
             layers.append(nn.Dropout(p=dropout))
             input_dim = i_dim

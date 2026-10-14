@@ -65,10 +65,12 @@ class Trainer(object):
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
         self.scheduler = None
         if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
         self.model_path = model_path
         self.model_logger = model_logger
         self.eval_step = eval_step
+        if not isinstance(eval_step, int) or eval_step < 1:
+            raise ValueError("eval_step must be a positive integer")
 
         self.best_save_heap = []
         self.newest_save_queue = []
@@ -79,8 +81,8 @@ class Trainer(object):
 
     def _check_nan(self, loss):
         """Check whether the loss value is NaN."""
-        if torch.isnan(loss):
-            raise ValueError("Training loss is nan")
+        if not torch.isfinite(loss):
+            raise ValueError("Training loss is not finite")
 
     def _iter_loggers(self):
         """Return logger instances as a list.
@@ -168,7 +170,9 @@ class Trainer(object):
                 code = "-".join([str(int(_)) for _ in index])
                 indices_set.add(code)
 
-        collision_rate = (num_sample - len(list(indices_set))) / num_sample
+        if num_sample == 0:
+            raise ValueError("Cannot evaluate an empty catalog")
+        collision_rate = (num_sample - len(indices_set)) / num_sample
 
         return collision_rate
 
@@ -192,6 +196,7 @@ class Trainer(object):
         """
 
         cur_eval_step = 0
+        os.makedirs(self.model_path, exist_ok=True)
 
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr']})
@@ -208,7 +213,7 @@ class Trainer(object):
             logs['train/epoch_time'] = training_end_time - training_start_time
 
             # eval
-            if (epoch_idx + 1) % self.eval_step == 0:
+            if (epoch_idx + 1) % self.eval_step == 0 or epoch_idx + 1 == self.n_epoch:
                 valid_start_time = time()
                 collision_rate = self.evaluate(train_dataloader)
                 valid_end_time = time()
@@ -227,6 +232,10 @@ class Trainer(object):
                 else:
                     cur_eval_step += 1
                 # ========== Log once per epoch ==========
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(train_loss)
+            elif self.scheduler is not None:
+                self.scheduler.step()
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_idx)
 
