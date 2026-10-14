@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import tqdm
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import RegularizationLoss
@@ -91,6 +92,9 @@ class MTLTrainer(object):
             self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default Adam optimizer
         self.scheduler = None
         if scheduler_fn is not None:
+            scheduler_params = dict(scheduler_params or {})
+            if scheduler_fn is ReduceLROnPlateau:
+                scheduler_params.setdefault('mode', earlystop_mode)
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
         self.loss_fns = [get_loss_func(task_type) for task_type in task_types]
         self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
@@ -182,12 +186,14 @@ class MTLTrainer(object):
             if lr_value is not None:
                 logs['learning_rate'] = lr_value
 
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
+            if self.scheduler is not None and not isinstance(self.scheduler, ReduceLROnPlateau):
                 self.scheduler.step()  # update lr in epoch level by scheduler
+                print("Current lr : {}".format(self._current_lr()))
 
             scores = self.evaluate(self.model, val_dataloader)
+            if isinstance(self.scheduler, ReduceLROnPlateau):
+                self.scheduler.step(scores[self.earlystop_taskid])
+                print("Current lr : {}".format(self._current_lr()))
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
             score = scores[self.earlystop_taskid]
