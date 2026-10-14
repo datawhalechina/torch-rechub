@@ -70,20 +70,19 @@ class SASRec(torch.nn.Module):
             self.forward_layers.append(new_fwd_layer)
 
     def seq_forward(self, x, embed_x_feature):
-        x = x['seq']
+        x = x[self.features[0].name]
 
         embed_x_feature *= self.features[0].embed_dim**0.5
-        embed_x_feature = embed_x_feature.squeeze()  # (bacth_size, max_len, embed_dim)
 
-        positions = np.tile(np.array(range(x.shape[1])), [x.shape[0], 1])
+        positions = torch.arange(x.size(1), device=x.device).expand(x.size(0), -1)
 
-        embed_x_feature += self.position_emb(torch.LongTensor(positions))
+        embed_x_feature += self.position_emb(positions)
         embed_x_feature = self.emb_dropout(embed_x_feature)
 
-        timeline_mask = torch.BoolTensor(x == 0)
+        timeline_mask = x == 0
         embed_x_feature *= ~timeline_mask.unsqueeze(-1)
 
-        attention_mask = ~torch.tril(torch.ones((embed_x_feature.shape[1], embed_x_feature.shape[1]), dtype=torch.bool))
+        attention_mask = ~torch.tril(torch.ones((x.size(1), x.size(1)), dtype=torch.bool, device=x.device))
 
         for i in range(len(self.attention_layers)):
             embed_x_feature = torch.transpose(embed_x_feature, 0, 1)
@@ -112,9 +111,9 @@ class SASRec(torch.nn.Module):
         seq_output = self.seq_forward(x, seq_embed)  # [batch_size, max_len, embed_dim]
 
         # Get the last valid position for each sequence
-        seq = x['seq']
-        seq_lens = (seq != 0).sum(dim=1) - 1  # Last valid index
-        seq_lens = seq_lens.clamp(min=0)
+        seq = x[self.features[0].name]
+        positions = torch.arange(seq.size(1), device=seq.device).expand_as(seq)
+        seq_lens = positions.masked_fill(seq == 0, -1).max(dim=1).values.clamp(min=0)
         batch_idx = torch.arange(seq_output.size(0), device=seq_output.device)
         user_emb = seq_output[batch_idx, seq_lens]  # [batch_size, embed_dim]
 
@@ -126,10 +125,20 @@ class SASRec(torch.nn.Module):
         """Compute item embedding for in-batch negative sampling."""
         if self.mode == "user":
             return None
-        if self.item_feature is not None:
-            item_ids = x[self.item_feature.name]
+        if self.item_feature is not None or self.mode in ("in_batch", "item"):
+            if self.item_feature is not None:
+                item_ids = x[self.item_feature.name]
+            elif self.mode == 'item':
+                item_ids = x['target']
+            else:
+                item_ids = x[self.features[1].name]
+                if item_ids.dim() == 2:
+                    seq = x[self.features[0].name]
+                    positions = torch.arange(seq.size(1), device=seq.device).expand_as(seq)
+                    last = positions.masked_fill(seq == 0, -1).max(dim=1).values.clamp(min=0)
+                    item_ids = item_ids.gather(1, last.unsqueeze(1)).squeeze(1)
             # Use the embedding layer to get item embeddings
-            item_emb = self.item_emb.embedding[self.features[0].name](item_ids)
+            item_emb = self.item_emb.embed_dict[self.features[0].name](item_ids)
             if self.mode == "item":
                 return item_emb
             return item_emb.unsqueeze(1)  # [batch_size, 1, embed_dim]
@@ -141,6 +150,8 @@ class SASRec(torch.nn.Module):
             return self.user_tower(x)
         if self.mode == "item":
             return self.item_tower(x)
+        if self.mode == "in_batch":
+            return self.user_tower(x), self.item_tower(x)
 
         # In-batch negative sampling mode
         if self.item_feature is not None:
