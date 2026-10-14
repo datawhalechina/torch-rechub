@@ -39,7 +39,9 @@ def get_ali_ccp_data_dict(data_path='./data/ali-ccp'):
     return dense_feas, sparse_feas, x_train, y_train, x_val, y_val, x_test, y_test
 
 
-def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False, item_features=None):
+    if in_batch_neg and not item_features:
+        raise ValueError("Specify item_features (item-only columns) when enabling in-batch ranking.")
     torch.manual_seed(seed)
     dense_feas, sparse_feas, x_train, y_train, x_val, y_val, x_test, y_test = get_ali_ccp_data_dict(dataset_path)
     dg = DataGenerator(x_train, y_train)
@@ -50,7 +52,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         model = DeepFM(deep_features=dense_feas, fm_features=sparse_feas, mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"})
     elif model_name == "dcn":
         model = DCN(features=dense_feas + sparse_feas, n_cross_layers=3, mlp_params={"dims": [256, 128]})
-    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
+    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir, in_batch_neg=in_batch_neg, item_features=item_features)
     # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
@@ -69,9 +71,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use other positive items in the batch as negatives')
+    parser.add_argument('--item_features', nargs='+', help='Item-only columns to swap together; required with --in_batch_neg')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, in_batch_neg=args.in_batch_neg, item_features=args.item_features)
 """
 python run_ali_ccp_ctr_ranking.py --model_name widedeep
 python run_ali_ccp_ctr_ranking.py --model_name deepfm

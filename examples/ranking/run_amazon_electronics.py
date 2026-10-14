@@ -12,10 +12,10 @@ from torch_rechub.utils.data import DataGenerator, df_to_dict, generate_seq_feat
 sys.path.append("../..")
 
 
-def get_amazon_data_dict(dataset_path):
+def get_amazon_data_dict(dataset_path, in_batch_neg=False):
     data = pd.read_csv(dataset_path)
     print('========== Start Amazon ==========')
-    train, val, test = generate_seq_feature(data=data, user_col="user_id", item_col="item_id", time_col='time', item_attribute_cols=["cate_id"])
+    train, val, test = generate_seq_feature(data=data, user_col="user_id", item_col="item_id", time_col='time', item_attribute_cols=["cate_id"], in_batch_neg=in_batch_neg)
     print('INFO: Now, the dataframe named: ', train.columns)
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     print(train)
@@ -48,15 +48,28 @@ def get_amazon_data_dict(dataset_path):
     return features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y)
 
 
-def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False):
     torch.manual_seed(seed)
-    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_amazon_data_dict(dataset_path)
+    features, target_features, history_features, (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_amazon_data_dict(dataset_path, in_batch_neg=in_batch_neg)
     dg = DataGenerator(train_x, train_y)
 
     train_dataloader, val_dataloader, test_dataloader = dg.generate_dataloader(x_val=val_x, y_val=val_y, x_test=test_x, y_test=test_y, batch_size=batch_size)
     model = DIN(features=features, history_features=history_features, target_features=target_features, mlp_params={"dims": [256, 128]}, attention_mlp_params={"dims": [256, 128]})
 
-    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=4, device=device, model_path=save_dir)
+    ctr_trainer = CTRTrainer(
+        model,
+        optimizer_params={
+            "lr": learning_rate,
+            "weight_decay": weight_decay
+        },
+        n_epoch=epoch,
+        earlystop_patience=4,
+        device=device,
+        model_path=save_dir,
+        in_batch_neg=in_batch_neg,
+        item_features=["target_item_id",
+                       "target_cate_id"]
+    )
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
     print(f'test auc: {auc}')
@@ -73,9 +86,10 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use other positive items in the batch as negatives')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, in_batch_neg=args.in_batch_neg)
 """
 python run_amazon_electronics.py
 """

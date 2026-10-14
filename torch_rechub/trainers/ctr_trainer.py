@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import torch
 import tqdm
@@ -12,7 +13,7 @@ class CTRTrainer(object):
     """A general trainer for single task learning.
 
     Args:
-        model (nn.Module): any multi task learning model.
+        model (nn.Module): any single-task ranking model.
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
         scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
@@ -28,6 +29,12 @@ class CTRTrainer(object):
         embedding_l2 (float): L2 regularization coefficient for embedding parameters (default=0.0).
         dense_l1 (float): L1 regularization coefficient for dense parameters (default=0.0).
         dense_l2 (float): L2 regularization coefficient for dense parameters (default=0.0).
+        in_batch_neg (bool): construct negative user-item pairs from positive rows in the batch.
+            Defaults to False, preserving the original supervised BCE training.
+        item_features (list): item column names or Feature objects to swap together.
+            User, history and context columns remain attached to their original row.
+        in_batch_neg_ratio (int): negatives per positive, default=1. None uses all other rows.
+        sampler_seed (int): optional seed for reproducible in-batch sampling.
     """
 
     def __init__(
@@ -45,7 +52,23 @@ class CTRTrainer(object):
         loss_mode=True,
         model_path="./",
         model_logger=None,
+        in_batch_neg=False,
+        item_features=None,
+        in_batch_neg_ratio=1,
+        sampler_seed=None,
     ):
+        self.in_batch_neg = in_batch_neg
+        if isinstance(item_features, str):
+            item_features = [item_features]
+        self.item_features = [getattr(feature, 'name', feature) for feature in item_features or []]
+        if in_batch_neg:
+            if not self.item_features or any(not isinstance(name, str) or not name for name in self.item_features):
+                raise ValueError("Provide item_features, e.g. ['item_id', 'cate_id'], for in-batch ranking.")
+            if len(set(self.item_features)) != len(self.item_features):
+                raise ValueError("item_features must not contain duplicate column names.")
+            if in_batch_neg_ratio is not None and (not isinstance(in_batch_neg_ratio, int) or isinstance(in_batch_neg_ratio, bool) or in_batch_neg_ratio < 1):
+                raise ValueError("in_batch_neg_ratio must be a positive integer or None.")
+        self.in_batch_neg_ratio = in_batch_neg_ratio
         self.model = model  # for uniform weights save method in one gpu or multi gpu
         if gpus is None:
             gpus = []
@@ -56,6 +79,9 @@ class CTRTrainer(object):
         # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
         self.model.to(self.device)
+        self._sampler_generator = None
+        if in_batch_neg and sampler_seed is not None:
+            self._sampler_generator = torch.Generator(device=self.device).manual_seed(sampler_seed)
         if optimizer_params is None:
             optimizer_params = {"lr": 1e-3, "weight_decay": 1e-5}
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
@@ -74,20 +100,56 @@ class CTRTrainer(object):
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
         self.model_logger = model_logger
 
+    def _inbatch_data(self, x_dict, y):
+        """Keep positive rows and pair each with other rows' complete item features."""
+        y = y.reshape(-1)
+        if not ((y == 0) | (y == 1)).all():
+            raise ValueError("In-batch ranking requires binary labels; y=1 identifies positive interactions.")
+        missing = set(self.item_features) - x_dict.keys()
+        if missing:
+            raise ValueError(f"Missing item feature columns: {sorted(missing)}")
+        positive = y == 1
+        x_dict = {name: values[positive] for name, values in x_dict.items()}
+        batch_size = int(positive.sum())
+        if batch_size < 2:
+            return None
+        rows = torch.arange(batch_size, device=y.device)
+        if self.in_batch_neg_ratio is None:
+            offsets = torch.arange(1, batch_size, device=y.device).expand(batch_size, -1)
+        else:
+            offsets = torch.randint(1, batch_size, (batch_size, self.in_batch_neg_ratio), device=y.device, generator=self._sampler_generator)
+        donors = (rows.unsqueeze(1) + offsets) % batch_size
+        donors = torch.cat([rows.unsqueeze(1), donors], dim=1)
+        owners = rows.repeat_interleave(donors.size(1))
+        item_rows = donors.reshape(-1)
+        paired = {name: values[item_rows if name in self.item_features else owners] for name, values in x_dict.items()}
+        labels = torch.zeros_like(donors, dtype=torch.float32)
+        labels[:, 0] = 1
+        return paired, labels.reshape(-1)
+
     def train_one_epoch(self, data_loader, log_interval=10):
         self.model.train()
         total_loss = 0
         epoch_loss = 0
         batch_count = 0
+        skipped_batches = 0
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for i, (x_dict, y) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             y = y.to(self.device).float()
+            if self.in_batch_neg:
+                paired = self._inbatch_data(x_dict, y)
+                if paired is None:
+                    skipped_batches += 1
+                    continue
+                x_dict, y = paired
             if self.loss_mode:
                 y_pred = self.model(x_dict)
                 loss = self.criterion(y_pred, y)
             else:
                 y_pred, other_loss = self.model(x_dict)
+                if self.in_batch_neg and isinstance(other_loss, torch.Tensor):
+                    other_loss = other_loss.mean()
                 loss = self.criterion(y_pred, y) + other_loss
 
             # Add regularization loss
@@ -100,10 +162,14 @@ class CTRTrainer(object):
             total_loss += loss.item()
             epoch_loss += loss.item()
             batch_count += 1
-            if (i + 1) % log_interval == 0:
+            if batch_count % log_interval == 0:
                 tk0.set_postfix(loss=total_loss / log_interval)
                 total_loss = 0
 
+        if self.in_batch_neg and batch_count == 0:
+            raise ValueError("No usable in-batch ranking batches. Provide at least two positive rows per batch.")
+        if skipped_batches:
+            warnings.warn(f"Skipped {skipped_batches} batch(es) with fewer than two positive interactions.", RuntimeWarning, stacklevel=2)
         # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
