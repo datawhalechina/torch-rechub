@@ -46,6 +46,8 @@ class FaceBookDSSM(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return pos_item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, pos_item_embedding
 
 
 # calculate cosine score
@@ -68,8 +70,11 @@ class FaceBookDSSM(torch.nn.Module):
         if self.mode == "user":
             return None, None
         input_item_pos = self.embedding(x, self.pos_item_features, squeeze_dim=True)
-        if self.mode == "item":  # inference embedding mode, the zeros is just for placefolder
-            return self.item_mlp(input_item_pos), None
+        if self.mode in ("item", "in_batch"):  # only the positive item is needed
+            pos_embedding = self.item_mlp(input_item_pos)
+            if self.mode == "in_batch":
+                pos_embedding = F.normalize(pos_embedding, p=2, dim=1)
+            return pos_embedding, None
         input_item_neg = self.embedding(x, self.neg_item_features, squeeze_dim=True)
         pos_embedding, neg_embedding = self.item_mlp(input_item_pos), self.item_mlp(input_item_neg)
         pos_embedding = F.normalize(pos_embedding, p=2, dim=1)

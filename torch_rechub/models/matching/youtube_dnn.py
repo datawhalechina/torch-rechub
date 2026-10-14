@@ -43,6 +43,8 @@ class YoutubeDNN(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, item_embedding
 
 
 # calculate cosine score
@@ -69,6 +71,8 @@ class YoutubeDNN(torch.nn.Module):
         pos_embedding = F.normalize(pos_embedding, p=2, dim=2)
         if self.mode == "item":  # inference embedding mode
             return pos_embedding.squeeze(1)  # [batch_size, embed_dim]
+        if self.mode == "in_batch":
+            return pos_embedding
         neg_embeddings = self.embedding(x, self.neg_item_feature, squeeze_dim=False).squeeze(1)  # [batch_size, n_neg_items, embed_dim]
         neg_embeddings = F.normalize(neg_embeddings, p=2, dim=2)
         # [batch_size, 1+n_neg_items, embed_dim]

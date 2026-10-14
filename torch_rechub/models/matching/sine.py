@@ -67,6 +67,8 @@ class SINE(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, item_embedding
 
         y = torch.mul(user_embedding, item_embedding).sum(dim=-1)
 
@@ -137,6 +139,8 @@ class SINE(torch.nn.Module):
         pos_embedding = self.item_embedding(x[self.item_features[0]]).unsqueeze(1)
         if self.mode == "item":  # inference embedding mode
             return pos_embedding.squeeze(1)  # [batch_size, embed_dim]
+        if self.mode == "in_batch":
+            return pos_embedding
         neg_embeddings = self.item_embedding(x[self.neg_item_features[0]]).squeeze(1)  # [batch_size, n_neg_items, embed_dim]
 
         # [batch_size, 1+n_neg_items, embed_dim]

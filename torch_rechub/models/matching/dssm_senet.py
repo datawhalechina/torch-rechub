@@ -47,6 +47,8 @@ class DSSM(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, item_embedding
 
 
 # calculate cosine score

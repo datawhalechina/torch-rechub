@@ -209,7 +209,7 @@ trainer.fit(train_dl)
 
 `mode` 是训练器的损失契约，不能在同一个 DSSM 实例上任意切换。本页 DSSM 的标量概率输出应使用 `mode=0`。
 
-### 4.3 单卡 in-batch 训练
+### 4.3 单设备 in-batch 训练
 
 在 `examples/matching` 目录运行：
 
@@ -219,9 +219,24 @@ python run_ml_dssm.py --in_batch_neg --batch_size 256 --temperature 0.02 --devic
 
 使用一张 GPU 时将 `--device cpu` 改为 `--device cuda:0`。示例会自动以 `neg_ratio=0` 构造正交互，并使用独立的数据缓存；不加 `--in_batch_neg` 时保留原来的离线负采样与 BCE 训练。
 
-自己准备数据时，每行必须是一个真实的用户—物品正交互，不能混入离线负样本。调用 `MatchTrainer(model, in_batch_neg=True)` 即可使用默认全 batch 路径：归一化两塔向量，计算 `user_emb @ item_emb.T / model.temperature`，再以对角线位置 `arange(B)` 为标签计算交叉熵。传入的训练 `y` 仅作占位，不决定正负；已有随机/困难负采样或 BPR 的显式配置保留原路径。
+其他 MovieLens 召回示例也支持 `--in_batch_neg`。已有代码通常只需改两处：
 
-该简单版本把所有非对角线位置当作负样本，不屏蔽重复物品，也不做采样概率修正。同 batch 出现相同物品时可能产生假负例。`batch_size` 至少为 2，只有一条样本的尾批会跳过并提示；整个 epoch 都没有有效 batch 时会报错。
+```python
+df_train, df_test = generate_seq_feature_match(data, user_col, item_col, "timestamp", in_batch_neg=True)
+trainer = MatchTrainer(model, in_batch_neg=True)
+```
+
+数据生成函数会构造正样本配对；原来的模型参数、训练 `mode` 和推理接口保持原有形式。模型默认 `forward()` 仍返回原来的分数，Trainer 只在 in-batch 前向期间临时切换已有的 `model.mode`，并在结束后恢复。无需配置向量输出开关或改变已有预测代码。
+
+所有公开的 matching 模型均支持该入口。MIND/ComiRec 沿用正样本对应的兴趣选择，YoutubeSBC 保留采样偏差修正；NARM/STAMP 可直接沿用下一物品 ID 的训练标签，`run_sbr.py --in_batch_neg` 即可开启。若自己构造会话输入，历史序列使用后补齐，`y` 应为真实的下一物品 ID，或者显式提供 `item_feature` 及对应的物品列。SASRec 原有逐位置正负序列训练保持可用，in-batch 使用最后一个有效位置对应的正物品。
+
+向量是否归一化沿用各模型原有的打分方式：DSSM/YoutubeDNN 等使用归一化向量，YoutubeSBC 使用余弦打分，NARM/STAMP/SINE 等保留原有点积。Trainer 不统一改变模型的向量尺度，以保持训练与原有召回评估一致。
+
+当前 in-batch 入口支持单设备（`cpu` 或一张 CUDA 显卡），多卡支持单独维护。
+
+自己准备配对数据时，每行必须是一个真实的用户—物品正交互，不能混入离线负样本。调用 `MatchTrainer(model, in_batch_neg=True)` 即可使用默认全 batch 路径：DSSM 两塔提供归一化向量，Trainer 计算 `user_emb @ item_emb.T / model.temperature`，再以对角线位置 `arange(B)` 为标签计算交叉熵。显式用户—物品配对的训练 `y` 仅作占位，不决定正负；会话模型的下一物品标签则作为目标物品 ID。已有随机/困难负采样或 BPR 的显式配置保留原路径。
+
+该简单版本把所有非对角线位置当作负样本，不屏蔽重复物品；除 YoutubeSBC 本身的修正外，不额外引入采样概率修正。同 batch 出现相同物品时可能产生假负例。`batch_size` 至少为 2，只有一条样本的尾批会跳过并提示；整个 epoch 都没有有效 batch 时会报错。
 
 训练后沿用下一节的向量召回评估。正样本训练集不能直接作为 AUC 验证集；`fit(..., val_dataloader=...)` 的 AUC 验证仍需要真实的 0/1 标签。
 
