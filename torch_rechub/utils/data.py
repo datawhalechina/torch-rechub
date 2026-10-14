@@ -1,7 +1,7 @@
 import json
 import os
 import random
-from numbers import Integral, Real
+from numbers import Integral
 
 import numpy as np
 import pandas as pd
@@ -240,7 +240,16 @@ def neg_sample(click_hist, item_size):
     """Uniformly sample an unseen item in [1, item_size], without unbounded retries."""
     if isinstance(item_size, bool) or not isinstance(item_size, Integral) or item_size < 1:
         raise ValueError("item_size must be a positive integer")
-    seen = {int(item) for item in click_hist if isinstance(item, Real) and 1 <= item <= item_size and int(item) == item}
+    if isinstance(click_hist, torch.Tensor):
+        click_hist = click_hist.detach().reshape(-1).tolist()
+    seen = set()
+    for item in click_hist:
+        try:
+            item_id = int(item)
+        except (TypeError, ValueError, OverflowError):
+            continue  # Nonintegral/unrepresentable IDs cannot equal a sampled integer.
+        if item == item_id and 1 <= item_id <= item_size:
+            seen.add(item_id)
     available = item_size - len(seen)
     if available == 0:
         raise ValueError("No unseen items in the catalog; cannot sample a negative")
