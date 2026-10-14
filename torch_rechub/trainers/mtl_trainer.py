@@ -206,9 +206,10 @@ class MTLTrainer(object):
 
             if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
                 print('validation best score of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
-                self.model.load_state_dict(self.early_stopper.best_weights)
                 break
 
+        if self.early_stopper.best_weights is not None:
+            self.model.load_state_dict(self.early_stopper.best_weights)
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed)))  # save best auc model
 
         for logger in self._iter_loggers():

@@ -200,9 +200,10 @@ class MatchTrainer(object):
 
                 if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
-                    self.model.load_state_dict(self.early_stopper.best_weights)
                     break
 
+        if val_dataloader is not None and self.early_stopper.best_weights is not None:
+            self.model.load_state_dict(self.early_stopper.best_weights)
         torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
 
         for logger in self._iter_loggers():
