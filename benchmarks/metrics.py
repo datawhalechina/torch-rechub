@@ -45,8 +45,8 @@ def evaluate_matching_topk(data, user_embedding, item_embedding, topk: int) -> d
     user_pos_item = ground_truth_df.groupby(data.user_col).agg(list).reset_index()
     ground_truth = dict(zip(user_pos_item[data.user_col], user_pos_item[data.item_col]))
 
-    raw_metrics = topk_metrics(y_true=ground_truth, y_pred=match_res, topKs=[recall_count])
-    return _parse_topk_metrics(raw_metrics)
+    metrics = topk_metrics(y_true=ground_truth, y_pred=match_res, topKs=[recall_count], return_numeric=True)
+    return {f"{name}@{recall_count}": values[0] for name, values in metrics.items()}
 
 
 def _parse_topk_metrics(raw_metrics: dict[str, list[str]]) -> dict[str, float]:
