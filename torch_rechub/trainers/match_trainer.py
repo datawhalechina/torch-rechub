@@ -66,9 +66,9 @@ class MatchTrainer(object):
             raise ValueError("In-batch training supports a single device. Pass an unwrapped model and use device='cpu' or device='cuda:0'.")
         self._full_inbatch = in_batch_neg and mode in (0, 2) and in_batch_neg_ratio is None and not hard_negative
         self._temperature = getattr(model, 'temperature', 1.0)
-        if self._full_inbatch:
+        if in_batch_neg:
             if not math.isfinite(self._temperature) or self._temperature <= 0:
-                raise ValueError("model.temperature must be finite and greater than zero for embedding-based softmax/pair-wise training.")
+                raise ValueError("model.temperature must be finite and greater than zero for in-batch training.")
         if in_batch_neg and (not hasattr(model, 'user_tower') or not hasattr(model, 'item_tower')):
             raise ValueError("In-batch training requires a matching model with user_tower and item_tower methods.")
         self.gpus = gpus
@@ -109,36 +109,6 @@ class MatchTrainer(object):
         # Initialize regularization loss
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
         self.model_logger = model_logger
-
-    def _inbatch_loss(self, x_dict):
-        """Run the model's in-batch forward, then train against the batch's items."""
-        model = self.model
-        original_mode = model.mode
-        model.mode = 'in_batch'
-        try:
-            users, items = self.model(x_dict)
-        finally:
-            model.mode = original_mode
-        if users is None or items is None:
-            raise ValueError("In-batch training needs one positive item per row. Provide item_feature or a target item ID.")
-        if users.dim() == 3 and users.size(1) == 1:
-            users = users.squeeze(1)
-        if items.dim() == 3 and items.size(1) == 1:
-            items = items.squeeze(1)
-        if users.dim() != 2 or users.shape != items.shape:
-            raise ValueError("In-batch user and positive item embeddings must have the same [batch_size, embedding_dim] shape.")
-        scores = users @ items.t()
-        if hasattr(model, 'correct_inbatch_logits'):
-            scores = model.correct_inbatch_logits(scores, x_dict)
-        if self._full_inbatch:
-            logits = scores / self._temperature
-            targets = torch.arange(logits.size(0), device=logits.device)
-            return self.criterion(logits, targets)
-        neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
-        logits = gather_inbatch_logits(scores, neg_indices)
-        if self.mode == 1:
-            return self.criterion(logits[:, 0], logits[:, 1:], in_batch_neg=True)
-        return self.criterion(logits, torch.zeros(logits.size(0), dtype=torch.long, device=logits.device))
 
     def train_one_epoch(self, data_loader, log_interval=10):
         self.model.train()
@@ -286,6 +256,7 @@ class MatchTrainer(object):
         model = model.to(self.device)
         model.eval()
         predicts = []
+        # Temporarily select a tower; later calls should keep the original scoring mode.
         model.mode = mode
         try:
             with torch.no_grad():
@@ -295,6 +266,7 @@ class MatchTrainer(object):
                     y_pred = model(x_dict)
                     predicts.append(y_pred.data)
         finally:
+            # Restore on both success and failure; exceptions still propagate to the caller.
             model.mode = original_mode
         return torch.cat(predicts, dim=0)
 
@@ -469,3 +441,39 @@ class MatchTrainer(object):
             dpi=dpi,
             **kwargs
         )
+
+    def _inbatch_loss(self, x_dict):
+        """Get tower embeddings, choose batch negatives, and apply the configured loss."""
+        model = self.model
+        original_mode = model.mode
+        model.mode = 'in_batch'
+        try:
+            users, items = model(x_dict)
+        finally:
+            # Only this forward needs embeddings; restore the usual scoring mode even on failure.
+            model.mode = original_mode
+        if users is None or items is None:
+            raise ValueError("In-batch training needs one positive item per row. Provide item_feature or a target item ID.")
+        # Existing towers return either [B, D] or [B, 1, D].
+        if users.dim() == 3 and users.size(1) == 1:
+            users = users.squeeze(1)
+        if items.dim() == 3 and items.size(1) == 1:
+            items = items.squeeze(1)
+        if users.dim() != 2 or users.shape != items.shape:
+            raise ValueError("In-batch user and positive item embeddings must have the same [batch_size, embedding_dim] shape.")
+
+        scores = users @ items.t()
+        if hasattr(model, 'correct_inbatch_logits'):
+            scores = model.correct_inbatch_logits(scores, x_dict)
+        logits = scores / self._temperature
+        if self._full_inbatch:
+            # Each row's positive item is on the diagonal of the full [B, B] matrix.
+            targets = torch.arange(logits.size(0), device=logits.device)
+        else:
+            neg_indices = inbatch_negative_sampling(scores, neg_ratio=self.in_batch_neg_ratio, hard_negative=self.hard_negative, generator=self._sampler_generator)
+            logits = gather_inbatch_logits(logits, neg_indices)
+            if self.mode == 1:
+                return self.criterion(logits[:, 0], logits[:, 1:], in_batch_neg=True)
+            # After gathering, the positive item is in column 0 for every row.
+            targets = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
+        return self.criterion(logits, targets)
