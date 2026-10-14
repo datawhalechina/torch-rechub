@@ -83,7 +83,7 @@ jobs:
           git diff --exit-code
           
           # 步骤4: 运行flake8进行最终的代码质量检查
-          flake8 --max-line-length=248 --extend-ignore=E203,W503,E501,E722,E402,F821,F523,E711,E741,F401,E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302 --max-complexity=30 torch_rechub/ examples/ tests/ benchmarks/
+          flake8 --max-line-length=248 --extend-ignore=E203,W503,E501,E722,E402,F523,E711,E741,F401,E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302 --max-complexity=30 torch_rechub/ examples/ tests/ benchmarks/
 
       - name: Type checking (MyPy) - Optional
         continue-on-error: true
@@ -242,7 +242,7 @@ jobs:
   # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   compatibility:
-    name: Dependency Check (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
+    name: Runtime Compatibility (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     needs: lint
     if: github.event_name != 'release'
@@ -284,6 +284,15 @@ jobs:
           python -m pytest -c config/pytest.ini -v \
             tests/test_onnx_quantization.py tests/test_pa_array_to_tensor.py \
             tests/test_hstu_model.py tests/test_hllm_embedding_alignment.py tests/test_tiger_example.py
+
+      - name: Verify small CPU training and reload
+        env:
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          PYTHONUTF8: '1'
+        run: |
+          pytest -c config/pytest.ini tests/test_e2e_ranking.py tests/test_e2e_multitask.py -q
 
   # ===================================================================
   # 安全检查 (仅在 push/PR 时运行，release 时跳过)
@@ -360,8 +369,8 @@ jobs:
   # ===================================================================
   # 自动发布到 PyPI 和 GitHub Release (使用 uv)
   # 功能：
-  # - 从 GitHub Release 自动同步版本号
-  # - 更新 CHANGELOG.md
+  # - 从不可变 GitHub Release 标签检出代码并校验版本号
+  # - 版本号与 CHANGELOG.md 必须在打标签之前提交
   # - 构建并发布到 PyPI
   # - 上传构建产物到 GitHub Release 页面
   # 注意：此 job 仅在 release 事件时运行，不依赖其他 job（代码已在合并时检查过）
@@ -374,81 +383,16 @@ jobs:
     environment: pypi
     permissions:
       id-token: write   # Required for trusted publishing
-      contents: write   # Required for pushing changes and uploading release assets
-      actions: write    # Required for triggering docs deploy workflow
+      contents: write   # Required for uploading release assets
+
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get version from tag
-        id: get_version
-        run: |
-          # 从 tag 提取版本号 (去掉 v 前缀)
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version: $VERSION"
-
-      - name: Update version in pyproject.toml
-        run: |
-          # 更新 pyproject.toml 中的版本号
-          sed -i "s/^version = \".*\"/version = \"${{ steps.get_version.outputs.VERSION }}\"/" pyproject.toml
-          echo "✅ Updated pyproject.toml version to ${{ steps.get_version.outputs.VERSION }}"
-          grep "^version" pyproject.toml
-
-      - name: Update CHANGELOG.md
-        env:
-          RELEASE_BODY: ${{ github.event.release.body }}
-          RELEASE_NAME: ${{ github.event.release.name }}
-        run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-          DATE=$(date +%Y-%m-%d)
-
-          # 创建新的 changelog 条目
-          NEW_ENTRY="## [${VERSION}] - ${DATE}
-
-          ${RELEASE_BODY}
-
-          ---
-
-          "
-
-          # 在第一个 --- 分隔符之后插入新版本记录
-          awk -v entry="$NEW_ENTRY" '
-            !found && /^---$/ { print; print ""; print entry; found=1; next }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
-
-          echo "✅ Updated CHANGELOG.md with version $VERSION"
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add pyproject.toml CHANGELOG.md
-
-          # 检查是否有变更
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore(release): v${{ steps.get_version.outputs.VERSION }} [skip ci]"
-            git push origin main
-            echo "✅ Pushed version changes to main branch"
-          fi
-
-      - name: Trigger docs deploy after release commit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # The release commit uses [skip ci], so the docs deploy workflow will
-          # not run from that push. Dispatch the existing docs deploy workflow
-          # against main so it rebuilds VitePress from the release commit.
-          gh workflow run deploy.yml --ref main
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -457,6 +401,13 @@ jobs:
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Verify tagged version before building
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          uv run --no-project --python ${{ env.PYTHON_VERSION }} --with tomli python -c "import os, tomli; tag = os.environ['RELEASE_TAG']; version = tag[1:] if tag.startswith('v') else tag; declared = tomli.load(open('pyproject.toml', 'rb'))['project']['version']; assert declared == version, f'Tag {tag} does not match project version {declared}'; print(f'Building immutable tag {tag}')"
+          git diff --exit-code
 
       - name: Build package with uv
         id: build
