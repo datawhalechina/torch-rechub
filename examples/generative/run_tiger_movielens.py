@@ -397,6 +397,8 @@ def test(args):
             )
 
             output_text = tokenizer.batch_decode(output["sequences"], skip_special_tokens=True)
+            # -100 is the training loss mask, not a tokenizer vocabulary ID.
+            targets = targets.masked_fill(targets == -100, tokenizer.pad_token_id)
             targets_text = tokenizer.batch_decode(targets, skip_special_tokens=True)
             topk_res = get_topk_results(output_text, output["sequences_scores"], targets_text, args.num_beams, all_items=all_items if args.filter_items else None)
 

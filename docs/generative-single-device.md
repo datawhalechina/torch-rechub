@@ -202,6 +202,8 @@ TIGER 真数据：先训练 RQ-VAE，顺序导出唯一 SID；检查 inter.json 
 5. SID 新增消歧段后，必须重新导出目录并重新训练 TIGER，不能混用旧 tokenizer/checkpoint。get_indices 的三段 Tensor 输出不变，仅语义字符串导出增加后缀。
 6. 模型目录 fingerprint 能发现重分配 SID，即使语义 token 集合相同；老 checkpoint 没有 fingerprint 时只能沿用旧兼容行为，调用者应自查原目录。
 7. 新 sampled 路径只支持单设备；多卡设计、负例跨卡汇集及完整恢复 optimizer/scaler 状态不在本分支。原 full-CE 的既有 gpus 入口保留，但不能据此宣称新路径已完成多卡训练。
+8. 外部 User LLM 使用 FP16/BF16 时，缓存向量经投影后按该 LLM 的输入 embedding dtype 对齐；投影梯度保留。两种半精度、默认/采样损失的轻量 CPU 更新已复核，不代表完整预训练 LLM 训练验证。
+9. TIGER 测试时先把 labels 中的训练掩码 -100 还原为 PAD，再解码。不等长 SID 的 padding 不能直接交给 tokenizer 当词表 ID。
 
 ## 8. 真正论文复现的下一步
 

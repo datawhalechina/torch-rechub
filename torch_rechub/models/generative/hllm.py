@@ -285,6 +285,9 @@ class HLLMModel(nn.Module):
         item_emb = self.item_projection(self.item_embeddings[seq_tokens])
         if self.user_model is not None:
             # Position/time modelling belongs to the supplied causal LLM.
+            # Cached embeddings/projection may be FP32 while a pretrained
+            # User LLM uses FP16/BF16; align inputs without breaking gradients.
+            item_emb = item_emb.to(dtype=self.user_model.get_input_embeddings().weight.dtype)
             outputs = self.user_model(inputs_embeds=item_emb, attention_mask=padding_mask.long(), use_cache=False, return_dict=True)
             return outputs.last_hidden_state * padding_mask.unsqueeze(-1).to(item_emb.dtype)
 
