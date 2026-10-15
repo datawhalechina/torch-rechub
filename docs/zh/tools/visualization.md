@@ -86,7 +86,11 @@ visualize_model(model, save_path="model_arch.pdf", dpi=300)
 
 ### visualize_model
 
-生成模型的计算图可视化。
+生成模型的计算图可视化。CTR、Match、MTL、Seq 四个训练器共用这一绘图入口，不改变原有训练调用方式。
+
+绘图结束（包括追踪报错）后，会保留各子模块原来的训练/评估状态。默认在 CPU 追踪；如果模型在其他设备，会使用副本，不移动训练器的原模型。大模型可显式传 `device="cuda:0"`，在原设备追踪以避免复制模型。
+
+图只展示这次输入实际执行的前向路径，不代表所有可能的分支，也不执行训练或计算反向传播。
 
 ```python
 from torch_rechub.utils.visualization import visualize_model
@@ -111,7 +115,7 @@ graph = visualize_model(
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
 | `model` | nn.Module | 要可视化的 PyTorch 模型 | 必需 |
-| `input_data` | dict | 输入数据字典，如果为 None 则自动生成 | None |
+| `input_data` | dict / Tensor / tuple / list | 字典作为一个参数；tuple/list 按位置传参；None 自动生成特征输入 | None |
 | `batch_size` | int | 自动生成输入时的 batch size | 2 |
 | `seq_length` | int | 序列特征的长度 | 10 |
 | `depth` | int | 可视化深度，-1 表示显示所有层 | 3 |
@@ -191,6 +195,18 @@ trainer.fit(train_dl, val_dl)
 
 # 可视化模型
 trainer.visualization(save_path="model.pdf", depth=4)
+```
+
+序列训练器保留原来的参数顺序，自动生成非 padding token 和全零时间差（仅用于展示结构）：
+
+```python
+seq_trainer.visualization(seq_length=20, save_path="sequence.svg")
+```
+
+自定义模型无法自动推断特征时，直接提供它的实际输入即可：
+
+```python
+visualize_model(model, input_data=(tokens, time_diffs), save_path="custom.png")
 ```
 
 ## 输出格式
