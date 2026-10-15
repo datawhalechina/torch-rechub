@@ -35,7 +35,7 @@ def build_neg_history(split, hist_item_col, item2cate, n_items):
     return neg_items, neg_cates
 
 
-def get_data(dataset_path):
+def get_data(dataset_path, in_batch_neg=False):
     raw = pd.read_csv(dataset_path)
     # replicate label encoding done inside generate_seq_feature to build item2cate
     enc_data = raw.copy()
@@ -48,7 +48,7 @@ def get_data(dataset_path):
     n_users = enc_data['user_id'].max()
     n_cates = enc_data['cate_id'].max()
 
-    train, val, test = generate_seq_feature(data=raw, user_col="user_id", item_col="item_id", time_col="time", item_attribute_cols=["cate_id"])
+    train, val, test = generate_seq_feature(data=raw, user_col="user_id", item_col="item_id", time_col="time", item_attribute_cols=["cate_id"], in_batch_neg=in_batch_neg)
 
     features = [SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
     target_features = [
@@ -101,10 +101,10 @@ def get_data(dataset_path):
     return (features, target_features, history_features, neg_history_features, (train, train_y), (val, val_y), (test, test_y))
 
 
-def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False):
     torch.manual_seed(seed)
     features, target_features, history_features, neg_history_features, \
-        (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_data(dataset_path)
+        (train_x, train_y), (val_x, val_y), (test_x, test_y) = get_data(dataset_path, in_batch_neg=in_batch_neg)
 
     dg = DataGenerator(train_x, train_y)
     train_dl, val_dl, test_dl = dg.generate_dataloader(x_val=val_x, y_val=val_y, x_test=test_x, y_test=test_y, batch_size=batch_size)
@@ -130,6 +130,9 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
         device=device,
         model_path=save_dir,
         loss_mode=False,
+        in_batch_neg=in_batch_neg,
+        item_features=["target_item_id",
+                       "target_cate_id"],
     )
     trainer.fit(train_dl, val_dl)
     auc = trainer.evaluate(trainer.model, test_dl)
@@ -147,8 +150,9 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--save_dir", default="./")
     parser.add_argument("--seed", type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use in-batch target-item negatives; retain DIEN auxiliary history supervision')
     args = parser.parse_args()
-    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, in_batch_neg=args.in_batch_neg)
 """
 python run_dien.py
 """
