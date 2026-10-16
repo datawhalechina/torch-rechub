@@ -6,14 +6,12 @@ Examples:
   python examples/serving/quantize_onnx.py --input deepfm.onnx --output deepfm.fp16.onnx --mode fp16
 """
 
-from __future__ import annotations
-
 import argparse
 
 from torch_rechub.utils.quantization import quantize_model
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="Input ONNX model path (fp32).")
     parser.add_argument("--output", required=True, help="Output ONNX model path.")
@@ -21,8 +19,8 @@ def main() -> None:
     parser.add_argument("--per-channel", action="store_true", help="Enable per-channel weight quantization (INT8).")
     parser.add_argument("--reduce-range", action="store_true", help="Use reduced quant range (INT8).")
     parser.add_argument("--weight-type", default="qint8", choices=["qint8", "quint8"], help="Weight quant type (INT8).")
-    parser.add_argument("--optimize-model", action="store_true", help="Run ORT graph optimization before quantization.")
-    parser.add_argument("--keep-io-types", action="store_true", help="Keep model I/O as fp32 when converting to fp16.")
+    parser.add_argument("--optimize-model", action="store_true", help="Legacy ORT < 1.16 only: optimize before INT8 quantization.")
+    parser.add_argument("--keep-io-types", action=argparse.BooleanOptionalAction, default=True, help="Keep FP16 model I/O as fp32 (default); use --no-keep-io-types to convert floating-point I/O too.")
     args = parser.parse_args()
 
     out = quantize_model(
