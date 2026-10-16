@@ -135,8 +135,10 @@ from torch_rechub.utils.visualization import display_graph
 graph = visualize_model(model, depth=4)
 
 # 在 Jupyter 中显示
-display_graph(graph, format='png')
+display_graph(graph, format='png');
 ```
+
+末尾的分号用于避免 Jupyter 再次回显返回的 Graphviz 对象。通常直接使用 `graph = trainer.visualization()` 即可自动显示，不需要再调用 `display_graph()`。
 
 ## 使用示例
 

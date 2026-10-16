@@ -49,6 +49,9 @@ def visualize_model(model, input_data=None, batch_size=2, seq_length=10, depth=3
     if device.type == "cuda" and device.index is None:
         device = torch.device("cuda", torch.cuda.current_device())
 
+    # torchview uses a nonnegative depth; keep -1 as RecHub's show-all shortcut.
+    depth = float("inf") if depth == -1 else depth
+
     if input_data is None:
         features = extract_feature_info(model)["features"]
         if not features:

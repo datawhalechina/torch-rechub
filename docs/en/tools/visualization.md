@@ -135,8 +135,10 @@ from torch_rechub.utils.visualization import display_graph
 graph = visualize_model(model, depth=4)
 
 # Display it in Jupyter
-display_graph(graph, format='png')
+display_graph(graph, format='png');
 ```
+
+The trailing semicolon prevents Jupyter from displaying the returned Graphviz object a second time. Usually, `graph = trainer.visualization()` already displays the diagram; no extra `display_graph()` call is needed.
 
 ## Usage Examples
 
