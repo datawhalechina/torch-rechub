@@ -1,71 +1,41 @@
-"""
-Benchmark ONNX inference latency + model size.
-
-This script compares:
-  - ONNX FP32
-  - ONNX INT8 (dynamic quantized)
-  - ONNX FP16 (converted)
-
-It generates dummy inputs from the ONNX model input signatures.
-
-Examples:
-  python examples/serving/benchmark_onnx_quantization.py --fp32 deepfm.onnx --int8 deepfm.int8.onnx
-  python examples/serving/benchmark_onnx_quantization.py --fp32 deepfm.onnx --fp16 deepfm.fp16.onnx --provider CUDAExecutionProvider
-"""
-
-from __future__ import annotations
+"""Compare ONNX latency on the same inputs; use --inputs batch.npz for real data."""
 
 import argparse
 import os
 import time
-from typing import Dict
 
 import numpy as np
 
-
-def _model_size_mb(path: str) -> float:
-    return os.path.getsize(path) / (1024 * 1024)
+FLOAT_DTYPES = {"tensor(float)": np.float32, "tensor(float16)": np.float16, "tensor(double)": np.float64}
 
 
-def _make_feeds(sess, batch_size: int, seq_len: int) -> Dict[str, np.ndarray]:
-    feeds: Dict[str, np.ndarray] = {}
+def _make_feeds(sess, batch_size, seq_len):
+    """Generate floating-point demo data; IDs/masks/lengths require real inputs."""
+    feeds = {}
+    rng = np.random.default_rng(2022)
     for inp in sess.get_inputs():
+        if inp.type not in FLOAT_DTYPES:
+            raise ValueError(f"Input {inp.name!r} has type {inp.type}; supply valid IDs/masks/lengths with --inputs batch.npz")
         shape = []
         for i, d in enumerate(inp.shape):
             if d is None or isinstance(d, str):
-                # heuristic: first dynamic dim -> batch, second -> seq_len
-                if i == 0:
-                    shape.append(batch_size)
-                elif i == 1:
-                    shape.append(seq_len)
-                else:
-                    shape.append(1)
+                # Demo convention only; real inputs need no shape guessing.
+                shape.append(batch_size if i == 0 else seq_len if i == 1 else 1)
             else:
                 shape.append(int(d))
 
-        t = inp.type
-        if "int64" in t:
-            arr = np.random.randint(0, 100, size=shape, dtype=np.int64)
-        elif "int32" in t:
-            arr = np.random.randint(0, 100, size=shape, dtype=np.int32)
-        elif "float16" in t:
-            arr = np.random.rand(*shape).astype(np.float16)
-        else:
-            # default float32
-            arr = np.random.rand(*shape).astype(np.float32)
-
-        feeds[inp.name] = arr
+        feeds[inp.name] = rng.random(shape).astype(FLOAT_DTYPES[inp.type])
     return feeds
 
 
-def _bench_one(path: str, provider: str, batch_size: int, seq_len: int, warmup: int, repeat: int) -> None:
-    import onnxruntime as ort
-
-    sess_options = ort.SessionOptions()
-    sess = ort.InferenceSession(path, sess_options=sess_options, providers=[provider])
-    feeds = _make_feeds(sess, batch_size=batch_size, seq_len=seq_len)
-
-    # warmup
+def _bench_one(sess, path, feeds, warmup, repeat):
+    if {inp.name for inp in sess.get_inputs()} != set(feeds):
+        raise ValueError(f"Input names differ for {path}; all compared models must use the same input names")
+    feeds = dict(feeds)
+    for inp in sess.get_inputs():
+        # A model with converted FP16 I/O needs the same values in float16.
+        if inp.type in FLOAT_DTYPES and np.issubdtype(feeds[inp.name].dtype, np.floating):
+            feeds[inp.name] = feeds[inp.name].astype(FLOAT_DTYPES[inp.type], copy=False)
     for _ in range(warmup):
         _ = sess.run(None, feeds)
 
@@ -76,29 +46,47 @@ def _bench_one(path: str, provider: str, batch_size: int, seq_len: int, warmup: 
 
     avg_ms = (end - start) * 1000 / repeat
     print(f"- {os.path.basename(path)}")
-    print(f"  size: { _model_size_mb(path):.2f} MB")
-    print(f"  provider: {provider}")
-    print(f"  avg latency: {avg_ms:.3f} ms  (batch={batch_size}, seq_len={seq_len}, repeat={repeat})")
+    print(f"  ONNX file: {os.path.getsize(path) / (1024 * 1024):.2f} MB (external weight files excluded)")
+    print(f"  registered providers: {sess.get_providers()} (some operators may run on CPU)")
+    print(f"  input shapes: { {name: list(value.shape) for name, value in feeds.items()} }")
+    print(f"  avg latency: {avg_ms:.3f} ms  (repeat={repeat}, CPU threads=1, includes host/device copies)")
 
 
-def main() -> None:
+def main():
+    import onnxruntime as ort
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--fp32", required=True, help="FP32 ONNX model path.")
     parser.add_argument("--int8", default=None, help="INT8 ONNX model path (optional).")
     parser.add_argument("--fp16", default=None, help="FP16 ONNX model path (optional).")
     parser.add_argument("--provider", default="CPUExecutionProvider", help="ONNX Runtime execution provider.")
+    parser.add_argument("--inputs", help="A .npz batch keyed by ONNX input name; required for IDs/masks/lengths.")
     parser.add_argument("--batch-size", type=int, default=1, help="Dummy batch size for dynamic inputs.")
     parser.add_argument("--seq-len", type=int, default=10, help="Dummy seq length for dynamic sequence inputs.")
     parser.add_argument("--warmup", type=int, default=20, help="Warmup runs.")
     parser.add_argument("--repeat", type=int, default=200, help="Benchmark runs.")
     args = parser.parse_args()
+    if min(args.batch_size, args.seq_len, args.repeat) < 1 or args.warmup < 0:
+        parser.error("batch-size, seq-len and repeat must be positive; warmup must be nonnegative")
+    if args.provider not in ort.get_available_providers():
+        parser.error(f"{args.provider} is unavailable; installed providers: {ort.get_available_providers()}")
+
+    paths = [path for path in (args.fp32, args.int8, args.fp16) if path]
+    feeds = None
+    if args.inputs:
+        with np.load(args.inputs, allow_pickle=False) as batch:
+            feeds = {name: batch[name] for name in batch.files}
 
     print("## ONNX Benchmark")
-    _bench_one(args.fp32, args.provider, args.batch_size, args.seq_len, args.warmup, args.repeat)
-    if args.int8:
-        _bench_one(args.int8, args.provider, args.batch_size, args.seq_len, args.warmup, args.repeat)
-    if args.fp16:
-        _bench_one(args.fp16, args.provider, args.batch_size, args.seq_len, args.warmup, args.repeat)
+    for path in paths:
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 1
+        sess = ort.InferenceSession(path, sess_options=options, providers=[args.provider])
+        if args.provider not in sess.get_providers():
+            raise RuntimeError(f"{args.provider} failed to initialize; actual providers: {sess.get_providers()}")
+        if feeds is None:
+            feeds = _make_feeds(sess, args.batch_size, args.seq_len)
+        _bench_one(sess, path, feeds, args.warmup, args.repeat)
 
 
 if __name__ == "__main__":
