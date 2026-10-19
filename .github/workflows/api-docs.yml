@@ -9,7 +9,7 @@ on:
       - '.github/workflows/api-docs.yml'
 
 env:
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.10'
 
 jobs:
   api-docs:
@@ -48,6 +48,8 @@ jobs:
 
       - name: Commit generated API docs
         if: steps.changed-files.outputs.torch_rechub == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -56,5 +58,5 @@ jobs:
             echo "No API doc changes to commit"
           else
             git commit -m "docs(api): auto-generate API docs [skip ci]"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:$PR_BRANCH"
           fi

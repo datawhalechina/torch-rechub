@@ -11,11 +11,13 @@ This document provides detailed installation instructions for Torch-RecHub, incl
 
 Before installing Torch-RecHub, ensure your system meets the following requirements:
 
-- **Python 3.9+**
-- **PyTorch 1.10+** (choose the CPU, NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU build for your device)
+- **Python 3.10+**
+- **PyTorch 2.6+** (choose the CPU, NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU build for your device)
 - **NumPy**
 - **Pandas**
 - **Scikit-learn**
+
+The development baseline is Python 3.10+, PyTorch 2.6+, NumPy 1.26.4+, Pandas 2.1+, and Scikit-learn 1.4+. The generative extra uses Transformers >=4.57.3,<5; version 5 is not selected automatically. These are API baselines, not a claim that every hardware/dependency combination has been tested. New GPUs such as the RTX 50 series may need a newer PyTorch/CUDA build; do not downgrade a working environment to match the minimum.
 
 ## Installation Methods
 
