@@ -45,8 +45,7 @@ def test_quantize_dynamic_int8_creates_model(tmp_path, dynamo):
             fp32_path,
             input_names=["x"],
             output_names=["output"],
-            opset_version=14,
-            dynamo=False,  # Keep opset 14; newer dynamo exporters target opset 18+.
+            opset_version=18 if dynamo else 14,
             do_constant_folding=True,
             **export_options,
         )
@@ -89,7 +88,6 @@ def test_convert_fp16_creates_model(tmp_path):
             input_names=["x"],
             output_names=["output"],
             opset_version=14,
-            dynamo=False,  # Keep opset 14; newer dynamo exporters target opset 18+.
             do_constant_folding=True,
             **export_options,
         )
