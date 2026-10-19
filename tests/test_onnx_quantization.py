@@ -1,9 +1,11 @@
+import inspect
 import os
 
 import pytest
 
 
-def test_quantize_dynamic_int8_creates_model(tmp_path):
+@pytest.mark.parametrize("dynamo", [False, True])
+def test_quantize_dynamic_int8_creates_model(tmp_path, dynamo):
     pytest.importorskip("onnx")
     ort = pytest.importorskip("onnxruntime")
 
@@ -11,6 +13,13 @@ def test_quantize_dynamic_int8_creates_model(tmp_path):
     import torch
 
     from torch_rechub.utils.quantization import quantize_model
+
+    has_dynamo = "dynamo" in inspect.signature(torch.onnx.export).parameters
+    if dynamo and (not has_dynamo or tuple(int(part) for part in ort.__version__.split(".")[:2]) < (1, 18)):
+        pytest.skip("Dynamo fixture requires a supporting PyTorch exporter and ORT >= 1.18")
+    if dynamo:
+        pytest.importorskip("onnxscript")
+    torch.manual_seed(2026)
 
     class TinyMLP(torch.nn.Module):
 
@@ -28,6 +37,7 @@ def test_quantize_dynamic_int8_creates_model(tmp_path):
     int8_path = str(tmp_path / "tiny_int8.onnx")
 
     with torch.no_grad():
+        export_options = {"dynamo": dynamo} if has_dynamo else {}
         torch.onnx.export(
             model,
             (x,
@@ -38,6 +48,7 @@ def test_quantize_dynamic_int8_creates_model(tmp_path):
             opset_version=14,
             dynamo=False,  # Keep opset 14; newer dynamo exporters target opset 18+.
             do_constant_folding=True,
+            **export_options,
         )
 
     quantize_model(fp32_path, int8_path, mode="int8")
@@ -48,7 +59,8 @@ def test_quantize_dynamic_int8_creates_model(tmp_path):
     sess = ort.InferenceSession(int8_path, providers=["CPUExecutionProvider"])
     out = sess.run(None, {"x": x.numpy().astype(np.float32)})
     assert len(out) == 1
-    assert out[0].shape[0] == 2
+    assert out[0].shape == (2, 1)
+    np.testing.assert_allclose(out[0], model(x).detach().numpy(), rtol=0.1, atol=0.02)
 
 
 def test_convert_fp16_creates_model(tmp_path):
@@ -67,6 +79,8 @@ def test_convert_fp16_creates_model(tmp_path):
     fp16_path = str(tmp_path / "linear_fp16.onnx")
 
     with torch.no_grad():
+        # Test the supported legacy-export path; older torch has no dynamo flag.
+        export_options = {"dynamo": False} if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
         torch.onnx.export(
             model,
             (x,
@@ -77,8 +91,12 @@ def test_convert_fp16_creates_model(tmp_path):
             opset_version=14,
             dynamo=False,  # Keep opset 14; newer dynamo exporters target opset 18+.
             do_constant_folding=True,
+            **export_options,
         )
 
     quantize_model(fp32_path, fp16_path, mode="fp16", keep_io_types=True)
     assert os.path.exists(fp16_path)
-    onnx.checker.check_model(onnx.load(fp16_path))
+    converted = onnx.load(fp16_path)
+    onnx.checker.check_model(converted)
+    assert converted.graph.input[0].type.tensor_type.elem_type == onnx.TensorProto.FLOAT
+    assert converted.graph.output[0].type.tensor_type.elem_type == onnx.TensorProto.FLOAT

@@ -54,6 +54,8 @@ def extract_feature_info(model: nn.Module) -> Dict[str, Any]:
     # Common feature attribute names across different model types
     feature_attrs = [
         'features',           # MMOE, DCN, etc.
+        'sparse_features',    # AutoInt
+        'dense_features',     # AutoInt
         'deep_features',      # DeepFM, WideDeep
         'fm_features',        # DeepFM
         'wide_features',      # WideDeep
