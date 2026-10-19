@@ -12,8 +12,8 @@
 ![forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
 ![issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
 
-[![python](https://img.shields.io/badge/python-3.9%2B-3776AB?style=for-the-badge)](https://www.python.org/)
-[![pytorch](https://img.shields.io/badge/pytorch-1.10%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
+[![python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge)](https://www.python.org/)
+[![pytorch](https://img.shields.io/badge/pytorch-2.6%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
 [![torchview](https://img.shields.io/badge/torchview-0.2%2B-6CB33F?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 English | [简体中文](README_zh.md)
@@ -66,8 +66,8 @@ English | [简体中文](README_zh.md)
 
 ### Requirements
 
-* Python 3.9+
-* PyTorch 1.10+ (choose the CPU, NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU build for your device)
+* Python 3.10+
+* PyTorch 2.6+ (choose the CPU, NVIDIA CUDA, AMD ROCm, or Huawei Ascend NPU build for your device)
 * NumPy
 * Pandas
 * SciPy
@@ -81,7 +81,7 @@ PyTorch builds are tightly coupled with your hardware, driver, and runtime versi
 ```bash
 # Install one PyTorch build matching your device
 pip install torch                                                     # CPU
-pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+pip install torch --index-url https://download.pytorch.org/whl/cu126  # NVIDIA GPU (CUDA 12.6; choose a build matching your hardware)
 pip install torch torch-npu                                           # Huawei Ascend NPU (requires torch-npu >= 2.5.1)
 pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
@@ -99,7 +99,7 @@ cd torch-rechub
 
 # Install one PyTorch build matching your device
 uv pip install torch                                                     # CPU
-uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+uv pip install torch --index-url https://download.pytorch.org/whl/cu126  # NVIDIA GPU (CUDA 12.6; choose a build matching your hardware)
 uv pip install torch torch-npu                                           # Huawei Ascend NPU (requires torch-npu >= 2.5.1)
 uv pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
