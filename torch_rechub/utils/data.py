@@ -120,7 +120,7 @@ def get_metric_func(task_type="classification"):
     raise ValueError("task_type must be classification or regression")
 
 
-def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols=[], min_item=0, shuffle=True, max_len=50):
+def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols=[], min_item=0, shuffle=True, max_len=50, in_batch_neg=False):
     """Generate sequence features and negatives for ranking.
 
     Parameters
@@ -141,6 +141,9 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
         Shuffle train/val/test.
     max_len : int, default=50
         Max history length.
+    in_batch_neg : bool, default=False
+        Generate positive-only training rows for CTRTrainer. Validation and test
+        retain their original positive/negative pairs for supervised evaluation.
 
     Returns
     -------
@@ -171,22 +174,22 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
         if len_pos_list < min_item:  # drop this user when his pos items < min_item
             continue
 
-        neg_list = [neg_sample(pos_list, n_items) for _ in range(len_pos_list)]
+        neg_list = None if in_batch_neg else [neg_sample(pos_list, n_items) for _ in range(len_pos_list)]
         for i in range(1, min(len_pos_list, max_len)):
             hist_item = pos_list[:i]
             hist_item = hist_item + [0] * (max_len - len(hist_item))
             pos_item = pos_list[i]
-            neg_item = neg_list[i]
+            neg_item = neg_list[i] if neg_list is not None else (neg_sample(pos_list, n_items) if i >= len_pos_list - 2 else None)
             pos_seq = [1, pos_item, uid, hist_item]
-            neg_seq = [0, neg_item, uid, hist_item]
+            neg_seq = [0, neg_item, uid, hist_item] if neg_item is not None else None
             if len(item_attribute_cols) > 0:
                 for attr_col in item_attribute_cols:  # the history of item attribute features
                     hist_attr = hist[attr_col].tolist()[:i]
                     hist_attr = hist_attr + [0] * (max_len - len(hist_attr))
                     pos2attr = [hist_attr, item2attr[attr_col][pos_item]]
-                    neg2attr = [hist_attr, item2attr[attr_col][neg_item]]
                     pos_seq += pos2attr
-                    neg_seq += neg2attr
+                    if neg_seq is not None:
+                        neg_seq += [hist_attr, item2attr[attr_col][neg_item]]
             if i == len_pos_list - 1:
                 test_data.append(pos_seq)
                 test_data.append(neg_seq)
@@ -195,7 +198,8 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
                 val_data.append(neg_seq)
             else:
                 train_data.append(pos_seq)
-                train_data.append(neg_seq)
+                if not in_batch_neg:
+                    train_data.append(neg_seq)
 
     col_name = ['label', 'target_item_id', user_col, 'hist_item_id']
     if len(item_attribute_cols) > 0:

@@ -17,7 +17,9 @@ from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match
 sys.path.append("../..")
 
 
-def get_movielens_data(data_path, batch_size, load_cache=False):
+def get_movielens_data(data_path, batch_size, load_cache=False, in_batch_neg=False):
+    os.makedirs("./data/ml-1m/saved/", exist_ok=True)
+    cache_path = "./data/ml-1m/saved/youtube_sbc_inbatch.npy" if in_batch_neg else "./data/ml-1m/saved/data_cache.npy"
     data = pd.read_csv(data_path)
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
     sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', "cate_id"]
@@ -41,16 +43,16 @@ def get_movielens_data(data_path, batch_size, load_cache=False):
     item_profile = data[["movie_id", "cate_id", "sample_weight"]].drop_duplicates('movie_id')
 
     if load_cache:  # if you have run this script before and saved the preprocessed data
-        x_train, y_train, x_test = np.load("./data/ml-1m/saved/data_cache.npy", allow_pickle=True)
+        x_train, y_train, x_test = np.load(cache_path, allow_pickle=True)
     else:
         # Note: mode=0 means point-wise sample generate and will add label col.
         # ! neg_ratio=0 means we need not sample negative in SBCNM model due to it is In-batch sample.
-        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=0, min_item=0)
+        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=0, min_item=0, in_batch_neg=in_batch_neg)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         # label=0 means the first pred value is positiva sample
         y_train = np.array([0] * df_train.shape[0])
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-        np.save("./data/ml-1m/saved/data_cache.npy", np.array((x_train, y_train, x_test), dtype=object))
+        np.save(cache_path, np.array((x_train, y_train, x_test), dtype=object))
 
     user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']  # sparse feature
     item_cols = ['movie_id', "cate_id"]  # sparse feature
@@ -66,11 +68,11 @@ def get_movielens_data(data_path, batch_size, load_cache=False):
     return user_features, item_features, sample_weight_feature, x_train, y_train, all_item, test_user
 
 
-def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.manual_seed(seed)
-    user_features, item_features, sample_weight_feature, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path, batch_size=batch_size, load_cache=False)
+    user_features, item_features, sample_weight_feature, x_train, y_train, all_item, test_user = get_movielens_data(dataset_path, batch_size=batch_size, load_cache=False, in_batch_neg=in_batch_neg)
     dg = MatchDataGenerator(x=x_train, y=y_train)
 
     model = YoutubeSBC(
@@ -83,9 +85,9 @@ def main(dataset_path, epoch, learning_rate, batch_size, weight_decay, device, s
         n_neg=3,
         temperature=0.02)
     # mode=2 means use list-wise loss: softmax
-    trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir)
+    trainer = MatchTrainer(model, mode=2, in_batch_neg=in_batch_neg, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, device=device, model_path=save_dir)
 
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size)
+    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=batch_size, num_workers=0)
     trainer.fit(train_dl)
     print("inference embedding")
     user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
@@ -107,9 +109,10 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./data/ml-1m/saved/')
     parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use positive pairs and negatives from the batch')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, in_batch_neg=args.in_batch_neg)
 """
 python run_ml_youtube_sbc.py
 """

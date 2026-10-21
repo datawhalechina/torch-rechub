@@ -6,7 +6,6 @@ References:
 Authors: Mincai Lai, laimincai@shanghaitech.edu.cn
 """
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -43,11 +42,6 @@ class YoutubeSBC(torch.nn.Module):
         self.item_mlp = MLP(self.item_dims, output_layer=False, **item_params)
         self.mode = None
 
-        # in-batch sampling index
-        self.index0 = np.repeat(np.arange(batch_size), n_neg + 1)
-        self.index1 = np.concatenate([np.arange(i, i + n_neg + 1) for i in range(batch_size)])
-        self.index1[np.where(self.index1 >= batch_size)] -= batch_size
-
     def forward(self, x):
         user_embedding = self.user_tower(x)  # (batch_size, embedding_dim)
         item_embedding = self.item_tower(x)  # (batch_size, embedding_dim)
@@ -55,29 +49,22 @@ class YoutubeSBC(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, item_embedding
 
 
 # pred[i, j] means predicted score that user_i give to item_j
         pred = torch.cosine_similarity(user_embedding.unsqueeze(1), item_embedding, dim=2)  # (batch_size, batch_size)
 
-        # get sample weight of items in this batch
-        sample_weight = self.embedding(x, self.sample_weight_feature, squeeze_dim=True).squeeze(1)  # (batch_size)
-        # Sampling Bias Corrected, using broadcast. (batch_size, batch_size)
-        scores = pred - torch.log(sample_weight)
+        scores = self.correct_inbatch_logits(pred, x)
+        rows = torch.arange(scores.size(0), device=scores.device).unsqueeze(1)
+        columns = (rows + torch.arange(self.n_neg + 1, device=scores.device)) % scores.size(0)
+        return scores[rows, columns] / self.temperature  # [batch_size, 1 + n_neg]
 
-        if user_embedding.shape[0] * (self.n_neg + 1) != self.index0.shape[0]:  # last batch
-            batch_size = user_embedding.shape[0]
-            index0 = self.index0[:batch_size * (self.n_neg + 1)]
-            index1 = self.index1[:batch_size * (self.n_neg + 1)]
-            index0[np.where(index0 >= batch_size)] -= batch_size
-            index1[np.where(index1 >= batch_size)] -= batch_size
-            scores = scores[index0, index1]  # (batch_size, 1 + self.n_neg)
-        else:
-            # (batch_size, 1 + self.n_neg)
-            scores = scores[self.index0, self.index1]
-
-        scores = scores / self.temperature
-        return scores.view(-1, self.n_neg + 1)  # (batch_size, 1 + self.n_neg)
+    def correct_inbatch_logits(self, scores, x):
+        """Keep sampling-bias correction for both original and full-batch training."""
+        weights = self.embedding(x, self.sample_weight_feature, squeeze_dim=True).squeeze(1)
+        return scores - torch.log(weights.clamp_min(torch.finfo(scores.dtype).tiny))
 
     def user_tower(self, x):
         if self.mode == "item":
@@ -86,6 +73,8 @@ class YoutubeSBC(torch.nn.Module):
         input_user = self.embedding(x, self.user_features, squeeze_dim=True)
         # [batch_size, user_params["dims"][-1]]
         user_embedding = self.user_mlp(input_user)
+        if self.mode == 'in_batch':
+            user_embedding = F.normalize(user_embedding, p=2, dim=1)
         return user_embedding
 
     def item_tower(self, x):
@@ -95,4 +84,6 @@ class YoutubeSBC(torch.nn.Module):
         input_item = self.embedding(x, self.item_features, squeeze_dim=True)
         # [batch_size, item_params["dims"][-1]]
         item_embedding = self.item_mlp(input_item)
+        if self.mode == 'in_batch':
+            item_embedding = F.normalize(item_embedding, p=2, dim=1)
         return item_embedding

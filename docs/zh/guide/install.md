@@ -11,11 +11,13 @@ description: Torch-RecHub 详细安装说明，包括稳定版和最新版安装
 
 在安装 Torch-RecHub 之前，请确保您的系统满足以下要求：
 
-- **Python 3.9+**
-- **PyTorch 1.10+**（根据硬件选择 CPU、NVIDIA CUDA、AMD ROCm 或华为昇腾 NPU 版本）
+- **Python 3.10+**
+- **PyTorch 2.6+**（根据硬件选择 CPU、NVIDIA CUDA、AMD ROCm 或华为昇腾 NPU 版本）
 - **NumPy**
 - **Pandas**
 - **Scikit-learn**
+
+本项目的开发基线为 Python 3.10+、PyTorch 2.6+、NumPy 1.26.4+、Pandas 2.1+、Scikit-learn 1.4+。生成式可选依赖限定 Transformers 4.57.3 至 5.0 之前；不自动跨到 5.x。版本下限表示选用的 API 基线，并非每一种硬件/依赖组合都已运行验证。RTX 50 系等新显卡仍需选择支持该架构的较新 PyTorch/CUDA 构建，不应为了贴近最低版本降级已可用的环境。
 
 ## 安装方式
 

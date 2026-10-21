@@ -67,7 +67,11 @@ def main(
     device,
     save_dir,
     seed,
+    in_batch_neg=False,
+    item_features=None,
 ):
+    if in_batch_neg and not item_features:
+        raise ValueError("Specify item_features (item-only columns) when enabling in-batch ranking.")
     torch.manual_seed(seed)
     (
         dense_feas,
@@ -148,6 +152,8 @@ def main(
         earlystop_patience=10,
         device=device,
         model_path=save_dir,
+        in_batch_neg=in_batch_neg,
+        item_features=item_features,
     )
     # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
@@ -168,6 +174,8 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu")  # cuda:0
     parser.add_argument("--save_dir", default="./")
     parser.add_argument("--seed", type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use other positive items in the batch as negatives')
+    parser.add_argument('--item_features', nargs='+', help='Item-only columns to swap together; required with --in_batch_neg')
 
     args = parser.parse_args()
     main(
@@ -180,6 +188,8 @@ if __name__ == "__main__":
         args.device,
         args.save_dir,
         args.seed,
+        in_batch_neg=args.in_batch_neg,
+        item_features=args.item_features,
     )
 """
 python run_avazu.py --model_name widedeep

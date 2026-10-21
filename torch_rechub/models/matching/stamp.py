@@ -82,8 +82,9 @@ class STAMP(nn.Module):
         """Compute item embedding for in-batch negative sampling."""
         if self.mode == "user":
             return None
-        if self.item_feature is not None:
-            item_ids = x[self.item_feature.name]
+        if self.item_feature is not None or self.mode in ("in_batch", "item"):
+            item_name = self.item_feature.name if self.item_feature is not None else "target"
+            item_ids = x[item_name]
             item_emb = self.item_emb(item_ids)  # [batch_size, embed_dim]
             if self.mode == "item":
                 return item_emb
@@ -96,6 +97,8 @@ class STAMP(nn.Module):
             return self.user_tower(input_dict)
         if self.mode == "item":
             return self.item_tower(input_dict)
+        if self.mode == "in_batch":
+            return self.user_tower(input_dict), self.item_tower(input_dict)
 
         # In-batch negative sampling mode
         if self.item_feature is not None:

@@ -90,8 +90,10 @@ trainer.export_onnx(
 ## ONNX 量化（Quantization）
 
 在工业推理中，FP32 往往不是最优解。常用两类压缩方式：
-- **INT8 动态量化（Dynamic Quantization）**：主要对 Linear/MatMul 等权重做 INT8，通常对 **CPU** 推理加速明显，且精度损失可控。
-- **FP16 转换**：对支持 Tensor Core 的 GPU 推理更友好，能降低显存占用并提升吞吐。
+- **INT8 动态量化（Dynamic Quantization）**：用于 **CPU** 推理，主要量化 Linear/MatMul 等算子。是否加速、精度是否满足要求，需要用自己的数据测量。
+- **FP16 转换**：用于支持 FP16 的 **GPU** 推理，可以降低浮点权重占用；实际吞吐取决于显卡与算子支持。
+
+这两个模式不是按显存大小划分的两档 GPU 量化。当前 INT8 接口不包含 TensorRT 的 GPU INT8 校准流程，也不处理超过 2 GB 的外部权重大模型。
 
 Torch-RecHub 在量化模块提供统一 API：
 
@@ -104,11 +106,7 @@ from torch_rechub.utils.quantization import quantize_model
 ```python
 from torch_rechub.utils.quantization import quantize_model
 
-quantize_model(
-    input_path="model_fp32.onnx",
-    output_path="model_int8.onnx",
-    mode="int8",
-)
+quantize_model("model_fp32.onnx", "model_int8.onnx", mode="int8")
 ```
 
 可选参数（按需）：
@@ -116,20 +114,19 @@ quantize_model(
 - `reduce_range=True`：缩小量化范围（部分 CPU 可能更稳）
 - `weight_type="qint8"|"quint8"`：权重量化类型
 
-> 注意：不同 `onnxruntime` 版本对 `quantize_dynamic()` 的参数支持略有差异；Torch-RecHub 会自动过滤掉当前版本不支持的参数，保证兼容性。
+原有 `dynamic_int8`、`dynamic` 模式别名和节点筛选参数继续可用；不再静默丢弃不受支持的参数。`optimize_model` 只在 ORT < 1.16 中可用，且保留原默认 `False`；ORT >= 1.16 已移除该参数，显式设置 `True` 会清楚报错。如需优化，请先单独使用 ORT 的 `quant_pre_process()`。
+
+兼容说明：部分 Dynamo 导出的 Gemm 模型在 ORT 转置权重后会留下冲突的重复 shape 元信息。ORT >= 1.18 支持直接接收 ModelProto，本工具会在内存副本中移除与 initializer 重名的冗余 `value_info`，保留其他中间张量元信息与原文件，避免该冲突；不改变导出器。更旧 ORT 仍使用原来的文件路径接口，如遇到这类 Dynamo/Gemm 问题，可显式使用 `trainer.export_onnx(..., onnx_export_kwargs={"dynamo": False})` 或给 `torch.onnx.export()` 传 `dynamo=False`。
 
 ### 2) FP16 转换（推荐 GPU）
 
 ```python
 from torch_rechub.utils.quantization import quantize_model
 
-quantize_model(
-    input_path="model_fp32.onnx",
-    output_path="model_fp16.onnx",
-    mode="fp16",
-    keep_io_types=True,  # 通常建议保留 I/O 为 FP32，兼容性更好
-)
+quantize_model("model_fp32.onnx", "model_fp16.onnx", mode="fp16")
 ```
+
+Python API 与命令行均默认 `keep_io_types=True`，保留浮点输入/输出为 FP32；整数类别 ID 不改变。只有显式设置 `keep_io_types=False` 或 CLI 的 `--no-keep-io-types` 时，才转换浮点 I/O。`float16` 模式别名继续支持。
 
 ## 脚本示例与基准测试（Benchmark）
 
@@ -147,11 +144,15 @@ python examples/serving/quantize_onnx.py --input model_fp32.onnx --output model_
 对比 FP32 / INT8 / FP16 的 **模型大小** 与 **推理耗时**：
 
 ```bash
-python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --int8 model_int8.onnx
-python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --provider CUDAExecutionProvider
+python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --int8 model_int8.onnx --inputs batch.npz
+python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --inputs batch.npz --provider CUDAExecutionProvider
 ```
 
-脚本会根据 ONNX 输入签名自动构造 dummy inputs（适合做快速的端到端性能 sanity check）。
+`batch.npz` 保存一批已完成预处理的真实输入，键必须与 ONNX 输入名一致，例如 `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`。整数组件必须使用模型要求的 dtype。所有待比较模型共用这批输入；如果 FP16 模型改变了浮点 I/O 类型，脚本只做相应的浮点 dtype 转换。
+
+没有 `--inputs` 时，脚本只为浮点输入生成固定随机种子的演示数据；类别 ID、mask、长度等整数/布尔输入必须提供真实数据，避免猜测词表和有效取值。脚本检查 provider 是否可用并成功注册，不会把 CPU 回退误报成 GPU 成功；注册 CUDA 仍不代表全部节点运行在 GPU。
+
+打印的文件大小仅指 `.onnx` 文件，不包含外部权重；基准固定 ORT CPU 算子线程为 1，耗时包含输入/输出拷贝，不是纯 GPU kernel 耗时。
 
 > 导出成功只说明模型文件已生成。上线前还应使用真实样本分别运行 PyTorch 与 ONNX Runtime，核对输出形状、数值误差和动态 batch，并在量化后重新评估业务指标；基准脚本不会替代这些一致性检查。
 
