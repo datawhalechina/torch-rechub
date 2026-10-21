@@ -10,7 +10,7 @@ import torch
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from torch_rechub.basic.features import DenseFeature, SparseFeature
+from torch_rechub.basic.features import DenseFeature, SequenceFeature, SparseFeature
 from torch_rechub.models import ranking as rk
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.utils.data import DataGenerator
@@ -105,6 +105,49 @@ def test_ranking_e2e(model_class, ranking_data):
 
         assert isinstance(auc, float)
         assert 0.0 <= auc <= 1.0, f"AUC for {model_name} is out of range: {auc}"
+
+
+@pytest.mark.parametrize("context", ["sparse", "dense", "mixed", "empty"])
+def test_din_context_features(context, tmp_path):
+    """DIN keeps dense context values and still accepts the original sparse inputs."""
+    torch.manual_seed(2026)
+    sparse = [SparseFeature("user_id", vocab_size=10, embed_dim=4)]
+    dense = [DenseFeature("price"), DenseFeature("profile", embed_dim=3)]
+    features = {"sparse": sparse, "dense": dense, "mixed": sparse + dense, "empty": []}[context]
+    target = [SparseFeature("item_id", vocab_size=20, embed_dim=4)]
+    history = [SequenceFeature("history", vocab_size=20, embed_dim=4, pooling="concat", shared_with="item_id")]
+    model = rk.DIN(features, history, target, mlp_params={"dims": [8]}, attention_mlp_params={"dims": [8]})
+    x = {
+        "user_id": torch.arange(8),
+        "price": torch.randn(8,
+                             requires_grad=True),
+        "profile": torch.randn(8,
+                               3,
+                               requires_grad=True),
+        "item_id": torch.arange(1,
+                                9),
+        "history": torch.randint(1,
+                                 20,
+                                 (8,
+                                  3)),
+    }
+    y = torch.tensor([0, 1] * 4, dtype=torch.float32)
+    before = model.mlp.mlp[0].weight.detach().clone()
+    trainer = CTRTrainer(model, n_epoch=1, device="cpu", model_path=str(tmp_path))
+    trainer.fit([(x, y)])
+    assert not torch.equal(before, model.mlp.mlp[0].weight)
+    if context in {"dense", "mixed"}:
+        assert x["price"].grad.abs().sum() > 0
+        assert x["profile"].grad.abs().sum() > 0
+    model.eval()
+    with torch.no_grad():
+        expected = model(x)
+        assert expected.shape == (8,)
+        assert torch.isfinite(expected).all()
+        model.mlp.mlp[0].weight.add_(1)
+        model.load_state_dict(torch.load(tmp_path / "model.pth", weights_only=True))
+        torch.testing.assert_close(model(x), expected)
+        assert model({name: values[:1] for name, values in x.items()}).shape == (1,)
 
 
 if __name__ == '__main__':
