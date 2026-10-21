@@ -86,7 +86,11 @@ visualize_model(model, save_path="model_arch.pdf", dpi=300)
 
 ### visualize_model
 
-Generate computation graph visualization.
+Generate computation graph visualization. CTR, Match, MTL and Seq trainers share this drawing function; their training calls are unchanged.
+
+Drawing preserves each submodule's training/evaluation mode, including when tracing fails. CPU tracing remains the default. A copy is used when tracing on another device, leaving the trainer's model untouched. For large models, pass their current device (for example, `device="cuda:0"`) to avoid a model copy.
+
+The diagram shows the forward path taken by these inputs, not every possible branch. Drawing does not train the model or run backpropagation.
 
 ```python
 from torch_rechub.utils.visualization import visualize_model
@@ -111,7 +115,7 @@ graph = visualize_model(
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
 | `model` | nn.Module | PyTorch model to visualize | Required |
-| `input_data` | dict | Input data dictionary, auto-generated if None | None |
+| `input_data` | dict / Tensor / tuple / list | Dict as one argument; tuple/list as positional arguments; None generates feature inputs | None |
 | `batch_size` | int | Batch size for auto-generated input | 2 |
 | `seq_length` | int | Sequence feature length | 10 |
 | `depth` | int | Visualization depth, -1 shows all layers | 3 |
@@ -131,8 +135,10 @@ from torch_rechub.utils.visualization import display_graph
 graph = visualize_model(model, depth=4)
 
 # Display it in Jupyter
-display_graph(graph, format='png')
+display_graph(graph, format='png');
 ```
+
+The trailing semicolon prevents Jupyter from displaying the returned Graphviz object a second time. Usually, `graph = trainer.visualization()` already displays the diagram; no extra `display_graph()` call is needed.
 
 ## Usage Examples
 
@@ -191,6 +197,18 @@ trainer.fit(train_dl, val_dl)
 
 # Visualize model
 trainer.visualization(save_path="model.pdf", depth=4)
+```
+
+The sequence trainer keeps its original argument order and generates non-padding tokens with zero time differences, for drawing only:
+
+```python
+seq_trainer.visualization(seq_length=20, save_path="sequence.svg")
+```
+
+For a custom model without recognizable feature definitions, provide its actual inputs:
+
+```python
+visualize_model(model, input_data=(tokens, time_diffs), save_path="custom.png")
 ```
 
 ## Output Formats

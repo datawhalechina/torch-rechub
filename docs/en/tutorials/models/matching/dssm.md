@@ -219,9 +219,24 @@ python run_ml_dssm.py --in_batch_neg --batch_size 256 --temperature 0.02 --devic
 
 Use `--device cuda:0` for one GPU. The example generates positive interactions with `neg_ratio=0` and uses a separate data cache. Without `--in_batch_neg`, it keeps the original offline negatives and BCE training.
 
-For your own data, each row must be a positive user-item interaction, without offline negative rows. `MatchTrainer(model, in_batch_neg=True)` normalizes both tower embeddings, computes `user_emb @ item_emb.T / model.temperature`, and applies cross entropy with diagonal targets `arange(B)`. Training labels `y` are placeholders, not positive/negative indicators. Explicit random/hard sampling and BPR configurations retain their existing paths.
+The other MovieLens retrieval examples also support `--in_batch_neg`. Existing code usually needs two changes:
 
-This simple version treats all off-diagonal entries as negatives, without duplicate-item masking or sampling-probability correction. Repeated items can therefore become false negatives. Use `batch_size >= 2`; singleton batches are skipped with a warning, and an epoch with no usable batches raises an error.
+```python
+df_train, df_test = generate_seq_feature_match(data, user_col, item_col, "timestamp", in_batch_neg=True)
+trainer = MatchTrainer(model, in_batch_neg=True)
+```
+
+The data helper produces positive pairs. Existing model parameters, training modes, and inference interfaces keep their original form. The default model `forward()` still returns its original scores; the trainer temporarily switches the existing `model.mode` during the in-batch forward and restores it afterwards. No embedding-output switch or prediction-code migration is required.
+
+All public matching models support this entry point. MIND/ComiRec retain positive-item-based interest selection; YoutubeSBC retains sampling-bias correction. NARM/STAMP can use their existing next-item ID labels directly: enable `run_sbr.py --in_batch_neg`. Custom session histories use post-padding, and `y` must contain actual next-item IDs unless an explicit `item_feature` and corresponding item column are supplied. SASRec retains its original per-position positive/negative training; in-batch training uses the positive item at the last valid sequence position.
+
+Normalization follows each model's original scoring: DSSM/YoutubeDNN use normalized vectors, YoutubeSBC uses cosine scores, and NARM/STAMP/SINE retain dot products. The trainer does not impose a shared embedding scale, keeping training aligned with the existing retrieval evaluation.
+
+This in-batch entry point currently supports a single device (`cpu` or one CUDA GPU). Multi-GPU support is maintained separately.
+
+For paired data, each row must be a positive user-item interaction without offline negative rows. DSSM's towers provide normalized embeddings; `MatchTrainer(model, in_batch_neg=True)` computes `user_emb @ item_emb.T / model.temperature` and applies cross entropy with diagonal targets `arange(B)`. Training labels `y` are placeholders for explicit user-item pairs; next-item labels for session models supply the actual target item IDs. Explicit random/hard sampling and BPR configurations retain their existing paths.
+
+This simple version treats all off-diagonal entries as negatives without duplicate-item masking. It adds no sampling-probability correction beyond YoutubeSBC's own correction. Repeated items can therefore become false negatives. Use `batch_size >= 2`; singleton batches are skipped with a warning, and an epoch with no usable batches raises an error.
 
 Evaluate retrieval using the embeddings as shown below. A positive-only training dataset is not an AUC validation dataset: AUC validation through `fit(..., val_dataloader=...)` still requires genuine binary labels.
 

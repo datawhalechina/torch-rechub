@@ -157,11 +157,11 @@ def gather_inbatch_logits(scores, neg_indices):
     # positive: scores[i][i]
     positive_logits = torch.diagonal(scores).reshape(-1, 1)  # (B,1)
     # negatives: scores[i][neg_indices[i, j]]
-    negative_logits = scores[torch.arange(scores.size(0)).unsqueeze(1), neg_indices]  # (B,K)
+    negative_logits = scores[torch.arange(scores.size(0), device=scores.device).unsqueeze(1), neg_indices]  # (B,K)
     return torch.cat([positive_logits, negative_logits], dim=1)
 
 
-def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols=None, sample_method=0, mode=0, neg_ratio=0, min_item=0):
+def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols=None, sample_method=0, mode=0, neg_ratio=0, min_item=0, in_batch_neg=False):
     """Generate sequence feature and negative sample for match.
 
     Args:
@@ -179,12 +179,16 @@ def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribut
         mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
         neg_ratio (int, optional): negative sample ratio, >= 1. Defaults to 0.
         min_item (int, optional): the min item each user must have. Defaults to 0.
+        in_batch_neg (bool, optional): generate positive-only pairs for MatchTrainer.
+            When enabled, mode and neg_ratio do not generate offline negatives.
 
     Returns:
         pd.DataFrame: split train and test data with sequence features.
     """
     if item_attribute_cols is None:
         item_attribute_cols = []
+    if in_batch_neg:
+        mode, neg_ratio = 0, 0
     if mode == 2:  # list wise learning
         assert neg_ratio > 0, 'neg_ratio must be greater than 0 when list-wise learning'
     elif mode == 1:  # pair wise learning
@@ -194,9 +198,11 @@ def generate_seq_feature_match(data, user_col, item_col, time_col, item_attribut
     train_set, test_set = [], []
     n_cold_user = 0
 
-    items_cnt = Counter(data[item_col].tolist())
-    items_cnt_order = OrderedDict(sorted((items_cnt.items()), key=lambda x: x[1], reverse=True))  # item_id:item count
-    neg_list = negative_sample(items_cnt_order, ratio=data.shape[0] * neg_ratio, method_id=sample_method)
+    neg_list = []
+    if neg_ratio:
+        items_cnt = Counter(data[item_col].tolist())
+        items_cnt_order = OrderedDict(sorted((items_cnt.items()), key=lambda x: x[1], reverse=True))  # item_id:item count
+        neg_list = negative_sample(items_cnt_order, ratio=data.shape[0] * neg_ratio, method_id=sample_method)
     neg_idx = 0
     for uid, hist in tqdm.tqdm(data.groupby(user_col), desc='generate sequence features'):
         pos_list = hist[item_col].tolist()

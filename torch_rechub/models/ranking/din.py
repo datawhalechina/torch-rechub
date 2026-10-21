@@ -36,8 +36,6 @@ class DIN(nn.Module):
         self.mlp = MLP(self.all_dims, activation="dice", **mlp_params)
 
     def forward(self, x):
-        # (batch_size, num_features, emb_dim)
-        embed_x_features = self.embedding(x, self.features)
         # (batch_size, num_history_features, seq_length, emb_dim)
         embed_x_history = self.embedding(x, self.history_features)
         # (batch_size, num_target_features, emb_dim)
@@ -49,7 +47,11 @@ class DIN(nn.Module):
         # (batch_size, num_history_features, emb_dim)
         attention_pooling = torch.cat(attention_pooling, dim=1)
 
-        mlp_in = torch.cat([attention_pooling.flatten(start_dim=1), embed_x_target.flatten(start_dim=1), embed_x_features.flatten(start_dim=1)], dim=1)  # (batch_size, N)
+        mlp_in = [attention_pooling.flatten(start_dim=1), embed_x_target.flatten(start_dim=1)]
+        if self.features:
+            # Flatten context so both sparse embeddings and dense values reach the MLP.
+            mlp_in.append(self.embedding(x, self.features, squeeze_dim=True))
+        mlp_in = torch.cat(mlp_in, dim=1)  # (batch_size, N)
 
         y = self.mlp(mlp_in)
         return torch.sigmoid(y.squeeze(1))

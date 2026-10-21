@@ -90,8 +90,10 @@ After exporting to ONNX, you can inspect the model structure online with [Netron
 ## ONNX Quantization
 
 FP32 is often not the best choice for production inference. Two common compression methods are:
-- **INT8 dynamic quantization**: Primarily quantizes weights for operations such as Linear/MatMul to INT8. It usually provides substantial inference speedups on **CPU** with manageable accuracy loss.
-- **FP16 conversion**: Better suited to GPU inference with Tensor Core support; it can reduce GPU memory use and improve throughput.
+- **INT8 dynamic quantization**: Intended for **CPU** inference, primarily quantizing operations such as Linear/MatMul. Measure performance and accuracy on your own data.
+- **FP16 conversion**: Intended for **GPUs** supporting FP16. It reduces floating-point weight storage; throughput depends on hardware and operator support.
+
+These are not two GPU presets selected by VRAM size. The INT8 entry point does not implement TensorRT GPU INT8 calibration, and this utility does not handle models with more than 2 GB of external weights.
 
 Torch-RecHub provides a unified API in its quantization module:
 
@@ -104,11 +106,7 @@ from torch_rechub.utils.quantization import quantize_model
 ```python
 from torch_rechub.utils.quantization import quantize_model
 
-quantize_model(
-    input_path="model_fp32.onnx",
-    output_path="model_int8.onnx",
-    mode="int8",
-)
+quantize_model("model_fp32.onnx", "model_int8.onnx", mode="int8")
 ```
 
 Optional arguments:
@@ -116,20 +114,19 @@ Optional arguments:
 - `reduce_range=True`: Reduce the quantization range, which may be more stable on some CPUs
 - `weight_type="qint8"|"quint8"`: Weight quantization type
 
-> Note: Support for `quantize_dynamic()` arguments varies slightly between `onnxruntime` versions. Torch-RecHub automatically filters out arguments unsupported by the installed version to maintain compatibility.
+Existing `dynamic_int8`/`dynamic` aliases and node-selection arguments remain available; unsupported arguments are no longer silently discarded. `optimize_model` is supported only by ORT < 1.16 and retains the original `False` default. ORT >= 1.16 removed that argument, so explicitly requesting `True` raises a clear error. Use ORT's separate `quant_pre_process()` step if graph optimization is needed.
+
+Compatibility: some Dynamo-exported Gemm models contain duplicated weight-shape metadata that becomes stale when ORT transposes the weights. ORT >= 1.18 accepts a ModelProto directly, allowing this utility to remove redundant `value_info` entries matching initializer names in an in-memory copy while preserving other intermediate metadata and the original file. The exporter is unchanged. Older ORT versions retain the original file-path interface; if they encounter this Dynamo/Gemm issue, explicitly export with `trainer.export_onnx(..., onnx_export_kwargs={"dynamo": False})` or pass `dynamo=False` to `torch.onnx.export()`.
 
 ### 2) FP16 Conversion (Recommended for GPU)
 
 ```python
 from torch_rechub.utils.quantization import quantize_model
 
-quantize_model(
-    input_path="model_fp32.onnx",
-    output_path="model_fp16.onnx",
-    mode="fp16",
-    keep_io_types=True,  # Keeping I/O in FP32 is generally recommended for better compatibility
-)
+quantize_model("model_fp32.onnx", "model_fp16.onnx", mode="fp16")
 ```
+
+Both the Python API and CLI default to `keep_io_types=True`, retaining FP32 floating-point inputs/outputs. Integer category IDs are unchanged. Set `keep_io_types=False`, or pass `--no-keep-io-types` to the CLI, to convert floating-point I/O too. The existing `float16` alias is preserved.
 
 ## Example Scripts and Benchmarks
 
@@ -147,10 +144,14 @@ python examples/serving/quantize_onnx.py --input model_fp32.onnx --output model_
 Compare **model size** and **inference latency** across FP32, INT8, and FP16:
 
 ```bash
-python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --int8 model_int8.onnx
-python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --provider CUDAExecutionProvider
+python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --int8 model_int8.onnx --inputs batch.npz
+python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --inputs batch.npz --provider CUDAExecutionProvider
 ```
 
-The script automatically constructs dummy inputs from the ONNX input signature, making it suitable for a quick end-to-end performance sanity check.
+Save one batch of preprocessed inputs in `batch.npz`, keyed by the ONNX input names, for example `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`. Integer arrays must use the model's required dtype. Every compared model receives this same batch; only floating-point dtype conversion is applied when a model uses FP16 I/O.
+
+Without `--inputs`, fixed-seed demo data is generated only for floating-point inputs. IDs, masks and lengths require real input data rather than guessed vocabulary sizes or valid values. The script checks that the requested provider is available and successfully registered instead of reporting CPU fallback as GPU success; registering CUDA still does not mean that every operator runs on GPU.
+
+Reported size covers the `.onnx` file only, excluding external weights. The benchmark fixes ORT CPU operator threads to one. Latency includes input/output copies rather than measuring GPU kernel time alone.
 
 > A successful export only confirms that the model file was generated. Before production use, run both PyTorch and ONNX Runtime on real samples to compare output shapes, numerical errors, and dynamic batching, then reevaluate business metrics after quantization. The benchmark script does not replace these consistency checks.

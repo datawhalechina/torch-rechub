@@ -77,7 +77,20 @@ def main(config):
     else:
         raise NotImplementedError(f"Unknown model {config.model_name}")
 
-    trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": config.learning_rate, "weight_decay": config.weight_decay}, n_epoch=config.epoch, device=config.device, model_path=config.save_dir)
+    trainer = MatchTrainer(
+        model,
+        mode=2,
+        in_batch_neg=getattr(config,
+                             'in_batch_neg',
+                             False),
+        optimizer_params={
+            "lr": config.learning_rate,
+            "weight_decay": config.weight_decay
+        },
+        n_epoch=config.epoch,
+        device=config.device,
+        model_path=config.save_dir
+    )
 
     trainer.fit(train_dl)
 
@@ -102,6 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--top_k", type=int, default=20)
     parser.add_argument("--seed", type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use next-item labels as positive targets and negatives from the batch')
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--save_dir", default="./")
 

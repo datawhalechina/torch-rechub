@@ -34,8 +34,9 @@ class DSSM(torch.nn.Module):
         self.embedding = EmbeddingLayer(user_features + item_features)
         self.user_mlp = MLP(self.user_dims, output_layer=False, **user_params)
         self.item_mlp = MLP(self.item_dims, output_layer=False, **item_params)
-        self.user_num_features = len([fea.embed_dim for fea in self.user_features if isinstance(fea, SparseFeature) or isinstance(fea, SequenceFeature) and fea.shared_with is None])
-        self.item_num_features = len([fea.embed_dim for fea in self.item_features if isinstance(fea, SparseFeature) or isinstance(fea, SequenceFeature) and fea.shared_with is None])
+        # Sharing an embedding table does not remove a field from the tower input.
+        self.user_num_features = len([fea for fea in self.user_features if isinstance(fea, (SparseFeature, SequenceFeature))])
+        self.item_num_features = len([fea for fea in self.item_features if isinstance(fea, (SparseFeature, SequenceFeature))])
         self.user_senet = SENETLayer(self.user_num_features)
         self.item_senet = SENETLayer(self.item_num_features)
         self.mode = None
@@ -47,6 +48,8 @@ class DSSM(torch.nn.Module):
             return user_embedding
         if self.mode == "item":
             return item_embedding
+        if self.mode == "in_batch":
+            return user_embedding, item_embedding
 
 
 # calculate cosine score

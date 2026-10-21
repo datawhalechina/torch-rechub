@@ -99,6 +99,8 @@ class MIND(torch.nn.Module):
         k_index = torch.argmax(dot_res, dim=1).squeeze(-1)
         batch_index = torch.arange(user_embedding.shape[0], device=user_embedding.device)
         best_interest_emb = user_embedding[batch_index, k_index, :].unsqueeze(1)
+        if self.mode == "in_batch":
+            return best_interest_emb, pos_item_embedding
 
         y = torch.mul(best_interest_emb, item_embedding).sum(dim=-1)
         return y
@@ -151,6 +153,8 @@ class MIND(torch.nn.Module):
         pos_embedding = F.normalize(pos_embedding, p=2, dim=-1)  # L2 normalize
         if self.mode == "item":  # inference embedding mode
             return pos_embedding.squeeze(1)  # [batch_size, embed_dim]
+        if self.mode == "in_batch":
+            return pos_embedding
         neg_embeddings = self.embedding(x, self.neg_item_feature, squeeze_dim=False).squeeze(1)  # [batch_size, n_neg_items, embed_dim]
         neg_embeddings = F.normalize(neg_embeddings, p=2, dim=-1)  # L2 normalize
         # [batch_size, 1+n_neg_items, embed_dim]

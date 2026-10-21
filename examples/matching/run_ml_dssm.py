@@ -19,7 +19,7 @@ sys.path.append("../..")
 def get_movielens_data(data_path, load_cache=False, in_batch_neg=False):
     cache_dir = "./data/ml-1m/saved/"
     os.makedirs(cache_dir, exist_ok=True)
-    cache_name = "data_preprocess_inbatch.npy" if in_batch_neg else "data_preprocess.npy"
+    cache_name = "dssm_inbatch.npy" if in_batch_neg else "data_preprocess.npy"
     cache_path = os.path.join(cache_dir, cache_name)
     data = pd.read_csv(data_path)
     data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
@@ -43,9 +43,7 @@ def get_movielens_data(data_path, load_cache=False, in_batch_neg=False):
     if load_cache:  # if you have run this script before and saved the preprocessed data
         x_train, y_train, x_test, y_test = np.load(cache_path, allow_pickle=True)
     else:
-        # In-batch training consumes positive pairs only; labels are placeholders.
-        neg_ratio = 0 if in_batch_neg else 3
-        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=neg_ratio, min_item=0)
+        df_train, df_test = generate_seq_feature_match(data, user_col, item_col, time_col="timestamp", item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=3, min_item=0, in_batch_neg=in_batch_neg)
         x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
         y_train = x_train["label"]
         x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
@@ -109,10 +107,10 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--batch_size', type=int, default=4096)  # 4096
     parser.add_argument('--weight_decay', type=float, default=1e-6)
-    parser.add_argument('--device', default='cpu')  # cuda:0
+    parser.add_argument('--device', default='cpu', help='cpu or a single CUDA device such as cuda:0')
     parser.add_argument('--save_dir', default='./data/ml-1m/saved/')
     parser.add_argument('--seed', type=int, default=2022)
-    parser.add_argument('--in_batch_neg', action='store_true', help='Train on positive pairs using full-batch cross entropy on one device')
+    parser.add_argument('--in_batch_neg', action='store_true', help='Train on positive pairs using full-batch cross entropy')
     parser.add_argument('--temperature', type=float, default=0.02, help='Temperature for in-batch logits; unused by point-wise BCE')
 
     args = parser.parse_args()

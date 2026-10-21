@@ -653,6 +653,7 @@ class CapsuleNetwork(nn.Module):
             self.linear = nn.Linear(self.embedding_dim, self.embedding_dim * self.interest_num, bias=False)
         else:
             self.w = nn.Parameter(torch.Tensor(1, self.seq_len, self.interest_num * self.embedding_dim, self.embedding_dim))
+            nn.init.xavier_uniform_(self.w)
 
     def forward(self, item_eb, mask):
         if self.bilinear_type == 0:

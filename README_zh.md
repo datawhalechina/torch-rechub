@@ -12,8 +12,8 @@
 ![forks](https://img.shields.io/github/forks/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
 ![issues](https://img.shields.io/github/issues/datawhalechina/torch-rechub?style=for-the-badge&color=orange)
 
-[![python](https://img.shields.io/badge/python-3.9%2B-3776AB?style=for-the-badge)](https://www.python.org/)
-[![pytorch](https://img.shields.io/badge/pytorch-1.10%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
+[![python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge)](https://www.python.org/)
+[![pytorch](https://img.shields.io/badge/pytorch-2.6%2B-EE4C2C?style=for-the-badge)](https://pytorch.org/)
 [![torchview](https://img.shields.io/badge/torchview-0.2%2B-6CB33F?style=for-the-badge)](https://github.com/mert-kurttutan/torchview)
 
 [English](README.md) | 简体中文
@@ -66,8 +66,8 @@
 
 ### 环境要求
 
-* Python 3.9+
-* PyTorch 1.10+（根据硬件选择 CPU、NVIDIA CUDA、AMD ROCm 或华为昇腾 NPU 版本）
+* Python 3.10+
+* PyTorch 2.6+（根据硬件选择 CPU、NVIDIA CUDA、AMD ROCm 或华为昇腾 NPU 版本）
 * NumPy
 * Pandas
 * SciPy
@@ -81,7 +81,7 @@ PyTorch 与硬件、驱动和运行时版本强相关。安装前建议先查看
 ```bash
 # 根据设备选择对应的 PyTorch 版本，只需安装其中一种
 pip install torch                                                     # CPU
-pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+pip install torch --index-url https://download.pytorch.org/whl/cu126  # NVIDIA GPU (CUDA 12.6; choose a build matching your hardware)
 pip install torch torch-npu                                           # Huawei Ascend NPU (需要 torch-npu >= 2.5.1)
 pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
@@ -99,7 +99,7 @@ cd torch-rechub
 
 # 根据设备选择对应的 PyTorch 版本，只需安装其中一种
 uv pip install torch                                                     # CPU
-uv pip install torch --index-url https://download.pytorch.org/whl/cu121  # NVIDIA GPU (CUDA 12.1)
+uv pip install torch --index-url https://download.pytorch.org/whl/cu126  # NVIDIA GPU (CUDA 12.6; choose a build matching your hardware)
 uv pip install torch torch-npu                                           # Huawei Ascend NPU (需要 torch-npu >= 2.5.1)
 uv pip install --index-url https://repo.amd.com/rocm/whl/gfx1151/ "rocm[libraries,devel]" torch torchvision torchaudio  # AMD GPU (ROCm, gfx1151 = Ryzen AI Max+ 395/390/385)
 
