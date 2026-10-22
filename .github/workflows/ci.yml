@@ -401,26 +401,6 @@ jobs:
         run: |
           uv run --no-project --python ${{ env.PYTHON_VERSION }} python config/generate_api_md.py
 
-      - name: Commit release metadata to main
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git add pyproject.toml uv.lock CHANGELOG.md docs/en/api/api.md docs/zh/api/api.md
-          if git diff --cached --quiet origin/main; then
-            echo "Release metadata already synced to main"
-          elif ! git diff --staged --quiet; then
-            git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
-            git push origin HEAD:main
-          fi
-
-      - name: Trigger docs deploy
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy.yml --ref main
-
       - name: Build package with uv
         id: build
         run: |
@@ -433,6 +413,28 @@ jobs:
 
       - name: Check package metadata
         run: uvx twine check dist/*
+
+      - name: Commit release metadata to main
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git add pyproject.toml uv.lock CHANGELOG.md docs/en/api/api.md docs/zh/api/api.md
+          if git diff --cached --quiet origin/main; then
+            echo "Release metadata already synced to main"
+          elif ! git diff --staged --quiet; then
+            git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
+            # 只将本次发布元信息提交接到最新 main，安装包已从标签代码构建。
+            git rebase --onto origin/main HEAD^
+            git push origin HEAD:main
+          fi
+
+      - name: Trigger docs deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main
 
       - name: Publish to PyPI
         env:
