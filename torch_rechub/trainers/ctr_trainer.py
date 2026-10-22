@@ -194,20 +194,21 @@ class CTRTrainer(object):
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
-                for logger in self._iter_loggers():
-                    logger.log_metrics({'val/auc': auc}, step=epoch_i)
-
                 is_best = auc > self.early_stopper.best_auc
-                if self.early_stopper.stop_training(auc, self.model.state_dict()):
-                    print(f'validation: best auc: {self.early_stopper.best_auc}')
-                    break
+                stop_training = self.early_stopper.stop_training(auc, self.model.state_dict())
                 if is_best:
                     torch.save(self.early_stopper.best_weights, model_file)
 
-        if val_dataloader is not None and self.early_stopper.best_weights is not None:
+                for logger in self._iter_loggers():
+                    logger.log_metrics({'val/auc': auc}, step=epoch_i)
+
+                if stop_training:
+                    print(f'validation: best auc: {self.early_stopper.best_auc}')
+                    break
+
+        if val_dataloader and self.early_stopper.best_weights is not None:
             self.model.load_state_dict(self.early_stopper.best_weights)
-        else:
-            torch.save(self.model.state_dict(), model_file)  # no validation: save the final model
+        torch.save(self.model.state_dict(), model_file)
 
         for logger in self._iter_loggers():
             logger.finish()
