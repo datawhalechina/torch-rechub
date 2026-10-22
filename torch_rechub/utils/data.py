@@ -1,6 +1,7 @@
 import json
 import os
 import random
+from numbers import Integral
 
 import numpy as np
 import pandas as pd
@@ -240,9 +241,33 @@ def df_to_dict(data):
 
 
 def neg_sample(click_hist, item_size):
-    neg = random.randint(1, item_size)
-    while neg in click_hist:
+    """Uniformly sample an unseen item in [1, item_size], without unbounded retries."""
+    if isinstance(item_size, bool) or not isinstance(item_size, Integral) or item_size < 1:
+        raise ValueError("item_size must be a positive integer")
+    if isinstance(click_hist, torch.Tensor):
+        click_hist = click_hist.detach().reshape(-1).tolist()
+    seen = set()
+    for item in click_hist:
+        try:
+            item_id = int(item)
+        except (TypeError, ValueError, OverflowError):
+            continue  # Nonintegral/unrepresentable IDs cannot equal a sampled integer.
+        if item == item_id and 1 <= item_id <= item_size:
+            seen.add(item_id)
+    available = item_size - len(seen)
+    if available == 0:
+        raise ValueError("No unseen items in the catalog; cannot sample a negative")
+    # Retain the original seeded draws in the common, low-coverage case.
+    for _ in range(32):
         neg = random.randint(1, item_size)
+        if neg not in seen:
+            return neg
+    # Draw a rank in the complement without allocating the entire catalog.
+    neg = random.randint(1, available)
+    for item in sorted(seen):
+        if item > neg:
+            break
+        neg += 1
     return neg
 
 
