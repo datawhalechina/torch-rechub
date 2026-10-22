@@ -140,7 +140,7 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
     shuffle : bool, default=True
         Shuffle train/val/test.
     max_len : int, default=50
-        Max history length.
+        Max history length per sample; does not limit train/val/test splitting.
     in_batch_neg : bool, default=False
         Generate positive-only training rows for CTRTrainer. Validation and test
         retain their original positive/negative pairs for supervised evaluation.
@@ -150,6 +150,8 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
     tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
         Train, validation, and test data with sequence features.
     """
+    if max_len < 1:
+        raise ValueError("max_len must be at least 1")
     for feat in data:
         le = LabelEncoder()
         data[feat] = le.fit_transform(data[feat])
@@ -175,8 +177,8 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
             continue
 
         neg_list = None if in_batch_neg else [neg_sample(pos_list, n_items) for _ in range(len_pos_list)]
-        for i in range(1, min(len_pos_list, max_len)):
-            hist_item = pos_list[:i]
+        for i in range(1, len_pos_list):
+            hist_item = pos_list[max(0, i - max_len):i]
             hist_item = hist_item + [0] * (max_len - len(hist_item))
             pos_item = pos_list[i]
             neg_item = neg_list[i] if neg_list is not None else (neg_sample(pos_list, n_items) if i >= len_pos_list - 2 else None)
@@ -184,7 +186,7 @@ def generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols
             neg_seq = [0, neg_item, uid, hist_item] if neg_item is not None else None
             if len(item_attribute_cols) > 0:
                 for attr_col in item_attribute_cols:  # the history of item attribute features
-                    hist_attr = hist[attr_col].tolist()[:i]
+                    hist_attr = hist[attr_col].tolist()[max(0, i - max_len):i]
                     hist_attr = hist_attr + [0] * (max_len - len(hist_attr))
                     pos2attr = [hist_attr, item2attr[attr_col][pos_item]]
                     pos_seq += pos2attr
@@ -364,6 +366,8 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
     tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
         Train/val/test splits with sequence features.
     """
+    if max_len < 1:
+        raise ValueError("max_len must be at least 1")
     for feat in data:
         le = LabelEncoder()
         data[feat] = le.fit_transform(data[feat])
@@ -384,8 +388,8 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
         if len(item[2]) < drop_short:
             continue
         user_id = item[1]
-        click_hist_list = item[2][:max_len]
-        cate_hist_list = item[3][:max_len]
+        click_hist_list = item[2]
+        cate_hist_list = item[3]
 
         neg_list = [neg_sample(click_hist_list, n_items) for _ in range(len(click_hist_list))]
         hist_list = []
@@ -393,12 +397,14 @@ def create_seq_features(data, seq_feature_col=['item_id', 'cate_id'], max_len=50
         for i in range(1, len(click_hist_list)):
             hist_list.append(click_hist_list[i - 1])
             cate_list.append(cate_hist_list[i - 1])
-            hist_list_pad = hist_list + [0] * (max_len - len(hist_list))
-            cate_list_pad = cate_list + [0] * (max_len - len(cate_list))
+            history_items = hist_list[-max_len:]
+            history_cates = cate_list[-max_len:]
+            hist_list_pad = history_items + [0] * (max_len - len(history_items))
+            cate_list_pad = history_cates + [0] * (max_len - len(history_cates))
             if i == len(click_hist_list) - 1:
                 test_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
                 test_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
-            if i == len(click_hist_list) - 2:
+            elif i == len(click_hist_list) - 2:
                 val_data.append([user_id, hist_list_pad, cate_list_pad, click_hist_list[i], cate_hist_list[i], 1])
                 val_data.append([user_id, hist_list_pad, cate_list_pad, neg_list[i], item2cate_dict[neg_list[i]], 0])
             else:
