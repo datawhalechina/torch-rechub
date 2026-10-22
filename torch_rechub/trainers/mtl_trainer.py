@@ -205,11 +205,12 @@ class MTLTrainer(object):
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_i)
 
-            best_score = self.early_stopper.best_auc
-            if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
+            score = scores[self.earlystop_taskid]
+            is_best = score > self.early_stopper.best_auc if self.early_stopper.mode == "max" else score < self.early_stopper.best_auc
+            if self.early_stopper.stop_training(score, self.model.state_dict()):
                 print('validation best score of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
                 break
-            if self.early_stopper.best_auc != best_score:
+            if is_best:
                 torch.save(self.early_stopper.best_weights, model_file)
 
         if self.early_stopper.best_weights is not None:
