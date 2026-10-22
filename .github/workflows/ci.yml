@@ -369,8 +369,8 @@ jobs:
   # ===================================================================
   # 自动发布到 PyPI 和 GitHub Release (使用 uv)
   # 功能：
-  # - 从不可变 GitHub Release 标签检出代码并校验版本号
-  # - 版本号与 CHANGELOG.md 必须在打标签之前提交
+  # - 从 GitHub Release 标签检出代码，自动更新版本、CHANGELOG 和 API 文档
+  # - 自动同步发布元信息到 main 并触发文档部署
   # - 构建并发布到 PyPI
   # - 上传构建产物到 GitHub Release 页面
   # 注意：此 job 仅在 release 事件时运行，不依赖其他 job（代码已在合并时检查过）
@@ -383,8 +383,8 @@ jobs:
     environment: pypi
     permissions:
       id-token: write   # Required for trusted publishing
-      contents: write   # Required for uploading release assets
-
+      contents: write   # Required for pushing metadata and uploading release assets
+      actions: write    # Required for triggering docs deployment
 
     steps:
       - name: Checkout code
@@ -392,7 +392,6 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -402,12 +401,34 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      - name: Verify tagged version before building
+      - name: Prepare version and changelog from Release
+        run: |
+          uv run --no-project --python ${{ env.PYTHON_VERSION }} --with packaging python config/prepare_release.py
+          uv lock
+
+      - name: Generate API docs
+        run: |
+          uv run --no-project --python ${{ env.PYTHON_VERSION }} python config/generate_api_md.py
+
+      - name: Commit release metadata to main
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          uv run --no-project --python ${{ env.PYTHON_VERSION }} --with tomli python -c "import os, tomli; tag = os.environ['RELEASE_TAG']; version = tag[1:] if tag.startswith('v') else tag; declared = tomli.load(open('pyproject.toml', 'rb'))['project']['version']; assert declared == version, f'Tag {tag} does not match project version {declared}'; print(f'Building immutable tag {tag}')"
-          git diff --exit-code
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git add pyproject.toml uv.lock CHANGELOG.md docs/en/api/api.md docs/zh/api/api.md
+          if git diff --cached --quiet origin/main; then
+            echo "Release metadata already synced to main"
+          elif ! git diff --staged --quiet; then
+            git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Trigger docs deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main
 
       - name: Build package with uv
         id: build
