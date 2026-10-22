@@ -1,4 +1,6 @@
 import copy
+import math
+from numbers import Integral
 
 
 class EarlyStopper(object):
@@ -11,15 +13,15 @@ class EarlyStopper(object):
     """
 
     def __init__(self, patience, mode="max"):
+        if isinstance(patience, bool) or not isinstance(patience, Integral) or patience < 1:
+            raise ValueError("patience must be a positive integer")
         if mode not in {"max", "min"}:
             raise ValueError("mode must be either 'max' or 'min'")
 
         self.patience = patience
         self.mode = mode
         self.trial_counter = 0
-        # Keep the previous initial value in the default mode so existing
-        # callers retain the same behavior.
-        self.best_auc = 0 if mode == "max" else float("inf")
+        self.best_auc = float("-inf") if mode == "max" else float("inf")
         self.best_weights = None
 
     def stop_training(self, val_auc, weights):
@@ -30,7 +32,9 @@ class EarlyStopper(object):
                 for backward compatibility.
             weights (tensor): the weights of model
         """
-        improved = val_auc > self.best_auc if self.mode == "max" else val_auc < self.best_auc
+        if not math.isfinite(val_auc):
+            raise ValueError("validation metric must be finite")
+        improved = self.best_weights is None or (val_auc > self.best_auc if self.mode == "max" else val_auc < self.best_auc)
         if improved:
             self.best_auc = val_auc
             self.trial_counter = 0
