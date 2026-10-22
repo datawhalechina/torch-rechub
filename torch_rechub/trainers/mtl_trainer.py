@@ -190,13 +190,6 @@ class MTLTrainer(object):
             scores = self.evaluate(self.model, val_dataloader)
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
-            best_score = self.early_stopper.best_auc
-            stop_training = self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict())
-            if self.early_stopper.best_auc != best_score:
-                # Keep the previous checkpoint intact if saving is interrupted.
-                torch.save(self.early_stopper.best_weights, model_file + ".tmp")
-                os.replace(model_file + ".tmp", model_file)
-
             for task_id, score in enumerate(scores):
                 logs[f'val/task_{task_id}_score'] = score
                 _log_per_epoch.append(score)
@@ -212,9 +205,12 @@ class MTLTrainer(object):
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_i)
 
-            if stop_training:
+            best_score = self.early_stopper.best_auc
+            if self.early_stopper.stop_training(scores[self.earlystop_taskid], self.model.state_dict()):
                 print('validation best score of main task %d: %.6f' % (self.earlystop_taskid, self.early_stopper.best_auc))
                 break
+            if self.early_stopper.best_auc != best_score:
+                torch.save(self.early_stopper.best_weights, model_file)
 
         if self.early_stopper.best_weights is not None:
             self.model.load_state_dict(self.early_stopper.best_weights)

@@ -196,19 +196,15 @@ class MatchTrainer(object):
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
-                best_score = self.early_stopper.best_auc
-                stop_training = self.early_stopper.stop_training(auc, self.model.state_dict())
-                if self.early_stopper.best_auc != best_score:
-                    # Keep the previous checkpoint intact if saving is interrupted.
-                    torch.save(self.early_stopper.best_weights, model_file + ".tmp")
-                    os.replace(model_file + ".tmp", model_file)
-
                 for logger in self._iter_loggers():
                     logger.log_metrics({'val/auc': auc}, step=epoch_i)
 
-                if stop_training:
+                best_score = self.early_stopper.best_auc
+                if self.early_stopper.stop_training(auc, self.model.state_dict()):
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
                     break
+                if self.early_stopper.best_auc != best_score:
+                    torch.save(self.early_stopper.best_weights, model_file)
 
         if val_dataloader is not None and self.early_stopper.best_weights is not None:
             self.model.load_state_dict(self.early_stopper.best_weights)
