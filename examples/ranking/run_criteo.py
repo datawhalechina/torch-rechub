@@ -55,7 +55,9 @@ def get_criteo_data_dict(data_path):
     return dense_feas, sparse_feas, ffm_linear_feas, ffm_cross_feas, x, y
 
 
-def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed):
+def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_decay, device, save_dir, seed, in_batch_neg=False, item_features=None):
+    if in_batch_neg and not item_features:
+        raise ValueError("Specify item_features (item-only columns) when enabling in-batch ranking.")
     torch.manual_seed(seed)
     dense_feas, sparse_feas, ffm_linear_feas, ffm_cross_feas, x, y = get_criteo_data_dict(dataset_path)
     dg = DataGenerator(x, y)
@@ -78,7 +80,7 @@ def main(dataset_path, model_name, epoch, learning_rate, batch_size, weight_deca
         model = DeepFFM(linear_features=ffm_linear_feas, cross_features=ffm_cross_feas, embed_dim=10, mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"})
     elif model_name == "fat_deepffm":
         model = FatDeepFFM(linear_features=ffm_linear_feas, cross_features=ffm_cross_feas, embed_dim=10, reduction_ratio=1, mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"})
-    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir)
+    ctr_trainer = CTRTrainer(model, optimizer_params={"lr": learning_rate, "weight_decay": weight_decay}, n_epoch=epoch, earlystop_patience=10, device=device, model_path=save_dir, in_batch_neg=in_batch_neg, item_features=item_features)
     # scheduler_fn=torch.optim.lr_scheduler.StepLR,scheduler_params={"step_size": 2,"gamma": 0.8},
     ctr_trainer.fit(train_dataloader, val_dataloader)
     auc = ctr_trainer.evaluate(ctr_trainer.model, test_dataloader)
@@ -97,9 +99,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cpu')  # cuda:0
     parser.add_argument('--save_dir', default='./')
     parser.add_argument('--seed', type=int, default=2022)
+    parser.add_argument('--in_batch_neg', action='store_true', help='Use other positive items in the batch as negatives')
+    parser.add_argument('--item_features', nargs='+', help='Item-only columns to swap together; required with --in_batch_neg')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed)
+    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, in_batch_neg=args.in_batch_neg, item_features=args.item_features)
 """
 python run_criteo.py --model_name widedeep
 python run_criteo.py --model_name deepfm

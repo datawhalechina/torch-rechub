@@ -32,43 +32,42 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "torch>=1.10.0",
-    "numpy>=1.19.0",
-    "pandas>=1.2.0",
-    "scikit-learn>=0.24.0",
-    "tqdm>=4.60.0",
+    "torch>=2.6.0,<3",
+    "numpy>=1.26.4,<3",
+    "pandas>=2.1.0,<3",
+    "scikit-learn>=1.4.0,<2",
+    "tqdm>=4.66.0,<5",
 ]
 
 [project.optional-dependencies]
 annoy = ["annoy>=1.17.2"]
 faiss = ["faiss-cpu==1.13.0"]
-milvus = ["pymilvus>=2.6.5"]
+milvus = ["pymilvus>=2.6.5,<3"]
 generative = [
-    "accelerate>=1.0.1",
-    "transformers>=4.46.3",
+    "accelerate>=1.12.0,<2",
+    "transformers>=4.57.3,<5",
 ]
 bigdata = [
     "pyarrow>=21,<26",
 ]
 onnx = [
-    "ml-dtypes>=0.5.0",
-    "onnx>=1.14.0",
-    "onnxscript>=0.1.0",
-    "onnxruntime>=1.14.0",
-    "onnxconverter-common>=1.14.0",
+    "ml-dtypes>=0.5.0,<1",
+    "onnx>=1.17.0,<2",
+    "onnxscript>=0.2.0,<1",
+    "onnxruntime>=1.20.0,<2",
+    "onnxconverter-common>=1.14.0,<2",
 ]
 visualization = [
-    "torchview>=0.2.6",
-    "graphviz>=0.20",
+    "torchview>=0.2.7,<0.3",
+    "graphviz>=0.20,<1",
 ]
 tracking = [
     "wandb>=0.13.0",
@@ -85,17 +84,17 @@ benchmark = [
 all = [
     "annoy>=1.17.2",
     "faiss-cpu==1.13.0",
-    "pymilvus>=2.6.5",
-    "accelerate>=1.0.1",
-    "transformers>=4.46.3",
+    "pymilvus>=2.6.5,<3",
+    "accelerate>=1.12.0,<2",
+    "transformers>=4.57.3,<5",
     "pyarrow>=21,<26",
-    "ml-dtypes>=0.5.0",
-    "onnx>=1.14.0",
-    "onnxscript>=0.1.0",
-    "onnxruntime>=1.14.0",
-    "onnxconverter-common>=1.14.0",
-    "torchview>=0.2.6",
-    "graphviz>=0.20",
+    "ml-dtypes>=0.5.0,<1",
+    "onnx>=1.17.0,<2",
+    "onnxscript>=0.2.0,<1",
+    "onnxruntime>=1.20.0,<2",
+    "onnxconverter-common>=1.14.0,<2",
+    "torchview>=0.2.7,<0.3",
+    "graphviz>=0.20,<1",
     "wandb>=0.13.0",
     "swanlab>=0.1.0",
     "tensorboardX>=2.5",
@@ -189,7 +188,7 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

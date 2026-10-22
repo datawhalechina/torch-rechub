@@ -176,6 +176,7 @@ class MatchTrainer(object):
         return epoch_loss / batch_count if batch_count > 0 else 0
 
     def fit(self, train_dataloader, val_dataloader=None):
+        model_file = os.path.join(self.model_path, "model.pth")
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.mode})
 
@@ -195,15 +196,21 @@ class MatchTrainer(object):
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
+                is_best = auc > self.early_stopper.best_auc
+                stop_training = self.early_stopper.stop_training(auc, self.model.state_dict())
+                if is_best:
+                    torch.save(self.early_stopper.best_weights, model_file)
+
                 for logger in self._iter_loggers():
                     logger.log_metrics({'val/auc': auc}, step=epoch_i)
 
-                if self.early_stopper.stop_training(auc, self.model.state_dict()):
+                if stop_training:
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
-                    self.model.load_state_dict(self.early_stopper.best_weights)
                     break
 
-        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
+        if val_dataloader and self.early_stopper.best_weights is not None:
+            self.model.load_state_dict(self.early_stopper.best_weights)
+        torch.save(self.model.state_dict(), model_file)
 
         for logger in self._iter_loggers():
             logger.finish()
@@ -346,89 +353,15 @@ class MatchTrainer(object):
                 model.mode = original_mode
 
     def visualization(self, input_data=None, batch_size=2, seq_length=10, depth=3, show_shapes=True, expand_nested=True, save_path=None, graph_name="model", device=None, dpi=300, **kwargs):
-        """Visualize the model's computation graph.
+        """Draw the model; see utils.visualization.visualize_model for options.
 
-        This method generates a visual representation of the model architecture,
-        showing layer connections, tensor shapes, and nested module structures.
-        It automatically extracts feature information from the model.
-
-        Parameters
-        ----------
-        input_data : dict, optional
-            Example input dict {feature_name: tensor}.
-            If not provided, dummy inputs will be generated automatically.
-        batch_size : int, default=2
-            Batch size for auto-generated dummy input.
-        seq_length : int, default=10
-            Sequence length for SequenceFeature.
-        depth : int, default=3
-            Visualization depth, higher values show more detail.
-            Set to -1 to show all layers.
-        show_shapes : bool, default=True
-            Whether to display tensor shapes.
-        expand_nested : bool, default=True
-            Whether to expand nested modules.
-        save_path : str, optional
-            Path to save the graph image (.pdf, .svg, .png).
-            If None, displays in Jupyter or opens system viewer.
-        graph_name : str, default="model"
-            Name for the graph.
-        device : str, optional
-            Device for model execution. If None, defaults to 'cpu'.
-        dpi : int, default=300
-            Resolution in dots per inch for output image.
-            Higher values produce sharper images suitable for papers.
-        **kwargs : dict
-            Additional arguments passed to torchview.draw_graph().
-
-        Returns
-        -------
-        ComputationGraph
-            A torchview ComputationGraph object.
-
-        Raises
-        ------
-        ImportError
-            If torchview or graphviz is not installed.
-
-        Notes
-        -----
-        Default Display Behavior:
-            When `save_path` is None (default):
-            - In Jupyter/IPython: automatically displays the graph inline
-            - In Python script: opens the graph with system default viewer
-
-        Examples
-        --------
-        >>> trainer = MatchTrainer(model, ...)
-        >>> trainer.fit(train_dl)
-        >>>
-        >>> # Auto-display in Jupyter (no save_path needed)
-        >>> trainer.visualization(depth=4)
-        >>>
-        >>> # Save to high-DPI PNG for papers
-        >>> trainer.visualization(save_path="model.png", dpi=300)
+        Inputs are generated from model features unless input_data is provided.
+        Example: trainer.visualization(save_path="model.png", depth=3).
         """
-        from ..utils.visualization import TORCHVIEW_AVAILABLE, visualize_model
-
-        if not TORCHVIEW_AVAILABLE:
-            raise ImportError(
-                "Visualization requires torchview. "
-                "Install with: pip install torch-rechub[visualization]\n"
-                "Also ensure graphviz is installed on your system:\n"
-                "  - Ubuntu/Debian: sudo apt-get install graphviz\n"
-                "  - macOS: brew install graphviz\n"
-                "  - Windows: choco install graphviz"
-            )
-
-        # Handle DataParallel wrapped model
-        model = self.model.module if hasattr(self.model, 'module') else self.model
-
-        # Use provided device or default to 'cpu'
-        viz_device = device if device is not None else 'cpu'
+        from ..utils.visualization import visualize_model
 
         return visualize_model(
-            model,
+            self.model,
             input_data=input_data,
             batch_size=batch_size,
             seq_length=seq_length,
@@ -437,7 +370,7 @@ class MatchTrainer(object):
             expand_nested=expand_nested,
             save_path=save_path,
             graph_name=graph_name,
-            device=viz_device,
+            device=device,
             dpi=dpi,
             **kwargs
         )

@@ -75,7 +75,7 @@ torch-rechub项目采用现代化的CI/CD流程，确保代码质量和自动化
 - **Flake8**: 代码风格和语法检查
 
 #### 2. 测试矩阵 (test)
-- 支持Python 3.9-3.12版本
+- 支持Python 3.10及以上版本；不同硬件请先安装匹配的PyTorch构建
 - 支持Ubuntu、Windows、macOS操作系统
 - 运行pytest测试套件
 - 生成测试覆盖率报告
@@ -679,4 +679,4 @@ SKIP=mypy pre-commit run
 ---
 
 *最后更新: 2025-06-30*
-*维护者: torch-rechub team* 
+*维护者: torch-rechub team*

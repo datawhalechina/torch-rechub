@@ -18,14 +18,24 @@ on:
       - 'config/**'
       - 'tests/**'
       - 'pyproject.toml'
+      - 'uv.lock'
       - '.github/workflows/ci.yml'
   release:
     types: [published]
 
 # 环境变量
 env:
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.10'
+  TORCH_VERSION: '2.6.0'
   TORCH_INDEX_URL: 'https://download.pytorch.org/whl/cpu'
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  OPENBLAS_NUM_THREADS: '1'
+  HF_HUB_OFFLINE: '1'
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   # ===================================================================
@@ -59,7 +69,7 @@ jobs:
         run: |
           pip install --upgrade pip
           # 安装特定版本的格式化工具以确保一致性（与 pyproject.toml 保持一致）
-          pip install yapf==0.43.0 isort==5.13.2 flake8>=3.8.0 mypy>=0.800 toml>=0.10.2
+          python -m pip install yapf==0.43.0 isort==5.13.2 "flake8>=3.8.0" "mypy>=0.800" "toml>=0.10.2"
 
       - name: Format & Lint
         run: |
@@ -81,11 +91,11 @@ jobs:
           mypy torch_rechub/ --ignore-missing-imports
 
   # ===================================================================
-  # 完整测试 (Python 3.9) - 运行所有测试和覆盖率报告
+  # 完整测试 (Python 3.10) - 运行所有测试和覆盖率报告
   # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   test:
-    name: Full Test Suite (Python 3.9)
+    name: Full Test Suite (Python 3.10)
     runs-on: ${{ matrix.os }}
     needs: lint
     if: github.event_name != 'release'
@@ -103,10 +113,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.9
+      - name: Set up Python 3.10
         uses: actions/setup-python@v7
         with:
-          python-version: '3.9'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip packages
         uses: actions/cache@v6
@@ -114,10 +124,9 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/torch
-          key: ${{ runner.os }}-py3.9-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-torch${{ env.TORCH_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
           restore-keys: |
-            ${{ runner.os }}-py3.9-
-            ${{ runner.os }}-
+            ${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-torch${{ env.TORCH_VERSION }}-
 
       - name: Install system dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -128,10 +137,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install CPU-only PyTorch for faster CI
-          pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
-          # Install the package with dev and onnx dependencies
-          pip install -e ".[dev,annoy,faiss,milvus,onnx]"
+          # Verify the declared minimum PyTorch, not whichever version is newest.
+          # macOS wheels are distributed on PyPI; the CPU index is for Linux/Windows.
+          test_extras="dev,generative,bigdata,onnx"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            python -m pip install "torch==$TORCH_VERSION"
+          else
+            python -m pip install "torch==$TORCH_VERSION" --index-url "$TORCH_INDEX_URL"
+            # Indexing tests already run on Linux/Windows, not macOS.
+            test_extras="$test_extras,annoy,faiss,milvus"
+          fi
+          python -m pip install -e ".[$test_extras]" "torch==$TORCH_VERSION"
+          python -m pip check
 
       - name: Start Milvus
         if: matrix.os == 'ubuntu-latest'
@@ -199,19 +216,19 @@ jobs:
           exit 1
 
       - name: Run tests
-        if: matrix.os != 'macos-latest'
+        if: matrix.os == 'windows-latest'
         run: |
-          pytest -c config/pytest.ini tests/ -v
+          python -m pytest -c config/pytest.ini tests/ -v
 
       - name: Run tests (skip indexing tests)
         if: matrix.os == 'macos-latest'
         run: |
-          pytest -c config/pytest.ini tests/ -v --ignore=tests/test_serving.py
+          python -m pytest -c config/pytest.ini tests/ -v --ignore=tests/test_serving.py
 
       - name: Run tests with coverage (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
+          python -m pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
 
       - name: Shutdown Milvus
         if: always() && matrix.os == 'ubuntu-latest'
@@ -221,19 +238,25 @@ jobs:
 
 
   # ===================================================================
-  # 依赖兼容性验证 (Python 3.10+) - 仅验证依赖安装成功
+  # 依赖兼容性验证 (Python 3.10+) - 安装、导入及关键功能回归
   # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   compatibility:
-    name: Dependency Check (Python ${{ matrix.python-version }})
+    name: Dependency Check (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     needs: lint
     if: github.event_name != 'release'
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        include:
+          - {python-version: '3.10', torch-version: '2.6.0'}
+          - {python-version: '3.11', torch-version: '2.6.0'}
+          - {python-version: '3.12', torch-version: '2.6.0'}
+          - {python-version: '3.13', torch-version: '2.6.0'}
+          - {python-version: '3.11', torch-version: '2.9.1'}
 
     steps:
       - name: Checkout code
@@ -247,15 +270,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install CPU-only PyTorch for faster CI
-          pip install torch --index-url ${{ env.TORCH_INDEX_URL }}
-          # Verify package installation with all optional dependencies
-          pip install -e ".[dev,onnx]"
+          python -m pip install "torch==${{ matrix.torch-version }}" --index-url "$TORCH_INDEX_URL"
+          python -m pip install -e ".[dev,generative,bigdata,onnx,visualization]" "torch==${{ matrix.torch-version }}"
+          python -m pip check
 
       - name: Verify imports
         run: |
           python -c "import torch_rechub; print(f'torch-rechub {torch_rechub.__version__ if hasattr(torch_rechub, \"__version__\") else \"installed\"} on Python ${{ matrix.python-version }}')"
-          python -c "import onnx; import onnxruntime; print('ONNX dependencies OK')"
+          python -c "import torch, numpy, pandas, sklearn, pyarrow, onnx, onnxruntime, transformers, accelerate, torchview; from torch_rechub.models.generative import TIGERModel; print('Torch', torch.__version__, 'and optional dependencies OK')"
+
+      - name: Run compatibility tests
+        run: |
+          python -m pytest -c config/pytest.ini -v \
+            tests/test_onnx_quantization.py tests/test_pa_array_to_tensor.py \
+            tests/test_hstu_model.py tests/test_hllm_embedding_alignment.py tests/test_tiger_example.py
 
   # ===================================================================
   # 安全检查 (仅在 push/PR 时运行，release 时跳过)
@@ -332,8 +360,8 @@ jobs:
   # ===================================================================
   # 自动发布到 PyPI 和 GitHub Release (使用 uv)
   # 功能：
-  # - 从 GitHub Release 自动同步版本号
-  # - 更新 CHANGELOG.md
+  # - 从 GitHub Release 标签检出代码，自动更新版本、CHANGELOG 和 API 文档
+  # - 自动同步发布元信息到 main 并触发文档部署
   # - 构建并发布到 PyPI
   # - 上传构建产物到 GitHub Release 页面
   # 注意：此 job 仅在 release 事件时运行，不依赖其他 job（代码已在合并时检查过）
@@ -346,81 +374,15 @@ jobs:
     environment: pypi
     permissions:
       id-token: write   # Required for trusted publishing
-      contents: write   # Required for pushing changes and uploading release assets
-      actions: write    # Required for triggering docs deploy workflow
+      contents: write   # Required for pushing metadata and uploading release assets
+      actions: write    # Required for triggering docs deployment
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get version from tag
-        id: get_version
-        run: |
-          # 从 tag 提取版本号 (去掉 v 前缀)
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version: $VERSION"
-
-      - name: Update version in pyproject.toml
-        run: |
-          # 更新 pyproject.toml 中的版本号
-          sed -i "s/^version = \".*\"/version = \"${{ steps.get_version.outputs.VERSION }}\"/" pyproject.toml
-          echo "✅ Updated pyproject.toml version to ${{ steps.get_version.outputs.VERSION }}"
-          grep "^version" pyproject.toml
-
-      - name: Update CHANGELOG.md
-        env:
-          RELEASE_BODY: ${{ github.event.release.body }}
-          RELEASE_NAME: ${{ github.event.release.name }}
-        run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-          DATE=$(date +%Y-%m-%d)
-
-          # 创建新的 changelog 条目
-          NEW_ENTRY="## [${VERSION}] - ${DATE}
-
-          ${RELEASE_BODY}
-
-          ---
-
-          "
-
-          # 在第一个 --- 分隔符之后插入新版本记录
-          awk -v entry="$NEW_ENTRY" '
-            !found && /^---$/ { print; print ""; print entry; found=1; next }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
-
-          echo "✅ Updated CHANGELOG.md with version $VERSION"
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add pyproject.toml CHANGELOG.md
-
-          # 检查是否有变更
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore(release): v${{ steps.get_version.outputs.VERSION }} [skip ci]"
-            git push origin main
-            echo "✅ Pushed version changes to main branch"
-          fi
-
-      - name: Trigger docs deploy after release commit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # The release commit uses [skip ci], so the docs deploy workflow will
-          # not run from that push. Dispatch the existing docs deploy workflow
-          # against main so it rebuilds VitePress from the release commit.
-          gh workflow run deploy.yml --ref main
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -429,6 +391,15 @@ jobs:
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Prepare version and changelog from Release
+        run: |
+          uv run --no-project --python ${{ env.PYTHON_VERSION }} --with packaging python config/prepare_release.py
+          uv lock
+
+      - name: Generate API docs
+        run: |
+          uv run --no-project --python ${{ env.PYTHON_VERSION }} python config/generate_api_md.py
 
       - name: Build package with uv
         id: build
@@ -442,6 +413,28 @@ jobs:
 
       - name: Check package metadata
         run: uvx twine check dist/*
+
+      - name: Commit release metadata to main
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git add pyproject.toml uv.lock CHANGELOG.md docs/en/api/api.md docs/zh/api/api.md
+          if git diff --cached --quiet origin/main; then
+            echo "Release metadata already synced to main"
+          elif ! git diff --staged --quiet; then
+            git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
+            # 只将本次发布元信息提交接到最新 main，安装包已从标签代码构建。
+            git rebase --onto origin/main HEAD^
+            git push origin HEAD:main
+          fi
+
+      - name: Trigger docs deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main
 
       - name: Publish to PyPI
         env:

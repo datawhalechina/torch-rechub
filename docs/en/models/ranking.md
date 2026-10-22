@@ -7,6 +7,27 @@ description: Torch-RecHub ranking models detailed introduction
 
 Ranking models are core components in recommendation systems, used to predict users' click-through rates or preference scores for items, thereby performing fine-grained ranking on retrieved candidates. Torch-RecHub provides various advanced ranking models covering different feature processing and modeling approaches.
 
+## In-Batch Negatives: One Training Entry Point
+
+All 13 public ranking models use the same entry point without changing model constructors, default outputs or inference:
+
+```python
+trainer = CTRTrainer(model, in_batch_neg=True,
+                     item_features=["item_id", "cate_id"])
+```
+
+The default remains supervised BCE on the original labels. When enabled, the trainer keeps only positive interactions (`y=1`), retains each row's user/context/history and swaps another positive row's complete item fields into it. These generated pairs receive label 0 and use the original model forward and BCE. Labels must be binary; all-zero placeholder labels used by retrieval examples are not valid here.
+
+`item_features` accepts column names or existing Feature objects. Include the item ID and all item attributes, never user/history fields. Precomputed user-item cross features must be recomputed and are not supported by this simple swapping entry point. Anonymous fields such as Criteo C1/C2 require an explicit, meaningful item-field definition; the trainer does not guess.
+
+The default `in_batch_neg_ratio=1` draws one other row's item per positive, avoiding a full `B × B` ranking forward. Set a positive integer for more negatives or `None` for all other rows. Random sampling is with replacement and excludes the same row, not repeated item IDs or other known positives, so false negatives remain possible. `sampler_seed` controls sampling randomness. Batches with fewer than two positive rows are skipped with a warning; an epoch without usable pairs raises an error.
+
+DIN/BST recompute candidate-conditioned attention through their original forward. DIEN keeps `loss_mode=False` and its auxiliary history loss: this switch changes target-item sampling, not the auxiliary task's negative-history inputs.
+
+Add `--in_batch_neg` to the Amazon DIN/DIEN examples. Other single-task ranking examples also require `--item_features`; existing binary training labels select positive interactions. `generate_seq_feature(..., in_batch_neg=True)` generates positive-only training rows while retaining supervised positive/negative validation and test rows.
+
+Evaluation, prediction, export and checkpoint structure remain unchanged. Generated negatives are training assumptions, not observed non-clicked impressions; evaluate with real labels and do not assume calibrated production click probabilities. Multi-task models and `MTLTrainer` are outside this single-task ranking entry point.
+
 ## 1. WideDeep
 
 ### Description
