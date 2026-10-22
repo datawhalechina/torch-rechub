@@ -174,6 +174,7 @@ class CTRTrainer(object):
         return epoch_loss / batch_count if batch_count > 0 else 0
 
     def fit(self, train_dataloader, val_dataloader=None):
+        model_file = os.path.join(self.model_path, "model.pth")
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.loss_mode})
 
@@ -193,15 +194,21 @@ class CTRTrainer(object):
                 auc = self.evaluate(self.model, val_dataloader)
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
+                is_best = auc > self.early_stopper.best_auc
+                stop_training = self.early_stopper.stop_training(auc, self.model.state_dict())
+                if is_best:
+                    torch.save(self.early_stopper.best_weights, model_file)
+
                 for logger in self._iter_loggers():
                     logger.log_metrics({'val/auc': auc}, step=epoch_i)
 
-                if self.early_stopper.stop_training(auc, self.model.state_dict()):
+                if stop_training:
                     print(f'validation: best auc: {self.early_stopper.best_auc}')
-                    self.model.load_state_dict(self.early_stopper.best_weights)
                     break
 
-        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best auc model
+        if val_dataloader and self.early_stopper.best_weights is not None:
+            self.model.load_state_dict(self.early_stopper.best_weights)
+        torch.save(self.model.state_dict(), model_file)
 
         for logger in self._iter_loggers():
             logger.finish()
