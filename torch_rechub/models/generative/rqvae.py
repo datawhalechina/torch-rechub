@@ -487,7 +487,17 @@ class RQVAEModel(nn.Module):
         self.sk_epsilons = sk_epsilons
         self.sk_iters = sk_iters
         self.encode_layer_dims = [self.in_dim] + self.layers + [self.e_dim]
-        self.encoder = MLP(input_dim=self.encode_layer_dims[0], dims=self.encode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu", batchnorm=self.bn)
+        # Hidden layers use ReLU; the latent and reconstruction outputs stay linear.
+        self.encoder = nn.Sequential(
+            MLP(input_dim=self.in_dim,
+                dims=self.layers,
+                output_layer=False,
+                dropout=self.dropout_prob,
+                activation="relu",
+                batchnorm=self.bn),
+            nn.Linear(self.encode_layer_dims[-2],
+                      self.e_dim),
+        )
         self.rq = ResidualVectorQuantizer(
             num_emb_list,
             e_dim,
@@ -499,7 +509,16 @@ class RQVAEModel(nn.Module):
         )
 
         self.decode_layer_dims = self.encode_layer_dims[::-1]
-        self.decoder = MLP(input_dim=self.decode_layer_dims[0], dims=self.decode_layer_dims[1:], output_layer=False, dropout=self.dropout_prob, activation="relu", batchnorm=self.bn)
+        self.decoder = nn.Sequential(
+            MLP(input_dim=self.e_dim,
+                dims=self.layers[::-1],
+                output_layer=False,
+                dropout=self.dropout_prob,
+                activation="relu",
+                batchnorm=self.bn),
+            nn.Linear(self.decode_layer_dims[-2],
+                      self.in_dim),
+        )
 
     def forward(self, x, use_sk=True):
         """Forward pass.

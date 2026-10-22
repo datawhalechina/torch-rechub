@@ -96,7 +96,7 @@ class SeqTrainer(object):
         self.amp = bool(amp and self.device.type == 'cuda')
         # Small-temperature cosine scores amplify gradients; a modest initial
         # scale avoids skipping all updates in short tutorial runs.
-        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp, init_scale=1024) if hasattr(torch, 'amp') and hasattr(torch.amp, 'GradScaler') else torch.cuda.amp.GradScaler(enabled=self.amp, init_scale=1024)
+        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp, init_scale=1024)
         self.max_grad_norm = max_grad_norm
         self.eval_chunk_size = eval_chunk_size
         if optimizer_params is None:
@@ -151,8 +151,8 @@ class SeqTrainer(object):
             dict: 训练历史
         """
         history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
-        best_score, best_loss, best_weights = float('-inf'), float('inf'), None
         os.makedirs(self.model_path, exist_ok=True)
+        model_file = os.path.join(self.model_path, "model.pth")
         if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and val_dataloader is None:
             raise ValueError("ReduceLROnPlateau requires validation data")
 
@@ -179,15 +179,21 @@ class SeqTrainer(object):
                 logs['auc'] = val_accuracy  # For compatibility with EarlyStopper
 
                 print(f"epoch: {epoch_i}, validation: loss: {val_loss:.4f}, accuracy: {val_accuracy:.4f}")
-                if val_accuracy > best_score or (val_accuracy == best_score and val_loss < best_loss):
-                    best_score = val_accuracy
-                    best_loss = val_loss
-                    # Keep the best snapshot off GPU, especially for a frozen
-                    # LLM item table. Loading copies it back to model devices.
-                    best_weights = {name: value.detach().cpu().clone() for name, value in self.model.state_dict().items()}
+                improved = val_accuracy > self.early_stopper.best_auc
+                # EarlyStopper owns the only best snapshot. Keep it on CPU so
+                # a frozen HLLM item table does not occupy GPU memory twice.
+                stop_training = self.early_stopper.stop_training(
+                    val_accuracy,
+                    {
+                        name: value.cpu() for name, value in self.model.state_dict().items()
+                    } if improved else self.early_stopper.best_weights,
+                )
+                if improved:
+                    # Save before logging or the next epoch: an interruption
+                    # must not discard a completed validation's best model.
+                    torch.save(self.early_stopper.best_weights, model_file)
 
-                # 早停
-                if self.early_stopper.stop_training(val_accuracy, best_weights):
+                if stop_training:
                     print(f'validation: best accuracy: {self.early_stopper.best_auc}')
                     break
 
@@ -198,9 +204,9 @@ class SeqTrainer(object):
             elif self.scheduler is not None:
                 self.scheduler.step()
 
-        if best_weights is not None:
-            self.model.load_state_dict(best_weights)
-        torch.save(self.model.state_dict(), os.path.join(self.model_path, "model.pth"))  # save best model
+        if val_dataloader is not None and self.early_stopper.best_weights is not None:
+            self.model.load_state_dict(self.early_stopper.best_weights)
+        torch.save(self.model.state_dict(), model_file)
 
         for logger in self._iter_loggers():
             logger.finish()

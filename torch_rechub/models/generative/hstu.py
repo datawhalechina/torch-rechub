@@ -20,11 +20,11 @@ class HSTUModel(nn.Module):
     - Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
       projection **before** splitting (Eq. 2), so all four streams go through
       the non-linearity.
-    - This adaptation uses ``alpha = 1/sqrt(dqk)`` scaling and a per-head
-      bucketed (position-diff, time-diff) bias ``rab^{p,t}`` to scores
-      **before** the ``silu(scores) / max_seq_len`` activation (Eq. 3).
-      Meta's rel_bias path uses unscaled QK and a head-shared relative bias;
-      these historical model differences are intentionally not hidden.
+    - Like Meta's ``rel_bias`` path, attention uses unscaled QK and a
+      head-shared relative bias before ``SiLU(scores) / seq_len`` (Eq. 3).
+      This dense adaptation retains same-position time differences; Meta's
+      timestamp bias uses the next event time. Input preprocessing and layer
+      parameterization are not checkpoint-compatible with the reference.
     - Gated output ``LayerNorm(A V) * U`` projected by a single linear
       ``f_2`` (Eq. 4); no concat-u/x bypass and no separate FFN.
     - External residual ``x + Layer(x)`` is applied around each layer in
@@ -82,7 +82,8 @@ class HSTUModel(nn.Module):
     Notes
     -----
     ``time_diffs`` semantics: per-position seconds delta from a single anchor
-    (e.g. ``query_time - timestamps[i]``), following the Meta reference.
+    (e.g. ``query_time - timestamps[i]``). This input contract differs from
+    the reference's next-event timestamp bias.
     Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
     distribution will be different; set ``time_bucket_divisor`` and
     ``time_bucket_unit`` accordingly.

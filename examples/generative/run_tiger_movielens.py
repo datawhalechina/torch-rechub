@@ -268,6 +268,18 @@ def train(args):
     print(f"Added {num_added} semantic-id tokens (vocab size -> {len(tokenizer)})")
     config.vocab_size = len(tokenizer)
 
+    if args.resume_from_checkpoint:
+        # Check before saving anything: equal vocabulary sizes do not imply
+        # that token IDs still refer to the same items.
+        saved_config = T5Config.from_pretrained(args.resume_from_checkpoint, local_files_only=True)
+        if getattr(saved_config, "semantic_ids_sha256", None) != config.semantic_ids_sha256:
+            raise ValueError("Resume requires the checkpoint's original semantic ID catalog and fingerprint")
+        if getattr(saved_config, "user_bucket_size", 0) != config.user_bucket_size:
+            raise ValueError("user_bucket_size differs from the checkpoint")
+        saved_tokenizer = AutoTokenizer.from_pretrained(args.resume_from_checkpoint, local_files_only=True)
+        if saved_config.vocab_size != config.vocab_size or saved_tokenizer.get_vocab() != tokenizer.get_vocab():
+            raise ValueError("Tokenizer vocabulary differs from the checkpoint")
+
     os.makedirs(args.output_dir, exist_ok=True)
     tokenizer.save_pretrained(args.output_dir)
     config.save_pretrained(args.output_dir)
@@ -277,12 +289,6 @@ def train(args):
     model.resize_token_embeddings(len(tokenizer))
     model.to(device)
     model.config.use_cache = False
-
-    # transformers>=5 renamed Trainer's ``tokenizer`` argument to
-    # ``processing_class``; pick whichever the installed version accepts.
-    import inspect
-
-    tok_kw = "processing_class" if "processing_class" in inspect.signature(transformers.Trainer.__init__).parameters else "tokenizer"
 
     trainer = transformers.Trainer(
         model=model,
@@ -313,7 +319,7 @@ def train(args):
         ),
         data_collator=valid_data.get_collate_fn(tokenizer),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=args.early_stopping_patience)],
-        **{tok_kw: tokenizer},
+        processing_class=tokenizer,
     )
 
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)

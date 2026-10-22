@@ -795,14 +795,14 @@ class CEN(nn.Module):
 
 
 class HSTULayer(nn.Module):
-    """Single HSTU "sequential transduction unit" layer (paper-faithful).
+    """Dense HSTU layer with the reference rel_bias attention equation.
 
     Implements HSTU Eq. 2-4 from *Actions Speak Louder than Words*:
 
     - Eq. 2 — ``U, V, Q, K = Split(SiLU(f_1(LayerNorm(x))))``: a **single**
       ``SiLU`` is applied to the joint projection **before** the split, so all
       four of ``U, V, Q, K`` go through the non-linearity.
-    - Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T * alpha + rab^{p,t}) / N) V(x)``: the
+    - Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T + rab^{p,t}) / N) V(x)``: the
       learnable bucketed (position-diff, time-diff) bias ``rab^{p,t}`` is added
       to scores **before** the ``SiLU/N`` activation.
     - Eq. 4 — ``Y(x) = f_2(LayerNorm(A V) * U)``: a single linear ``f_2`` is
@@ -817,8 +817,8 @@ class HSTULayer(nn.Module):
         dv: Value/u dim per head.
         dropout: Dropout applied to the gated attention output before the
             final projection.
-        max_seq_len: Used for the ``silu(scores) / max_seq_len`` scaling and
-            for sizing the relative-position table inside ``rab``.
+        max_seq_len: Maximum size of the relative-position table inside ``rab``.
+            Attention is divided by the actual padded input length ``N``.
         num_time_buckets: Number of time-difference buckets in ``rab``.
         time_bucket_fn: ``'sqrt'`` or ``'log'`` bucketization in ``rab``.
         time_bucket_divisor: Bucket-range divisor in ``rab``.
@@ -848,13 +848,12 @@ class HSTULayer(nn.Module):
         self.dqk = dqk
         self.dv = dv
         self.max_seq_len = max_seq_len
-        self.attn_alpha = 1.0 / math.sqrt(dqk)
 
         self.norm_in = nn.LayerNorm(d_model)
         self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv)
 
         self.rab = RelativeBucketedTimeAndPositionBias(
-            n_heads=n_heads,
+            n_heads=1,  # One relative bias shared by all attention heads.
             max_seq_len=max_seq_len,
             num_time_buckets=num_time_buckets,
             time_bucket_fn=time_bucket_fn,
@@ -894,7 +893,7 @@ class HSTULayer(nn.Module):
         u = proj_out[..., 2 * H * self.dqk:2 * H * self.dqk + H * self.dv].reshape(batch_size, seq_len, H, self.dv)
         v = proj_out[..., 2 * H * self.dqk + H * self.dv:].reshape(batch_size, seq_len, H, self.dv).transpose(1, 2)
 
-        scores = torch.matmul(q, k.transpose(-2, -1)) * self.attn_alpha  # (B, H, L, L)
+        scores = torch.matmul(q, k.transpose(-2, -1))  # (B, H, L, L), no sqrt(dqk) scaling
         # Eq. 3: rab^{p,t} is added to scores BEFORE the SiLU/N activation.
         scores = scores + self.rab(time_diffs=time_diffs, seq_len=seq_len)
 
@@ -906,9 +905,7 @@ class HSTULayer(nn.Module):
             key_mask = padding_mask.unsqueeze(1).unsqueeze(1)  # (B, 1, 1, L)
             valid_mask = valid_mask & key_mask
 
-        scores = scores.masked_fill(~valid_mask, -1e4)
-
-        attn_weights = F.silu(scores) / self.max_seq_len  # HSTU: silu then /N
+        attn_weights = (F.silu(scores) / seq_len).masked_fill(~valid_mask, 0)
 
         attn_output = torch.matmul(attn_weights, v)  # (B, H, L, dv)
         attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_len, H * self.dv)

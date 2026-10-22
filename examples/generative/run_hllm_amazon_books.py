@@ -21,7 +21,6 @@ if REPO_ROOT not in sys.path:
 
 import numpy as np
 import torch
-import tqdm
 
 from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hllm import HLLMModel
@@ -227,7 +226,7 @@ def main():
     val_gen = SequenceDataGenerator(val_data['seq_tokens'], val_data['seq_positions'], val_data['targets'], val_data['seq_time_diffs'])
 
     train_dataloader = train_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
-    val_dataloader = val_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
+    val_dataloader = val_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0, shuffle=False)[0]
 
     print(f"Train size: {len(train_dataloader.dataset)}")
     print(f"Val size: {len(val_dataloader.dataset)}")
@@ -240,40 +239,16 @@ def main():
     print("=" * 80)
 
     # Evaluate on test set
-    model.to(args.device)
-    model.eval()
-
     test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
-    test_dataloader = test_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
+    test_dataloader = test_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0, shuffle=False)[0]
 
-    y_true = {}
-    y_pred = {}
-    user_idx = 0
-
-    with torch.no_grad():
-        for seq_tokens, _, seq_time_diffs, targets in tqdm.tqdm(test_dataloader, desc="Evaluating"):
-            seq_tokens = seq_tokens.to(args.device)
-            seq_time_diffs = seq_time_diffs.to(args.device)
-            targets = targets.cpu().numpy()
-
-            states = model.encode(seq_tokens, seq_time_diffs)
-            last = torch.arange(seq_tokens.size(1), device=seq_tokens.device).expand_as(seq_tokens).masked_fill(seq_tokens.eq(0), -1).max(dim=1).values
-            states = states[torch.arange(states.size(0), device=states.device), last]
-            last_logits = model.score_items(states, torch.arange(model.vocab_size, device=states.device))
-            last_logits[:, 0] = float('-inf')
-
-            # Get top-200 predictions
-            _, top_items = torch.topk(last_logits, k=min(200, model.vocab_size - 1), dim=-1)
-            top_items = top_items.cpu().numpy()
-
-            for i in range(len(targets)):
-                user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]
-                y_pred[user_id] = top_items[i].tolist()
-                user_idx += 1
+    topKs = sorted({min(k, vocab_size - 1) for k in [10, 50, 200]})
+    predictions = trainer.predict(test_dataloader, top_k=max(topKs))
+    y_true = {str(i): [int(target)] for i, target in enumerate(test_data['targets'])}
+    y_pred = {str(i): items.tolist() for i, items in enumerate(predictions)}
 
     # Calculate metrics
-    results = topk_metrics(y_true, y_pred, topKs=sorted({min(k, model.vocab_size - 1) for k in [10, 50, 200]}))
+    results = topk_metrics(y_true, y_pred, topKs=topKs)
     print("\n✅ Test Results:")
     print("=" * 50)
     for metric_name in ["Hit", "NDCG"]:
