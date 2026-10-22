@@ -122,15 +122,14 @@ def precision_score(y_true, y_pred, topKs=None):
     return result['Precision']
 
 
-def topk_metrics(y_true, y_pred, topKs=None, return_numeric=False):
+def topk_metrics(y_true, y_pred, topKs=None):
     """Macro-averaged Top-K metrics after deduplicating candidates.
 
     Empty ground-truth users are excluded; an entirely empty evaluation is zero.
     Hit is the fraction of evaluated users with at least one hit. Precision uses
     the requested K even when fewer candidates are available.
 
-    The default retains the legacy display strings. Set return_numeric=True to
-    obtain lists of floats under the same metric names.
+    Results retain the original display strings, such as "Recall@5: 0.5".
     """
     if topKs is None:
         topKs = [5]
@@ -154,7 +153,7 @@ def topk_metrics(y_true, y_pred, topKs=None, return_numeric=False):
             totals["Precision"] += hits / k
         for name in results:
             value = totals[name] / len(users) if users else 0.0
-            results[name].append(value if return_numeric else f"{name}@{k}: {round(value, 4)}")
+            results[name].append(f"{name}@{k}: {round(value, 4)}")
     return results
 
 
