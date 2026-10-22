@@ -26,8 +26,6 @@ class EDCN(torch.nn.Module):
 
     def __init__(self, features, n_cross_layers, mlp_params, bridge_type="hadamard_product", use_regulation_module=True, temperature=1):
         super().__init__()
-        if isinstance(n_cross_layers, bool) or not isinstance(n_cross_layers, int) or n_cross_layers < 1:
-            raise ValueError("n_cross_layers must be a positive integer")
         self.features = features
         self.n_cross_layers = n_cross_layers
         self.num_fields = len(features)
@@ -45,7 +43,6 @@ class EDCN(torch.nn.Module):
         embed_x = self.embedding(x, self.features, squeeze_dim=True)
         cross_i, deep_i = self.regulation_modules[0](embed_x)
         cross_0 = cross_i
-        bridge_i = embed_x
         for i in range(self.n_cross_layers):
             if i > 0:
                 cross_i, deep_i = self.regulation_modules[i](bridge_i)
