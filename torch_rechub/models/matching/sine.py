@@ -121,7 +121,7 @@ class SINE(torch.nn.Module):
 
         # # user's next intention C^u_{apt}
         h_3 = einsum('bse, ed -> bsd', x_u_hat, self.w_4).tanh()
-        c_u_apt = F.normalize(einsum("bs, bse -> be", F.softmax(einsum('bsd, dh -> bsh', h_3, self.w_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - x_u_mask.float()), dim=1), x_u_hat), -1)
+        c_u_apt = F.normalize(einsum("bs, bse -> be", F.softmax(einsum('bsd, dh -> bsh', h_3, self.w_5).reshape(-1, self.seq_max_len) + -1.e9 * (1 - x_u_mask.float()), dim=1), x_u_hat), p=2, dim=-1)
 
         # # aggregation weights e_k^u
         e_u = F.softmax(einsum('be, bke -> bk', c_u_apt, phi_u) / self.temperature, dim=1)
