@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import random
@@ -633,13 +634,25 @@ class EmbDataset(Dataset):
 
 class TigerSeqDataset(Dataset):
 
-    def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0):
+    def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0, user_bucket_size=0):
 
         super().__init__()
 
         self.max_his_len = max_his_len
         self.sample_num = sample_num
         self.mode = mode
+        if not isinstance(user_bucket_size, int) or user_bucket_size < 0:
+            raise ValueError("user_bucket_size must be a non-negative integer")
+        self.user_bucket_size = user_bucket_size
+        if any(not isinstance(code, (list, tuple)) for code in indices_json.values()):
+            raise ValueError("Each semantic ID must be a list of tokens")
+        codes = [tuple(code) for code in indices_json.values()]
+        if not codes or len(set(codes)) != len(codes):
+            raise ValueError("Semantic IDs must identify each item uniquely; export collision suffixes first")
+        if any(not code or any(not isinstance(token, str) for token in code) for code in codes):
+            raise ValueError("Each semantic ID must be a non-empty sequence of strings")
+        if len({"".join(code) for code in codes}) != len(codes):
+            raise ValueError("Concatenated semantic IDs must remain unique")
 
         # cache
         self.new_tokens = None
@@ -683,6 +696,12 @@ class TigerSeqDataset(Dataset):
             history = history[-self.max_his_len:]
         return history
 
+    def _history_text(self, uid, history):
+        if not self.user_bucket_size:
+            return "".join(history)
+        bucket = int.from_bytes(hashlib.sha256(str(uid).encode("utf-8")).digest()[:8], "big") % self.user_bucket_size
+        return f"<user_{bucket}>" + "".join(history)
+
     def _process_train_data(self):
         inter_data = []
         for uid in self.remapped_inters:
@@ -691,7 +710,7 @@ class TigerSeqDataset(Dataset):
                 history = items[:i]
                 history = self._truncate_history(history)
 
-                inter_data.append({"item": items[i], "inters": "".join(history)})
+                inter_data.append({"item": items[i], "inters": self._history_text(uid, history)})
 
         return inter_data
 
@@ -703,7 +722,7 @@ class TigerSeqDataset(Dataset):
             history = items[:-2]
             history = self._truncate_history(history)
 
-            inter_data.append({"item": items[-2], "inters": "".join(history)})
+            inter_data.append({"item": items[-2], "inters": self._history_text(uid, history)})
 
         return inter_data
 
@@ -715,7 +734,7 @@ class TigerSeqDataset(Dataset):
             history = items[:-1]
             history = self._truncate_history(history)
 
-            inter_data.append({"item": items[-1], "inters": "".join(history)})
+            inter_data.append({"item": items[-1], "inters": self._history_text(uid, history)})
 
         if self.sample_num > 0:
             all_idx = np.arange(len(inter_data))
@@ -755,16 +774,12 @@ class TigerSeqDataset(Dataset):
                 tokens.add(token)
 
         self.new_tokens = sorted(list(tokens))
+        self.new_tokens.extend(f"<user_{bucket}>" for bucket in range(self.user_bucket_size))
         return self.new_tokens
 
     def get_all_items(self, as_list=False):
-        if self.all_items is not None:
-            return self.all_items
-
         items = ["".join(index) for index in self.indices.values()]
-        self.all_items = items if as_list else set(items)
-
-        return self.all_items
+        return items if as_list else set(items)
 
     def get_prefix_allowed_tokens_fn(self, tokenizer):
 

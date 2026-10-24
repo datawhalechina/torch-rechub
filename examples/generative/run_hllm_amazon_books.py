@@ -15,16 +15,17 @@ import os
 import pickle
 import sys
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import numpy as np
 import torch
-import tqdm
 
 from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hllm import HLLMModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator, pad_sequences
-
-sys.path.append("../..")
 
 # Get the directory where this script is located
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -62,14 +63,8 @@ def check_training_environment(device, model_type, dataset_path):
         total_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         print(f"   Total VRAM: {total_memory:.2f} GB")
 
-        required_vram = 6
-        if total_memory < required_vram:
-            print(f"⚠️  Warning: HLLM training requires at least {required_vram}GB VRAM")
-            response = input("   Continue? (y/n): ").strip().lower()
-            if response != 'y':
-                return False
-        else:
-            print("✅ VRAM sufficient")
+        print("   Memory depends on catalog size, encoder width and sequence length.")
+        print("   Start small: --d_model 256 --batch_size 8 --max_seq_len 50 --loss_type sampled_softmax --amp")
     else:
         print("✅ Using CPU (will be slow)")
 
@@ -99,7 +94,7 @@ def check_training_environment(device, model_type, dataset_path):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="HLLM training on Amazon Books dataset (Official)")
+    parser = argparse.ArgumentParser(description="HLLM-inspired training on Amazon Books with cached item embeddings")
     parser.add_argument("--data_dir", default=_DEFAULT_DATA_DIR, help="Data directory")
     parser.add_argument("--model_type", default="tinyllama", choices=["tinyllama", "baichuan2"], help="LLM model type")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"], help="Device")
@@ -109,7 +104,12 @@ def main():
     parser.add_argument("--n_layers", type=int, default=2, help="Number of transformer layers")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
     parser.add_argument("--max_seq_len", type=int, default=200, help="Maximum sequence length")
-    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce"], help="Loss function type")
+    parser.add_argument("--loss_type", default="nce", choices=["cross_entropy", "nce", "sampled_softmax"], help="Legacy nce uses full vocabulary; sampled_softmax uses sampled negatives")
+    parser.add_argument("--d_model", type=int, default=None, help="Optional smaller encoder width, e.g. 256")
+    parser.add_argument("--num_negatives", type=int, default=128)
+    parser.add_argument("--accumulation_steps", type=int, default=1)
+    parser.add_argument("--amp", action="store_true")
+    parser.add_argument("--learn_temperature", action="store_true")
 
     args = parser.parse_args()
 
@@ -155,7 +155,7 @@ def main():
     # Load item embeddings
     emb_file = os.path.join(args.data_dir, f'item_embeddings_{args.model_type}.pt')
     item_embeddings = torch.load(emb_file, map_location='cpu')
-    d_model = item_embeddings.shape[1]
+    d_model = item_embeddings.shape[1] if args.d_model is None else args.d_model
 
     # Adjust n_heads based on d_model
     if d_model >= 2048:
@@ -184,6 +184,8 @@ def main():
         dropout=args.dropout,
         use_rel_pos_bias=True,
         use_time_embedding=True,
+        project_items=True,
+        learn_temperature=args.learn_temperature,
     )
 
     print("✅ Model created")
@@ -195,7 +197,9 @@ def main():
     print("=" * 80)
 
     # Configure loss function
-    if args.loss_type == 'nce':
+    if args.loss_type == 'sampled_softmax':
+        loss_params = {'num_negatives': args.num_negatives, 'negative_similarity_threshold': 0.99}
+    elif args.loss_type == 'nce':
         loss_params = {"temperature": 1.0, "ignore_index": 0}
     else:
         loss_params = {"ignore_index": 0}
@@ -211,6 +215,8 @@ def main():
         n_epoch=args.epochs,
         loss_type=args.loss_type,
         loss_params=loss_params,
+        accumulation_steps=args.accumulation_steps,
+        amp=args.amp,
     )
     print(f"✅ Using {args.loss_type.upper()} Loss")
 
@@ -220,7 +226,7 @@ def main():
     val_gen = SequenceDataGenerator(val_data['seq_tokens'], val_data['seq_positions'], val_data['targets'], val_data['seq_time_diffs'])
 
     train_dataloader = train_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
-    val_dataloader = val_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
+    val_dataloader = val_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0, shuffle=False)[0]
 
     print(f"Train size: {len(train_dataloader.dataset)}")
     print(f"Val size: {len(val_dataloader.dataset)}")
@@ -233,37 +239,16 @@ def main():
     print("=" * 80)
 
     # Evaluate on test set
-    model.to(args.device)
-    model.eval()
-
     test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
-    test_dataloader = test_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0)[0]
+    test_dataloader = test_gen.generate_dataloader(batch_size=args.batch_size, num_workers=0, shuffle=False)[0]
 
-    y_true = {}
-    y_pred = {}
-    user_idx = 0
-
-    with torch.no_grad():
-        for seq_tokens, _, seq_time_diffs, targets in tqdm.tqdm(test_dataloader, desc="Evaluating"):
-            seq_tokens = seq_tokens.to(args.device)
-            seq_time_diffs = seq_time_diffs.to(args.device)
-            targets = targets.cpu().numpy()
-
-            logits = model(seq_tokens, seq_time_diffs)
-            last_logits = logits[:, -1, :]  # (B, V)
-
-            # Get top-200 predictions
-            _, top_items = torch.topk(last_logits, k=200, dim=-1)
-            top_items = top_items.cpu().numpy()
-
-            for i in range(len(targets)):
-                user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]
-                y_pred[user_id] = top_items[i].tolist()
-                user_idx += 1
+    topKs = sorted({min(k, vocab_size - 1) for k in [10, 50, 200]})
+    predictions = trainer.predict(test_dataloader, top_k=max(topKs))
+    y_true = {str(i): [int(target)] for i, target in enumerate(test_data['targets'])}
+    y_pred = {str(i): items.tolist() for i, items in enumerate(predictions)}
 
     # Calculate metrics
-    results = topk_metrics(y_true, y_pred, topKs=[10, 50, 200])
+    results = topk_metrics(y_true, y_pred, topKs=topKs)
     print("\n✅ Test Results:")
     print("=" * 50)
     for metric_name in ["Hit", "NDCG"]:

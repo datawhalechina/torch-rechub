@@ -12,17 +12,19 @@ class HSTUModel(nn.Module):
 
     Autoregressive generative recommender that stacks ``HSTUBlock`` layers to
     capture long-range dependencies and predict the next item. The layer
-    internals follow the HSTU paper (Eq. 2-4) and Meta's reference
-    implementation (`meta-recsys/generative-recommenders`):
+    internals are a dense teaching adaptation of HSTU (Eq. 2-4), not a
+    parameter-identical port of Meta's jagged reference implementation:
 
     - Token embedding + absolute position embedding + (optional) time-bucket
       embedding on the input side.
     - Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
       projection **before** splitting (Eq. 2), so all four streams go through
       the non-linearity.
-    - Attention uses ``alpha = 1/sqrt(dqk)`` scaling and adds a per-head
-      bucketed (position-diff, time-diff) bias ``rab^{p,t}`` to scores
-      **before** the ``silu(scores) / max_seq_len`` activation (Eq. 3).
+    - Like Meta's ``rel_bias`` path, attention uses unscaled QK and a
+      head-shared relative bias before ``SiLU(scores) / seq_len`` (Eq. 3).
+      This dense adaptation retains same-position time differences; Meta's
+      timestamp bias uses the next event time. Input preprocessing and layer
+      parameterization are not checkpoint-compatible with the reference.
     - Gated output ``LayerNorm(A V) * U`` projected by a single linear
       ``f_2`` (Eq. 4); no concat-u/x bypass and no separate FFN.
     - External residual ``x + Layer(x)`` is applied around each layer in
@@ -80,7 +82,8 @@ class HSTUModel(nn.Module):
     Notes
     -----
     ``time_diffs`` semantics: per-position seconds delta from a single anchor
-    (e.g. ``query_time - timestamps[i]``), following the Meta reference.
+    (e.g. ``query_time - timestamps[i]``). This input contract differs from
+    the reference's next-event timestamp bias.
     Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
     distribution will be different; set ``time_bucket_divisor`` and
     ``time_bucket_unit`` accordingly.
@@ -210,8 +213,8 @@ class HSTUModel(nn.Module):
         buckets = (buckets / self.time_bucket_divisor).clamp(min=0, max=self.num_time_buckets - 1)
         return buckets.long()
 
-    def forward(self, x, time_diffs=None):
-        """Forward pass.
+    def encode(self, x, time_diffs=None):
+        """Encode a history into states without scoring the item vocabulary.
 
         Args:
             x (Tensor): Input token ids, shape ``(batch_size, seq_len)``. ``0``
@@ -222,8 +225,7 @@ class HSTUModel(nn.Module):
                 temporal signal).
 
         Returns:
-            Tensor: Logits over the vocabulary, shape
-                ``(batch_size, seq_len, vocab_size)``.
+            Tensor: Sequence states, shape ``(batch_size, seq_len, d_model)``.
         """
         batch_size, seq_len = x.shape
         if seq_len > self.max_seq_len:
@@ -254,20 +256,32 @@ class HSTUModel(nn.Module):
 
         hstu_output = self.hstu_block(embeddings, padding_mask=padding_mask, time_diffs=time_diffs)
         hstu_output = hstu_output * padding_mask.unsqueeze(-1).to(hstu_output.dtype)
+        return hstu_output
 
+    def score_items(self, states, item_ids):
+        """Score only the requested item IDs, without allocating (B, L, V)."""
         if self.tie_embeddings:
             output_weight = self.token_embedding.weight
             output_bias = self.output_bias
         else:
             output_weight = self.output_projection.weight
             output_bias = self.output_projection.bias
+        output_weight = output_weight[item_ids]
+        output_bias = output_bias[item_ids] if output_bias is not None else None
 
         if self.score_norm == 'l2':
-            hstu_output = F.normalize(hstu_output, p=2, dim=-1, eps=self.l2_norm_eps)
-            output_weight = F.normalize(output_weight, p=2, dim=-1, eps=self.l2_norm_eps)
+            # Normalize in float32: PAD's zero vector and a tiny epsilon can
+            # produce non-finite backward values in float16.
+            states = F.normalize(states.float(), p=2, dim=-1, eps=self.l2_norm_eps)
+            output_weight = F.normalize(output_weight.float(), p=2, dim=-1, eps=self.l2_norm_eps)
 
-        logits = F.linear(hstu_output, output_weight, output_bias)
+        logits = F.linear(states, output_weight, output_bias)
         if self.temperature != 1.0:
             logits = logits / self.temperature
 
         return logits
+
+    def forward(self, x, time_diffs=None):
+        """Keep the original full-vocabulary logits interface."""
+        states = self.encode(x, time_diffs)
+        return self.score_items(states, torch.arange(self.vocab_size, device=x.device))

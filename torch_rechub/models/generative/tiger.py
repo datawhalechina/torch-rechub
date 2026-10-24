@@ -22,7 +22,28 @@ class TIGERModel(T5ForConditionalGeneration):
         self.temperature = 1.0
 
     def set_hyper(self, temperature):
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
         self.temperature = temperature
+
+    @staticmethod
+    def build_tokenizer(tokens, model_max_length=512):
+        """Offline semantic-token vocabulary; no natural-language checkpoint."""
+        from tokenizers import Tokenizer
+        from tokenizers.models import WordLevel
+        from tokenizers.pre_tokenizers import WhitespaceSplit
+        from tokenizers.processors import TemplateProcessing
+        from transformers import PreTrainedTokenizerFast
+
+        if {"<pad>", "</s>", "<unk>"}.intersection(tokens):
+            raise ValueError("Semantic/user tokens must not use reserved special-token names")
+        vocab = {token: index for index, token in enumerate(["<pad>", "</s>", "<unk>"] + sorted(set(tokens)))}
+        backend = Tokenizer(WordLevel(vocab, unk_token="<unk>"))
+        backend.pre_tokenizer = WhitespaceSplit()
+        backend.post_processor = TemplateProcessing(single="$A </s>", pair="$A </s> $B </s>", special_tokens=[("</s>", 1)])
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, pad_token="<pad>", eos_token="</s>", unk_token="<unk>", model_max_length=model_max_length)
+        tokenizer.add_tokens(sorted(set(tokens)))
+        return tokenizer
 
     def ranking_loss(self, lm_logits, labels):
         loss = None

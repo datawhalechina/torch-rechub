@@ -3,8 +3,9 @@
 TIGER trains a T5 seq2seq model **from scratch** to autoregressively generate
 the semantic ID of the next item. A semantic ID is a short tuple of codebook
 tokens (e.g. ``<a_1><b_10>``) produced by RQ-VAE over item embeddings. Following
-the TIGER paper, ``--base_model`` only supplies the T5 *architecture/config* and
-tokenizer; the transformer weights are randomly initialized, not loaded from a
+the TIGER paper, the default builds an offline semantic vocabulary and a small
+T5 config. Optional ``--base_model`` supplies the config/tokenizer, not weights.
+The transformer weights are randomly initialized, not loaded from a
 pretrained NL checkpoint (the semantic-ID vocabulary is not natural language).
 
 Run modes (``--mode``)
@@ -19,12 +20,13 @@ Run modes (``--mode``)
     Load tokenizer/config/model from ``--ckpt_path`` (defaults to
     ``--output_dir``) and report hit@k / ndcg@k with constrained beam search.
 ``all``
-    ``generate-toy-data`` -> ``train`` -> ``test`` (default).
+    ``train`` -> ``test`` on existing data (default). Never overwrites data.
 
 Examples
 --------
 Toy end-to-end smoke run::
 
+    python run_tiger_amazon_books.py --mode generate-toy-data
     python run_tiger_amazon_books.py --mode all --epochs 5 --per_device_batch_size 4
 
 Real data: first obtain ``semantic_ids.json`` from RQ-VAE
@@ -38,6 +40,7 @@ sequences, then::
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -52,7 +55,7 @@ import torch
 import transformers
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import EarlyStoppingCallback, T5Config, T5Tokenizer
+from transformers import AutoTokenizer, EarlyStoppingCallback, T5Config, T5Tokenizer
 
 from torch_rechub.models.generative.tiger import TIGERModel
 from torch_rechub.utils.data import TigerSeqDataset, Trie
@@ -109,6 +112,8 @@ def generate_toy_data(args):
         "7": ["<a_4>",
               "<b_70>"],
     }
+    if os.path.exists(args.data_inter_path) or os.path.exists(args.data_indice_path):
+        raise FileExistsError("Toy generation never overwrites existing files; choose new data paths")
     _write_json(args.data_inter_path, inter_data)
     _write_json(args.data_indice_path, index_data)
     print("Toy Amazon-Books dataset generated:")
@@ -147,17 +152,34 @@ def train(args):
     """
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    tokenizer = T5Tokenizer.from_pretrained(args.base_model, model_max_length=args.model_max_length)
-    config = T5Config.from_pretrained(args.base_model)
-
     inters_json, indices_json = load_inters_and_indices(args)
-    train_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="train")
-    valid_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="valid")
+    train_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="train", user_bucket_size=args.user_bucket_size)
+    valid_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="valid", user_bucket_size=args.user_bucket_size)
+    if args.base_model:
+        tokenizer = T5Tokenizer.from_pretrained(args.base_model, model_max_length=args.model_max_length)
+        config = T5Config.from_pretrained(args.base_model)
+    else:
+        tokenizer = TIGERModel.build_tokenizer(train_data.get_new_tokens(), args.model_max_length)
+        config = T5Config(d_model=128, d_kv=64, d_ff=1024, num_layers=4, num_decoder_layers=4, num_heads=6, dropout_rate=0.1, pad_token_id=0, eos_token_id=1, decoder_start_token_id=0)
+    config.user_bucket_size = args.user_bucket_size
+    config.semantic_ids_sha256 = hashlib.sha256(json.dumps(indices_json, sort_keys=True).encode("utf-8")).hexdigest()
 
     # Critical: register the semantic-id tokens and grow the embedding table.
     num_added = tokenizer.add_tokens(train_data.get_new_tokens())
     print(f"Added {num_added} semantic-id tokens (vocab size -> {len(tokenizer)})")
     config.vocab_size = len(tokenizer)
+
+    if args.resume_from_checkpoint:
+        # Check before saving anything: equal vocabulary sizes do not imply
+        # that token IDs still refer to the same items.
+        saved_config = T5Config.from_pretrained(args.resume_from_checkpoint, local_files_only=True)
+        if getattr(saved_config, "semantic_ids_sha256", None) != config.semantic_ids_sha256:
+            raise ValueError("Resume requires the checkpoint's original semantic ID catalog and fingerprint")
+        if getattr(saved_config, "user_bucket_size", 0) != config.user_bucket_size:
+            raise ValueError("user_bucket_size differs from the checkpoint")
+        saved_tokenizer = AutoTokenizer.from_pretrained(args.resume_from_checkpoint, local_files_only=True)
+        if saved_config.vocab_size != config.vocab_size or saved_tokenizer.get_vocab() != tokenizer.get_vocab():
+            raise ValueError("Tokenizer vocabulary differs from the checkpoint")
 
     os.makedirs(args.output_dir, exist_ok=True)
     tokenizer.save_pretrained(args.output_dir)
@@ -169,12 +191,6 @@ def train(args):
     model.to(device)
     model.config.use_cache = False
 
-    # transformers>=5 renamed Trainer's ``tokenizer`` argument to
-    # ``processing_class``; pick whichever the installed version accepts.
-    import inspect
-
-    tok_kw = "processing_class" if "processing_class" in inspect.signature(transformers.Trainer.__init__).parameters else "tokenizer"
-
     trainer = transformers.Trainer(
         model=model,
         train_dataset=train_data,
@@ -183,6 +199,8 @@ def train(args):
             per_device_train_batch_size=args.per_device_batch_size,
             per_device_eval_batch_size=args.per_device_batch_size,
             gradient_accumulation_steps=args.gradient_accumulation_steps,
+            fp16=args.fp16,
+            gradient_checkpointing=args.gradient_checkpointing,
             warmup_ratio=args.warmup_ratio,
             num_train_epochs=args.epochs,
             learning_rate=args.learning_rate,
@@ -195,13 +213,14 @@ def train(args):
             eval_steps=args.save_and_eval_steps,
             save_steps=args.save_and_eval_steps,
             output_dir=args.output_dir,
+            report_to="none",
             save_total_limit=2,
             load_best_model_at_end=True,
             eval_delay=1 if args.save_and_eval_strategy == "epoch" else 2000,
         ),
         data_collator=valid_data.get_collate_fn(tokenizer),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=args.early_stopping_patience)],
-        **{tok_kw: tokenizer},
+        processing_class=tokenizer,
     )
 
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
@@ -225,24 +244,23 @@ def test(args):
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    tokenizer = T5Tokenizer.from_pretrained(ckpt, model_max_length=args.model_max_length)
+    tokenizer = AutoTokenizer.from_pretrained(ckpt, model_max_length=args.model_max_length)
+    model = TIGERModel.from_pretrained(ckpt, low_cpu_mem_usage=False)
 
     inters_json, indices_json = load_inters_and_indices(args)
     sample_num = args.sample_num if args.sample_num and args.sample_num > 0 else 0
-    test_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="test", sample_num=sample_num)
+    fingerprint = hashlib.sha256(json.dumps(indices_json, sort_keys=True).encode("utf-8")).hexdigest()
+    if getattr(model.config, 'semantic_ids_sha256', fingerprint) != fingerprint:
+        raise ValueError("Semantic ID catalog differs from the training checkpoint")
+    test_data = TigerSeqDataset(inters_json, indices_json, args.max_his_len, mode="test", sample_num=sample_num, user_bucket_size=getattr(model.config, 'user_bucket_size', 0))
 
-    # Load the model with the checkpoint's OWN config so the embedding size matches
-    # the saved weights. Passing a grown vocab_size into from_pretrained would raise
-    # an embedding-size mismatch before we ever reached resize_token_embeddings.
-    model = TIGERModel.from_pretrained(ckpt, low_cpu_mem_usage=False)
-
-    # Defensive: if the checkpoint tokenizer is missing any semantic-id token
-    # (e.g. a vanilla T5 checkpoint), add them and then resize the loaded model.
-    num_added = tokenizer.add_tokens(test_data.get_new_tokens())
-    if num_added:
-        print(f"Checkpoint tokenizer was missing {num_added} semantic-id tokens; added them.")
+    # The checkpoint owns the vocabulary. Missing tokens are a mismatch, not
+    # a reason to silently add randomly initialized embeddings at evaluation.
+    missing = [token for token in test_data.get_new_tokens() if tokenizer.convert_tokens_to_ids(token) == tokenizer.unk_token_id]
+    if missing:
+        raise ValueError("Checkpoint tokenizer does not match the semantic IDs; regenerate/retrain instead of adding random embeddings")
     if model.get_input_embeddings().weight.size(0) != len(tokenizer):
-        model.resize_token_embeddings(len(tokenizer))
+        raise ValueError("Checkpoint embedding size does not match its saved tokenizer")
 
     model.to(device)
     model.config.use_cache = True  # speed up constrained beam search
@@ -286,6 +304,8 @@ def test(args):
             )
 
             output_text = tokenizer.batch_decode(output["sequences"], skip_special_tokens=True)
+            # -100 is the training loss mask, not a tokenizer vocabulary ID.
+            targets = targets.masked_fill(targets == -100, tokenizer.pad_token_id)
             targets_text = tokenizer.batch_decode(targets, skip_special_tokens=True)
             topk_res = get_topk_results(output_text, output["sequences_scores"], targets_text, args.num_beams, all_items=all_items if args.filter_items else None)
 
@@ -310,17 +330,18 @@ def get_topk_results(predictions, scores, targets, k, all_items=None):
     predictions = [p.strip().replace(" ", "") for p in predictions]
     targets = [t.strip().replace(" ", "") for t in targets]
 
-    if all_items is not None:
-        for i, seq in enumerate(predictions):
-            if seq not in all_items:
-                scores[i] = -1000
-
     for b in range(batch):
         batch_seqs = predictions[b * k:(b + 1) * k]
         batch_scores = scores[b * k:(b + 1) * k]
         sorted_pairs = sorted(zip(batch_seqs, batch_scores), key=lambda x: x[1], reverse=True)
         target_item = targets[b]
-        results.append([1 if pred == target_item else 0 for pred, _ in sorted_pairs])
+        seen, relevance = set(), []
+        for pred, _ in sorted_pairs:
+            if pred in seen or (all_items is not None and pred not in all_items):
+                continue
+            seen.add(pred)
+            relevance.append(int(pred == target_item))
+        results.append(relevance + [0] * (k - len(relevance)))
 
     return results
 
@@ -359,7 +380,10 @@ def parse_args():
     parser.add_argument("--mode", type=str, default="all", choices=RUN_MODES, help="Which stage(s) to run")
 
     # global
-    parser.add_argument("--base_model", type=str, default="t5-small", help="Base T5 model name or path")
+    parser.add_argument("--base_model", type=str, default=None, help="Optional T5 architecture/tokenizer; default is an offline semantic vocabulary")
+    parser.add_argument("--user_bucket_size", type=int, default=2000, help="Number of stable hashed user tokens; 0 disables them")
+    parser.add_argument("--fp16", action="store_true", help="CUDA mixed precision")
+    parser.add_argument("--gradient_checkpointing", action="store_true", help="Trade compute for lower activation memory")
     parser.add_argument("--output_dir", type=str, default="./ckpt/tiger_amazon", help="Directory to save tokenizer/config/checkpoints")
 
     # dataset
@@ -372,7 +396,7 @@ def parse_args():
     parser.add_argument("--optim", type=str, default="adamw_torch", help="Optimizer name")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--learning_rate", type=float, default=5e-4)
-    parser.add_argument("--per_device_batch_size", type=int, default=256)
+    parser.add_argument("--per_device_batch_size", type=int, default=8)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
     parser.add_argument("--logging_step", type=int, default=10)
     parser.add_argument("--model_max_length", type=int, default=512)
@@ -397,7 +421,7 @@ def parse_args():
 
 
 def main(args):
-    if args.mode in ("generate-toy-data", "all"):
+    if args.mode == "generate-toy-data":
         generate_toy_data(args)
     if args.mode in ("train", "all"):
         train(args)
