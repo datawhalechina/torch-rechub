@@ -5,6 +5,7 @@ import warnings
 import torch
 import tqdm
 from sklearn.metrics import roc_auc_score
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import BPRLoss, RegularizationLoss
@@ -101,6 +102,9 @@ class MatchTrainer(object):
         self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default optimizer
         self.scheduler = None
         if scheduler_fn is not None:
+            scheduler_params = dict(scheduler_params or {})
+            if scheduler_fn is ReduceLROnPlateau:
+                scheduler_params.setdefault('mode', 'max')
             self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
         self.evaluate_fn = roc_auc_score  # default evaluate function
         self.n_epoch = n_epoch
@@ -177,6 +181,8 @@ class MatchTrainer(object):
 
     def fit(self, train_dataloader, val_dataloader=None):
         model_file = os.path.join(self.model_path, "model.pth")
+        if isinstance(self.scheduler, ReduceLROnPlateau) and val_dataloader is None:
+            raise ValueError("ReduceLROnPlateau requires validation data to monitor AUC")
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.mode})
 
@@ -187,13 +193,15 @@ class MatchTrainer(object):
             for logger in self._iter_loggers():
                 logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
 
-            if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
+            if self.scheduler is not None and not isinstance(self.scheduler, ReduceLROnPlateau):
                 self.scheduler.step()  # update lr in epoch level by scheduler
+                print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
 
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
+                if isinstance(self.scheduler, ReduceLROnPlateau):
+                    self.scheduler.step(auc)
+                    print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
                 is_best = auc > self.early_stopper.best_auc
