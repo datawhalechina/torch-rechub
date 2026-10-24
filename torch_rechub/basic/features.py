@@ -34,9 +34,8 @@ class SequenceFeature(object):
         return f'<SequenceFeature {self.name} with Embedding shape ({self.vocab_size}, {self.embed_dim})>'
 
     def get_embedding_layer(self):
-        if not hasattr(self, 'embed'):
-            self.embed = self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
-        return self.embed
+        # A Feature describes a schema; trainable parameters belong to the model.
+        return self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
 
 
 class SparseFeature(object):
@@ -66,9 +65,7 @@ class SparseFeature(object):
         return f'<SparseFeature {self.name} with Embedding shape ({self.vocab_size}, {self.embed_dim})>'
 
     def get_embedding_layer(self):
-        if not hasattr(self, 'embed'):
-            self.embed = self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
-        return self.embed
+        return self.initializer(self.vocab_size, self.embed_dim, padding_idx=self.padding_idx)
 
 
 class DenseFeature(object):
