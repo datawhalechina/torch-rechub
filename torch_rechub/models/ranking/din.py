@@ -40,10 +40,11 @@ class DIN(nn.Module):
         embed_x_history = self.embedding(x, self.history_features)
         # (batch_size, num_target_features, emb_dim)
         embed_x_target = self.embedding(x, self.target_features)
+        # (batch_size, num_history_features, seq_length); exclude configured padding/OOV IDs.
+        history_mask = self.embedding.input_mask(x, self.history_features).bool()
         attention_pooling = []
         for i in range(self.num_history_features):
-            mask = self.embedding.input_mask(x, self.history_features[i]).squeeze(1).bool()
-            attention_seq = self.attention_layers[i](embed_x_history[:, i, :, :], embed_x_target[:, i, :], mask=mask)
+            attention_seq = self.attention_layers[i](embed_x_history[:, i, :, :], embed_x_target[:, i, :], mask=history_mask[:, i, :])
             attention_pooling.append(attention_seq.unsqueeze(1))  # (batch_size, 1, emb_dim)
         # (batch_size, num_history_features, emb_dim)
         attention_pooling = torch.cat(attention_pooling, dim=1)
