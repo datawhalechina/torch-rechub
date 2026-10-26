@@ -202,9 +202,7 @@ class ConcatPooling(nn.Module):
         super().__init__()
 
     def forward(self, x, mask=None):
-        if mask is None:
-            return x
-        return x * mask.reshape(x.size(0), x.size(1), 1).to(x.dtype)
+        return x
 
 
 class AveragePooling(nn.Module):
