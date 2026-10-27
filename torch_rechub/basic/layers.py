@@ -502,7 +502,7 @@ class CrossNetMix(nn.Module):
             moe_out = torch.matmul(output_of_experts, gating_score_experts.softmax(1))
             x_l = moe_out + x_l  # (bs, in_features, 1)
 
-        x_l = x_l.squeeze()  # (bs, in_features)
+        x_l = x_l.squeeze(-1)  # (bs, in_features), including bs=1
         return x_l
 
 

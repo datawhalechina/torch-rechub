@@ -1,98 +1,56 @@
-import sys
-import tempfile
-from pathlib import Path
+import copy
 
 import numpy as np
 import pytest
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.models import multi_task as mtl
+from torch_rechub.models import multi_task
 from torch_rechub.trainers import MTLTrainer
 from torch_rechub.utils.data import DataGenerator
 
-# Dynamically get all multi-task models
-mtl_models = [getattr(mtl, model_name) for model_name in mtl.__all__]
 
-
-@pytest.fixture(scope="module")
-def mtl_data():
-    """Create a dataset fixture for all multi-task model tests."""
-    n_samples = 500
-    n_tasks = 2
-
-    # Features
-    features = [DenseFeature("d1"), SparseFeature("s1", vocab_size=100, embed_dim=16)]
-
-    # Data
-    data = {"d1": torch.randn(n_samples), "s1": torch.randint(0, 100, (n_samples,))}
-    labels = [torch.randint(0, 2, (n_samples, 1)).float() for i in range(n_tasks)]
-
-    # Create a simplified dataloader for MTL
-    class MTLDataset(torch.utils.data.Dataset):
-
-        def __init__(self, x_dict, y_list):
-            self.x_dict = x_dict
-            self.y_list = y_list
-
-        def __len__(self):
-            return len(self.x_dict['d1'])
-
-        def __getitem__(self, idx):
-            x = {k: v[idx] for k, v in self.x_dict.items()}
-            y = [y[idx] for y in self.y_list]
-            return x, y
-
-    dataset = MTLDataset(data, labels)
-    dataloader = DataLoader(dataset, batch_size=128)
-
-    return {"features": features, "dataloader": dataloader, "n_tasks": n_tasks, "task_types": ["classification"] * n_tasks}
-
-
-@pytest.mark.parametrize("model_class", mtl_models)
-def test_multitask_e2e(model_class, mtl_data):
-    """End-to-end test for multi-task models."""
-    model_name = model_class.__name__
-
-    # Skip problematic models for now to ensure CI passes
-    # These models need more complex configuration and debugging
-    pytest.skip(f"Model {model_name} needs more complex setup - skipping for now.")
-
-    features = mtl_data["features"]
-    task_types = mtl_data["task_types"]
-    n_tasks = mtl_data["n_tasks"]
-
-    params = {}
-
+@pytest.mark.parametrize("model_name", multi_task.__all__)
+def test_multitask_e2e(model_name, tmp_path):
+    """All public MTL models complete real fit/evaluate/save; no unconditional skip."""
+    torch.manual_seed(2022)
+    rng = np.random.default_rng(2022)
+    features = [DenseFeature("d1"), SparseFeature("s1", 32, 4), SparseFeature("s2", 32, 4)]
+    x = {"d1": rng.normal(size=64).astype("float32"), "s1": rng.integers(1, 32, 64), "s2": rng.integers(1, 32, 64)}
+    ctr = np.tile([0, 1], 32)
+    cvr = np.tile([0, 0, 1, 1], 16)
+    ys = np.stack([ctr, cvr], axis=1)
+    task_types = ["classification"] * 2
+    towers = [{"dims": [8]}, {"dims": [8]}]
+    params = dict(features=features, task_types=task_types, tower_params_list=towers)
     if model_name == "SharedBottom":
-        params.update({"features": features, "task_types": task_types, "bottom_params": {"dims": [32]}, "tower_params_list": [{"dims": [16]}] * n_tasks})
-    elif model_name == "ESMM":
-        params.update({"features": features, "ctr_task_params": {"dims": [16]}, "cvr_task_params": {"dims": [16]}})
+        params["bottom_params"] = {"dims": [8]}
     elif model_name == "MMOE":
-        params.update({"features": features, "task_types": task_types, "n_expert": 4, "expert_params": {"dims": [16]}, "tower_params_list": [{"dims": [16]}] * n_tasks})
+        params.update(n_expert=2, expert_params={"dims": [8]})
     elif model_name == "PLE":
-        params.update({"features": features, "task_types": task_types, "n_level": 1, "n_expert_specific": 2, "n_expert_shared": 2, "expert_params": {"dims": [16]}, "tower_params_list": [{"dims": [16]}] * n_tasks})
+        params.update(n_level=1, n_expert_specific=1, n_expert_shared=1, expert_params={"dims": [8]})
     elif model_name == "AITM":
-        params.update({"features": features, "task_types": task_types, "tower_params_list": [{"dims": [16]}] * n_tasks, "ait_params": {"dims": [16]}})
+        params = dict(features=features, n_task=2, bottom_params={"dims": [8]}, tower_params_list=towers)
+    elif model_name == "ESMM":
+        params = dict(user_features=[features[1]], item_features=[features[2]], cvr_params={"dims": [8]}, ctr_params={"dims": [8]})
+        # ESMM outputs [CVR, CTR, CTCVR]; Trainer optimizes CTR and CTCVR.
+        ys = np.stack([cvr, ctr, cvr * ctr], axis=1)
+        task_types = ["classification"] * 3
     else:
-        pytest.skip(f"Model {model_name} requires specific setup.")
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        model = model_class(**params)
-
-        trainer = MTLTrainer(model, task_types=task_types, optimizer_params={"lr": 0.01}, n_epoch=1, device='cpu', model_path=temp_dir)
-
-        # Simplified fit call for testing
-        for data_batch in mtl_data["dataloader"]:
-            loss = trainer.train_one_epoch(data_batch)
-            assert isinstance(loss, float)
-            break  # Run only one batch for speed
-
-
-if __name__ == '__main__':
-    pytest.main(['-v', __file__])
+        raise AssertionError(f"Add an explicit training fixture for new model {model_name}")
+    train, val, _ = DataGenerator({k: v[:32] for k, v in x.items()}, ys[:32]).generate_dataloader(x_val={k: v[32:] for k, v in x.items()}, y_val=ys[32:], batch_size=8)
+    model = getattr(multi_task, model_name)(**params)
+    initial = {name: value.clone() for name, value in model.named_parameters()}
+    trainer = MTLTrainer(model, task_types, n_epoch=1, device="cpu", model_path=str(tmp_path))
+    trainer.fit(train, val)
+    scores = trainer.evaluate(model, val)
+    assert len(scores) == len(task_types) and all(np.isfinite(score) and 0 <= score <= 1 for score in scores)
+    assert any(not torch.equal(initial[name], value) for name, value in model.named_parameters())
+    batch, _ = next(iter(val))
+    with torch.no_grad():
+        expected = model(batch)
+    restored = getattr(multi_task, model_name)(**copy.deepcopy(params))
+    restored.load_state_dict(torch.load(tmp_path / "model_base_0.pth", map_location="cpu", weights_only=True))
+    restored.eval()
+    with torch.no_grad():
+        torch.testing.assert_close(restored(batch), expected)

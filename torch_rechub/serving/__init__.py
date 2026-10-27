@@ -1,9 +1,16 @@
 import typing as ty
+from importlib import import_module
 
-from .annoy import AnnoyBuilder
 from .base import BaseBuilder
-from .faiss import FaissBuilder
-from .milvus import MilvusBuilder
+
+
+def __getattr__(name):
+    # Keep direct class imports working without requiring every ANN backend.
+    modules = {"AnnoyBuilder": "annoy", "FaissBuilder": "faiss", "MilvusBuilder": "milvus"}
+    if name not in modules:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(import_module(f"{__name__}.{modules[name]}"), name)
+
 
 # Type for supported retrieval models.
 _RetrievalModel = ty.Literal["annoy", "faiss", "milvus"]
@@ -36,12 +43,15 @@ def builder_factory(model: _RetrievalModel, **builder_config) -> BaseBuilder:
         if the specified retrieval model is not supported.
     """
     if model == "annoy":
+        from .annoy import AnnoyBuilder
         return AnnoyBuilder(**builder_config)
 
     if model == "faiss":
+        from .faiss import FaissBuilder
         return FaissBuilder(**builder_config)
 
     if model == "milvus":
+        from .milvus import MilvusBuilder
         return MilvusBuilder(**builder_config)
 
     raise NotImplementedError(f"{model=} is not implemented yet!")

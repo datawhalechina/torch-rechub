@@ -20,19 +20,21 @@ def get_amazon_data_dict(dataset_path, in_batch_neg=False):
     n_users, n_items, n_cates = data["user_id"].max(), data["item_id"].max(), data["cate_id"].max()
     print(train)
 
-    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
+    features = [SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0), SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0), SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)]
     target_features = features
     history_features = [
         SequenceFeature("hist_item_id",
                         vocab_size=n_items + 1,
                         embed_dim=8,
                         pooling="concat",
-                        shared_with="target_item_id"),
+                        shared_with="target_item_id",
+                        padding_idx=0),
         SequenceFeature("hist_cate_id",
                         vocab_size=n_cates + 1,
                         embed_dim=8,
                         pooling="concat",
-                        shared_with="target_cate_id")
+                        shared_with="target_cate_id",
+                        padding_idx=0)
     ]
 
     print('========== Generate input dict ==========')
