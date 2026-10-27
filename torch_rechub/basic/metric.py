@@ -123,37 +123,95 @@ def precision_score(y_true, y_pred, topKs=None):
 
 
 def topk_metrics(y_true, y_pred, topKs=None):
-    """Macro-averaged Top-K metrics after deduplicating candidates.
+    """Compute NDCG, MRR, Recall, Hit and Precision for each requested K.
 
-    Empty ground-truth users are excluded; an entirely empty evaluation is zero.
-    Hit is the fraction of evaluated users with at least one hit. Precision uses
-    the requested K even when fewer candidates are available.
+    Args:
+        y_true (dict): {user_id: relevant_item_ids}.
+        y_pred (dict): {user_id: recommended_item_ids}, ordered by score.
+        topKs (list or tuple): Positive cutoffs, default [5].
 
-    Results retain the original display strings, such as "Recall@5: 0.5".
+    Returns:
+        defaultdict: Metric names mapped to the original display strings.
+
+    Hit is the fraction of users with at least one hit, rather than the old
+    global hit count divided by the number of relevant items. For example,
+    two users with one hit each have Hit=1.0, even with five relevant items.
+
+    Duplicate IDs count once. Users without relevant items are excluded;
+    an empty evaluation returns zero. Precision still divides by requested K.
     """
     if topKs is None:
         topKs = [5]
-    if not isinstance(topKs, (tuple, list)) or any(isinstance(k, bool) or not isinstance(k, Integral) or k < 1 for k in topKs):
-        raise ValueError("topKs must be a list or tuple of positive integers")
     if set(y_true) != set(y_pred):
         raise ValueError("y_true and y_pred must contain the same user IDs")
-    results = {name: [] for name in ("NDCG", "MRR", "Recall", "Hit", "Precision")}
-    users = [(set(items), list(dict.fromkeys(y_pred[user]))) for user, items in y_true.items() if len(items)]
-    for k in topKs:
-        totals = dict.fromkeys(results, 0.0)
-        for truth, predictions in users:
-            ranks = [rank for rank, item in enumerate(predictions[:k]) if item in truth]
-            hits = len(ranks)
-            dcg = sum(1.0 / np.log2(rank + 2) for rank in ranks)
-            ideal = sum(1.0 / np.log2(rank + 2) for rank in range(min(k, len(truth))))
-            totals["NDCG"] += dcg / ideal
-            totals["MRR"] += 1.0 / (ranks[0] + 1) if ranks else 0.0
-            totals["Recall"] += hits / len(truth)
-            totals["Hit"] += float(hits > 0)
-            totals["Precision"] += hits / k
-        for name in results:
-            value = totals[name] / len(users) if users else 0.0
-            results[name].append(f"{name}@{k}: {round(value, 4)}")
+
+    if not isinstance(topKs, (tuple, list)) or any(isinstance(k, bool) or not isinstance(k, Integral) or k < 1 for k in topKs):
+        raise ValueError("topKs must be a list or tuple of positive integers")
+
+    pred_array = []
+    true_array = []
+    for u in y_true.keys():
+        pred_array.append(list(dict.fromkeys(y_pred[u])))
+        true_array.append(set(y_true[u]))
+    ndcg_result = []
+    mrr_result = []
+    hit_result = []
+    precision_result = []
+    recall_result = []
+    for idx in range(len(topKs)):
+        ndcgs = 0
+        mrrs = 0
+        hits = 0
+        precisions = 0
+        recalls = 0
+        valid_users = 0
+        for i in range(len(true_array)):
+            if len(true_array[i]) != 0:
+                mrr_tmp = 0
+                mrr_flag = True
+                hit_tmp = 0
+                dcg_tmp = 0
+                idcg_tmp = 0
+                for j in range(topKs[idx]):
+                    if j < len(pred_array[i]) and pred_array[i][j] in true_array[i]:
+                        hit_tmp += 1.
+                        if mrr_flag:
+                            mrr_flag = False
+                            mrr_tmp = 1. / (1 + j)
+                        dcg_tmp += 1. / (np.log2(j + 2))
+                    if j < len(true_array[i]):
+                        idcg_tmp += 1. / (np.log2(j + 2))
+                valid_users += 1
+                hits += float(hit_tmp > 0)
+                mrrs += mrr_tmp
+                recalls += hit_tmp / len(true_array[i])
+                precisions += hit_tmp / topKs[idx]
+                if idcg_tmp != 0:
+                    ndcgs += dcg_tmp / idcg_tmp
+        num_users = max(valid_users, 1)
+        hit_result.append(round(hits / num_users, 4))
+        mrr_result.append(round(mrrs / num_users, 4))
+        recall_result.append(round(recalls / num_users, 4))
+        precision_result.append(round(precisions / num_users, 4))
+        ndcg_result.append(round(ndcgs / num_users, 4))
+
+    results = defaultdict(list)
+    for idx in range(len(topKs)):
+
+        output = f'NDCG@{topKs[idx]}: {ndcg_result[idx]}'
+        results['NDCG'].append(output)
+
+        output = f'MRR@{topKs[idx]}: {mrr_result[idx]}'
+        results['MRR'].append(output)
+
+        output = f'Recall@{topKs[idx]}: {recall_result[idx]}'
+        results['Recall'].append(output)
+
+        output = f'Hit@{topKs[idx]}: {hit_result[idx]}'
+        results['Hit'].append(output)
+
+        output = f'Precision@{topKs[idx]}: {precision_result[idx]}'
+        results['Precision'].append(output)
     return results
 
 
