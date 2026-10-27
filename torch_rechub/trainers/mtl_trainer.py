@@ -21,7 +21,9 @@ class MTLTrainer(object):
         task_types (list): types of tasks, only support ["classfication", "regression"].
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_fn (torch.optim.lr_scheduler): StepLR/CosineAnnealingLR step once per epoch.
+            ReduceLROnPlateau uses the validation score of earlystop_taskid;
+            its default mode follows earlystop_mode. scheduler_params can override mode.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
         n_epoch (int): epoch number of training.

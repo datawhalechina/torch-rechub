@@ -20,7 +20,8 @@ class MatchTrainer(object):
         mode (int, optional): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_fn (torch.optim.lr_scheduler): StepLR/CosineAnnealingLR step once per epoch.
+            ReduceLROnPlateau steps after validation using AUC; its default mode is "max".
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         n_epoch (int): epoch number of training.
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
