@@ -35,7 +35,8 @@ class EDCN(torch.nn.Module):
         self.cross_layers = nn.ModuleList([CrossLayer(self.dims) for _ in range(n_cross_layers)])
         self.bridge_modules = nn.ModuleList([BridgeModule(self.dims, bridge_type) for _ in range(n_cross_layers)])
         self.regulation_modules = nn.ModuleList([RegulationModule(self.num_fields, self.fea_dims, tau=temperature, use_regulation=use_regulation_module) for _ in range(n_cross_layers)])
-        mlp_params["dims"] = [self.dims, self.dims]
+        # Bridge inputs require this width; never mutate the caller's configuration.
+        mlp_params = {**mlp_params, "dims": [self.dims, self.dims]}
         self.mlps = nn.ModuleList([MLP(self.dims, output_layer=False, **mlp_params) for _ in range(n_cross_layers)])
         self.linear = LR(self.dims * 3)
 

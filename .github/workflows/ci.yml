@@ -147,6 +147,10 @@ jobs:
             # Indexing tests already run on Linux/Windows, not macOS.
             test_extras="$test_extras,annoy,faiss,milvus"
           fi
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # Annoy uses -march=native; rebuild it for this runner's CPU.
+            python -m pip cache remove annoy
+          fi
           python -m pip install -e ".[$test_extras]" "torch==$TORCH_VERSION"
           python -m pip check
 
@@ -242,7 +246,7 @@ jobs:
   # (仅在 push/PR 时运行，release 时跳过)
   # ===================================================================
   compatibility:
-    name: Dependency Check (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
+    name: Runtime Compatibility (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     needs: lint
     if: github.event_name != 'release'
@@ -284,6 +288,15 @@ jobs:
           python -m pytest -c config/pytest.ini -v \
             tests/test_onnx_quantization.py tests/test_pa_array_to_tensor.py \
             tests/test_hstu_model.py tests/test_hllm_embedding_alignment.py tests/test_tiger_example.py
+
+      - name: Verify small CPU training and reload
+        env:
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          PYTHONUTF8: '1'
+        run: |
+          python -m pytest -c config/pytest.ini tests/test_e2e_ranking.py tests/test_e2e_multitask.py -q
 
   # ===================================================================
   # 安全检查 (仅在 push/PR 时运行，release 时跳过)

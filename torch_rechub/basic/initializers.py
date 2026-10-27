@@ -96,5 +96,5 @@ class Pretrained(object):
 
     def __call__(self, vocab_size, embed_dim, padding_idx=None):
         assert vocab_size == self.embedding_weight.shape[0] and embed_dim == self.embedding_weight.shape[1]
-        embed = torch.nn.Embedding.from_pretrained(self.embedding_weight, freeze=self.freeze, padding_idx=padding_idx)
+        embed = torch.nn.Embedding.from_pretrained(self.embedding_weight.clone(), freeze=self.freeze, padding_idx=padding_idx)
         return embed

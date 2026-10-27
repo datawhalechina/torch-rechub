@@ -40,9 +40,11 @@ class DIN(nn.Module):
         embed_x_history = self.embedding(x, self.history_features)
         # (batch_size, num_target_features, emb_dim)
         embed_x_target = self.embedding(x, self.target_features)
+        # (batch_size, num_history_features, seq_length); exclude configured padding/OOV IDs.
+        history_mask = self.embedding.input_mask(x, self.history_features).bool()
         attention_pooling = []
         for i in range(self.num_history_features):
-            attention_seq = self.attention_layers[i](embed_x_history[:, i, :, :], embed_x_target[:, i, :])
+            attention_seq = self.attention_layers[i](embed_x_history[:, i, :, :], embed_x_target[:, i, :], mask=history_mask[:, i, :])
             attention_pooling.append(attention_seq.unsqueeze(1))  # (batch_size, 1, emb_dim)
         # (batch_size, num_history_features, emb_dim)
         attention_pooling = torch.cat(attention_pooling, dim=1)
@@ -76,7 +78,7 @@ class ActivationUnit(nn.Module):
         self.use_softmax = use_softmax
         self.attention = MLP(4 * self.emb_dim, dims=dims, activation=activation)
 
-    def forward(self, history, target):
+    def forward(self, history, target, mask=None):
         seq_length = history.size(1)
         # batch_size,seq_length,emb_dim
         target = target.unsqueeze(1).expand(-1, seq_length, -1)
@@ -86,7 +88,12 @@ class ActivationUnit(nn.Module):
         # (batch_size*seq_length, 1) -> (batch_size,seq_length)
         att_weight = att_weight.view(-1, seq_length)
         if self.use_softmax:
+            if mask is not None:
+                att_weight = att_weight.masked_fill(~mask, torch.finfo(att_weight.dtype).min)
             att_weight = att_weight.softmax(dim=-1)
+        if mask is not None:
+            # Multiplication also makes an entirely padded history return zero.
+            att_weight = att_weight * mask.to(att_weight.dtype)
 
 
 # (batch_size, seq_length, 1) * (batch_size, seq_length, emb_dim)
