@@ -147,6 +147,10 @@ jobs:
             # Indexing tests already run on Linux/Windows, not macOS.
             test_extras="$test_extras,annoy,faiss,milvus"
           fi
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # Annoy uses -march=native; rebuild it for this runner's CPU.
+            python -m pip cache remove annoy
+          fi
           python -m pip install -e ".[$test_extras]" "torch==$TORCH_VERSION"
           python -m pip check
 
