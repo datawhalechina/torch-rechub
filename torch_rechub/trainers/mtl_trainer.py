@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import tqdm
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import RegularizationLoss
@@ -21,9 +20,7 @@ class MTLTrainer(object):
         task_types (list): types of tasks, only support ["classfication", "regression"].
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler): StepLR/CosineAnnealingLR step once per epoch.
-            ReduceLROnPlateau uses the validation score of earlystop_taskid;
-            its default mode follows earlystop_mode. scheduler_params can override mode.
+        scheduler_fn (torch.optim.lr_scheduler): optional scheduler called with step() once per epoch, e.g. StepLR.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
         n_epoch (int): epoch number of training.
@@ -94,10 +91,7 @@ class MTLTrainer(object):
             self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default Adam optimizer
         self.scheduler = None
         if scheduler_fn is not None:
-            scheduler_params = dict(scheduler_params or {})
-            if scheduler_fn is ReduceLROnPlateau:
-                scheduler_params.setdefault('mode', earlystop_mode)
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
         self.loss_fns = [get_loss_func(task_type) for task_type in task_types]
         self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
         self.n_epoch = n_epoch
@@ -188,14 +182,11 @@ class MTLTrainer(object):
             if lr_value is not None:
                 logs['learning_rate'] = lr_value
 
-            if self.scheduler is not None and not isinstance(self.scheduler, ReduceLROnPlateau):
+            print("Current lr : {}".format(lr_value))
+            if self.scheduler is not None:
                 self.scheduler.step()  # update lr in epoch level by scheduler
-                print("Current lr : {}".format(self._current_lr()))
 
             scores = self.evaluate(self.model, val_dataloader)
-            if isinstance(self.scheduler, ReduceLROnPlateau):
-                self.scheduler.step(scores[self.earlystop_taskid])
-                print("Current lr : {}".format(self._current_lr()))
             print('epoch:', epoch_i, 'validation scores: ', scores)
 
             score = scores[self.earlystop_taskid]

@@ -4,7 +4,6 @@ import warnings
 import torch
 import tqdm
 from sklearn.metrics import roc_auc_score
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from ..basic.callback import EarlyStopper
 from ..basic.loss_func import RegularizationLoss
@@ -17,8 +16,7 @@ class CTRTrainer(object):
         model (nn.Module): any single-task ranking model.
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler): StepLR/CosineAnnealingLR step once per epoch.
-            ReduceLROnPlateau steps after validation using AUC; its default mode is "max".
+        scheduler_fn (torch.optim.lr_scheduler): optional scheduler called with step() once per epoch, e.g. StepLR.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         n_epoch (int): epoch number of training.
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
@@ -91,10 +89,7 @@ class CTRTrainer(object):
             regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.scheduler = None
         if scheduler_fn is not None:
-            scheduler_params = dict(scheduler_params or {})
-            if scheduler_fn is ReduceLROnPlateau:
-                scheduler_params.setdefault('mode', 'max')
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
         self.loss_mode = loss_mode
         self.criterion = torch.nn.BCELoss()  # default loss cross_entropy
         self.evaluate_fn = roc_auc_score  # default evaluate function
@@ -180,8 +175,6 @@ class CTRTrainer(object):
 
     def fit(self, train_dataloader, val_dataloader=None):
         model_file = os.path.join(self.model_path, "model.pth")
-        if isinstance(self.scheduler, ReduceLROnPlateau) and val_dataloader is None:
-            raise ValueError("ReduceLROnPlateau requires validation data to monitor AUC")
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.loss_mode})
 
@@ -192,15 +185,12 @@ class CTRTrainer(object):
             for logger in self._iter_loggers():
                 logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
 
-            if self.scheduler is not None and not isinstance(self.scheduler, ReduceLROnPlateau):
+            print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
+            if self.scheduler is not None:
                 self.scheduler.step()  # update lr in epoch level by scheduler
-                print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
 
             if val_dataloader:
                 auc = self.evaluate(self.model, val_dataloader)
-                if isinstance(self.scheduler, ReduceLROnPlateau):
-                    self.scheduler.step(auc)
-                    print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
                 print('epoch:', epoch_i, 'validation: auc:', auc)
 
                 is_best = auc > self.early_stopper.best_auc
