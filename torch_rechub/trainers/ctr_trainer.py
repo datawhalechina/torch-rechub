@@ -16,7 +16,7 @@ class CTRTrainer(object):
         model (nn.Module): any single-task ranking model.
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_fn (torch.optim.lr_scheduler): optional scheduler called with step() once per epoch, e.g. StepLR.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         n_epoch (int): epoch number of training.
         earlystop_patience (int): how long to wait after last time validation auc improved (default=10).
@@ -89,7 +89,7 @@ class CTRTrainer(object):
             regularization_params = {"embedding_l1": 0.0, "embedding_l2": 0.0, "dense_l1": 0.0, "dense_l2": 0.0}
         self.scheduler = None
         if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
         self.loss_mode = loss_mode
         self.criterion = torch.nn.BCELoss()  # default loss cross_entropy
         self.evaluate_fn = roc_auc_score  # default evaluate function
@@ -185,9 +185,8 @@ class CTRTrainer(object):
             for logger in self._iter_loggers():
                 logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
 
+            print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
             if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  # update lr in epoch level by scheduler
 
             if val_dataloader:

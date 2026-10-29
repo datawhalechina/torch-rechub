@@ -20,7 +20,7 @@ class MTLTrainer(object):
         task_types (list): types of tasks, only support ["classfication", "regression"].
         optimizer_fn (torch.optim): optimizer function of pytorch (default = `torch.optim.Adam`).
         optimizer_params (dict): parameters of optimizer_fn.
-        scheduler_fn (torch.optim.lr_scheduler) : torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+        scheduler_fn (torch.optim.lr_scheduler): optional scheduler called with step() once per epoch, e.g. StepLR.
         scheduler_params (dict): parameters of optimizer scheduler_fn.
         adaptive_params (dict): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
         n_epoch (int): epoch number of training.
@@ -91,7 +91,7 @@ class MTLTrainer(object):
             self.optimizer = optimizer_fn(self.model.parameters(), **optimizer_params)  # default Adam optimizer
         self.scheduler = None
         if scheduler_fn is not None:
-            self.scheduler = scheduler_fn(self.optimizer, **scheduler_params)
+            self.scheduler = scheduler_fn(self.optimizer, **(scheduler_params or {}))
         self.loss_fns = [get_loss_func(task_type) for task_type in task_types]
         self.evaluate_fns = [get_metric_func(task_type) for task_type in task_types]
         self.n_epoch = n_epoch
@@ -182,9 +182,8 @@ class MTLTrainer(object):
             if lr_value is not None:
                 logs['learning_rate'] = lr_value
 
+            print("Current lr : {}".format(lr_value))
             if self.scheduler is not None:
-                if epoch_i % self.scheduler.step_size == 0:
-                    print("Current lr : {}".format(self.optimizer.state_dict()['param_groups'][0]['lr']))
                 self.scheduler.step()  # update lr in epoch level by scheduler
 
             scores = self.evaluate(self.model, val_dataloader)
