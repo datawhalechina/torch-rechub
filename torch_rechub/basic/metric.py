@@ -16,7 +16,6 @@ from collections import defaultdict
 from numbers import Integral
 
 import numpy as np
-from sklearn.metrics import log_loss as sklearn_log_loss
 from sklearn.metrics import roc_auc_score
 
 
@@ -123,27 +122,27 @@ def precision_score(y_true, y_pred, topKs=None):
 
 
 def topk_metrics(y_true, y_pred, topKs=None):
-    """Compute NDCG, MRR, Recall, Hit and Precision for each requested K.
+    """choice topk metrics and compute it
+        the metrics contains 'ndcg', 'mrr', 'recall', 'precision' and 'hit'
 
-    Args:
-        y_true (dict): {user_id: relevant_item_ids}.
-        y_pred (dict): {user_id: recommended_item_ids}, ordered by score.
-        topKs (list or tuple): Positive cutoffs, default [5].
+        Args:
+                y_true (dict): {userid, item_ids}, the key is user id and the value is the list that contains the items the user interacted
+                y_pred (dict): {userid, item_ids}, the key is user id and the value is the list that contains the items recommended
+                topKs (list or tuple): if you want to get top5 and top10, topKs=(5, 10)
 
-    Returns:
-        defaultdict: Metric names mapped to the original display strings.
+        Return:
+                results (dict): {metric_name: metric_values}, it contains five metrics, 'ndcg', 'recall', 'mrr', 'hit', 'precision'
 
-    Hit is the fraction of users with at least one hit, rather than the old
-    global hit count divided by the number of relevant items. For example,
-    two users with one hit each have Hit=1.0, even with five relevant items.
-
-    Duplicate IDs count once. Users without relevant items are excluded;
-    an empty evaluation returns zero. Precision still divides by requested K.
-    """
+        Hit keeps the original total hits / total relevant items definition.
+        Other metrics average over all users, including users without relevant items.
+        Evaluation requires at least one relevant item; input IDs are not deduplicated.
+        """
     if topKs is None:
         topKs = [5]
     if set(y_true) != set(y_pred):
         raise ValueError("y_true and y_pred must contain the same user IDs")
+    if not any(len(items) for items in y_true.values()):
+        raise ValueError("topk_metrics requires at least one relevant item")
 
     if not isinstance(topKs, (tuple, list)) or any(isinstance(k, bool) or not isinstance(k, Integral) or k < 1 for k in topKs):
         raise ValueError("topKs must be a list or tuple of positive integers")
@@ -151,8 +150,8 @@ def topk_metrics(y_true, y_pred, topKs=None):
     pred_array = []
     true_array = []
     for u in y_true.keys():
-        pred_array.append(list(dict.fromkeys(y_pred[u])))
-        true_array.append(set(y_true[u]))
+        pred_array.append(y_pred[u])
+        true_array.append(y_true[u])
     ndcg_result = []
     mrr_result = []
     hit_result = []
@@ -164,7 +163,7 @@ def topk_metrics(y_true, y_pred, topKs=None):
         hits = 0
         precisions = 0
         recalls = 0
-        valid_users = 0
+        gts = 0
         for i in range(len(true_array)):
             if len(true_array[i]) != 0:
                 mrr_tmp = 0
@@ -181,19 +180,18 @@ def topk_metrics(y_true, y_pred, topKs=None):
                         dcg_tmp += 1. / (np.log2(j + 2))
                     if j < len(true_array[i]):
                         idcg_tmp += 1. / (np.log2(j + 2))
-                valid_users += 1
-                hits += float(hit_tmp > 0)
+                gts += len(true_array[i])
+                hits += hit_tmp
                 mrrs += mrr_tmp
                 recalls += hit_tmp / len(true_array[i])
                 precisions += hit_tmp / topKs[idx]
                 if idcg_tmp != 0:
                     ndcgs += dcg_tmp / idcg_tmp
-        num_users = max(valid_users, 1)
-        hit_result.append(round(hits / num_users, 4))
-        mrr_result.append(round(mrrs / num_users, 4))
-        recall_result.append(round(recalls / num_users, 4))
-        precision_result.append(round(precisions / num_users, 4))
-        ndcg_result.append(round(ndcgs / num_users, 4))
+        hit_result.append(round(hits / gts, 4))
+        mrr_result.append(round(mrrs / len(pred_array), 4))
+        recall_result.append(round(recalls / len(pred_array), 4))
+        precision_result.append(round(precisions / len(pred_array), 4))
+        ndcg_result.append(round(ndcgs / len(pred_array), 4))
 
     results = defaultdict(list)
     for idx in range(len(topKs)):
@@ -216,7 +214,12 @@ def topk_metrics(y_true, y_pred, topKs=None):
 
 
 def log_loss(y_true, y_pred):
-    return sklearn_log_loss(y_true, y_pred, labels=[0, 1])
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred, dtype=float)
+    eps = np.finfo(float).eps
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+    score = y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)
+    return -score.sum() / len(y_true)
 
 
 def diversity_score(y_pred, item_embeddings, topKs=None):
