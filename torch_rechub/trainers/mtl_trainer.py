@@ -110,9 +110,12 @@ class MTLTrainer(object):
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
         self.model_logger = model_logger
 
-    def train_one_epoch(self, data_loader):
+    def train_one_epoch(self, data_loader, log_interval=10):
+        if log_interval < 1:
+            raise ValueError("log_interval must be positive")
         self.model.train()
         total_loss = np.zeros(self.n_task)
+        interval_loss = np.zeros(self.n_task)
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
         for iter_i, (x_dict, ys) in enumerate(tk0):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
@@ -156,7 +159,12 @@ class MTLTrainer(object):
                 self.model.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-            total_loss += np.array([l.item() for l in loss_list])
+            loss_values = np.array([l.item() for l in loss_list])
+            total_loss += loss_values
+            interval_loss += loss_values
+            if (iter_i + 1) % log_interval == 0:
+                tk0.set_postfix({f'task_{i}_loss': interval_loss[i] / log_interval for i in range(self.n_task)}, lr=self._current_lr())
+                interval_loss.fill(0)
         log_dict = {"task_%d:" % (i): total_loss[i] / (iter_i + 1) for i in range(self.n_task)}
         loss_list = [total_loss[i] / (iter_i + 1) for i in range(self.n_task)]
         print("train loss: ", log_dict)
@@ -165,7 +173,11 @@ class MTLTrainer(object):
 
         return loss_list
 
-    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0):
+    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0, log_interval=10):
+        """Train with progress updates every log_interval batches.
+
+        Set log_interval=1 to show each batch's task losses and learning rate.
+        """
         model_file = os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed))
         total_log = []
 
@@ -174,7 +186,8 @@ class MTLTrainer(object):
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self._current_lr(), 'adaptive_method': self.adaptive_method})
 
         for epoch_i in range(self.n_epoch):
-            _log_per_epoch = self.train_one_epoch(train_dataloader)
+            print('epoch:', epoch_i)
+            _log_per_epoch = self.train_one_epoch(train_dataloader, log_interval=log_interval)
 
             # Collect metrics
             logs = {f'train/task_{task_id}_loss': loss_val for task_id, loss_val in enumerate(_log_per_epoch)}

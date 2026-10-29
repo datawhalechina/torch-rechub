@@ -111,6 +111,8 @@ class MatchTrainer(object):
         self.model_logger = model_logger
 
     def train_one_epoch(self, data_loader, log_interval=10):
+        if log_interval < 1:
+            raise ValueError("log_interval must be positive")
         self.model.train()
         total_loss = 0
         epoch_loss = 0
@@ -165,7 +167,7 @@ class MatchTrainer(object):
             epoch_loss += loss.item()
             batch_count += 1
             if batch_count % log_interval == 0:
-                tk0.set_postfix(loss=total_loss / log_interval)
+                tk0.set_postfix(loss=total_loss / log_interval, lr=self.optimizer.param_groups[0]['lr'])
                 total_loss = 0
 
         if self.in_batch_neg and batch_count == 0:
@@ -175,14 +177,18 @@ class MatchTrainer(object):
         # Return average epoch loss
         return epoch_loss / batch_count if batch_count > 0 else 0
 
-    def fit(self, train_dataloader, val_dataloader=None):
+    def fit(self, train_dataloader, val_dataloader=None, log_interval=10):
+        """Train with progress updates every log_interval trained batches.
+
+        Set log_interval=1 to show each batch's loss and learning rate.
+        """
         model_file = os.path.join(self.model_path, "model.pth")
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_mode': self.mode})
 
         for epoch_i in range(self.n_epoch):
             print('epoch:', epoch_i)
-            train_loss = self.train_one_epoch(train_dataloader)
+            train_loss = self.train_one_epoch(train_dataloader, log_interval=log_interval)
 
             for logger in self._iter_loggers():
                 logger.log_metrics({'train/loss': train_loss, 'learning_rate': self.optimizer.param_groups[0]['lr']}, step=epoch_i)
