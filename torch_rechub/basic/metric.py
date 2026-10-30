@@ -14,6 +14,7 @@ Authors: Qida Dong, dongjidan@126.com
 from collections import defaultdict
 
 import numpy as np
+from sklearn import metrics
 from sklearn.metrics import roc_auc_score
 
 
@@ -47,6 +48,8 @@ def get_user_pred(y_true, y_pred, users):
 def gauc_score(y_true, y_pred, users, weights=None):
     """compute GAUC
 
+        Users with only one label class are excluded from the weighted average.
+
         Args:
                 y_true (array): dim(N, ), all true labels of the data
                 y_pred (array): dim(N, ), the predicted score
@@ -63,6 +66,8 @@ def gauc_score(y_true, y_pred, users, weights=None):
     score = 0
     num = 0
     for u in user_pred.keys():
+        if len(set(user_pred[u]['y_true'])) < 2:
+            continue
         auc = auc_score(user_pred[u]['y_true'], user_pred[u]['y_pred'])
         if weights is None:
             user_weight = len(user_pred[u]['y_true'])
@@ -71,6 +76,8 @@ def gauc_score(y_true, y_pred, users, weights=None):
         auc *= user_weight
         num += user_weight
         score += auc
+    if num == 0:
+        raise ValueError("GAUC requires a positive-weight user with both label classes")
     return score / num
 
 
@@ -154,7 +161,7 @@ def topk_metrics(y_true, y_pred, topKs=None):
                 dcg_tmp = 0
                 idcg_tmp = 0
                 for j in range(topKs[idx]):
-                    if pred_array[i][j] in true_array[i]:
+                    if j < len(pred_array[i]) and pred_array[i][j] in true_array[i]:
                         hit_tmp += 1.
                         if mrr_flag:
                             mrr_flag = False
@@ -196,8 +203,7 @@ def topk_metrics(y_true, y_pred, topKs=None):
 
 
 def log_loss(y_true, y_pred):
-    score = y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)
-    return -score.sum() / len(y_true)
+    return metrics.log_loss(y_true, y_pred, labels=[0, 1])
 
 
 def diversity_score(y_pred, item_embeddings, topKs=None):
