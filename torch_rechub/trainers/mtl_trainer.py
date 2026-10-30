@@ -111,8 +111,7 @@ class MTLTrainer(object):
         self.model_logger = model_logger
 
     def train_one_epoch(self, data_loader, log_interval=10):
-        if log_interval < 1:
-            raise ValueError("log_interval must be positive")
+        """Train one epoch; log_interval is a positive integer, defaulting to 10."""
         self.model.train()
         total_loss = np.zeros(self.n_task)
         interval_loss = np.zeros(self.n_task)
@@ -176,6 +175,7 @@ class MTLTrainer(object):
     def fit(self, train_dataloader, val_dataloader, mode='base', seed=0, log_interval=10):
         """Train with progress updates every log_interval batches.
 
+        Use a positive integer for log_interval (default: 10).
         Set log_interval=1 to show each batch's task losses and learning rate.
         """
         model_file = os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed))

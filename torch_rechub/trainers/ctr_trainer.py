@@ -128,8 +128,7 @@ class CTRTrainer(object):
         return paired, labels.reshape(-1)
 
     def train_one_epoch(self, data_loader, log_interval=10):
-        if log_interval < 1:
-            raise ValueError("log_interval must be positive")
+        """Train one epoch; log_interval is a positive integer, defaulting to 10."""
         self.model.train()
         total_loss = 0
         epoch_loss = 0
@@ -178,6 +177,7 @@ class CTRTrainer(object):
     def fit(self, train_dataloader, val_dataloader=None, log_interval=10):
         """Train with progress updates every log_interval trained batches.
 
+        Use a positive integer for log_interval (default: 10).
         Set log_interval=1 to show each batch's loss and learning rate.
         """
         model_file = os.path.join(self.model_path, "model.pth")
