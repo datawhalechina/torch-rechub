@@ -110,11 +110,13 @@ class MTLTrainer(object):
         self.reg_loss_fn = RegularizationLoss(**regularization_params)
         self.model_logger = model_logger
 
-    def train_one_epoch(self, data_loader):
+    def train_one_epoch(self, data_loader, log_interval=10):
+        """Train one epoch; log_interval is a positive integer, defaulting to 10."""
         self.model.train()
-        total_loss = np.zeros(self.n_task)
+        interval_loss = np.zeros(self.n_task)
+        epoch_loss = np.zeros(self.n_task)
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
-        for iter_i, (x_dict, ys) in enumerate(tk0):
+        for batch_count, (x_dict, ys) in enumerate(tk0, start=1):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             ys = ys.to(self.device)
             y_preds = self.model(x_dict)
@@ -156,16 +158,26 @@ class MTLTrainer(object):
                 self.model.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-            total_loss += np.array([l.item() for l in loss_list])
-        log_dict = {"task_%d:" % (i): total_loss[i] / (iter_i + 1) for i in range(self.n_task)}
-        loss_list = [total_loss[i] / (iter_i + 1) for i in range(self.n_task)]
+            loss_values = np.array([l.item() for l in loss_list])
+            interval_loss += loss_values
+            epoch_loss += loss_values
+            if batch_count % log_interval == 0:
+                tk0.set_postfix({f'task_{i}_loss': interval_loss[i] / log_interval for i in range(self.n_task)}, lr=self._current_lr())
+                interval_loss.fill(0)
+        log_dict = {"task_%d:" % (i): epoch_loss[i] / batch_count for i in range(self.n_task)}
+        loss_list = [epoch_loss[i] / batch_count for i in range(self.n_task)]
         print("train loss: ", log_dict)
         if self.loss_weight:
             print("loss weight: ", [w.item() for w in self.loss_weight])
 
         return loss_list
 
-    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0):
+    def fit(self, train_dataloader, val_dataloader, mode='base', seed=0, log_interval=10):
+        """Train with progress updates every log_interval batches.
+
+        Use a positive integer for log_interval (default: 10).
+        Set log_interval=1 to show each batch's task losses and learning rate.
+        """
         model_file = os.path.join(self.model_path, "model_{}_{}.pth".format(mode, seed))
         total_log = []
 
@@ -174,7 +186,8 @@ class MTLTrainer(object):
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self._current_lr(), 'adaptive_method': self.adaptive_method})
 
         for epoch_i in range(self.n_epoch):
-            _log_per_epoch = self.train_one_epoch(train_dataloader)
+            print('epoch:', epoch_i)
+            _log_per_epoch = self.train_one_epoch(train_dataloader, log_interval=log_interval)
 
             # Collect metrics
             logs = {f'train/task_{task_id}_loss': loss_val for task_id, loss_val in enumerate(_log_per_epoch)}
