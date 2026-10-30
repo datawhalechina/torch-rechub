@@ -14,6 +14,7 @@ Authors: Qida Dong, dongjidan@126.com
 from collections import defaultdict
 
 import numpy as np
+from sklearn import metrics
 from sklearn.metrics import roc_auc_score
 
 
@@ -202,12 +203,7 @@ def topk_metrics(y_true, y_pred, topKs=None):
 
 
 def log_loss(y_true, y_pred):
-    y_true = np.asarray(y_true)
-    y_pred = np.asarray(y_pred, dtype=float)
-    eps = np.finfo(float).eps
-    y_pred = np.clip(y_pred, eps, 1 - eps)
-    score = y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)
-    return -score.sum() / len(y_true)
+    return metrics.log_loss(y_true, y_pred, labels=[0, 1])
 
 
 def diversity_score(y_pred, item_embeddings, topKs=None):
