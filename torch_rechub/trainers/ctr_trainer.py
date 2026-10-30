@@ -130,7 +130,7 @@ class CTRTrainer(object):
     def train_one_epoch(self, data_loader, log_interval=10):
         """Train one epoch; log_interval is a positive integer, defaulting to 10."""
         self.model.train()
-        total_loss = 0
+        interval_loss = 0
         epoch_loss = 0
         batch_count = 0
         skipped_batches = 0
@@ -160,12 +160,12 @@ class CTRTrainer(object):
             self.model.zero_grad()
             loss.backward()
             self.optimizer.step()
-            total_loss += loss.item()
+            interval_loss += loss.item()
             epoch_loss += loss.item()
             batch_count += 1
             if batch_count % log_interval == 0:
-                tk0.set_postfix(loss=total_loss / log_interval, lr=self.optimizer.param_groups[0]['lr'])
-                total_loss = 0
+                tk0.set_postfix(loss=interval_loss / log_interval, lr=self.optimizer.param_groups[0]['lr'])
+                interval_loss = 0
 
         if self.in_batch_neg and batch_count == 0:
             raise ValueError("No usable in-batch ranking batches. Provide at least two positive rows per batch.")

@@ -113,10 +113,10 @@ class MTLTrainer(object):
     def train_one_epoch(self, data_loader, log_interval=10):
         """Train one epoch; log_interval is a positive integer, defaulting to 10."""
         self.model.train()
-        total_loss = np.zeros(self.n_task)
         interval_loss = np.zeros(self.n_task)
+        epoch_loss = np.zeros(self.n_task)
         tk0 = tqdm.tqdm(data_loader, desc="train", smoothing=0, mininterval=1.0)
-        for iter_i, (x_dict, ys) in enumerate(tk0):
+        for batch_count, (x_dict, ys) in enumerate(tk0, start=1):
             x_dict = {k: v.to(self.device) for k, v in x_dict.items()}  # tensor to GPU
             ys = ys.to(self.device)
             y_preds = self.model(x_dict)
@@ -159,13 +159,13 @@ class MTLTrainer(object):
                 loss.backward()
                 self.optimizer.step()
             loss_values = np.array([l.item() for l in loss_list])
-            total_loss += loss_values
             interval_loss += loss_values
-            if (iter_i + 1) % log_interval == 0:
+            epoch_loss += loss_values
+            if batch_count % log_interval == 0:
                 tk0.set_postfix({f'task_{i}_loss': interval_loss[i] / log_interval for i in range(self.n_task)}, lr=self._current_lr())
                 interval_loss.fill(0)
-        log_dict = {"task_%d:" % (i): total_loss[i] / (iter_i + 1) for i in range(self.n_task)}
-        loss_list = [total_loss[i] / (iter_i + 1) for i in range(self.n_task)]
+        log_dict = {"task_%d:" % (i): epoch_loss[i] / batch_count for i in range(self.n_task)}
+        loss_list = [epoch_loss[i] / batch_count for i in range(self.n_task)]
         print("train loss: ", log_dict)
         if self.loss_weight:
             print("loss weight: ", [w.item() for w in self.loss_weight])
