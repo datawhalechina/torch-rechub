@@ -45,7 +45,7 @@ class HLLMTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, rel_pos_bias=None):
+    def forward(self, x, rel_pos_bias=None, padding_mask=None):
         """Forward pass.
         
         Args:
@@ -81,7 +81,14 @@ class HLLMTransformerBlock(nn.Module):
         if rel_pos_bias is not None:
             scores = scores + rel_pos_bias
 
+        allowed = causal_mask.unsqueeze(0).unsqueeze(0)
+        if padding_mask is not None:
+            allowed = allowed & padding_mask[:, None, None, :]
+        # An all-PAD query has no legal keys: zero its weights after softmax.
+        scores = scores.masked_fill(~allowed, torch.finfo(scores.dtype).min)
+
         attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = attn_weights.masked_fill(~allowed, 0)
         attn_weights = self.dropout(attn_weights)
 
         attn_output = torch.matmul(attn_weights, V)
@@ -97,6 +104,8 @@ class HLLMTransformerBlock(nn.Module):
         x = self.norm2(x)
         x = self.ffn(x)
         x = residual + x
+        if padding_mask is not None:
+            x = x * padding_mask.unsqueeze(-1).to(x.dtype)
 
         return x
 
@@ -107,7 +116,8 @@ class HLLMModel(nn.Module):
     This is a lightweight implementation of HLLM that uses pre-computed item
     embeddings as input. The original ByteDance HLLM uses end-to-end training
     with both Item LLM and User LLM, but this implementation focuses on the
-    User LLM component for resource efficiency.
+    sequence encoder for resource efficiency. By default it is an HLLM-inspired
+    baseline, not a pretrained User LLM or full end-to-end paper reproduction.
 
     Architecture:
         - Item Embeddings: Pre-computed using LLM (offline, frozen)
@@ -141,10 +151,38 @@ class HLLMModel(nn.Module):
             so logits = cos(x, emb) / temperature, bounded in [-1/T, +1/T].
             Loss functions should be configured with their own temperature=1.0
             to avoid double scaling.
+        user_model (nn.Module, optional): Supplied pretrained causal base model,
+            e.g. AutoModel, returning last_hidden_state from inputs_embeds.
+            Its hidden size must match d_model. A causal-LM vocabulary head is
+            not needed. No checkpoint is downloaded by this class.
+        project_items (bool): Default False preserves the dimension check.
+            True allows a small trainable projection from cached LLM embeddings
+            to d_model; this is a resource-saving approximation, not paper HLLM.
+        learn_temperature (bool): Default False preserves fixed temperature.
+            True learns a logit scale clamped to [1, 100], like the reference.
     """
 
-    def __init__(self, item_embeddings, vocab_size, d_model=512, n_heads=8, n_layers=4, max_seq_len=256, dropout=0.1, use_rel_pos_bias=True, use_time_embedding=True, num_time_buckets=2048, time_bucket_fn='sqrt', temperature=0.07):
+    def __init__(
+        self,
+        item_embeddings,
+        vocab_size,
+        d_model=512,
+        n_heads=8,
+        n_layers=4,
+        max_seq_len=256,
+        dropout=0.1,
+        use_rel_pos_bias=True,
+        use_time_embedding=True,
+        num_time_buckets=2048,
+        time_bucket_fn='sqrt',
+        temperature=0.07,
+        user_model=None,
+        project_items=False,
+        learn_temperature=False
+    ):
         super().__init__()
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.n_heads = n_heads
@@ -154,6 +192,7 @@ class HLLMModel(nn.Module):
         self.num_time_buckets = num_time_buckets
         self.time_bucket_fn = time_bucket_fn
         self.temperature = temperature
+        self.logit_scale = nn.Parameter(torch.tensor(math.log(1.0 / temperature))) if learn_temperature else None
 
         # Load item embeddings
         if isinstance(item_embeddings, str):
@@ -164,28 +203,37 @@ class HLLMModel(nn.Module):
                              f"!= vocab_size={vocab_size}. "
                              "Embedding tensor must be indexed by token_id "
                              "(row i = embedding of vocab token i, row 0 = PAD).")
-        if item_embeddings.shape[1] != d_model:
-            raise ValueError(f"item_embeddings.shape[1]={item_embeddings.shape[1]} != d_model={d_model}")
+        if item_embeddings.shape[1] != d_model and not project_items:
+            raise ValueError(f"item_embeddings.shape[1]={item_embeddings.shape[1]} != d_model={d_model}; set project_items=True to learn a projection")
+        self.item_projection = nn.Identity() if item_embeddings.shape[1] == d_model else nn.Linear(item_embeddings.shape[1], d_model, bias=False)
+        # Optional pretrained causal base model accepting inputs_embeds.
+        # Do not load checkpoints or execute remote model code implicitly.
+        self.user_model = user_model
+        if user_model is not None and user_model.config.hidden_size != d_model:
+            raise ValueError("user_model.config.hidden_size must match d_model")
 
-        # Normalize once because item embeddings are frozen.
-        item_embeddings = F.normalize(item_embeddings.float(), dim=-1, eps=1e-8)
+        # Preserve raw input magnitudes for an external pretrained User LLM.
+        # The historical small-encoder path keeps its normalized cache.
+        item_embeddings = item_embeddings.float()
+        if user_model is None:
+            item_embeddings = F.normalize(item_embeddings, dim=-1, eps=1e-8)
 
         # Register as buffer (not trainable)
         self.register_buffer('item_embeddings', item_embeddings)
 
         # Positional embedding
-        self.position_embedding = nn.Embedding(max_seq_len, d_model)
+        self.position_embedding = nn.Embedding(max_seq_len, d_model) if user_model is None else None
 
         # Time embedding
-        if use_time_embedding:
+        if use_time_embedding and user_model is None:
             self.time_embedding = nn.Embedding(num_time_buckets + 1, d_model, padding_idx=0)
 
         # Transformer blocks
-        self.transformer_blocks = nn.ModuleList([HLLMTransformerBlock(d_model=d_model, n_heads=n_heads, dropout=dropout) for _ in range(n_layers)])
+        self.transformer_blocks = nn.ModuleList([HLLMTransformerBlock(d_model=d_model, n_heads=n_heads, dropout=dropout) for _ in range(n_layers)] if user_model is None else [])
 
         # Relative position bias
         self.use_rel_pos_bias = use_rel_pos_bias
-        if use_rel_pos_bias:
+        if use_rel_pos_bias and user_model is None:
             self.rel_pos_bias = RelPosBias(n_heads, max_seq_len)
 
         # Dropout
@@ -196,6 +244,8 @@ class HLLMModel(nn.Module):
     def _init_weights(self):
         """Initialize model parameters."""
         for name, param in self.named_parameters():
+            if name.startswith('user_model.'):
+                continue  # Keep supplied pretrained weights (including LoRA).
             if 'weight' in name and len(param.shape) > 1:
                 nn.init.xavier_uniform_(param)
             elif 'bias' in name:
@@ -216,20 +266,30 @@ class HLLMModel(nn.Module):
         buckets = torch.clamp(buckets, min=0, max=self.num_time_buckets - 1)
         return buckets
 
-    def forward(self, seq_tokens, time_diffs=None):
-        """Forward pass.
+    def encode(self, seq_tokens, time_diffs=None):
+        """Encode history into states, masking PAD keys and PAD outputs.
         
         Args:
             seq_tokens (Tensor): Item token IDs of shape (B, L).
             time_diffs (Tensor, optional): Time differences in seconds of shape (B, L).
             
         Returns:
-            Tensor: Logits of shape (B, L, vocab_size).
+            Tensor: States of shape (B, L, d_model).
         """
         batch_size, seq_len = seq_tokens.shape
+        if seq_len > self.max_seq_len:
+            raise ValueError("Sequence exceeds max_seq_len")
+        padding_mask = seq_tokens.ne(0)
 
         # Look up item embeddings
-        item_emb = self.item_embeddings[seq_tokens]  # (B, L, D)
+        item_emb = self.item_projection(self.item_embeddings[seq_tokens])
+        if self.user_model is not None:
+            # Position/time modelling belongs to the supplied causal LLM.
+            # Cached embeddings/projection may be FP32 while a pretrained
+            # User LLM uses FP16/BF16; align inputs without breaking gradients.
+            item_emb = item_emb.to(dtype=self.user_model.get_input_embeddings().weight.dtype)
+            outputs = self.user_model(inputs_embeds=item_emb, attention_mask=padding_mask.long(), use_cache=False, return_dict=True)
+            return outputs.last_hidden_state * padding_mask.unsqueeze(-1).to(item_emb.dtype)
 
         # Add positional embedding
         positions = torch.arange(seq_len, dtype=torch.long, device=seq_tokens.device)
@@ -246,6 +306,7 @@ class HLLMModel(nn.Module):
             embeddings = embeddings + time_emb
 
         embeddings = self.dropout(embeddings)
+        embeddings = embeddings * padding_mask.unsqueeze(-1).to(embeddings.dtype)
 
         # Get relative position bias
         rel_pos_bias = None
@@ -255,11 +316,29 @@ class HLLMModel(nn.Module):
         # Pass through transformer blocks
         x = embeddings
         for block in self.transformer_blocks:
-            x = block(x, rel_pos_bias=rel_pos_bias)
+            x = block(x, rel_pos_bias=rel_pos_bias, padding_mask=padding_mask)
+        return x
 
+    def score_items(self, states, item_ids):
+        """Cosine scores on a candidate subset; item table remains frozen."""
         # Scoring head: cosine similarity with normalized item embeddings
         # x: (B, L, D), item_embeddings: (V, D)
-        x = F.normalize(x, dim=-1, eps=1e-8)
-        logits = torch.matmul(x, self.item_embeddings.t()) / self.temperature  # (B, L, V)
+        states = F.normalize(states.float(), dim=-1, eps=1e-8)
+        items = self.get_item_embeddings(item_ids)
+        if self.logit_scale is not None:
+            with torch.no_grad():
+                self.logit_scale.clamp_(0, math.log(100))
+            scale = self.logit_scale.exp()
+        else:
+            scale = 1.0 / self.temperature
+        logits = torch.matmul(states, items.t()) * scale
 
         return logits
+
+    def get_item_embeddings(self, item_ids):
+        """Normalized candidate vectors, including the optional projection."""
+        return F.normalize(self.item_projection(self.item_embeddings[item_ids]).float(), dim=-1, eps=1e-8)
+
+    def forward(self, seq_tokens, time_diffs=None):
+        """Preserve the full-vocabulary forward API."""
+        return self.score_items(self.encode(seq_tokens, time_diffs), torch.arange(self.vocab_size, device=seq_tokens.device))

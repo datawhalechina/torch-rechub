@@ -2,9 +2,9 @@
 
 Notes on memory:
     Amazon Books has ~686k items, so the per-batch logits tensor
-    ``(B, L, V)`` is large. Defaults here (``d_model=64``, ``batch_size=64``,
-    ``max_seq_len=50``) are tuned to fit on a 24 GB GPU. Scale them up on
-    larger cards (e.g. ``--d_model 256 --batch_size 128``).
+    ``(B, L, V)`` is large. Full-vocabulary CE is retained for compatibility,
+    not promised to fit a 16/24 GB GPU. Start with ``--loss_type sampled_softmax
+    --batch_size 16 --max_seq_len 50 --amp`` and measure peak memory.
 """
 
 import os
@@ -18,13 +18,11 @@ if REPO_ROOT not in sys.path:
 
 import numpy as np
 import torch
-import tqdm
 
 from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hstu import HSTUModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator, pad_sequences
-from torch_rechub.utils.hstu_utils import VocabMask
 
 
 def get_amazon_books_data(data_dir=None, max_seq_len=50):
@@ -100,45 +98,25 @@ def get_amazon_books_data(data_dir=None, max_seq_len=50):
     return train_data, val_data, test_data, vocab_size
 
 
-def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,), filter_seen=True):
-    """Evaluate top-K ranking metrics on the test set.
-
-    PAD (token id 0), any ids in ``invalid_items``, and optionally each user's
-    historical items are masked out before top-K. Filtering history matches the
-    Meta public evaluation protocol for HSTU/SASRec.
-    """
-    model = model.to(device)
-    model.eval()
-    vocab_mask = VocabMask(model.vocab_size, invalid_items=list(invalid_items)).to(device)
-
-    y_true = {}
-    y_pred = {}
-
-    user_idx = 0
-    with torch.no_grad():
-        for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
-            seq_tokens = seq_tokens.to(device)
-            seq_time_diffs = seq_time_diffs.to(device)
-            targets = targets.cpu().numpy()
-
-            logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
-            seen_ids = seq_tokens if filter_seen else None
-            last_logits = vocab_mask.apply_mask(logits[:, -1, :], invalid_ids=seen_ids)  # (B, V)
-
-            max_k = max(topKs)
-            _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
-            top_items = top_items.cpu().numpy()
-
-            for i in range(top_items.shape[0]):
-                user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]
-                y_pred[user_id] = top_items[i].tolist()
-                user_idx += 1
-
-    return topk_metrics(y_true, y_pred, topKs=topKs)
-
-
-def main(dataset_path=None, model_name='hstu', epoch=3, learning_rate=1e-3, batch_size=64, weight_decay=1e-5, device='cuda', save_dir='./', seed=2022, max_seq_len=50, d_model=64, n_heads=4, n_layers=2):
+def main(
+    dataset_path=None,
+    model_name='hstu',
+    epoch=3,
+    learning_rate=1e-3,
+    batch_size=64,
+    weight_decay=1e-5,
+    device='cuda',
+    save_dir='./',
+    seed=2022,
+    max_seq_len=50,
+    d_model=64,
+    n_heads=4,
+    n_layers=2,
+    loss_type='cross_entropy',
+    num_negatives=128,
+    accumulation_steps=1,
+    amp=False
+):
     """Main training and evaluation entry point.
 
     Args:
@@ -184,8 +162,8 @@ def main(dataset_path=None, model_name='hstu', epoch=3, learning_rate=1e-3, batc
     test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
 
     train_dataloader = train_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-    val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-    test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
+    val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0, shuffle=False)[0]
+    test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0, shuffle=False)[0]
 
     print(f"Vocab size: {vocab_size}")
     print(f"Train size: {len(train_dataloader.dataset)}")
@@ -215,6 +193,10 @@ def main(dataset_path=None, model_name='hstu', epoch=3, learning_rate=1e-3, batc
         earlystop_patience=10,
         device=device,
         model_path=save_dir,
+        loss_type=loss_type,
+        loss_params={'num_negatives': num_negatives} if loss_type == 'sampled_softmax' else None,
+        accumulation_steps=accumulation_steps,
+        amp=amp,
     )
 
     print("\nStart training...")
@@ -226,7 +208,11 @@ def main(dataset_path=None, model_name='hstu', epoch=3, learning_rate=1e-3, batc
     print(f"Test accuracy: {test_accuracy:.4f}")
 
     print("\nComputing ranking metrics...")
-    ranking_results = evaluate_ranking(model, test_dataloader, device, topKs=[10, 50, 200])
+    topKs = sorted({min(k, vocab_size - 1) for k in [10, 50, 200]})
+    predictions = trainer.predict(test_dataloader, top_k=max(topKs), filter_seen=True)
+    y_true = {str(i): [int(target)] for i, target in enumerate(test_data['targets'])}
+    y_pred = {str(i): items.tolist() for i, items in enumerate(predictions)}
+    ranking_results = topk_metrics(y_true, y_pred, topKs=topKs)
 
     print("\nRanking metrics on the test set:")
     print("=" * 50)
@@ -256,6 +242,28 @@ if __name__ == '__main__':
     parser.add_argument('--d_model', type=int, default=64, help='Hidden dimension')
     parser.add_argument('--n_heads', type=int, default=4, help='Number of attention heads')
     parser.add_argument('--n_layers', type=int, default=2, help='Number of HSTU layers')
+    parser.add_argument('--loss_type', default='cross_entropy', choices=['cross_entropy', 'sampled_softmax'])
+    parser.add_argument('--num_negatives', type=int, default=128)
+    parser.add_argument('--accumulation_steps', type=int, default=1)
+    parser.add_argument('--amp', action='store_true')
 
     args = parser.parse_args()
-    main(args.dataset_path, args.model_name, args.epoch, args.learning_rate, args.batch_size, args.weight_decay, args.device, args.save_dir, args.seed, args.max_seq_len, args.d_model, args.n_heads, args.n_layers)
+    main(
+        args.dataset_path,
+        args.model_name,
+        args.epoch,
+        args.learning_rate,
+        args.batch_size,
+        args.weight_decay,
+        args.device,
+        args.save_dir,
+        args.seed,
+        args.max_seq_len,
+        args.d_model,
+        args.n_heads,
+        args.n_layers,
+        args.loss_type,
+        args.num_negatives,
+        args.accumulation_steps,
+        args.amp
+    )
