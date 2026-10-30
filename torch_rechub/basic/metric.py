@@ -11,9 +11,7 @@ Beyond-accuracy metrics:
 
 Authors: Qida Dong, dongjidan@126.com
 """
-import warnings
 from collections import defaultdict
-from numbers import Integral
 
 import numpy as np
 from sklearn.metrics import roc_auc_score
@@ -49,6 +47,8 @@ def get_user_pred(y_true, y_pred, users):
 def gauc_score(y_true, y_pred, users, weights=None):
     """compute GAUC
 
+        Users with only one label class are excluded from the weighted average.
+
         Args:
                 y_true (array): dim(N, ), all true labels of the data
                 y_pred (array): dim(N, ), the predicted score
@@ -64,25 +64,19 @@ def gauc_score(y_true, y_pred, users, weights=None):
     user_pred = get_user_pred(y_true, y_pred, users)
     score = 0
     num = 0
-    skipped = 0
     for u in user_pred.keys():
         if len(set(user_pred[u]['y_true'])) < 2:
-            skipped += 1
             continue
         auc = auc_score(user_pred[u]['y_true'], user_pred[u]['y_pred'])
         if weights is None:
             user_weight = len(user_pred[u]['y_true'])
         else:
             user_weight = weights[u]
-        if not np.isfinite(user_weight) or user_weight < 0:
-            raise ValueError("GAUC weights must be finite and nonnegative")
         auc *= user_weight
         num += user_weight
         score += auc
     if num == 0:
         raise ValueError("GAUC requires a positive-weight user with both label classes")
-    if skipped:
-        warnings.warn(f"GAUC skipped {skipped}/{len(user_pred)} users with a single label class", RuntimeWarning, stacklevel=2)
     return score / num
 
 
@@ -133,19 +127,13 @@ def topk_metrics(y_true, y_pred, topKs=None):
         Return:
                 results (dict): {metric_name: metric_values}, it contains five metrics, 'ndcg', 'recall', 'mrr', 'hit', 'precision'
 
-        Hit keeps the original total hits / total relevant items definition.
-        Other metrics average over all users, including users without relevant items.
-        Evaluation requires at least one relevant item; input IDs are not deduplicated.
         """
     if topKs is None:
         topKs = [5]
-    if set(y_true) != set(y_pred):
-        raise ValueError("y_true and y_pred must contain the same user IDs")
-    if not any(len(items) for items in y_true.values()):
-        raise ValueError("topk_metrics requires at least one relevant item")
+    assert len(y_true) == len(y_pred)
 
-    if not isinstance(topKs, (tuple, list)) or any(isinstance(k, bool) or not isinstance(k, Integral) or k < 1 for k in topKs):
-        raise ValueError("topKs must be a list or tuple of positive integers")
+    if not isinstance(topKs, (tuple, list)):
+        raise ValueError('topKs wrong, it should be tuple or list')
 
     pred_array = []
     true_array = []
