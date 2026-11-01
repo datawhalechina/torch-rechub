@@ -194,6 +194,12 @@ class VectorQuantizer(nn.Module):
         self.embedding.weight.data.copy_(centers)
         self.initted = True
 
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+        # A restored codebook must not be overwritten by first-batch K-Means.
+        if prefix + "embedding.weight" in state_dict:
+            self.initted = True
+
     @staticmethod
     def center_distance_for_constraint(distances):
         """
@@ -278,8 +284,8 @@ class ResidualVectorQuantizer(nn.Module):
     """ResidualVectorQuantizer: Multi-stage residual vector quantization.
 
     Applies a sequence of VectorQuantizer modules to progressively
-    quantize the residuals of the input. Computes mean quantization
-    loss across all stages. References:SoundStream: An End-to-End Neural Audio Codec
+    quantize the residuals of the input. Sums quantization losses
+    across stages, as in TIGER. References:SoundStream: An End-to-End Neural Audio Codec
     https://arxiv.org/pdf/2107.03312.pdf
 
     Parameters
@@ -306,7 +312,7 @@ class ResidualVectorQuantizer(nn.Module):
         x : torch.Tensor of shape (batch_size, ..., e_dim)
     Output
         x_q : torch.Tensor of shape (batch_size, ..., e_dim)
-        mean_losses : torch.Tensor, scalar mean quantization loss
+        quant_loss : torch.Tensor, scalar sum of quantization losses
         all_indices : torch.Tensor of shape (batch_size, ..., num_quantizers)
 
     Examples
@@ -370,8 +376,8 @@ class ResidualVectorQuantizer(nn.Module):
         x_q : torch.Tensor
             Quantized output obtained by summing the outputs of all
             residual quantizers.
-        mean_losses : torch.Tensor
-            Mean vector quantization loss averaged over all stages.
+        quant_loss : torch.Tensor
+            Sum of vector quantization losses across all stages.
         all_indices : torch.Tensor
             Tensor containing codebook indices from all quantizers,
             stacked along the last dimension.
@@ -389,16 +395,19 @@ class ResidualVectorQuantizer(nn.Module):
         residual = x
         for quantizer in self.vq_layers:
             x_res, loss, indices = quantizer(residual, use_sk=use_sk)
-            residual = residual - x_res
-            x_q = x_q + x_res
+            # Later commitment losses still train the encoder through residuals.
+            residual = residual - x_res.detach()
+            x_q = x_q + x_res.detach()
 
             all_losses.append(loss)
             all_indices.append(indices)
 
-        mean_losses = torch.stack(all_losses).mean()
+        quant_loss = torch.stack(all_losses).sum()
         all_indices = torch.stack(all_indices, dim=-1)
 
-        return x_q, mean_losses, all_indices
+        # Apply straight-through once, rather than once per residual level.
+        x_q = x + (x_q - x).detach()
+        return x_q, quant_loss, all_indices
 
 
 class RQVAEModel(nn.Module):
@@ -637,9 +646,8 @@ class RQVAEModel(nn.Module):
         The loader must visit every row exactly once in dataset order. Optional
         item_ids maps those rows to business IDs; otherwise keys are row indices.
         Re-export the complete catalog after changing RQ-VAE or catalog order.
+        use_sk is retained for compatibility; export uses nearest codes and a collision suffix.
         """
-        import warnings
-
         from torch.utils.data import SequentialSampler
 
         if not isinstance(data_loader.sampler, SequentialSampler) or data_loader.drop_last:
@@ -653,8 +661,6 @@ class RQVAEModel(nn.Module):
         item_ids = list(range(len(data))) if item_ids is None else list(item_ids)
         if len(item_ids) != len(data) or len({str(item) for item in item_ids}) != len(item_ids):
             raise ValueError("item_ids must be unique and aligned with catalog rows")
-        if use_sk:
-            warnings.warn("Export uses nearest codes plus a collision suffix; use_sk is retained for compatibility")
         codes = []
         was_training = self.training
         self.eval()

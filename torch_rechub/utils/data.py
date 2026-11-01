@@ -633,6 +633,7 @@ class EmbDataset(Dataset):
 
 
 class TigerSeqDataset(Dataset):
+    """Item histories with unique semantic token lists; user_bucket_size=0 disables user tokens."""
 
     def __init__(self, inters_json, indices_json, max_his_len, mode="train", sample_num=0, user_bucket_size=0):
 
@@ -641,18 +642,10 @@ class TigerSeqDataset(Dataset):
         self.max_his_len = max_his_len
         self.sample_num = sample_num
         self.mode = mode
-        if not isinstance(user_bucket_size, int) or user_bucket_size < 0:
-            raise ValueError("user_bucket_size must be a non-negative integer")
         self.user_bucket_size = user_bucket_size
-        if any(not isinstance(code, (list, tuple)) for code in indices_json.values()):
-            raise ValueError("Each semantic ID must be a list of tokens")
-        codes = [tuple(code) for code in indices_json.values()]
-        if not codes or len(set(codes)) != len(codes):
+        codes = ["".join(code) for code in indices_json.values()]
+        if len(set(codes)) != len(codes):
             raise ValueError("Semantic IDs must identify each item uniquely; export collision suffixes first")
-        if any(not code or any(not isinstance(token, str) for token in code) for code in codes):
-            raise ValueError("Each semantic ID must be a non-empty sequence of strings")
-        if len({"".join(code) for code in codes}) != len(codes):
-            raise ValueError("Concatenated semantic IDs must remain unique")
 
         # cache
         self.new_tokens = None

@@ -6,9 +6,9 @@
 
 | 模块 | 本框架的实现 | 与论文或官方代码的差别 |
 | --- | --- | --- |
-| HSTU | dense 注意力；未缩放 QK 加 head-shared bias，再做 SiLU/N | 保留本框架的同位置时间差输入；不是官方下一事件时间语义，也不兼容官方 checkpoint |
+| HSTU | dense 注意力；无仿射 LayerNorm、无偏置 UVQK；未缩放 QK 加 head-shared bias，再做 SiLU/N | 保留本框架的同位置时间差输入；不是官方下一事件时间语义，也不兼容官方 checkpoint |
 | HLLM | 冻结离线 Item 向量；默认使用随机初始化的小 Transformer，也可传入已有 User 模型 | 默认只是 HLLM-inspired baseline；冻结 Item 的预训练 User 模型方案也不是双 LLM 联合训练 |
-| RQ-VAE | 隐藏层 ReLU，latent 和重建末层 Linear；顺序导出唯一语义 ID | 特征文本、向量模型和训练日程由用户确定，不能仅凭结构相似声称复现 |
+| RQ-VAE | 隐藏层 ReLU，latent 和重建末层 Linear；逐层量化损失求和，最终输出只做一次直通梯度；顺序导出唯一语义 ID | MSE 使用元素平均；特征文本、向量模型和训练日程由用户确定，不能仅凭结构相似声称复现 |
 | TIGER | 离线语义 tokenizer、用户桶 token、HF T5、目录约束 beam search | 使用 Hugging Face 而非论文 T5X；小配置不代表参数量、评估协议或结果完全一致 |
 
 依据：[Meta HSTU 实现](https://github.com/meta-recsys/generative-recommenders/blob/main/generative_recommenders/research/modeling/sequential/hstu.py)、[ByteDance HLLM 实现](https://github.com/bytedance/HLLM/blob/main/code/REC/model/HLLM/hllm.py)、[TIGER 论文](https://arxiv.org/html/2305.05065v3)。
@@ -39,11 +39,12 @@ item_ids = trainer.predict(test_loader, top_k=10)
 
 这里是正例加随机目录负例的交叉熵，不是召回模块的 B×B in-batch，也不是带 log-Q 修正的全词表 softmax 估计器。有效序列位置共享一组负例，只屏蔽抽中该位置正例本身的项；未引入召回 ID 去重规则。
 
-- 序列必须连续，可左或右 padding；例如 `[1,2,3,0,0]` 的下一项为 4，监督为 `[2,3,4,0,0]`。
+- 支持左、右 padding，也允许历史中有 OOV=0。例如 `[1,2,3,0,0]` 的下一项为 4，监督为 `[2,3,4,0,0]`；`[1,0,2,3]` 的监督为 `[0,0,3,4]`，不训练未知物品，也不把未知位置拼成新的已知相邻关系。每条历史至少有一个已知物品，目标是非零物品 ID。
 - `evaluate` 的 accuracy 使用全目录 top-1；采样模式的验证 loss 使用固定抽样，不可与全词表 CE 数值直接比较。
 - `predict` 分块计算全目录 top-k，排除 PAD；`filter_seen=False` 是默认值，开启后不足 K 个候选用 -1 填充。测试 loader 应设置 `shuffle=False`，便于与原始目标逐行对齐。
 - 每次验证 accuracy 严格提升立即保存 `model.pth`，正常结束恢复最佳权重。同分不替换；没有验证集时保存最终权重。最佳快照只由 EarlyStopper 管理并放在 CPU。
 - 梯度累积是等权微批平均，尾部不足一个累积组也会更新；不会自动扩大负例池。
+- 调度器沿用每个 epoch 调用一次 `step()` 的约定，不自动推断监控指标或 batch 更新频率。
 - 新采样路径只支持单设备；完整 optimizer/scaler 断点恢复和跨卡负例汇集后置。
 
 ## 3. 简单的小显存入口
@@ -81,6 +82,10 @@ model = HLLMModel(
 
 传入的是输出 hidden states 的 base model，而不是带语言词表预测头的 CausalLM 包装。调用方负责选用因果模型和确定冻结策略。本框架不会重新初始化其权重，也不自动下载权重或配置 LoRA。
 
+显存紧张时可先调用 `base.gradient_checkpointing_enable()`。冻结 Item 缓存本身没有梯度，模型会为送入检查点的输入激活开启梯度，确保 User LLM 参数仍能训练；这不会使缓存变成可训练参数。
+
+原 HLLM 的 Item LLM 使用可训练的物品聚合 token。示例预处理提取普通末 token 的冻结向量只是近似，不能把它称为原双 LLM 联合训练的复现。
+
 ## 4. RQ-VAE 与 TIGER 的目录必须一致
 
 训练 RQ-VAE 可 shuffle，导出 SID 必须按目录顺序。业务 item ID 必须与向量行号或显式 `item_ids` 对齐，PAD 行不应作为推荐物品导出。
@@ -102,10 +107,24 @@ TIGER 默认 tokenizer 完全离线；如选用 `--base_model` 的 T5 tokenizer�
 
 ## 5. 权重兼容与验证范围
 
-- HSTU 的相对偏置从每个 head 一份改为共享，数学缩放也改变；旧模型请重新训练，不使用 `strict=False` 掩盖不匹配。
+- HSTU 的相对偏置改为 head 共享，LayerNorm 使用 `eps=1e-6, elementwise_affine=False`，UVQK 无 bias，按 U/V/Q/K 顺序拆分，投影使用官方的正态初始化；旧模型请重新训练，不使用 `strict=False` 掩盖不匹配。
 - RQ-VAE 线性末层改变了结构和参数键。请重新训练、重新导出 SID，再训练 TIGER，不能混用旧 tokenizer/权重。
 - HLLM 未开启投影、可学习温度、外部 User 模型时保留原参数结构；PAD 修正会改变错误的旧数值行为。
 - 通用 MLP 的 `batchnorm` 默认仍为 True；RQ-VAE 的 `bn=False` 现在真正生效，不改变召回/排序默认配置。
 - 绘图继续复用公共可视化入口，ONNX 导出保留原 forward 输出；不保证任意外部 User LLM 都可导出。
 
-本次使用小型 CPU 数据验证训练、预测和保存边界，不把它当成论文效果或真实 16G/24G 显存测试。完整真实数据集效果、双 LLM 联合训练和多卡采样留待独立工作。
+## 6. 本轮 review 中修正的关键问题
+
+- **RQ-VAE 梯度**：原先每层都把直通输出从 residual 中相减，后续层的 commitment loss 对 encoder 的梯度会被抵消。现在使用 `residual -= code.detach()`，累计量化结果后只做一次 `x + (quantized - x).detach()`。各层量化损失按论文求和。加载码本后也不再重新 K-Means 覆盖权重。
+- **配对正例打分**：原先分块计算正例矩阵再取对角线。现在 `score_items(states, positive_ids, paired=True)` 直接逐行内积；负例仍是候选矩阵打分，避免额外循环和无用矩阵。
+- **词表显存**：全词表 forward 直接使用权重，避免先用 `arange(V)` 索引复制整张表；大目录训练仍推荐显式启用采样。
+- **输入约定与风格**：移除历史中间不能出现 0 的限制，去掉正整数参数的重复检查。TIGER 只保留实际语义 ID 字符串的唯一性检查，因为碰撞会使不同物品无法区分。
+- **CI**：Bandit 将 tokenizer 的 `<unk>`、`<pad>` 误认为密码，只在两个调用处使用 `# nosec B106` 并说明用途，不关闭安全扫描。
+
+本地 RTX 5080（16GB）、PyTorch 2.9.1+cu130 已完成 HSTU/HLLM 全词表、采样、AMP 的 6 组训练，每组 3 轮，覆盖内部 OOV、左右 padding、梯度累积尾组、最佳权重恢复和分块 top-k 对照。没有跳过优化器更新。
+
+另以目录 100,000 个物品、batch=16、序列长 200、hidden=128、2 层、128 个负例执行一次 AMP 前后向及参数更新，PyTorch 峰值分配分别约 HSTU 265MB、HLLM 160MB。这是小编码器和合成输入的显存测量，不包含预训练双 LLM，也不是完整数据集训练或论文指标复现。
+
+RQ-VAE 的现有 GPU 示例用 1,024 个合成向量训练 3 轮，保存、加载、导出通过；排除 PAD 后得到 1,023 个唯一 SID，峰值分配约 29MB。TIGER 的 MovieLens、Amazon 两个现有示例均完成离线 toy 数据训练、FP16、gradient checkpointing、约束 beam search 和断点续训，峰值分配约 102MB，使用默认 4+4 层结构。29 项现有定向测试及与线上相同规则的 Bandit 扫描通过。
+
+另用独立运算公式核对 HSTU 前向和梯度；用微型随机 Llama 检查外部 User 模型权重不被重置、因果性及 checkpoint 梯度。它验证接口和实现，不代表已经加载真实预训练 LLM 并完成论文数据集训练。

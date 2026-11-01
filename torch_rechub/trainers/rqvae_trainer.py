@@ -69,8 +69,6 @@ class Trainer(object):
         self.model_path = model_path
         self.model_logger = model_logger
         self.eval_step = eval_step
-        if not isinstance(eval_step, int) or eval_step < 1:
-            raise ValueError("eval_step must be a positive integer")
 
         self.best_save_heap = []
         self.newest_save_queue = []
@@ -232,9 +230,7 @@ class Trainer(object):
                 else:
                     cur_eval_step += 1
                 # ========== Log once per epoch ==========
-            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                self.scheduler.step(train_loss)
-            elif self.scheduler is not None:
+            if self.scheduler is not None:
                 self.scheduler.step()
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_idx)

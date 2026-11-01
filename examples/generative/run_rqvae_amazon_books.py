@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument('--e_dim', type=int, default=32, help='vq codebook embedding size')
     parser.add_argument('--quant_loss_weight', type=float, default=1.0, help='vq quantion loss weight')
     parser.add_argument("--beta", type=float, default=0.25, help="Beta for commitment loss")
-    parser.add_argument('--layers', type=int, nargs='+', default=[2048, 1024, 512, 256, 128, 64], help='hidden sizes of every layer')
+    parser.add_argument('--layers', type=int, nargs='+', default=[512, 256, 128], help='hidden sizes of every layer')
 
     return parser.parse_args()
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     )
     print(model)
     data_loader = DataLoader(data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
-    trainer = Trainer(model, optimizer_fn=torch.optim.Adam, optimizer_params={'lr': args.learning_rate, 'weight_decay': 1e-5}, n_epoch=args.epochs, device=args.device, model_path=args.model_path, eval_step=args.eval_step)
+    trainer = Trainer(model, optimizer_fn=torch.optim.Adam, optimizer_params={'lr': args.learning_rate, 'weight_decay': args.weight_decay}, n_epoch=args.epochs, device=args.device, model_path=args.model_path, eval_step=args.eval_step)
     best_loss, best_collision_rate = trainer.fit(data_loader)
 
     print("Best Loss", best_loss)

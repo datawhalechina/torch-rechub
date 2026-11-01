@@ -38,10 +38,11 @@ class TIGERModel(T5ForConditionalGeneration):
         if {"<pad>", "</s>", "<unk>"}.intersection(tokens):
             raise ValueError("Semantic/user tokens must not use reserved special-token names")
         vocab = {token: index for index, token in enumerate(["<pad>", "</s>", "<unk>"] + sorted(set(tokens)))}
-        backend = Tokenizer(WordLevel(vocab, unk_token="<unk>"))
+        # These are tokenizer vocabulary markers, not authentication tokens.
+        backend = Tokenizer(WordLevel(vocab, unk_token="<unk>"))  # nosec B106
         backend.pre_tokenizer = WhitespaceSplit()
         backend.post_processor = TemplateProcessing(single="$A </s>", pair="$A </s> $B </s>", special_tokens=[("</s>", 1)])
-        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, pad_token="<pad>", eos_token="</s>", unk_token="<unk>", model_max_length=model_max_length)
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, pad_token="<pad>", eos_token="</s>", unk_token="<unk>", model_max_length=model_max_length)  # nosec B106
         tokenizer.add_tokens(sorted(set(tokens)))
         return tokenizer
 

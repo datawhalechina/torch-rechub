@@ -19,7 +19,8 @@ class HSTUModel(nn.Module):
       embedding on the input side.
     - Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
       projection **before** splitting (Eq. 2), so all four streams go through
-      the non-linearity.
+      the non-linearity. LayerNorm has no affine parameters (eps=1e-6), and
+      the joint projection has no bias, matching the reference.
     - Like Meta's ``rel_bias`` path, attention uses unscaled QK and a
       head-shared relative bias before ``SiLU(scores) / seq_len`` (Eq. 3).
       This dense adaptation retains same-position time differences; Meta's
@@ -178,13 +179,16 @@ class HSTUModel(nn.Module):
     def _init_weights(self):
         """Initialize model parameters.
 
-        Xavier-uniform for 2D weights, zeros for biases. After init, force the
+        Normal (std=0.02) for UVQK, Xavier-uniform for other 2D weights,
+        zeros for biases. After init, force the
         ``padding_idx=0`` row of ``token_embedding`` back to zero (the xavier
         pass overwrites the zero row that ``nn.Embedding(..., padding_idx=0)``
         sets at construction time).
         """
         for name, param in self.named_parameters():
-            if 'weight' in name and len(param.shape) > 1:
+            if name.endswith('proj1.weight'):
+                nn.init.normal_(param, mean=0, std=0.02)
+            elif 'weight' in name and len(param.shape) > 1:
                 nn.init.xavier_uniform_(param)
             elif 'bias' in name:
                 nn.init.constant_(param, 0)
@@ -258,16 +262,20 @@ class HSTUModel(nn.Module):
         hstu_output = hstu_output * padding_mask.unsqueeze(-1).to(hstu_output.dtype)
         return hstu_output
 
-    def score_items(self, states, item_ids):
-        """Score only the requested item IDs, without allocating (B, L, V)."""
+    def score_items(self, states, item_ids=None, paired=False):
+        """Score item IDs, or the full vocabulary when omitted.
+
+        ``paired=True`` scores one item per state for sampled positives.
+        """
         if self.tie_embeddings:
             output_weight = self.token_embedding.weight
             output_bias = self.output_bias
         else:
             output_weight = self.output_projection.weight
             output_bias = self.output_projection.bias
-        output_weight = output_weight[item_ids]
-        output_bias = output_bias[item_ids] if output_bias is not None else None
+        if item_ids is not None:
+            output_weight = output_weight[item_ids]
+            output_bias = output_bias[item_ids] if output_bias is not None else None
 
         if self.score_norm == 'l2':
             # Normalize in float32: PAD's zero vector and a tiny epsilon can
@@ -275,7 +283,12 @@ class HSTUModel(nn.Module):
             states = F.normalize(states.float(), p=2, dim=-1, eps=self.l2_norm_eps)
             output_weight = F.normalize(output_weight.float(), p=2, dim=-1, eps=self.l2_norm_eps)
 
-        logits = F.linear(states, output_weight, output_bias)
+        if paired:
+            logits = (states * output_weight).sum(dim=-1)
+            if output_bias is not None:
+                logits = logits + output_bias
+        else:
+            logits = F.linear(states, output_weight, output_bias)
         if self.temperature != 1.0:
             logits = logits / self.temperature
 
@@ -284,4 +297,4 @@ class HSTUModel(nn.Module):
     def forward(self, x, time_diffs=None):
         """Keep the original full-vocabulary logits interface."""
         states = self.encode(x, time_diffs)
-        return self.score_items(states, torch.arange(self.vocab_size, device=x.device))
+        return self.score_items(states)

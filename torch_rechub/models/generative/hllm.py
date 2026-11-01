@@ -75,7 +75,6 @@ class HLLMTransformerBlock(nn.Module):
 
         # Causal mask
         causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
-        scores = scores.masked_fill(~causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
         # Add relative position bias if provided
         if rel_pos_bias is not None:
@@ -196,7 +195,7 @@ class HLLMModel(nn.Module):
 
         # Load item embeddings
         if isinstance(item_embeddings, str):
-            item_embeddings = torch.load(item_embeddings)
+            item_embeddings = torch.load(item_embeddings, map_location='cpu')
 
         if item_embeddings.shape[0] != vocab_size:
             raise ValueError(f"item_embeddings.shape[0]={item_embeddings.shape[0]} "
@@ -288,8 +287,12 @@ class HLLMModel(nn.Module):
             # Cached embeddings/projection may be FP32 while a pretrained
             # User LLM uses FP16/BF16; align inputs without breaking gradients.
             item_emb = item_emb.to(dtype=self.user_model.get_input_embeddings().weight.dtype)
+            if self.training and getattr(self.user_model, 'is_gradient_checkpointing', False):
+                # Reentrant checkpointing needs a gradient-carrying input even
+                # when the item cache is frozen. Preserve any projection graph.
+                item_emb.requires_grad_(True)
             outputs = self.user_model(inputs_embeds=item_emb, attention_mask=padding_mask.long(), use_cache=False, return_dict=True)
-            return outputs.last_hidden_state * padding_mask.unsqueeze(-1).to(item_emb.dtype)
+            return outputs.last_hidden_state.masked_fill(~padding_mask.unsqueeze(-1), 0)
 
         # Add positional embedding
         positions = torch.arange(seq_len, dtype=torch.long, device=seq_tokens.device)
@@ -319,8 +322,8 @@ class HLLMModel(nn.Module):
             x = block(x, rel_pos_bias=rel_pos_bias, padding_mask=padding_mask)
         return x
 
-    def score_items(self, states, item_ids):
-        """Cosine scores on a candidate subset; item table remains frozen."""
+    def score_items(self, states, item_ids=None, paired=False):
+        """Cosine scores for all candidates, or one paired item per state."""
         # Scoring head: cosine similarity with normalized item embeddings
         # x: (B, L, D), item_embeddings: (V, D)
         states = F.normalize(states.float(), dim=-1, eps=1e-8)
@@ -331,14 +334,15 @@ class HLLMModel(nn.Module):
             scale = self.logit_scale.exp()
         else:
             scale = 1.0 / self.temperature
-        logits = torch.matmul(states, items.t()) * scale
+        logits = (states * items).sum(dim=-1) if paired else torch.matmul(states, items.t())
 
-        return logits
+        return logits * scale
 
-    def get_item_embeddings(self, item_ids):
+    def get_item_embeddings(self, item_ids=None):
         """Normalized candidate vectors, including the optional projection."""
-        return F.normalize(self.item_projection(self.item_embeddings[item_ids]).float(), dim=-1, eps=1e-8)
+        items = self.item_embeddings if item_ids is None else self.item_embeddings[item_ids]
+        return F.normalize(self.item_projection(items).float(), dim=-1, eps=1e-8)
 
     def forward(self, seq_tokens, time_diffs=None):
         """Preserve the full-vocabulary forward API."""
-        return self.score_items(self.encode(seq_tokens, time_diffs), torch.arange(self.vocab_size, device=seq_tokens.device))
+        return self.score_items(self.encode(seq_tokens, time_diffs))

@@ -1,7 +1,6 @@
 """Sequence Generation Model Trainer."""
 
 import os
-from numbers import Integral
 
 import torch
 import torch.nn as nn
@@ -33,10 +32,10 @@ class SeqTrainer(object):
             or sampled_softmax (positive plus sampled catalog negatives).
         loss_params (dict): For sampled_softmax: num_negatives=128 and optional
             negative_similarity_threshold for normalized HLLM item vectors.
-        accumulation_steps (int): Microbatches per update, default 1.
+        accumulation_steps (int): Positive number of microbatches per update, default 1.
         amp (bool): CUDA float16 autocast/scaling, disabled by default.
         max_grad_norm (float, optional): Clip unscaled gradients.
-        eval_chunk_size (int): Candidate scoring chunk size, default 4096.
+        eval_chunk_size (int): Positive candidate scoring chunk size, default 4096.
 
     Methods:
         fit: 训练模型
@@ -86,12 +85,6 @@ class SeqTrainer(object):
         # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = torch.device(device)
         self.model.to(self.device)
-        if not isinstance(accumulation_steps, Integral) or accumulation_steps < 1:
-            raise ValueError("accumulation_steps must be a positive integer")
-        if not isinstance(eval_chunk_size, Integral) or eval_chunk_size < 1:
-            raise ValueError("eval_chunk_size must be a positive integer")
-        if max_grad_norm is not None and max_grad_norm <= 0:
-            raise ValueError("max_grad_norm must be positive")
         self.accumulation_steps = accumulation_steps
         self.amp = bool(amp and self.device.type == 'cuda')
         # Small-temperature cosine scores amplify gradients; a modest initial
@@ -114,8 +107,8 @@ class SeqTrainer(object):
             if self.negative_similarity_threshold is not None:
                 if not 0 <= self.negative_similarity_threshold <= 1 or not hasattr(self.model, 'get_item_embeddings'):
                     raise ValueError("negative_similarity_threshold requires normalized get_item_embeddings() and a value in [0, 1]")
-            if params or not isinstance(self.num_negatives, Integral) or self.num_negatives < 1:
-                raise ValueError("Unknown sampled_softmax parameters or invalid num_negatives")
+            if params:
+                raise ValueError("Unknown sampled_softmax parameters: " + ", ".join(params))
             if len(gpus) > 1:
                 raise ValueError("sampled_softmax currently supports one device; use the separate multi-GPU branch")
             if not all(hasattr(self.model, method) for method in ('encode', 'score_items', 'vocab_size')):
@@ -153,8 +146,6 @@ class SeqTrainer(object):
         history = {'train_loss': [], 'val_loss': [], 'val_accuracy': []}
         os.makedirs(self.model_path, exist_ok=True)
         model_file = os.path.join(self.model_path, "model.pth")
-        if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and val_dataloader is None:
-            raise ValueError("ReduceLROnPlateau requires validation data")
 
         for logger in self._iter_loggers():
             logger.log_hyperparams({'n_epoch': self.n_epoch, 'learning_rate': self.optimizer.param_groups[0]['lr'], 'loss_type': self.loss_type})
@@ -182,12 +173,10 @@ class SeqTrainer(object):
                 improved = val_accuracy > self.early_stopper.best_auc
                 # EarlyStopper owns the only best snapshot. Keep it on CPU so
                 # a frozen HLLM item table does not occupy GPU memory twice.
-                stop_training = self.early_stopper.stop_training(
-                    val_accuracy,
-                    {
-                        name: value.cpu() for name, value in self.model.state_dict().items()
-                    } if improved else self.early_stopper.best_weights,
-                )
+                weights = self.model.state_dict()
+                if improved:
+                    weights = {name: value.cpu() for name, value in weights.items()}
+                stop_training = self.early_stopper.stop_training(val_accuracy, weights)
                 if improved:
                     # Save before logging or the next epoch: an interruption
                     # must not discard a completed validation's best model.
@@ -199,9 +188,8 @@ class SeqTrainer(object):
 
             for logger in self._iter_loggers():
                 logger.log_metrics(logs, step=epoch_i)
-            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                self.scheduler.step(val_accuracy if self.scheduler.mode == 'max' else val_loss)
-            elif self.scheduler is not None:
+            print("Current lr : {}".format(self.optimizer.param_groups[0]['lr']))
+            if self.scheduler is not None:
                 self.scheduler.step()
 
         if val_dataloader is not None and self.early_stopper.best_weights is not None:
@@ -347,9 +335,6 @@ class SeqTrainer(object):
             raise ValueError("Every sequence must contain at least one non-PAD item")
         positions = torch.arange(seq_tokens.size(1), device=seq_tokens.device).expand_as(seq_tokens)
         last = positions.masked_fill(~valid, -1).max(dim=1).values
-        first = positions.masked_fill(~valid, seq_tokens.size(1)).min(dim=1).values
-        if not (last - first + 1).eq(valid.sum(dim=1)).all():
-            raise ValueError("Use contiguous histories with left or right padding, not internal PAD gaps")
         return last
 
     def _next_tokens(self, seq_tokens, targets):
@@ -369,9 +354,7 @@ class SeqTrainer(object):
         # reference's per-position draws, this trades diversity for efficiency.
         # Repeated positives are never treated as their own negatives.
         negatives = torch.randint(1, self.model.vocab_size, (self.num_negatives,), device=self.device, generator=generator)
-        # Compute matched positive scores in small blocks, not an N x N matrix
-        # of every valid position against every positive in the batch.
-        positive_scores = torch.cat([self.model.score_items(states[start:start + 64], positive_ids[start:start + 64]).diagonal() for start in range(0, states.size(0), 64)]).unsqueeze(1)
+        positive_scores = self.model.score_items(states, positive_ids, paired=True).unsqueeze(1)
         negative_scores = self.model.score_items(states, negatives)
         negative_scores = negative_scores.masked_fill(positive_ids[:, None].eq(negatives[None, :]), torch.finfo(negative_scores.dtype).min)
         if self.negative_similarity_threshold is not None:
@@ -396,12 +379,10 @@ class SeqTrainer(object):
     def predict(self, data_loader, top_k=10, filter_seen=False):
         """Return exact catalog top-k IDs with bounded scoring memory.
 
-        PAD is always excluded. History filtering is opt-in because a repeated
+        top_k is a positive integer. PAD is always excluded. History filtering is opt-in because a repeated
         interaction may be the true next item. This is not sampled evaluation.
         """
         model = self.model.module if hasattr(self.model, 'module') else self.model
-        if not isinstance(top_k, Integral) or top_k < 1:
-            raise ValueError("top_k must be a positive integer")
         top_k = min(top_k, model.vocab_size - 1)
         was_training = self.model.training
         self.model.eval()

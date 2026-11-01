@@ -849,8 +849,9 @@ class HSTULayer(nn.Module):
         self.dv = dv
         self.max_seq_len = max_seq_len
 
-        self.norm_in = nn.LayerNorm(d_model)
-        self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv)
+        self.norm_in = nn.LayerNorm(d_model, eps=1e-6, elementwise_affine=False)
+        self.proj1 = nn.Linear(d_model, 2 * n_heads * dqk + 2 * n_heads * dv, bias=False)
+        nn.init.normal_(self.proj1.weight, mean=0, std=0.02)
 
         self.rab = RelativeBucketedTimeAndPositionBias(
             n_heads=1,  # One relative bias shared by all attention heads.
@@ -861,7 +862,7 @@ class HSTULayer(nn.Module):
             time_bucket_unit=time_bucket_unit,
         )
 
-        self.norm_attn = nn.LayerNorm(n_heads * dv)
+        self.norm_attn = nn.LayerNorm(n_heads * dv, eps=1e-6, elementwise_affine=False)
         self.proj2 = nn.Linear(n_heads * dv, d_model)
 
         self.dropout = nn.Dropout(dropout)
@@ -888,10 +889,11 @@ class HSTULayer(nn.Module):
 
         # Eq. 2: SiLU on the whole UVQK projection BEFORE split.
         proj_out = F.silu(self.proj1(x_normed))
-        q = proj_out[..., :H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
-        k = proj_out[..., H * self.dqk:2 * H * self.dqk].reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
-        u = proj_out[..., 2 * H * self.dqk:2 * H * self.dqk + H * self.dv].reshape(batch_size, seq_len, H, self.dv)
-        v = proj_out[..., 2 * H * self.dqk + H * self.dv:].reshape(batch_size, seq_len, H, self.dv).transpose(1, 2)
+        u, v, q, k = torch.split(proj_out, [H * self.dv, H * self.dv, H * self.dqk, H * self.dqk], dim=-1)
+        q = q.reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
+        k = k.reshape(batch_size, seq_len, H, self.dqk).transpose(1, 2)
+        u = u.reshape(batch_size, seq_len, H, self.dv)
+        v = v.reshape(batch_size, seq_len, H, self.dv).transpose(1, 2)
 
         scores = torch.matmul(q, k.transpose(-2, -1))  # (B, H, L, L), no sqrt(dqk) scaling
         # Eq. 3: rab^{p,t} is added to scores BEFORE the SiLU/N activation.

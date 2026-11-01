@@ -167,7 +167,7 @@ def load_item_embeddings(data_dir, model_type='tinyllama'):
         print(f"请先运行: python examples/generative/data/ml-1m/preprocess_hllm_data.py --model_type {model_type}")
         return None
 
-    embeddings = torch.load(emb_file)
+    embeddings = torch.load(emb_file, map_location='cpu')
     print(f"✅ 加载item embeddings: {embeddings.shape}")
     return embeddings
 
