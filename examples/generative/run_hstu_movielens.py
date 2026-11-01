@@ -11,13 +11,11 @@ if REPO_ROOT not in sys.path:
 
 import numpy as np
 import torch
-import tqdm
 
 from torch_rechub.basic.metric import topk_metrics
 from torch_rechub.models.generative.hstu import HSTUModel
 from torch_rechub.trainers.seq_trainer import SeqTrainer
 from torch_rechub.utils.data import SequenceDataGenerator
-from torch_rechub.utils.hstu_utils import VocabMask
 
 
 def get_movielens_data(data_dir=None):
@@ -85,44 +83,6 @@ def get_movielens_data(data_dir=None):
     return train_data, val_data, test_data, vocab_size
 
 
-def evaluate_ranking(model, data_loader, device, topKs=[10, 50, 200], invalid_items=(0,), filter_seen=True):
-    """Evaluate top-K ranking metrics on the test set.
-
-    PAD (token id 0), any ids in ``invalid_items``, and optionally each user's
-    historical items are masked out before top-K. Filtering history matches the
-    Meta public evaluation protocol for HSTU/SASRec.
-    """
-    model = model.to(device)
-    model.eval()
-    vocab_mask = VocabMask(model.vocab_size, invalid_items=list(invalid_items)).to(device)
-
-    y_true = {}
-    y_pred = {}
-
-    user_idx = 0
-    with torch.no_grad():
-        for seq_tokens, _seq_positions, seq_time_diffs, targets in tqdm.tqdm(data_loader, desc="evaluating ranking", smoothing=0, mininterval=1.0):
-            seq_tokens = seq_tokens.to(device)
-            seq_time_diffs = seq_time_diffs.to(device)
-            targets = targets.cpu().numpy()
-
-            logits = model(seq_tokens, seq_time_diffs)  # (B, L, V)
-            seen_ids = seq_tokens if filter_seen else None
-            last_logits = vocab_mask.apply_mask(logits[:, -1, :], invalid_ids=seen_ids)  # (B, V)
-
-            max_k = max(topKs)
-            _, top_items = torch.topk(last_logits, k=max_k, dim=-1)
-            top_items = top_items.cpu().numpy()
-
-            for i in range(top_items.shape[0]):
-                user_id = str(user_idx)
-                y_true[user_id] = [int(targets[i])]
-                y_pred[user_id] = top_items[i].tolist()
-                user_idx += 1
-
-    return topk_metrics(y_true, y_pred, topKs=topKs)
-
-
 def main(
     dataset_path=None,
     model_name='hstu',
@@ -148,6 +108,10 @@ def main(
     time_bucket_unit='seconds',
     use_output_bias=False,
     scale_input_embedding=True,
+    loss_type='cross_entropy',
+    num_negatives=128,
+    accumulation_steps=1,
+    amp=False,
 ):
     """Main training and evaluation entry point.
 
@@ -188,6 +152,11 @@ def main(
 
     train_data, val_data, test_data, vocab_size = result
 
+    # MovieLens preprocessing left-pads histories; retain the most recent events.
+    for data in [train_data, val_data, test_data]:
+        for key in ['seq_tokens', 'seq_positions', 'seq_time_diffs']:
+            data[key] = np.asarray(data[key])[:, -max_seq_len:]
+
     # Build data loaders (with time-aware features)
     print("\nBuilding data loaders (with timestamp features)...")
     print("Using relative time/position bias")
@@ -197,8 +166,8 @@ def main(
     test_gen = SequenceDataGenerator(test_data['seq_tokens'], test_data['seq_positions'], test_data['targets'], test_data['seq_time_diffs'])
 
     train_dataloader = train_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-    val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
-    test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0)[0]
+    val_dataloader = val_gen.generate_dataloader(batch_size=batch_size, num_workers=0, shuffle=False)[0]
+    test_dataloader = test_gen.generate_dataloader(batch_size=batch_size, num_workers=0, shuffle=False)[0]
 
     print(f"Vocab size: {vocab_size}")
     print(f"Train size: {len(train_dataloader.dataset)}")
@@ -243,6 +212,10 @@ def main(
                                10),
         device=device,
         model_path=save_dir,
+        loss_type=loss_type,
+        loss_params={'num_negatives': num_negatives} if loss_type == 'sampled_softmax' else None,
+        accumulation_steps=accumulation_steps,
+        amp=amp,
     )
 
     # Train model
@@ -257,7 +230,11 @@ def main(
 
     # Evaluate ranking metrics
     print("\nComputing ranking metrics...")
-    ranking_results = evaluate_ranking(model, test_dataloader, device, topKs=[10, 50, 200])
+    topKs = sorted({min(k, vocab_size - 1) for k in [10, 50, 200]})
+    predictions = trainer.predict(test_dataloader, top_k=max(topKs), filter_seen=True)
+    y_true = {str(i): [int(target)] for i, target in enumerate(test_data['targets'])}
+    y_pred = {str(i): items.tolist() for i, items in enumerate(predictions)}
+    ranking_results = topk_metrics(y_true, y_pred, topKs=topKs)
 
     print("\nRanking metrics on the test set:")
     print("=" * 50)
@@ -299,6 +276,10 @@ if __name__ == '__main__':
     parser.add_argument('--time_bucket_unit', default='seconds', choices=['seconds', 'minutes'], help='Unit for time bucketization')
     parser.add_argument('--use_output_bias', action='store_true', help='Use output bias in item logits')
     parser.add_argument('--no_scale_input_embedding', action='store_true', help='Disable sqrt(d_model) input embedding scale')
+    parser.add_argument('--loss_type', default='cross_entropy', choices=['cross_entropy', 'sampled_softmax'])
+    parser.add_argument('--num_negatives', type=int, default=128)
+    parser.add_argument('--accumulation_steps', type=int, default=1)
+    parser.add_argument('--amp', action='store_true')
 
     args = parser.parse_args()
     main(
@@ -326,4 +307,8 @@ if __name__ == '__main__':
         args.time_bucket_unit,
         args.use_output_bias,
         not args.no_scale_input_embedding,
+        args.loss_type,
+        args.num_negatives,
+        args.accumulation_steps,
+        args.amp,
     )

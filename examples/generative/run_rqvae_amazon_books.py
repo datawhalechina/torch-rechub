@@ -4,14 +4,16 @@ import json
 import os
 import sys
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import torch
 from torch.utils.data import DataLoader
 
 from torch_rechub.models.generative.rqvae import RQVAEModel
 from torch_rechub.trainers.rqvae_trainer import Trainer
 from torch_rechub.utils.data import EmbDataset
-
-sys.path.append("../..")
 
 
 def parse_args():
@@ -29,6 +31,7 @@ def parse_args():
     parser.add_argument("--data_path", type=str, default="./data/amazon-books/processed/item_embeddings_tinyllama.pt", help="Input data path.")
     parser.add_argument("--device", type=str, default="cuda:0", help="gpu or cpu")
     parser.add_argument("--model_path", type=str, default="./", help="output directory for model")
+    parser.add_argument("--padding_idx", type=int, default=0, help="Exclude this embedding row from the item catalog; -1 disables exclusion")
 
     # RQVAE specific parameters
     parser.add_argument("--weight_decay", type=float, default=0.0, help='l2 regularization weight')
@@ -44,7 +47,7 @@ def parse_args():
     parser.add_argument('--e_dim', type=int, default=32, help='vq codebook embedding size')
     parser.add_argument('--quant_loss_weight', type=float, default=1.0, help='vq quantion loss weight')
     parser.add_argument("--beta", type=float, default=0.25, help="Beta for commitment loss")
-    parser.add_argument('--layers', type=int, nargs='+', default=[2048, 1024, 512, 256, 128, 64], help='hidden sizes of every layer')
+    parser.add_argument('--layers', type=int, nargs='+', default=[512, 256, 128], help='hidden sizes of every layer')
 
     return parser.parse_args()
 
@@ -78,14 +81,14 @@ if __name__ == '__main__':
     )
     print(model)
     data_loader = DataLoader(data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
-    trainer = Trainer(model, optimizer_fn=torch.optim.Adam, optimizer_params={'lr': args.learning_rate, 'weight_decay': 1e-5}, n_epoch=args.epochs, device=args.device, model_path=args.model_path, eval_step=args.eval_step)
+    trainer = Trainer(model, optimizer_fn=torch.optim.Adam, optimizer_params={'lr': args.learning_rate, 'weight_decay': args.weight_decay}, n_epoch=args.epochs, device=args.device, model_path=args.model_path, eval_step=args.eval_step)
     best_loss, best_collision_rate = trainer.fit(data_loader)
 
     print("Best Loss", best_loss)
     print("Best Collision Rate", best_collision_rate)
 
     #------------------------------generate Semantic IDs-------------------------------------------
-    test_data_loader = DataLoader(data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    test_data_loader = DataLoader(data, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, pin_memory=True)
 
     # you can try to use the best model based on loss or collision rate
     # best_model_path = os.path.join(args.model_path, "model_best_loss.pth")
@@ -94,6 +97,7 @@ if __name__ == '__main__':
     model.load_state_dict(state_dict)
     model.to(args.device)
     model.eval()
-    all_indices_dict = model.generate_semantic_ids(data, test_data_loader, prefix=args.prefix, use_sk=True, device=args.device)
+    all_indices_dict = model.generate_semantic_ids(data, test_data_loader, prefix=args.prefix, device=args.device)
+    all_indices_dict.pop(args.padding_idx, None)
     with open(os.path.join(args.model_path, "semantic_ids.json"), 'w') as fp:
         json.dump(all_indices_dict, fp)
