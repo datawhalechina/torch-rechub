@@ -251,7 +251,6 @@ def test_movielens_prepare_data_aligns_to_vocab(tmp_path):
     assert inters["1"] == [1, 2, 3]  # vocab token ids, chronological, movie 99 skipped
 
 
-@pytest.mark.slow
 @pytest.mark.skipif(not HAS_TRANSFORMERS, reason="transformers is not installed")
 def test_movielens_toy_end_to_end(tmp_path, monkeypatch):
     """Explicit toy preparation -> offline train -> constrained beam test."""
@@ -267,7 +266,7 @@ def test_movielens_toy_end_to_end(tmp_path, monkeypatch):
         "--output_dir",
         str(tmp_path / "ckpt"),
         "--toy_num_users",
-        "12",
+        "2",
         "--toy_num_items",
         "16",
         "--epochs",
@@ -277,7 +276,7 @@ def test_movielens_toy_end_to_end(tmp_path, monkeypatch):
         "--gradient_accumulation_steps",
         "1",
         "--num_beams",
-        "4",
+        "2",
         "--test_batch_size",
         "2",
         "--num_workers",

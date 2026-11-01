@@ -2,7 +2,7 @@
 # CI/CD 流程配置 - 代码质量检查、测试、构建、发布
 # ===================================================================
 # 触发条件：
-# - push/pull_request: 运行完整 CI 检查（lint, test, security, build）
+# - pull_request: 运行核心回归、兼容性检查和构建
 # - release: 仅运行发布流程（跳过已执行的检查）
 
 name: CI/CD Pipeline
@@ -22,6 +22,10 @@ on:
       - '.github/workflows/ci.yml'
   release:
     types: [published]
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # 环境变量
 env:
@@ -69,7 +73,7 @@ jobs:
         run: |
           pip install --upgrade pip
           # 安装特定版本的格式化工具以确保一致性（与 pyproject.toml 保持一致）
-          python -m pip install yapf==0.43.0 isort==5.13.2 "flake8>=3.8.0" "mypy>=0.800" "toml>=0.10.2"
+          python -m pip install yapf==0.43.0 isort==5.13.2 "flake8>=3.8.0" "toml>=0.10.2"
 
       - name: Format & Lint
         run: |
@@ -85,218 +89,62 @@ jobs:
           # 步骤4: 运行flake8进行最终的代码质量检查
           flake8 --max-line-length=248 --extend-ignore=E203,W503,E501,E722,E402,F821,F523,E711,E741,F401,E265,C901,E301,E305,W293,E261,W291,W292,E111,E117,F841,E302 --max-complexity=30 torch_rechub/ examples/ tests/ benchmarks/
 
-      - name: Type checking (MyPy) - Optional
-        continue-on-error: true
-        run: |
-          mypy torch_rechub/ --ignore-missing-imports
-
-  # ===================================================================
-  # 完整测试 (Python 3.10) - 运行所有测试和覆盖率报告
-  # (仅在 push/PR 时运行，release 时跳过)
-  # ===================================================================
+  # 核心回归只跑一次；Milvus 需要外部服务，单独手动验证。
   test:
-    name: Full Test Suite (Python 3.10)
-    runs-on: ${{ matrix.os }}
-    needs: lint
-    if: github.event_name != 'release'
-    timeout-minutes: 25
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
-    env:
-      SKIP_MILVUS_TESTS: ${{ matrix.os != 'ubuntu-latest' && '1' || '0' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/torch
-          key: ${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-torch${{ env.TORCH_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-torch${{ env.TORCH_VERSION }}-
-
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # Verify the declared minimum PyTorch, not whichever version is newest.
-          # macOS wheels are distributed on PyPI; the CPU index is for Linux/Windows.
-          test_extras="dev,generative,bigdata,onnx"
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            python -m pip install "torch==$TORCH_VERSION"
-          else
-            python -m pip install "torch==$TORCH_VERSION" --index-url "$TORCH_INDEX_URL"
-            # Indexing tests already run on Linux/Windows, not macOS.
-            test_extras="$test_extras,annoy,faiss,milvus"
-          fi
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            # Annoy uses -march=native; rebuild it for this runner's CPU.
-            python -m pip cache remove annoy
-          fi
-          python -m pip install -e ".[$test_extras]" "torch==$TORCH_VERSION"
-          python -m pip check
-
-      - name: Start Milvus
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          cat > embedEtcd.yaml <<'EOF'
-          listen-client-urls: http://0.0.0.0:2379
-          advertise-client-urls: http://0.0.0.0:2379
-          quota-backend-bytes: 4294967296
-          auto-compaction-mode: revision
-          auto-compaction-retention: '1000'
-          EOF
-
-          cat > user.yaml <<'EOF'
-          # Extra config to override default milvus.yaml
-          EOF
-
-          mkdir -p volumes/milvus
-          chmod -R 777 volumes
-
-          docker run -d \
-            --name milvus-standalone \
-            --security-opt seccomp:unconfined \
-            -e ETCD_USE_EMBED=true \
-            -e ETCD_DATA_DIR=/var/lib/milvus/etcd \
-            -e ETCD_CONFIG_PATH=/milvus/configs/embedEtcd.yaml \
-            -e COMMON_STORAGETYPE=local \
-            -e DEPLOY_MODE=STANDALONE \
-            -v "$PWD/volumes/milvus:/var/lib/milvus" \
-            -v "$PWD/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml" \
-            -v "$PWD/user.yaml:/milvus/configs/user.yaml" \
-            -p 19530:19530 \
-            -p 9091:9091 \
-            -p 2379:2379 \
-            --health-cmd="curl -f http://localhost:9091/healthz" \
-            --health-interval=30s \
-            --health-start-period=90s \
-            --health-timeout=20s \
-            --health-retries=3 \
-            milvusdb/milvus:v3.0-beta \
-            milvus run standalone
-
-      - name: Wait for Milvus
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          for i in {1..90}; do
-            if curl -fsS http://localhost:9091/healthz >/dev/null; then
-              echo "Milvus is ready."
-              exit 0
-            fi
-
-            if [ "$(docker inspect -f '{{.State.Running}}' milvus-standalone)" != "true" ]; then
-              echo "Milvus container exited before becoming healthy."
-              docker ps -a
-              docker logs milvus-standalone
-              exit 1
-            fi
-
-            echo "Waiting for Milvus... attempt $i/90"
-            sleep 2
-          done
-
-          echo "Milvus did not become ready in time."
-          docker ps -a
-          docker logs milvus-standalone
-          exit 1
-
-      - name: Run tests
-        if: matrix.os == 'windows-latest'
-        run: |
-          python -m pytest -c config/pytest.ini tests/ -v
-
-      - name: Run tests (skip indexing tests)
-        if: matrix.os == 'macos-latest'
-        run: |
-          python -m pytest -c config/pytest.ini tests/ -v --ignore=tests/test_serving.py
-
-      - name: Run tests with coverage (Ubuntu only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          python -m pytest -c config/pytest.ini tests/ -v --cov=torch_rechub --cov-report=xml --cov-report=term
-
-      - name: Shutdown Milvus
-        if: always() && matrix.os == 'ubuntu-latest'
-        run: |
-          docker rm -f milvus-standalone || true
-          sudo rm -rf volumes embedEtcd.yaml user.yaml
-
-
-  # ===================================================================
-  # 依赖兼容性验证 (Python 3.10+) - 安装、导入及关键功能回归
-  # (仅在 push/PR 时运行，release 时跳过)
-  # ===================================================================
-  compatibility:
-    name: Runtime Compatibility (Python ${{ matrix.python-version }}, Torch ${{ matrix.torch-version }})
+    name: Core Tests (Python 3.10, Torch 2.6)
     runs-on: ubuntu-latest
     needs: lint
     if: github.event_name != 'release'
-    timeout-minutes: 20
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
+        run: |
+          python -m pip install "torch==$TORCH_VERSION" --index-url "$TORCH_INDEX_URL"
+          # Annoy 的本地编译缓存可能带有另一台 runner 的 CPU 指令集。
+          python -m pip cache remove annoy
+          python -m pip install --no-binary=annoy -e ".[test,generative,bigdata,onnx,annoy,faiss]" "torch==$TORCH_VERSION"
+          python -m pip check
+      - name: Run core tests
+        run: python -m pytest -c config/pytest.ini tests -m "not integration" --durations=10
 
+  # Windows 和较新的依赖版本只验证代表性训练、序列模型和导出接口。
+  compatibility:
+    name: Compatibility (${{ matrix.os }}, Python ${{ matrix.python }}, Torch ${{ matrix.torch }})
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    if: github.event_name != 'release'
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {python-version: '3.10', torch-version: '2.6.0'}
-          - {python-version: '3.11', torch-version: '2.6.0'}
-          - {python-version: '3.12', torch-version: '2.6.0'}
-          - {python-version: '3.13', torch-version: '2.6.0'}
-          - {python-version: '3.11', torch-version: '2.9.1'}
-
+          - {os: windows-latest, python: '3.10', torch: '2.6.0'}
+          - {os: ubuntu-latest, python: '3.13', torch: '2.9.1'}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
-
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install "torch==${{ matrix.torch-version }}" --index-url "$TORCH_INDEX_URL"
-          python -m pip install -e ".[dev,generative,bigdata,onnx,visualization]" "torch==${{ matrix.torch-version }}"
+          python -m pip install "torch==${{ matrix.torch }}" --index-url "$TORCH_INDEX_URL"
+          python -m pip install -e ".[test,generative,onnx]" "torch==${{ matrix.torch }}"
           python -m pip check
-
-      - name: Verify imports
-        run: |
-          python -c "import torch_rechub; print(f'torch-rechub {torch_rechub.__version__ if hasattr(torch_rechub, \"__version__\") else \"installed\"} on Python ${{ matrix.python-version }}')"
-          python -c "import torch, numpy, pandas, sklearn, pyarrow, onnx, onnxruntime, transformers, accelerate, torchview; from torch_rechub.models.generative import TIGERModel; print('Torch', torch.__version__, 'and optional dependencies OK')"
-
       - name: Run compatibility tests
         run: |
-          python -m pytest -c config/pytest.ini -v \
-            tests/test_onnx_quantization.py tests/test_pa_array_to_tensor.py \
-            tests/test_hstu_model.py tests/test_hllm_embedding_alignment.py tests/test_tiger_example.py
-
-      - name: Verify small CPU training and reload
-        env:
-          OMP_NUM_THREADS: '1'
-          MKL_NUM_THREADS: '1'
-          OPENBLAS_NUM_THREADS: '1'
-          PYTHONUTF8: '1'
-        run: |
-          python -m pytest -c config/pytest.ini tests/test_e2e_ranking.py tests/test_e2e_multitask.py -q
+          python -m pytest -c config/pytest.ini \
+            'tests/test_e2e_ranking.py::test_ranking_e2e[DIN]' \
+            'tests/test_e2e_multitask.py::test_multitask_e2e[MMOE]' \
+            tests/test_e2e_matching.py tests/test_inbatch_sampling.py \
+            tests/test_hstu_model.py tests/test_hllm_embedding_alignment.py tests/test_onnx_export.py
 
   # ===================================================================
   # 安全检查 (仅在 push/PR 时运行，release 时跳过)

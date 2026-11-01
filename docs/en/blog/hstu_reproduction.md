@@ -7,6 +7,8 @@ description: Reproduction notes for Meta's HSTU model in torch-rechub, including
 
 This document describes the current implementation status of HSTU (Hierarchical Sequential Transduction Units) in `torch-rechub`. The core layer follows the main path of Eqs. 2-4 in the paper and Meta's reference implementation: the joint UVQK projection is passed through SiLU, `rab^{p,t}` is added to the attention scores, the output path retains only `f_2(Norm(AV) * U)`, and inter-layer residual connections are placed outside `HSTUBlock` layers.
 
+This implementation targets single-GPU learning and small-scale experiments. Sampled softmax, AMP, and gradient accumulation can reduce training memory. The core layer follows the HSTU computation, but time bias still uses differences between current events, and preprocessing and training settings differ from the official experiments. Paper metrics and official checkpoint compatibility are not guaranteed; retrain project checkpoints created before the core-layer corrections.
+
 ---
 
 ## 1. Module Structure
@@ -76,7 +78,7 @@ Here, `SiLU` is applied to the complete `UVQK` projection before it is split. Al
 The current attention path is:
 
 ```python
-scores = (Q @ K.transpose(-2, -1)) * (1.0 / sqrt(dqk))
+scores = Q @ K.transpose(-2, -1)
 scores = scores + rab(time_diffs, seq_len)
 attn_weights = silu(scores) / max_seq_len
 AV = attn_weights @ V
@@ -84,7 +86,7 @@ AV = attn_weights @ V
 
 Key points:
 
-- `rab^{p,t}` is a learnable per-head bias derived by bucketing relative position and relative time differences.
+- `rab^{p,t}` is a learnable bias shared across heads derived by bucketing relative position and relative time differences.
 - The bias is added to the attention scores, not to the input token embeddings.
 - HSTU uses `silu(scores) / N`, rather than standard Transformer softmax.
 - The causal mask prevents each position from attending to future tokens; the padding mask prevents PAD positions from being used as keys.
@@ -136,7 +138,7 @@ bucket = sqrt(dt) or log(dt)
 bucket = clamp(bucket / time_bucket_divisor, 0, num_time_buckets)
 ```
 
-When `time_diffs=None`, `rab` falls back to a position-only bias with shape `(1, H, L, L)`. When `time_diffs` is supplied, the output shape is `(B, H, L, L)`.
+When `time_diffs=None`, `rab` falls back to a position-only bias with shape `(1, H, L, L)`. When `time_diffs` is supplied, the output shape is `(B, H, L, L)`. The current `HSTULayer` constructs this module with `n_heads=1` and broadcasts the same bias across attention heads.
 
 ### 3.2 Role of `RelPosBias`
 

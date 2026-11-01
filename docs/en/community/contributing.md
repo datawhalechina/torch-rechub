@@ -103,11 +103,11 @@ uv run pytest tests/test_e2e_ranking.py
 uv run pytest --cov=torch_rechub
 ```
 
-Milvus integration tests require a reachable external service. Skip them when that environment is unavailable:
+Default tests do not start external services. After starting a local Milvus service, run its integration tests explicitly:
 
 ```powershell
-$env:SKIP_MILVUS_TESTS = "1"
-uv run pytest
+$env:RUN_MILVUS_TESTS = "1"
+uv run --extra milvus pytest tests/test_serving.py -m integration
 ```
 
 ## Documentation

@@ -7,6 +7,8 @@ description: Meta HSTU 模型在 torch-rechub 中的复现说明，包括架构�
 
 本文件说明当前 `torch-rechub` 中 HSTU（Hierarchical Sequential Transduction Units）的实现状态。核心层已经按论文 Eq. 2-4 和 Meta reference 的主要路径对齐：联合 UVQK 投影先做 SiLU、attention scores 加 `rab^{p,t}`、输出侧只保留 `f_2(Norm(AV) * U)`，层间残差放在 `HSTUBlock` 外部。
 
+当前实现面向单卡学习与小规模复现，可通过 `sampled_softmax`、AMP 和梯度累积降低训练显存。核心层遵循 HSTU 的计算路径，但时间偏置仍使用当前事件间的时间差，数据处理和训练配置也不等同于官方实验；不承诺论文指标或官方 checkpoint 兼容。核心层修正前的本项目权重需要重新训练。
+
 ---
 
 ## 1. 模块划分
@@ -76,7 +78,7 @@ proj_out = F.silu(self.proj1(self.norm_in(x)))
 当前 attention 路径为：
 
 ```python
-scores = (Q @ K.transpose(-2, -1)) * (1.0 / sqrt(dqk))
+scores = Q @ K.transpose(-2, -1)
 scores = scores + rab(time_diffs, seq_len)
 attn_weights = silu(scores) / max_seq_len
 AV = attn_weights @ V
@@ -84,7 +86,7 @@ AV = attn_weights @ V
 
 关键点：
 
-- `rab^{p,t}` 是每个 head 一份的可学习 bias，来自相对位置差和相对时间差的桶化结果。
+- `rab^{p,t}` 是所有 head 共享的可学习 bias，来自相对位置差和相对时间差的桶化结果。
 - bias 加在 attention scores 上，而不是加到输入 token embedding 上。
 - HSTU 使用 `silu(scores) / N`，不是 Transformer 标准 softmax。
 - causal mask 会阻止当前位置看未来 token；padding mask 会屏蔽 PAD 作为 key 的位置。
@@ -136,7 +138,7 @@ bucket = sqrt(dt) 或 log(dt)
 bucket = clamp(bucket / time_bucket_divisor, 0, num_time_buckets)
 ```
 
-当 `time_diffs=None` 时，`rab` 退化为 position-only bias，输出形状为 `(1, H, L, L)`；传入 `time_diffs` 时输出形状为 `(B, H, L, L)`。
+当 `time_diffs=None` 时，`rab` 退化为 position-only bias，输出形状为 `(1, H, L, L)`；传入 `time_diffs` 时输出形状为 `(B, H, L, L)`。当前 `HSTULayer` 为此模块设置 `n_heads=1`，再广播到各 attention head，共享同一组 bias。
 
 ### 3.2 `RelPosBias` 的定位
 

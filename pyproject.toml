@@ -26,7 +26,7 @@ keywords = [
     "recsys",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -162,14 +162,16 @@ indent_width = 4
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers --tb=short"
+pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
+    "integration: requires an external service (Milvus)",
+    "e2e: end-to-end tests",
     "unit: marks tests as unit tests",
 ]
 

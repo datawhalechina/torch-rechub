@@ -103,12 +103,12 @@ uv run pytest tests/test_e2e_ranking.py
 uv run pytest --cov=torch_rechub
 ```
 
-Milvus 集成测试需要可连接的外部服务；没有该环境时可跳过：
+默认测试不启动外部服务。Milvus 集成测试在本地服务启动后手动运行：
 
 ```powershell
 # PowerShell
-$env:SKIP_MILVUS_TESTS = "1"
-uv run pytest
+$env:RUN_MILVUS_TESTS = "1"
+uv run --extra milvus pytest tests/test_serving.py -m integration
 ```
 
 ## 📝 文档

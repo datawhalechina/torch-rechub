@@ -7,6 +7,8 @@ description: Data preparation, training commands, loss semantics, and implementa
 
 This document describes the runnable path for the current HLLM (Hierarchical Large Language Model for Recommendation) example in this repository. It implements an "offline precomputed item text embeddings + lightweight User Transformer" variant. It is not ByteDance's official end-to-end HLLM training stack, and its results should not be treated as a reproduction of the paper's metrics.
 
+The default path targets single-GPU experiments: freeze offline item vectors and train a small User Transformer. Use `--d_model` for a lower-dimensional projection and `--loss_type sampled_softmax --amp` to reduce memory. The model API also accepts a pretrained `user_model`, but the examples do not load one by default or jointly train both LLMs. Capacity on a 16/24 GB GPU depends on vocabulary size, sequence length, and model configuration.
+
 ## 1. Code Entry Points
 
 - Model: `torch_rechub/models/generative/hllm.py`
@@ -41,7 +43,7 @@ The text format is:
 Compress the following sentence into embedding: title: {title}genres: {genres}
 ```
 
-Amazon Books uses `title` and `description`. The scripts take the hidden state of the last token and write it to `item_embeddings_<model_type>.pt`, using the token ID as the row index; row 0 is reserved for PAD. `HLLMModel` checks that the number of rows equals `vocab_size` and the number of columns equals `d_model`, then L2-normalizes the matrix and registers it as a non-trainable buffer.
+Amazon Books uses `title` and `description`. The scripts take the hidden state of the last token and write it to `item_embeddings_<model_type>.pt`, using the token ID as the row index; row 0 is reserved for PAD. `HLLMModel` checks token alignment and freezes the item vectors. With matching dimensions it L2-normalizes them directly; a smaller `--d_model` uses a trainable projection into the User encoder dimension.
 
 Tokens without text remain zero vectors. The preprocessing log prints the number of covered items. For formal experiments, check this count rather than only checking whether the file exists.
 
@@ -60,7 +62,7 @@ seq_tokens [B, L]
   -> logits [B, L, V]
 ```
 
-Each block uses pre-norm multi-head self-attention, a feed-forward network, and residual connections. The current attention path creates only a causal mask, with no additional padding attention mask. Left-padded positions still receive position/time embeddings; this is an important boundary to verify against a complete production implementation.
+Each block uses pre-norm multi-head self-attention, a feed-forward network, and residual connections. Causal and padding masks prevent attention to future tokens and PAD keys; outputs at PAD positions are zeroed.
 
 ### 2.3 Training Objective and the Actual Semantics of `NCELoss`
 
@@ -176,10 +178,10 @@ Rerunning preprocessing rewrites the mappings, splits, and embedding files in th
 
 ## 6. Resource and Evaluation Notes
 
-- The HLLM forward pass creates full-vocabulary logits of shape `[B, L, V]`. Amazon Books has a large vocabulary, so memory usage is usually much higher than "storing item embeddings only." If an OOM occurs, reduce `--batch_size` and `--max_seq_len` first.
+- Default full-vocabulary training creates `[B, L, V]` logits; `sampled_softmax` scores only positives and sampled negatives. For large vocabularies, try sampled training, then reduce `--batch_size`, `--max_seq_len`, and `--d_model`.
 - TinyLlama/Baichuan2 runs only during offline embedding generation. Training uses precomputed embeddings, but the 2048/4096-dimensional User Transformer is still large.
 - The training scripts report the full-sequence loss and held-out top-1 accuracy from `SeqTrainer.evaluate()`, and additionally compute HR/NDCG@10/50/200.
-- Unlike the HSTU example, the current HLLM ranking evaluation does not mask PAD or previously seen items. Before comparing paper or online metrics, align the candidate set and filtering protocol.
+- The HLLM example uses chunked retrieval through `SeqTrainer.predict()`, excluding PAD; `filter_seen` controls history filtering. Align this option and the candidate set before comparing paper or online metrics.
 - Time and memory usage depend on the hardware, vocabulary size, sequence length, and cache state. This document does not provide fixed runtime estimates or percentage improvements that have not been verified by a benchmark script.
 
 ## 7. Boundaries Relative to Official End-to-End HLLM
@@ -189,15 +191,15 @@ Capabilities that can be verified in the current repository:
 - Item text embeddings are aligned by token ID and frozen.
 - A causal User Transformer produces full-vocabulary cosine logits.
 - MovieLens-1M and Amazon Books have preprocessing, training, and top-k evaluation examples.
-- A single-machine `SeqTrainer` can select either full-vocabulary CE or the full-vocabulary classification loss currently named `NCELoss`.
+- A single-machine `SeqTrainer` supports full-vocabulary CE, the legacy full-vocabulary `NCELoss`, and `sampled_softmax`, which scores positives and sampled negatives only.
 
 Parts that are not implemented or not aligned:
 
 - End-to-end joint training of the Item LLM and User LLM.
 - A component-by-component reproduction of the official large-model architecture, learnable item embedding tokens, and training configuration.
-- Sampled NCE or hard negatives.
+- The complete official negative-sampling strategy and training protocol.
 - DeepSpeed or distributed training.
-- A padding attention mask, unified candidate filtering, and experiments that reproduce paper metrics.
+- A unified history-filtering protocol and experiments that reproduce paper metrics.
 - Multi-step autoregressive decoding and a production inference service.
 
 Existing tests cover item embedding row/dimension validation and the range of cosine logits, but do not prove metric equivalence with the official implementation. The accurate positioning is therefore a lightweight research example, not a "97% aligned" or production-ready official reproduction.

@@ -7,6 +7,8 @@ description: TIGER 生成式推荐模型在 torch-rechub 中的运行说明，�
 
 本文件说明当前 `torch-rechub` 中 TIGER（Transformer Index for GEnerative Recommenders）的实现与运行方式。TIGER 把"预测下一个 item"建模成"生成下一个 item 的语义 ID"的序列到序列任务：每个 item 先由 RQ-VAE 量化成一串 codebook token（语义 ID，如 `<a_1><b_3><c_5>`），再用 T5 自回归地生成下一个 item 的语义 ID，并通过前缀受限的 beam search 约束到合法 item 上。
 
+这里复现 RQ-VAE 语义 ID、T5 自回归训练与合法候选受限解码的基本流程，使用 Hugging Face 实现以便单卡运行；并非官方训练环境或论文指标的完整复刻。先用小数据跑通，再按显存调整 batch size、AMP 和梯度累积。RQ-VAE 量化与梯度逻辑修正前的权重应重新训练，并重新导出语义 ID 后训练 TIGER，避免混用两套编码。
+
 示例脚本按数据集拆分，与 HSTU / HLLM 保持一致的"一数据集一脚本"风格：
 
 - `examples/generative/run_tiger_movielens.py`
@@ -125,7 +127,7 @@ python run_tiger_amazon_books.py --mode all \
 
 2. **生成语义 ID**：为同一批 item id 准备 item embedding（例如 HLLM 预处理产出的文本 embedding），用 `run_rqvae_amazon_books.py` 风格的 RQ-VAE 训练并导出 `semantic_ids.json`。**RQ-VAE 输出必须按第 1 步相同的 item id 作为 key**，否则 `inter.json` 与 `semantic_ids.json` 对不上。
 
-   当前仓库只有 Amazon 命名的通用 RQ-VAE 示例，没有封装 MovieLens 的映射检查；而且该脚本生成语义 ID 时的 DataLoader 当前设置了 `shuffle=True`，输出字典又按枚举位置编号。真实数据复现前应先确保导出阶段 `shuffle=False`，并确认 embedding 第 `i` 行就是 token id `i`。仅检查 key 数量无法发现“key 存在但对应错 item”的静默错位。
+   通用 RQ-VAE 示例虽以 Amazon 命名，也可接收其他数据集的 item embedding。训练时打乱样本，导出时使用 `shuffle=False` 保持行号顺序，并删除 PAD 的语义 ID。仍需保证 embedding 第 `i` 行就是第 1 步的 token id `i`。
 
    至少应在训练前检查覆盖范围：
 

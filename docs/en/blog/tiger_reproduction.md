@@ -7,6 +7,8 @@ description: How TIGER is run in torch-rechub, including the semantic-ID pipelin
 
 This document describes how TIGER (Transformer Index for GEnerative Recommenders) is implemented and run in `torch-rechub`. TIGER frames "predict the next item" as a sequence-to-sequence task of "generate the next item's semantic ID": each item is first quantized by RQ-VAE into a tuple of codebook tokens (a *semantic ID*, e.g. `<a_1><b_3><c_5>`), then T5 autoregressively generates the next item's semantic ID, constrained to legal items via prefix-restricted beam search.
 
+This reproduces the basic RQ-VAE semantic-ID, autoregressive T5 training, and catalog-constrained decoding pipeline using Hugging Face for single-GPU use. It does not reproduce the complete official environment or establish paper-metric equivalence. Start with a small dataset, then adjust batch size, AMP, and gradient accumulation for available memory. Retrain RQ-VAE checkpoints from before the quantization and gradient corrections, regenerate semantic IDs, and then train TIGER to avoid mixing code assignments.
+
 The example scripts follow the same "one script per dataset" layout as HSTU / HLLM:
 
 - `examples/generative/run_tiger_movielens.py`
@@ -125,7 +127,7 @@ Real data needs semantic IDs aligned with `inter.json`, so it is a two-stage RQ-
 
 2. **Generate semantic IDs**: prepare item embeddings for the same item ids (e.g. the text/ID embeddings produced by HLLM preprocessing), then train an `run_rqvae_amazon_books.py`-style RQ-VAE and export `semantic_ids.json`. **The RQ-VAE output must be keyed by the same item ids as step 1**, otherwise `inter.json` and `semantic_ids.json` will not line up.
 
-   The repository currently has only the generally usable, Amazon-named RQ-VAE example and does not wrap the MovieLens mapping check. In addition, the script's DataLoader currently uses `shuffle=True` while the exported dictionary is numbered by enumeration order. Before reproducing a real-data run, make sure export uses `shuffle=False` and confirm that embedding row `i` represents token id `i`. Checking only the number of keys cannot detect a silent mismatch where a key exists but points to the wrong item.
+   The Amazon-named RQ-VAE example also accepts item embeddings from other datasets. Training shuffles samples; export uses `shuffle=False` to preserve row order and removes the PAD semantic ID. Embedding row `i` must still represent token id `i` from step 1.
 
    At minimum, check coverage before training:
 

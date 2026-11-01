@@ -7,6 +7,8 @@ description: torch-rechub 中轻量 HLLM 实现的数据准备、训练命令、
 
 本文说明仓库当前 HLLM（Hierarchical Large Language Model for Recommendation）示例的可运行路径。这里实现的是“离线预计算 item 文本 embedding + 轻量 User Transformer”的版本，不是 ByteDance 官方端到端 HLLM 训练栈，也不应把本文结果当作论文指标复现。
 
+默认路径适合单卡实验：离线冻结 item 向量，训练小型 User Transformer；可用 `--d_model` 投影降维，并启用 `--loss_type sampled_softmax --amp`。模型接口也支持传入预训练 `user_model`，但示例默认不会加载它，更不包含两侧 LLM 的联合训练。16/24 GB 显存能容纳的规模取决于词表、序列长度和模型配置。
+
 ## 1. 代码入口
 
 - 模型：`torch_rechub/models/generative/hllm.py`
@@ -41,7 +43,7 @@ description: torch-rechub 中轻量 HLLM 实现的数据准备、训练命令、
 Compress the following sentence into embedding: title: {title}genres: {genres}
 ```
 
-Amazon Books 使用 `title` 与 `description`。脚本取最后一个 token 的隐藏状态，按 token id 行号写入 `item_embeddings_<model_type>.pt`；第 0 行保留给 PAD。`HLLMModel` 会检查行数等于 `vocab_size`、列数等于 `d_model`，随后做 L2 归一化并注册为不可训练 buffer。
+Amazon Books 使用 `title` 与 `description`。脚本取最后一个 token 的隐藏状态，按 token id 行号写入 `item_embeddings_<model_type>.pt`；第 0 行保留给 PAD。`HLLMModel` 检查 token 行号对齐并冻结 item 向量；默认维度一致时直接归一化，设置较小的 `--d_model` 时用可训练投影衔接 User 编码器。
 
 缺少文本的 token 会保留为零向量。预处理日志会打印覆盖数量，正式实验应检查该数字，不能只检查文件是否存在。
 
@@ -60,7 +62,7 @@ seq_tokens [B, L]
   -> logits [B, L, V]
 ```
 
-每个 block 使用 pre-norm 多头自注意力、前馈网络和残差连接。当前注意力只构造 causal mask，没有额外的 padding attention mask；左侧 PAD 位置仍会叠加位置/时间 embedding，这是与完整生产实现需要特别核对的边界。
+每个 block 使用 pre-norm 多头自注意力、前馈网络和残差连接。causal mask 与 padding mask 分别屏蔽未来 token 和 PAD key，并将 PAD 位置输出清零。
 
 ### 2.3 训练目标与 `NCELoss` 的真实语义
 
@@ -176,10 +178,10 @@ item_embeddings_tinyllama.pt
 
 ## 6. 资源与评估注意事项
 
-- HLLM 前向会生成 `[B, L, V]` 全词表 logits。Amazon Books 的词表很大，显存通常比“只存 item embedding”高得多；OOM 时优先降低 `--batch_size` 与 `--max_seq_len`。
+- 默认全词表训练会生成 `[B, L, V]` logits；`sampled_softmax` 则只计算正例与采样负例。大词表下可先选择采样训练，再降低 `--batch_size`、`--max_seq_len` 和 `--d_model`。
 - TinyLlama/Baichuan2 只在离线 embedding 生成阶段运行；训练阶段使用预计算 embedding，但 2048/4096 维 User Transformer 本身仍然较大。
 - 训练脚本报告 `SeqTrainer.evaluate()` 的 full-sequence loss、held-out top-1 accuracy，并额外计算 HR/NDCG@10/50/200。
-- HLLM 示例的 ranking 评估当前没有像 HSTU 示例那样屏蔽 PAD 与历史已看 item。若要做论文或线上口径比较，应先统一候选集合与过滤协议。
+- HLLM 示例使用 `SeqTrainer.predict()` 分块检索候选，排除 PAD；是否过滤历史由 `filter_seen` 控制。比较论文或线上指标前，应统一该选项与候选集合。
 - 时间和显存受硬件、词表规模、序列长度与缓存状态影响；本文不提供未经基准脚本验证的固定耗时或百分比提升。
 
 ## 7. 与官方端到端 HLLM 的边界
@@ -189,15 +191,15 @@ item_embeddings_tinyllama.pt
 - item 文本 embedding 按 token id 对齐并冻结；
 - causal User Transformer 输出全词表 cosine logits；
 - 支持 MovieLens-1M 与 Amazon Books 的预处理、训练和 top-k 评估示例；
-- 单机 `SeqTrainer` 可选择全词表 CE 或当前名为 `NCELoss` 的全词表分类损失。
+- 单机 `SeqTrainer` 支持全词表 CE、兼容旧接口的全词表 `NCELoss`，以及只计算正例和采样负例得分的 `sampled_softmax`。
 
 当前未实现或未对齐的部分：
 
 - Item LLM 与 User LLM 的端到端联合训练；
 - 官方大模型架构、可学习 item embedding token 与训练配置的逐项复刻；
-- sampled NCE / hard negatives；
+- 官方完整的负采样策略与训练协议；
 - DeepSpeed 或分布式训练；
-- padding attention mask、统一的候选过滤和论文指标复现实验；
+- 统一的历史候选过滤协议和论文指标复现实验；
 - 多步自回归解码与生产推理服务。
 
 现有测试覆盖 item embedding 行号/维度校验和 cosine logits 范围，但不证明与官方实现的指标一致。因此更准确的定位是轻量研究示例，而不是“97% 对齐”或可直接生产部署的官方复现。
