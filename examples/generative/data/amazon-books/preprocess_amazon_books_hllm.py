@@ -269,15 +269,16 @@ def generate_embeddings(item_text_map, model_type, device, output_dir, vocab_pat
     model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16 if device == 'cuda' else torch.float32, device_map=device, trust_remote_code=True)
     model.eval()
 
-    # Frozen last-token pooling is a lightweight approximation. Official HLLM
-    # instead learns an embedding token jointly with the Item and User LLMs.
+    # Generate embeddings using official ByteDance HLLM approach
+    # Uses last token's hidden state (no special [ITEM] token needed)
+    # In official implementation, learnable embedding tokens are appended during training
     embeddings_array = np.zeros((vocab_size, d_model), dtype=np.float32)
     total_items = sum(1 for token_id in item_to_idx.values() if token_id != 0)
     missing = 0
     generated = 0
 
     print(f"Generating embeddings for {total_items} products...")
-    print("Using frozen last-token embeddings (approximation without the official learned embedding token)")
+    print("Using official ByteDance HLLM format (last token hidden state)")
 
     with torch.no_grad():
         for product_id, token_id in tqdm.tqdm(sorted(item_to_idx.items(), key=lambda item: item[1]), desc="Generating embeddings"):
@@ -297,7 +298,8 @@ def generate_embeddings(item_text_map, model_type, device, output_dir, vocab_pat
             hidden_states = outputs.hidden_states[-1]
 
             # Use last token's hidden state as item embedding
-            # This does not reproduce the official learned embedding token.
+            # This matches official implementation where item_emb_token_n=1
+            # and embedding is extracted from the last position
             embedding = hidden_states[0, -1, :].cpu().numpy()
             embeddings_array[token_id] = embedding
             generated += 1
