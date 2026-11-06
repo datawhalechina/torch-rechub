@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-11-06
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🐛 Bug 修复 / Bug Fixes
+* fix(matching): count shared feature fields in SENet towers by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/276
+* fix(din): include dense context values in MLP input by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/280
+* fix(data): bound negative sampling and handle exhausted catalogs by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/281
+* fix(data): split full sequences before truncating histories by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/282
+* fix(callback): initialize early stopping from the first finite score by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/283
+* fix(trainers): persist best validation weights during training by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/284
+* fix(layers): preserve batch dimension for single-item inference by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/286
+* fix(serving): import optional backends only when selected by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/291
+* fix(features): isolate parameters between model instances by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/288
+* fix(features): restore per-feature embedding cache by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/294
+* fix(sequence): mask padding and correct SINE normalization by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/287
+* fix(trainers): simplify epoch learning-rate logging by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/290
+* fix(metrics): keep essential GAUC, Top-K and LogLoss boundary fixes by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/289
+* fix(generative): complete simple single-device training workflows by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/293
+### 🔧 模型更新 / Models
+* Add single-device in-batch DSSM training by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/272
+* feat(matching): extend in-batch sampling across recall models by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/274
+### ✨ 新特性 / Features
+* feat(ranking): add opt-in in-batch negative sampling by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/275
+* refactor: simplify ONNX quantization and preserve export compatibility by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/278
+* refactor: simplify shared model visualization by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/277
+* feat(trainers): configure batch loss and learning-rate progress by @1985312383 in https://github.com/datawhalechina/torch-rechub/pull/295
+
+
+**Full Changelog**: https://github.com/datawhalechina/torch-rechub/compare/v0.9.0...v1.0.0
+
 ## [0.9.0] - 2026-09-14
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->

@@ -43,11 +43,13 @@ forward(self, x: torch.Tensor)
 
 #### `EarlyStopper`
 
-Early stops the training if validation loss doesn't improve after a given patience.
+Early stops training if the validation metric does not improve.
 
 **参数**
 
-- `patience` (`int`): How long to wait after last time validation auc improved.
+- `patience` (`int`): How long to wait after the validation metric last improved.
+- `mode` (`str`): ``"max"`` for metrics where larger is better and ``"min"``
+  for metrics where smaller is better (default = ``"max"``).
 
 ##### `EarlyStopper.stop_training`
 
@@ -59,7 +61,8 @@ whether to stop training.
 
 **参数**
 
-- `val_auc` (`float`): auc score in val data.
+- `val_auc` (`float`): metric score on validation data. The name is kept
+  for backward compatibility.
 - `weights` (`tensor`): the weights of model
 
 ### `features`
@@ -335,6 +338,8 @@ Multi-layer perceptron with BN/activation/dropout per linear layer.
 - `dims` (`list, default []`): Hidden layer sizes.
 - `dropout` (`float, default 0`): Dropout probability.
 - `activation` (`str, default 'relu'`): Activation function (sigmoid, relu, prelu, dice, softmax).
+- `batchnorm` (`bool, default True`): Include BatchNorm after each hidden Linear. Disable for tiny RQ-VAE
+  batches; the default preserves existing ranking/matching behaviour.
 
 **张量形状**
 
@@ -607,14 +612,14 @@ forward(self, em)
 
 #### `HSTULayer`
 
-Single HSTU "sequential transduction unit" layer (paper-faithful).
+Dense HSTU layer with the reference rel_bias attention equation.
 
 Implements HSTU Eq. 2-4 from *Actions Speak Louder than Words*:
 
 - Eq. 2 — ``U, V, Q, K = Split(SiLU(f_1(LayerNorm(x))))``: a **single**
   ``SiLU`` is applied to the joint projection **before** the split, so all
   four of ``U, V, Q, K`` go through the non-linearity.
-- Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T * alpha + rab^{p,t}) / N) V(x)``: the
+- Eq. 3 — ``A(x) V(x) = (SiLU(Q K^T + rab^{p,t}) / N) V(x)``: the
   learnable bucketed (position-diff, time-diff) bias ``rab^{p,t}`` is added
   to scores **before** the ``SiLU/N`` activation.
 - Eq. 4 — ``Y(x) = f_2(LayerNorm(A V) * U)``: a single linear ``f_2`` is
@@ -629,7 +634,7 @@ The external residual ``x + Layer(x)`` is added by :class:`HSTUBlock`.
 - `dqk` (`Query/key dim per head.`)
 - `dv` (`Value/u dim per head.`)
 - `dropout` (`Dropout applied to the gated attention output before the`): final projection.
-- `max_seq_len` (`Used for the ``silu(scores) / max_seq_len`` scaling and`): for sizing the relative-position table inside ``rab``.
+- `max_seq_len` (`Maximum size of the relative-position table inside ``rab``.`): Attention is divided by the actual padded input length ``N``.
 - `num_time_buckets` (`Number of time-difference buckets in ``rab``.`)
 - `time_bucket_fn` (```'sqrt'`` or ``'log'`` bucketization in ``rab``.`)
 - `time_bucket_divisor` (`Bucket-range divisor in ``rab``.`)
@@ -933,6 +938,8 @@ gauc_score(y_true, y_pred, users, weights = None)
 ```
 
 compute GAUC
+
+Users with only one label class are excluded from the weighted average.
 
 **参数**
 
@@ -1334,7 +1341,7 @@ pre-computed item embeddings as input instead of learnable token embeddings.
 ###### `HLLMTransformerBlock.forward`
 
 ```python
-forward(self, x, rel_pos_bias = None)
+forward(self, x, rel_pos_bias = None, padding_mask = None)
 ```
 
 Forward pass.
@@ -1355,7 +1362,8 @@ HLLM: Hierarchical Large Language Model for Recommendation.
 This is a lightweight implementation of HLLM that uses pre-computed item
 embeddings as input. The original ByteDance HLLM uses end-to-end training
 with both Item LLM and User LLM, but this implementation focuses on the
-User LLM component for resource efficiency.
+sequence encoder for resource efficiency. By default it is an HLLM-inspired
+baseline, not a pretrained User LLM or full end-to-end paper reproduction.
 
 Architecture:
     - Item Embeddings: Pre-computed using LLM (offline, frozen)
@@ -1390,14 +1398,23 @@ Reference:
   so logits = cos(x, emb) / temperature, bounded in [-1/T, +1/T].
   Loss functions should be configured with their own temperature=1.0
   to avoid double scaling.
+- `user_model` (`nn.Module, optional`): Supplied pretrained causal base model,
+  e.g. AutoModel, returning last_hidden_state from inputs_embeds.
+  Its hidden size must match d_model. A causal-LM vocabulary head is
+  not needed. No checkpoint is downloaded by this class.
+- `project_items` (`bool`): Default False preserves the dimension check.
+  True allows a small trainable projection from cached LLM embeddings
+  to d_model; this is a resource-saving approximation, not paper HLLM.
+- `learn_temperature` (`bool`): Default False preserves fixed temperature.
+  True learns a logit scale clamped to [1, 100], like the reference.
 
-###### `HLLMModel.forward`
+###### `HLLMModel.encode`
 
 ```python
-forward(self, seq_tokens, time_diffs = None)
+encode(self, seq_tokens, time_diffs = None)
 ```
 
-Forward pass.
+Encode history into states, masking PAD keys and PAD outputs.
 
 **参数**
 
@@ -1406,7 +1423,31 @@ Forward pass.
 
 **返回**
 
-- `Tensor` (`Logits of shape (B, L, vocab_size).`)
+- `Tensor` (`States of shape (B, L, d_model).`)
+
+###### `HLLMModel.score_items`
+
+```python
+score_items(self, states, item_ids = None, paired = False)
+```
+
+Cosine scores for all candidates, or one paired item per state.
+
+###### `HLLMModel.get_item_embeddings`
+
+```python
+get_item_embeddings(self, item_ids = None)
+```
+
+Normalized candidate vectors, including the optional projection.
+
+###### `HLLMModel.forward`
+
+```python
+forward(self, seq_tokens, time_diffs = None)
+```
+
+Preserve the full-vocabulary forward API.
 
 #### `hstu`
 
@@ -1418,17 +1459,20 @@ HSTU: Hierarchical Sequential Transduction Units.
 
 Autoregressive generative recommender that stacks ``HSTUBlock`` layers to
 capture long-range dependencies and predict the next item. The layer
-internals follow the HSTU paper (Eq. 2-4) and Meta's reference
-implementation (`meta-recsys/generative-recommenders`):
+internals are a dense teaching adaptation of HSTU (Eq. 2-4), not a
+parameter-identical port of Meta's jagged reference implementation:
 
 - Token embedding + absolute position embedding + (optional) time-bucket
   embedding on the input side.
 - Each HSTU layer applies a single ``SiLU`` to the joint ``UVQK``
   projection **before** splitting (Eq. 2), so all four streams go through
-  the non-linearity.
-- Attention uses ``alpha = 1/sqrt(dqk)`` scaling and adds a per-head
-  bucketed (position-diff, time-diff) bias ``rab^{p,t}`` to scores
-  **before** the ``silu(scores) / max_seq_len`` activation (Eq. 3).
+  the non-linearity. LayerNorm has no affine parameters (eps=1e-6), and
+  the joint projection has no bias, matching the reference.
+- Like Meta's ``rel_bias`` path, attention uses unscaled QK and a
+  head-shared relative bias before ``SiLU(scores) / seq_len`` (Eq. 3).
+  This dense adaptation retains same-position time differences; Meta's
+  timestamp bias uses the next event time. Input preprocessing and layer
+  parameterization are not checkpoint-compatible with the reference.
 - Gated output ``LayerNorm(A V) * U`` projected by a single linear
   ``f_2`` (Eq. 4); no concat-u/x bypass and no separate FFN.
 - External residual ``x + Layer(x)`` is applied around each layer in
@@ -1468,7 +1512,8 @@ implementation (`meta-recsys/generative-recommenders`):
 **说明**
 
 ``time_diffs`` semantics: per-position seconds delta from a single anchor
-(e.g. ``query_time - timestamps[i]``), following the Meta reference.
+(e.g. ``query_time - timestamps[i]``). This input contract differs from
+the reference's next-event timestamp bias.
 Adjacent-step ``t[i] - t[i-1]`` deltas also work, but the bucket
 distribution will be different; set ``time_bucket_divisor`` and
 ``time_bucket_unit`` accordingly.
@@ -1482,13 +1527,13 @@ distribution will be different; set ``time_bucket_divisor`` and
 - **Output**
   - `logits` (```(batch_size, seq_len, vocab_size)```)
 
-###### `HSTUModel.forward`
+###### `HSTUModel.encode`
 
 ```python
-forward(self, x, time_diffs = None)
+encode(self, x, time_diffs = None)
 ```
 
-Forward pass.
+Encode a history into states without scoring the item vocabulary.
 
 **参数**
 
@@ -1501,7 +1546,25 @@ Forward pass.
 
 **返回**
 
-- `Tensor` (`Logits over the vocabulary, shape`): ``(batch_size, seq_len, vocab_size)``.
+- `Tensor` (`Sequence states, shape ``(batch_size, seq_len, d_model)``.`)
+
+###### `HSTUModel.score_items`
+
+```python
+score_items(self, states, item_ids = None, paired = False)
+```
+
+Score item IDs, or the full vocabulary when omitted.
+
+``paired=True`` scores one item per state for sampled positives.
+
+###### `HSTUModel.forward`
+
+```python
+forward(self, x, time_diffs = None)
+```
+
+Keep the original full-vocabulary logits interface.
 
 #### `rqvae`
 
@@ -1659,8 +1722,8 @@ the straight-through estimator.
 ResidualVectorQuantizer: Multi-stage residual vector quantization.
 
 Applies a sequence of VectorQuantizer modules to progressively
-quantize the residuals of the input. Computes mean quantization
-loss across all stages. References:SoundStream: An End-to-End Neural Audio Codec
+quantize the residuals of the input. Sums quantization losses
+across stages, as in TIGER. References:SoundStream: An End-to-End Neural Audio Codec
 https://arxiv.org/pdf/2107.03312.pdf
 
 **参数**
@@ -1680,7 +1743,7 @@ https://arxiv.org/pdf/2107.03312.pdf
   - `x` (`torch.Tensor of shape (batch_size, ..., e_dim)`)
 - **Output**
   - `x_q` (`torch.Tensor of shape (batch_size, ..., e_dim)`)
-  - `mean_losses` (`torch.Tensor, scalar mean quantization loss`)
+  - `quant_loss` (`torch.Tensor, scalar sum of quantization losses`)
   - `all_indices` (`torch.Tensor of shape (batch_size, ..., num_quantizers)`)
 
 **示例**
@@ -1720,7 +1783,7 @@ Apply residual vector quantization to the input features.
 
 - `x_q` (`torch.Tensor`): Quantized output obtained by summing the outputs of all
   residual quantizers.
-- `mean_losses` (`torch.Tensor`): Mean vector quantization loss averaged over all stages.
+- `quant_loss` (`torch.Tensor`): Sum of vector quantization losses across all stages.
 - `all_indices` (`torch.Tensor`): Tensor containing codebook indices from all quantizers,
   stacked along the last dimension.
 
@@ -1835,30 +1898,15 @@ Compute total loss combining reconstruction and quantization losses.
 ###### `RQVAEModel.generate_semantic_ids`
 
 ```python
-generate_semantic_ids(self, data, data_loader, prefix = ['<a_{}>', '<b_{}>', '<c_{}>', '<d_{}>', '<e_{}>'], use_sk = False, device = 'cuda')
+generate_semantic_ids(self, data, data_loader, prefix = None, use_sk = False, device = 'cuda', item_ids = None)
 ```
 
-Generate semantic IDs for a dataset using the residual vector quantizer.
+Export row-aligned, unique semantic IDs using a collision suffix.
 
-**参数**
-
-- `data` (`torch.Tensor`): Input dataset of shape (num_samples, in_dim)
-- `data_loader` (`torch.utils.data.DataLoader`): DataLoader for iterating over the dataset in batches
-- `prefix` (`list of str, default=["<a_{}>","<b_{}>","<c_{}>","<d_{}>","<e_{}>"]`): Prefix template for generating semantic ID strings for each quantizer stage
-- `use_sk` (`bool, default=False`): Whether to use Sinkhorn-based soft assignment for collisions
-- `device` (`str, default='cuda'`): Device to perform computation on
-
-**返回**
-
-- `all_indices_dict` (`dict`): Dictionary mapping item index to list of semantic ID strings from each quantization stage
-
-**示例**
-
-```python
->>> all_indices_dict = model.generate_semantic_ids(data, data_loader)
->>> len(all_indices_dict)
-```
-num_samples
+The loader must visit every row exactly once in dataset order. Optional
+item_ids maps those rows to business IDs; otherwise keys are row indices.
+Re-export the complete catalog after changing RQ-VAE or catalog order.
+use_sk is retained for compatibility; export uses nearest codes and a collision suffix.
 
 #### `tiger`
 
@@ -1875,6 +1923,14 @@ set_hyper(self, temperature)
 ```
 
 未提供文档说明。
+
+###### `TIGERModel.build_tokenizer`
+
+```python
+build_tokenizer(tokens, model_max_length = 512)
+```
+
+Offline semantic-token vocabulary; no natural-language checkpoint.
 
 ###### `TIGERModel.ranking_loss`
 
@@ -2007,7 +2063,9 @@ Deep Structured Semantic Model
 
 - `user_features` (`list[Feature Class]`): training by the user tower module.
 - `item_features` (`list[Feature Class]`): training by the item tower module.
-- `temperature` (`float`): temperature factor for similarity score, default to 1.0.
+- `temperature` (`float`): positive temperature for MatchTrainer's full-batch
+  in-batch cross entropy, default to 1.0. The point-wise forward path
+  continues to return sigmoid(cosine_similarity) without temperature scaling.
 - `user_params` (`dict`): the params of the User Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
 - `item_params` (`dict`): the params of the Item Tower module, keys include:`{"dims":list, "activation":str, "dropout":float, "output_layer":bool`}.
 
@@ -2164,6 +2222,29 @@ item_tower(self, x)
 
 模块: `torch_rechub.models.matching.mind`
 
+##### `dynamic_interest_mask`
+
+```python
+dynamic_interest_mask(mask, interest_num)
+```
+
+Per-user active-interest mask following the MIND paper's heuristic.
+
+Sizes the number of interests by history length
+``K'_u = max(1, min(interest_num, floor(log2(|I_u|))))`` where ``|I_u|`` is
+each user's interacted-item count (``mask.sum(-1)``). This is MIND-specific
+and lives with the model, not in the shared ``CapsuleNetwork`` routing layer.
+
+**参数**
+
+- `mask` (`Tensor`): history mask ``(B, L)`` with 1 for real items, 0 for padding.
+- `interest_num` (`int`): upper bound ``K`` on the number of interests.
+
+**返回**
+
+- `Tensor` (`boolean ``(B, interest_num)`` mask, ``True`` for the first`)
+- ```K'_u`` (active) interests of each user.`
+
 ##### `MIND`
 
 The match model mentioned in `Multi-Interest Network with Dynamic Routing` paper.
@@ -2178,8 +2259,19 @@ Note in origin paper, it's without item dnn tower and train item embedding direc
 - `neg_item_feature` (`list[Feature Class]`): training by the embedding table, it's the negative items id feature.
 - `max_length` (`int`): max sequence length of input item sequence
 - `temperature` (`float`): temperature factor for similarity score, default to 1.0.
+- `dynamic_interest` (`bool`): if ``True``, size the active interests per user by the
+  paper's heuristic ``K'_u = max(1, min(interest_num, floor(log2(|I_u|))))``
+  instead of a fixed ``interest_num``. Defaults to ``False`` (unchanged behaviour).
 
-    interest_num （int): interest num
+
+    interest_num （int): interest num (the upper bound ``K`` when ``dynamic_interest``).
+
+**说明**
+
+    With ``dynamic_interest=True`` the user-tower inference embedding zeroes out
+    each user's inactive interests (rows ``>= K'_u`` are zero vectors). Downstream
+    retrieval/indexing should skip those zero rows; :meth:`active_interest_mask`
+    returns the boolean ``(B, interest_num)`` mask of the interests to keep.
 
 ###### `MIND.forward`
 
@@ -2192,10 +2284,22 @@ forward(self, x)
 ###### `MIND.user_tower`
 
 ```python
-user_tower(self, x)
+user_tower(self, x, interest_mask = None)
 ```
 
 未提供文档说明。
+
+###### `MIND.active_interest_mask`
+
+```python
+active_interest_mask(self, x)
+```
+
+Per-user boolean mask ``(B, interest_num)`` of active interests.
+
+Returns ``None`` when ``dynamic_interest`` is off (all interests active).
+With ``dynamic_interest=True`` the inference user embedding zeroes the
+inactive interests; downstream retrieval can use this mask to drop them.
 
 ###### `MIND.item_tower`
 
@@ -2461,6 +2565,14 @@ forward(self, x)
 ```
 
 未提供文档说明。
+
+###### `YoutubeSBC.correct_inbatch_logits`
+
+```python
+correct_inbatch_logits(self, scores, x)
+```
+
+Keep sampling-bias correction for both original and full-batch training.
 
 ###### `YoutubeSBC.user_tower`
 
@@ -2958,7 +3070,7 @@ Activation Unit Layer mentioned in DIN paper, it is a Target Attention method.
 ###### `ActivationUnit.forward`
 
 ```python
-forward(self, history, target)
+forward(self, history, target, mask = None)
 ```
 
 未提供文档说明。
@@ -3292,10 +3404,10 @@ A general trainer for single task learning.
 
 **参数**
 
-- `model` (`nn.Module`): any multi task learning model.
+- `model` (`nn.Module`): any single-task ranking model.
 - `optimizer_fn` (`torch.optim`): optimizer function of pytorch (default = `torch.optim.Adam`).
 - `optimizer_params` (`dict`): parameters of optimizer_fn.
-- `scheduler_fn` (`torch.optim.lr_scheduler`): torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+- `scheduler_fn` (`torch.optim.lr_scheduler`): optional scheduler called with step() once per epoch, e.g. StepLR.
 - `scheduler_params` (`dict`): parameters of optimizer scheduler_fn.
 - `n_epoch` (`int`): epoch number of training.
 - `earlystop_patience` (`int`): how long to wait after last time validation auc improved (default=10).
@@ -3308,6 +3420,12 @@ A general trainer for single task learning.
 - `embedding_l2` (`float`): L2 regularization coefficient for embedding parameters (default=0.0).
 - `dense_l1` (`float`): L1 regularization coefficient for dense parameters (default=0.0).
 - `dense_l2` (`float`): L2 regularization coefficient for dense parameters (default=0.0).
+- `in_batch_neg` (`bool`): construct negative user-item pairs from positive rows in the batch.
+  Defaults to False, preserving the original supervised BCE training.
+- `item_features` (`list`): item column names or Feature objects to swap together.
+  User, history and context columns remain attached to their original row.
+- `in_batch_neg_ratio` (`int`): negatives per positive, default=1. None uses all other rows.
+- `sampler_seed` (`int`): optional seed for reproducible in-batch sampling.
 
 ##### `CTRTrainer.train_one_epoch`
 
@@ -3315,15 +3433,18 @@ A general trainer for single task learning.
 train_one_epoch(self, data_loader, log_interval = 10)
 ```
 
-未提供文档说明。
+Train one epoch; log_interval is a positive integer, defaulting to 10.
 
 ##### `CTRTrainer.fit`
 
 ```python
-fit(self, train_dataloader, val_dataloader = None)
+fit(self, train_dataloader, val_dataloader = None, log_interval = 10)
 ```
 
-未提供文档说明。
+Train with progress updates every log_interval trained batches.
+
+Use a positive integer for log_interval (default: 10).
+Set log_interval=1 to show each batch's loss and learning rate.
 
 ##### `CTRTrainer.evaluate`
 
@@ -3394,56 +3515,10 @@ for deployment. The export is non-invasive and does not modify the model code.
 visualization(self, input_data = None, batch_size = 2, seq_length = 10, depth = 3, show_shapes = True, expand_nested = True, save_path = None, graph_name = 'model', device = None, dpi = 300, **kwargs)
 ```
 
-Visualize the model's computation graph.
+Draw the model; see utils.visualization.visualize_model for options.
 
-This method generates a visual representation of the model architecture,
-showing layer connections, tensor shapes, and nested module structures.
-It automatically extracts feature information from the model.
-
-**参数**
-
-- `input_data` (`dict, optional`): Example input dict {feature_name: tensor}.
-  If not provided, dummy inputs will be generated automatically.
-- `batch_size` (`int`): Batch size for auto-generated dummy input (default: 2).
-- `seq_length` (`int`): Sequence length for SequenceFeature (default: 10).
-- `depth` (`int`): Visualization depth, higher values show more detail.
-  Set to -1 to show all layers (default: 3).
-- `show_shapes` (`bool`): Whether to display tensor shapes (default: True).
-- `expand_nested` (`bool`): Whether to expand nested modules (default: True).
-- `save_path` (`str, optional`): Path to save the graph image (.pdf, .svg, .png).
-  If None, displays in Jupyter or opens system viewer.
-- `graph_name` (`str`): Name for the graph (default: "model").
-- `device` (`str, optional`): Device for model execution. If None, defaults to 'cpu'.
-- `dpi` (`int`): Resolution in dots per inch for output image.
-  Higher values produce sharper images suitable for papers (default: 300).
-- `**kwargs` (`Additional arguments passed to ``torchview.draw_graph()``.`)
-
-**返回**
-
-- `ComputationGraph` (`A torchview ComputationGraph object.`)
-
-**异常**
-
-- `ImportError` (`If torchview or graphviz is not installed.`)
-
-**说明**
-
-    When ``save_path`` is None (default):
-    - In Jupyter/IPython: automatically displays the graph inline
-    - In Python script: opens the graph with system default viewer
-
-**示例**
-
-```python
->>> trainer = CTRTrainer(model, ...)
->>> trainer.fit(train_dl, val_dl)
->>>
->>> # Auto-display in Jupyter (no save_path needed)
->>> trainer.visualization(depth=4)
->>>
->>> # Save to high-DPI PNG for papers
->>> trainer.visualization(save_path="model.png", dpi=300)
-```
+Inputs are generated from model features unless input_data is provided.
+Example: trainer.visualization(save_path="model.png", depth=3).
 
 ### `match_trainer`
 
@@ -3455,18 +3530,25 @@ A general trainer for Matching/Retrieval
 
 **参数**
 
-- `model` (`nn.Module`): any matching model.
+- `model` (`nn.Module`): any matching model with user_tower/item_tower methods.
 - `mode` (`int, optional`): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
 - `optimizer_fn` (`torch.optim`): optimizer function of pytorch (default = `torch.optim.Adam`).
 - `optimizer_params` (`dict`): parameters of optimizer_fn.
-- `scheduler_fn` (`torch.optim.lr_scheduler`): torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+- `scheduler_fn` (`torch.optim.lr_scheduler`): optional scheduler called with step() once per epoch, e.g. StepLR.
 - `scheduler_params` (`dict`): parameters of optimizer scheduler_fn.
 - `n_epoch` (`int`): epoch number of training.
 - `earlystop_patience` (`int`): how long to wait after last time validation auc improved (default=10).
-- `device` (`str`): `"cpu"` or `"cuda:0"`
-- `gpus` (`list`): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
+- `device` (`str`): `"cpu"` or `"cuda:0"`.
+- `gpus` (`list`): legacy GPU ID list for training without in-batch negatives.
 - `model_path` (`str`): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
-- `in_batch_neg` (`bool`): whether to use in-batch negative sampling instead of global negatives.
+- `in_batch_neg` (`bool`): train on positive-only pairs on a single device using other items in the batch
+  as negatives. The trainer temporarily uses the model's mode='in_batch'.
+  With mode=0 or 2 and default sampling options, use full-batch cross entropy
+  on tower embeddings using the model's own normalization, scaled by
+  model.temperature (default=1.0).
+  Paired-data labels are placeholders; session next-item labels provide target IDs.
+  Validation AUC still requires binary labels.
+  Other rows are treated as negatives, including repeated item IDs.
 - `in_batch_neg_ratio` (`int`): number of negatives to draw from the batch per positive sample when in_batch_neg is True.
 - `hard_negative` (`bool`): whether to choose hardest negatives within batch (top-k by score) instead of uniform random.
 - `sampler_seed` (`int`): optional random seed for in-batch sampler to ease reproducibility/testing.
@@ -3477,15 +3559,18 @@ A general trainer for Matching/Retrieval
 train_one_epoch(self, data_loader, log_interval = 10)
 ```
 
-未提供文档说明。
+Train one epoch; log_interval is a positive integer, defaulting to 10.
 
 ##### `MatchTrainer.fit`
 
 ```python
-fit(self, train_dataloader, val_dataloader = None)
+fit(self, train_dataloader, val_dataloader = None, log_interval = 10)
 ```
 
-未提供文档说明。
+Train with progress updates every log_interval trained batches.
+
+Use a positive integer for log_interval (default: 10).
+Set log_interval=1 to show each batch's loss and learning rate.
 
 ##### `MatchTrainer.evaluate`
 
@@ -3529,7 +3614,7 @@ tower separately for efficient online serving.
 - `mode` (`str, optional`): Export mode for dual-tower models:
   - "user": Export only the user tower (for user embedding inference)
   - "item": Export only the item tower (for item embedding inference)
-  - None: Export the full model (default)
+  - None: Export the full model's original scoring output (default).
 - `dummy_input` (`dict, optional`): Example input dict {feature_name: tensor}.
   If not provided, dummy inputs will be generated automatically.
 - `batch_size` (`int`): Batch size for auto-generated dummy input (default: 2).
@@ -3573,57 +3658,10 @@ tower separately for efficient online serving.
 visualization(self, input_data = None, batch_size = 2, seq_length = 10, depth = 3, show_shapes = True, expand_nested = True, save_path = None, graph_name = 'model', device = None, dpi = 300, **kwargs)
 ```
 
-Visualize the model's computation graph.
+Draw the model; see utils.visualization.visualize_model for options.
 
-This method generates a visual representation of the model architecture,
-showing layer connections, tensor shapes, and nested module structures.
-It automatically extracts feature information from the model.
-
-**参数**
-
-- `input_data` (`dict, optional`): Example input dict {feature_name: tensor}.
-  If not provided, dummy inputs will be generated automatically.
-- `batch_size` (`int, default=2`): Batch size for auto-generated dummy input.
-- `seq_length` (`int, default=10`): Sequence length for SequenceFeature.
-- `depth` (`int, default=3`): Visualization depth, higher values show more detail.
-  Set to -1 to show all layers.
-- `show_shapes` (`bool, default=True`): Whether to display tensor shapes.
-- `expand_nested` (`bool, default=True`): Whether to expand nested modules.
-- `save_path` (`str, optional`): Path to save the graph image (.pdf, .svg, .png).
-  If None, displays in Jupyter or opens system viewer.
-- `graph_name` (`str, default="model"`): Name for the graph.
-- `device` (`str, optional`): Device for model execution. If None, defaults to 'cpu'.
-- `dpi` (`int, default=300`): Resolution in dots per inch for output image.
-  Higher values produce sharper images suitable for papers.
-- `**kwargs` (`dict`): Additional arguments passed to torchview.draw_graph().
-
-**返回**
-
-- `ComputationGraph`: A torchview ComputationGraph object.
-
-**异常**
-
-- `ImportError`: If torchview or graphviz is not installed.
-
-**说明**
-
-Default Display Behavior:
-    When `save_path` is None (default):
-    - In Jupyter/IPython: automatically displays the graph inline
-    - In Python script: opens the graph with system default viewer
-
-**示例**
-
-```python
->>> trainer = MatchTrainer(model, ...)
->>> trainer.fit(train_dl)
->>>
->>> # Auto-display in Jupyter (no save_path needed)
->>> trainer.visualization(depth=4)
->>>
->>> # Save to high-DPI PNG for papers
->>> trainer.visualization(save_path="model.png", dpi=300)
-```
+Inputs are generated from model features unless input_data is provided.
+Example: trainer.visualization(save_path="model.png", depth=3).
 
 ### `mtl_trainer`
 
@@ -3639,31 +3677,36 @@ A trainer for multi task learning.
 - `task_types` (`list`): types of tasks, only support ["classfication", "regression"].
 - `optimizer_fn` (`torch.optim`): optimizer function of pytorch (default = `torch.optim.Adam`).
 - `optimizer_params` (`dict`): parameters of optimizer_fn.
-- `scheduler_fn` (`torch.optim.lr_scheduler`): torch scheduling class, eg. `torch.optim.lr_scheduler.StepLR`.
+- `scheduler_fn` (`torch.optim.lr_scheduler`): optional scheduler called with step() once per epoch, e.g. StepLR.
 - `scheduler_params` (`dict`): parameters of optimizer scheduler_fn.
 - `adaptive_params` (`dict`): parameters of adaptive loss weight method. Now only support `{"method" : "uwl"}`.
 - `n_epoch` (`int`): epoch number of training.
 - `earlystop_taskid` (`int`): task id of earlystop metrics relies between multi task (default = 0).
-- `earlystop_patience` (`int`): how long to wait after last time validation auc improved (default = 10).
+- `earlystop_patience` (`int`): how long to wait after the validation metric last improved (default = 10).
 - `device` (`str`): `"cpu"` or `"cuda:0"`
 - `gpus` (`list`): id of multi gpu (default=[]). If the length >=1, then the model will wrapped by nn.DataParallel.
 - `model_path` (`str`): the path you want to save the model (default="./"). Note only save the best weight in the validation data.
+- `earlystop_mode` (`str`): ``"max"`` when a larger validation score is better,
+  or ``"min"`` when a smaller score is better (default = ``"max"``).
 
 ##### `MTLTrainer.train_one_epoch`
 
 ```python
-train_one_epoch(self, data_loader)
+train_one_epoch(self, data_loader, log_interval = 10)
 ```
 
-未提供文档说明。
+Train one epoch; log_interval is a positive integer, defaulting to 10.
 
 ##### `MTLTrainer.fit`
 
 ```python
-fit(self, train_dataloader, val_dataloader, mode = 'base', seed = 0)
+fit(self, train_dataloader, val_dataloader, mode = 'base', seed = 0, log_interval = 10)
 ```
 
-未提供文档说明。
+Train with progress updates every log_interval batches.
+
+Use a positive integer for log_interval (default: 10).
+Set log_interval=1 to show each batch's task losses and learning rate.
 
 ##### `MTLTrainer.evaluate`
 
@@ -3736,57 +3779,10 @@ corresponding to each task.
 visualization(self, input_data = None, batch_size = 2, seq_length = 10, depth = 3, show_shapes = True, expand_nested = True, save_path = None, graph_name = 'model', device = None, dpi = 300, **kwargs)
 ```
 
-Visualize the model's computation graph.
+Draw the model; see utils.visualization.visualize_model for options.
 
-This method generates a visual representation of the model architecture,
-showing layer connections, tensor shapes, and nested module structures.
-It automatically extracts feature information from the model.
-
-**参数**
-
-- `input_data` (`dict, optional`): Example input dict {feature_name: tensor}.
-  If not provided, dummy inputs will be generated automatically.
-- `batch_size` (`int, default=2`): Batch size for auto-generated dummy input.
-- `seq_length` (`int, default=10`): Sequence length for SequenceFeature.
-- `depth` (`int, default=3`): Visualization depth, higher values show more detail.
-  Set to -1 to show all layers.
-- `show_shapes` (`bool, default=True`): Whether to display tensor shapes.
-- `expand_nested` (`bool, default=True`): Whether to expand nested modules.
-- `save_path` (`str, optional`): Path to save the graph image (.pdf, .svg, .png).
-  If None, displays in Jupyter or opens system viewer.
-- `graph_name` (`str, default="model"`): Name for the graph.
-- `device` (`str, optional`): Device for model execution. If None, defaults to 'cpu'.
-- `dpi` (`int, default=300`): Resolution in dots per inch for output image.
-  Higher values produce sharper images suitable for papers.
-- `**kwargs` (`dict`): Additional arguments passed to torchview.draw_graph().
-
-**返回**
-
-- `ComputationGraph`: A torchview ComputationGraph object.
-
-**异常**
-
-- `ImportError`: If torchview or graphviz is not installed.
-
-**说明**
-
-Default Display Behavior:
-    When `save_path` is None (default):
-    - In Jupyter/IPython: automatically displays the graph inline
-    - In Python script: opens the graph with system default viewer
-
-**示例**
-
-```python
->>> trainer = MTLTrainer(model, task_types=["classification", "classification"])
->>> trainer.fit(train_dl, val_dl)
->>>
->>> # Auto-display in Jupyter (no save_path needed)
->>> trainer.visualization(depth=4)
->>>
->>> # Save to high-DPI PNG for papers
->>> trainer.visualization(save_path="model.png", dpi=300)
-```
+Inputs are generated from model features unless input_data is provided.
+Example: trainer.visualization(save_path="model.png", depth=3).
 
 ### `rqvae_trainer`
 
@@ -3933,6 +3929,14 @@ True
 - `device` (`str`): 设备，'cpu'或'cuda'，默认'cpu'
 - `gpus` (`list`): 多GPU的id列表，默认为[]
 - `model_path` (`str`): 模型保存路径，默认为'./'
+- `loss_type` (`str`): cross_entropy (default), legacy nce (full vocabulary),
+  or sampled_softmax (positive plus sampled catalog negatives).
+- `loss_params` (`dict`): For sampled_softmax: num_negatives=128 and optional
+  negative_similarity_threshold for normalized HLLM item vectors.
+- `accumulation_steps` (`int`): Positive number of microbatches per update, default 1.
+- `amp` (`bool`): CUDA float16 autocast/scaling, disabled by default.
+- `max_grad_norm` (`float, optional`): Clip unscaled gradients.
+- `eval_chunk_size` (`int`): Positive candidate scoring chunk size, default 4096.
 
 **方法**
 
@@ -3997,13 +4001,25 @@ evaluate(self, data_loader)
 
 Evaluate the model on a validation/test data loader.
 
-Loss is the full-sequence next-token CE (matching training);
+Loss matches training: full-vocabulary CE or sampled candidate CE.
+Sampled loss uses fixed validation draws and is not full-vocabulary CE.
 accuracy is top-1 hit on the held-out next item only (useful as a
 ranking-style proxy metric).
 
 **返回**
 
 - `tuple` (```(avg_loss, top1_accuracy)``.`)
+
+##### `SeqTrainer.predict`
+
+```python
+predict(self, data_loader, top_k = 10, filter_seen = False)
+```
+
+Return exact catalog top-k IDs with bounded scoring memory.
+
+top_k is a positive integer. PAD is always excluded. History filtering is opt-in because a repeated
+interaction may be the true next item. This is not sampled evaluation.
 
 ##### `SeqTrainer.export_onnx`
 
@@ -4052,58 +4068,11 @@ instead of dict input, making ONNX export more straightforward.
 visualization(self, seq_length = 50, vocab_size = None, batch_size = 2, depth = 3, show_shapes = True, expand_nested = True, save_path = None, graph_name = 'model', device = None, dpi = 300, **kwargs)
 ```
 
-Visualize the model's computation graph.
+Draw the sequence model with generated token and time inputs.
 
-This method generates a visual representation of the sequence model
-architecture, showing layer connections, tensor shapes, and nested
-module structures.
-
-**参数**
-
-- `seq_length` (`int, default=50`): Sequence length for dummy input.
-- `vocab_size` (`int, optional`): Vocabulary size for generating dummy tokens.
-  If None, will try to get from model.vocab_size or model.item_num.
-- `batch_size` (`int, default=2`): Batch size for dummy input.
-- `depth` (`int, default=3`): Visualization depth, higher values show more detail.
-  Set to -1 to show all layers.
-- `show_shapes` (`bool, default=True`): Whether to display tensor shapes.
-- `expand_nested` (`bool, default=True`): Whether to expand nested modules.
-- `save_path` (`str, optional`): Path to save the graph image (.pdf, .svg, .png).
-  If None, displays in Jupyter or opens system viewer.
-- `graph_name` (`str, default="model"`): Name for the graph.
-- `device` (`str, optional`): Device for model execution. If None, defaults to 'cpu'.
-- `dpi` (`int, default=300`): Resolution in dots per inch for output image.
-  Higher values produce sharper images suitable for papers.
-- `**kwargs` (`dict`): Additional arguments passed to torchview.draw_graph().
-
-**返回**
-
-- `ComputationGraph`: A torchview ComputationGraph object.
-
-**异常**
-
-- `ImportError`: If torchview or graphviz is not installed.
-- `ValueError`: If vocab_size is not provided and cannot be inferred from model.
-
-**说明**
-
-Default Display Behavior:
-    When `save_path` is None (default):
-    - In Jupyter/IPython: automatically displays the graph inline
-    - In Python script: opens the graph with system default viewer
-
-**示例**
-
-```python
->>> trainer = SeqTrainer(hstu_model, ...)
->>> trainer.fit(train_dl, val_dl)
->>>
->>> # Auto-display in Jupyter (no save_path needed)
->>> trainer.visualization(depth=4, vocab_size=10000)
->>>
->>> # Save to high-DPI PNG for papers
->>> trainer.visualization(save_path="model.png", dpi=300)
-```
+vocab_size defaults to model.vocab_size or model.item_num.
+Other options are shared with utils.visualization.visualize_model.
+Example: trainer.visualization(seq_length=20, save_path="model.png").
 
 ## `utils/`
 
@@ -4148,7 +4117,7 @@ Return default metric by task type.
 #### `generate_seq_feature`
 
 ```python
-generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols = [], min_item = 0, shuffle = True, max_len = 50)
+generate_seq_feature(data, user_col, item_col, time_col, item_attribute_cols = [], min_item = 0, shuffle = True, max_len = 50, in_batch_neg = False)
 ```
 
 Generate sequence features and negatives for ranking.
@@ -4162,7 +4131,9 @@ Generate sequence features and negatives for ranking.
 - `item_attribute_cols` (`list[str], optional`): Additional item attribute columns to include in sequences.
 - `min_item` (`int, default=0`): Minimum items per user; users below are dropped.
 - `shuffle` (`bool, default=True`): Shuffle train/val/test.
-- `max_len` (`int, default=50`): Max history length.
+- `max_len` (`int, default=50`): Max history length per sample; does not limit train/val/test splitting.
+- `in_batch_neg` (`bool, default=False`): Generate positive-only training rows for CTRTrainer. Validation and test
+  retain their original positive/negative pairs for supervised evaluation.
 
 **返回**
 
@@ -4190,7 +4161,7 @@ Convert DataFrame to dict inputs accepted by models.
 neg_sample(click_hist, item_size)
 ```
 
-未提供文档说明。
+Uniformly sample an unseen item in [1, item_size], without unbounded retries.
 
 #### `pad_sequences`
 
@@ -4404,7 +4375,7 @@ torch.Size([768])
 
 #### `TigerSeqDataset`
 
-未提供文档说明。
+Item histories with unique semantic token lists; user_bucket_size=0 disables user tokens.
 
 ##### `TigerSeqDataset.get_new_tokens`
 
@@ -4680,7 +4651,7 @@ neg_indices: (B, K)
 #### `generate_seq_feature_match`
 
 ```python
-generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols = None, sample_method = 0, mode = 0, neg_ratio = 0, min_item = 0)
+generate_seq_feature_match(data, user_col, item_col, time_col, item_attribute_cols = None, sample_method = 0, mode = 0, neg_ratio = 0, min_item = 0, in_batch_neg = False)
 ```
 
 Generate sequence feature and negative sample for match.
@@ -4701,6 +4672,8 @@ Generate sequence feature and negative sample for match.
 - `mode` (`int, optional`): the training mode, `{0:point-wise, 1:pair-wise, 2:list-wise}`. Defaults to 0.
 - `neg_ratio` (`int, optional`): negative sample ratio, >= 1. Defaults to 0.
 - `min_item` (`int, optional`): the min item each user must have. Defaults to 0.
+- `in_batch_neg` (`bool, optional`): generate positive-only pairs for MatchTrainer.
+  When enabled, mode and neg_ratio do not generate offline negatives.
 
 **返回**
 
@@ -5158,116 +5131,55 @@ Get information about model inputs.
 #### `quantize_model`
 
 ```python
-quantize_model(input_path: str, output_path: str, mode: str = 'int8', *, per_channel: bool = False, reduce_range: bool = False, weight_type: str = 'qint8', optimize_model: bool = False, op_types_to_quantize: Optional[list[str]] = None, nodes_to_quantize: Optional[list[str]] = None, nodes_to_exclude: Optional[list[str]] = None, extra_options: Optional[Dict[str, Any]] = None, keep_io_types: bool = True) -> str
+quantize_model(input_path, output_path, mode = 'int8', *, per_channel = False, reduce_range = False, weight_type = 'qint8', optimize_model = False, op_types_to_quantize = None, nodes_to_quantize = None, nodes_to_exclude = None, extra_options = None, keep_io_types = True)
 ```
 
-Quantize an ONNX model.
+Save a quantized model and return ``output_path``.
 
-**参数**
+``int8`` uses ONNX Runtime dynamic quantization; its optional weight/node
+arguments are passed directly to ORT. ``fp16`` uses onnxconverter-common
+and keeps floating-point inputs/outputs in FP32 by default.
 
-- `input_path` (`str`): Input ONNX model path (FP32).
-- `output_path` (`str`): Output ONNX model path.
-- `mode` (`str, default="int8"`): Quantization mode:
-  - "int8" / "dynamic_int8": ONNX Runtime dynamic quantization (weights INT8).
-  - "fp16": convert float tensors to float16.
-- `per_channel` (`bool, default=False`): Enable per-channel quantization for weights (INT8).
-- `reduce_range` (`bool, default=False`): Use reduced quantization range (INT8), sometimes helpful on certain CPUs.
-- `weight_type` (`{"qint8", "quint8"}, default="qint8"`): Weight quant type for dynamic quantization.
-- `optimize_model` (`bool, default=False`): Run ORT graph optimization before quantization.
-- `keep_io_types` (`bool, default=True`): For FP16 conversion, keep model input/output types as float32 for compatibility.
-
-
-op_types_to_quantize / nodes_to_quantize / nodes_to_exclude / extra_options
-    Advanced options forwarded to ``onnxruntime.quantization.quantize_dynamic``.
-
-**返回**
-
-- `str`: The output_path.
+``optimize_model`` is supported only by ORT versions older than 1.16.
+This utility is intended for small/medium models, not >2 GB external data.
 
 ### `visualization`
 
 模块: `torch_rechub.utils.visualization`
 
-#### `display_graph`
-
-```python
-display_graph(graph: Any, format: str = 'png') -> Any
-```
-
-Display a torchview ComputationGraph in Jupyter.
-
-**参数**
-
-- `graph` (`ComputationGraph`): Returned by :func:`visualize_model`.
-- `format` (`str, default='png'`): Output format; 'png' recommended for VSCode.
-
-**返回**
-
-- `graphviz.Digraph or None`: Displayed graph object, or None if display fails.
-
 #### `visualize_model`
 
 ```python
-visualize_model(model: nn.Module, input_data: Optional[Dict[str, torch.Tensor]] = None, batch_size: int = 2, seq_length: int = 10, depth: int = 3, show_shapes: bool = True, expand_nested: bool = True, save_path: Optional[str] = None, graph_name: str = 'model', device: str = 'cpu', dpi: int = 300, **kwargs) -> Any
+visualize_model(model, input_data = None, batch_size = 2, seq_length = 10, depth = 3, show_shapes = True, expand_nested = True, save_path = None, graph_name = 'model', device = 'cpu', dpi = 300, **kwargs)
 ```
 
-Visualize a Torch-RecHub model's computation graph.
-
-This function generates a visual representation of the model architecture,
-showing layer connections, tensor shapes, and nested module structures.
-It automatically extracts feature information from the model to generate
-appropriate dummy inputs.
+Draw one forward pass and return a torchview ComputationGraph.
 
 **参数**
 
-- `model` (`nn.Module`): PyTorch model to visualize. Should be a Torch-RecHub model
-  with feature attributes (e.g., DeepFM, DSSM, MMOE).
-- `input_data` (`dict, optional`): Dict of example inputs {feature_name: tensor}.
-  If None, inputs are auto-generated based on model features.
-- `batch_size` (`int, default=2`): Batch size for auto-generated inputs.
-- `seq_length` (`int, default=10`): Sequence length for SequenceFeature inputs.
-- `depth` (`int, default=3`): Visualization depth - higher values show more detail.
-  Set to -1 to show all layers.
-- `show_shapes` (`bool, default=True`): Whether to display tensor shapes on edges.
-- `expand_nested` (`bool, default=True`): Whether to expand nested nn.Module with dashed borders.
-- `save_path` (`str, optional`): Path to save the graph image. Supports .pdf, .svg, .png formats.
-  If None, displays in Jupyter or opens system viewer.
-- `graph_name` (`str, default="model"`): Name for the computation graph.
-- `device` (`str, default="cpu"`): Device for model execution during tracing.
-- `dpi` (`int, default=300`): Resolution in dots per inch for output image.
-  Higher values produce sharper images suitable for papers.
-- `**kwargs` (`dict`): Additional arguments passed to torchview.draw_graph().
-
-**返回**
-
-- `ComputationGraph`: A torchview ComputationGraph object.
-  - Use `.visual_graph` property to get the graphviz.Digraph
-  - Use `.resize_graph(scale=1.5)` to adjust graph size
-
-**异常**
-
-- `ImportError`: If torchview or graphviz is not installed.
-- `ValueError`: If model has no recognizable feature attributes.
-
-**说明**
-
-Default Display Behavior:
-    When `save_path` is None (default):
-    - In Jupyter/IPython: automatically displays the graph inline
-    - In Python script: opens the graph with system default viewer
-
-Requires graphviz system package: apt/brew/choco install graphviz.
-For Jupyter display issues, try: graphviz.set_jupyter_format('png').
+- `model` (`Model to draw. DataParallel wrappers are unwrapped automatically.`)
+- `input_data` (`Feature dict, Tensor, or tuple/list of positional inputs.`): If omitted, inputs are generated from the model's feature definitions.
+- `batch_size` (`Batch size for generated inputs.`)
+- `seq_length` (`Sequence length for generated inputs.`)
+- `depth` (`Module depth to show; -1 shows all layers.`)
+- `show_shapes` (`Show tensor shapes.`)
+- `expand_nested` (`Expand nested modules.`)
+- `save_path` (`PNG, SVG or PDF path. No suffix defaults to PDF.`): If omitted, display in Jupyter or open the system viewer.
+- `graph_name` (`Name of the graph.`)
+- `device` (`Tracing device, default CPU. Tracing on a different device uses`): a model copy; use the model's device to avoid copying large models.
+- `dpi` (`Output image resolution.`)
+- `**kwargs` (`Extra arguments for torchview.draw_graph.`)
 
 **示例**
 
 ```python
->>> from torch_rechub.models.ranking import DeepFM
->>> from torch_rechub.utils.visualization import visualize_model
->>>
->>> # Auto-display in Jupyter or open in viewer
->>> visualize_model(model, depth=4)  # No save_path needed
->>>
->>> # Save to high-DPI PNG for paper
->>> visualize_model(model, save_path="model.png", dpi=300)
+>>> visualize_model(model, save_path="model.png", depth=3)
 ```
+
+#### `display_graph`
+
+```python
+display_graph(graph, format = 'png')
+```
+
+Display a ComputationGraph in Jupyter and return its graphviz graph.
