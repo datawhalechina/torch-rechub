@@ -201,6 +201,29 @@ time_diffs  = [300, 200, 100, 0]
 
 其中 `seq_positions` 为兼容数据接口保留，当前 `HSTUModel` 会在 forward 中根据序列长度内部生成 position index，`SeqTrainer` 不使用 batch 中的 `seq_positions`。
 
+### MovieLens 每用户序列采样
+
+MovieLens 预处理器默认使用 `user_sequence`：每个符合长度要求的用户保留一条最近训练序列，对所有有效位置计算 next-token 损失。
+
+每个用户的最后一次交互留作测试、倒数第二次留作验证。对于序列 `1 2 3 4 5 6 7 8`，`user_sequence` 的训练输入是 `1 2 3 4 5`，逐位置标签是 `2 3 4 5 6`；验证目标为 `7`，测试目标为 `8`。最大输入长度为 200 时，训练窗口使用最后至多 201 个训练交互，更早的交互不会进入该窗口。它借鉴每用户采样的思路，但保留本项目的独立验证集、左 padding 和当前事件时间偏置，不等同于官方完整训练协议。
+
+从仓库根目录运行。训练示例默认训练 101 轮：
+
+```bash
+python examples/generative/data/ml-1m/preprocess_ml_hstu.py \
+    --training_sampling user_sequence \
+    --output_dir outputs/hstu_ml_user_sequence/data
+mkdir -p outputs/hstu_ml_user_sequence/model
+python examples/generative/run_hstu_movielens.py \
+    --dataset_path "$PWD/outputs/hstu_ml_user_sequence/data" \
+    --save_dir outputs/hstu_ml_user_sequence/model \
+    --device cuda --epoch 101 --batch_size 128
+```
+
+`preprocessing_config.json` 记录采样模式、最大长度及留出数量。
+
+每轮遍历所有符合条件的用户，每个用户贡献一条训练样本。训练时使用验证集选择模型权重，并记录更新步数和实际耗时；测试集用于最终效果评估。
+
 ### 5.3 训练目标
 
 `SeqTrainer` 使用整段 next-token 交叉熵：
