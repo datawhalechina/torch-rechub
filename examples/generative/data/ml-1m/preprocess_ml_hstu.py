@@ -5,15 +5,17 @@ HSTU-based generative recommendation experiments:
 
 - build interaction sequences per user;
 - sort interactions by timestamp;
-- generate multiple training samples per user via a sliding window;
-- create train/validation/test splits at the user level;
+- generate all training prefixes or one recent training sequence per user;
+- hold out the last two interactions per user for validation and test;
 - output ``seq_tokens``, ``seq_positions``, ``seq_time_diffs`` and ``targets``.
 
 Reference implementation: https://github.com/meta-recsys/generative-recommenders
-Key difference: we use an explicit sliding-window strategy to greatly increase
-training data while preserving temporal order.
+The user_sequence mode adopts per-user sampling, while retaining this example's
+independent validation split, left padding, and current-event time differences.
+It does not reproduce the full reference training protocol.
 """
 
+import json
 import os
 import pickle
 import urllib.request
@@ -119,26 +121,24 @@ def ensure_movielens_data(data_dir, download=True, overwrite=False):
 class MovieLensHSTUPreprocessor:
     """Preprocessor for MovieLens-1M data in HSTU format.
 
-    This class applies a sliding-window strategy to each user's interaction
-    sequence to generate multiple training samples, which significantly
-    increases data utilization and improves model training.
-
-    Example:
-        User sequence: [item1, item2, item3, item4, item5]
-        Generated samples:
-            ([item1], item2)
-            ([item1, item2], item3)
-            ([item1, item2, item3], item4)
-            ([item1, item2, item3, item4], item5)
+    ``all_prefixes`` retains the original prefix expansion. ``user_sequence``
+    emits one recent training window per eligible user. Both modes reserve the
+    final two interactions for validation and test and use whole-sequence
+    next-token supervision in SeqTrainer.
     """
 
-    def __init__(self, data_dir="./data/ml-1m/", output_dir="./data/ml-1m/processed/"):
+    def __init__(self, data_dir="./data/ml-1m/", output_dir="./data/ml-1m/processed/", training_sampling="user_sequence"):
         """Initialize the preprocessor.
 
         Args:
             data_dir (str): Directory containing the raw MovieLens-1M files.
             output_dir (str): Directory where processed files will be stored.
+            training_sampling (str): ``user_sequence`` (default) keeps one recent
+                training window per user; ``all_prefixes`` expands every prefix.
         """
+        if training_sampling not in ("all_prefixes", "user_sequence"):
+            raise ValueError("training_sampling must be all_prefixes or user_sequence")
+        self.training_sampling = training_sampling
         self.data_dir = data_dir
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -257,18 +257,19 @@ class MovieLensHSTUPreprocessor:
     def generate_leave_last_out_samples(self, user_sequences, user_timestamps, vocab):
         """Generate train/val/test samples using **leave-last-out per user**.
 
-        Standard SASRec / HSTU evaluation protocol:
-
         - Test sample (per user): ``input = items[:-1]``, ``target = items[-1]``.
         - Val sample (per user): ``input = items[:-2]``, ``target = items[-2]``.
-        - Train samples (per user): sliding window over the remaining prefix.
+        - Train samples with ``all_prefixes``: expand the remaining prefix.
           For ``i`` in ``[1, N-3]``, sample = ``(items[:i], items[i])``. This
           gives ``N - 3`` training samples per user without leaking the val or
           test targets.
+        - With ``user_sequence``: ``input = items[:-3]``,
+          ``target = items[-3]``. Truncation retains at most ``max_seq_len``
+          input items, giving at most ``max_seq_len + 1`` training events.
 
-        Time diffs follow the Meta reference: per-position seconds delta from
-        the prefix's last (query) timestamp, padded on the left to
-        ``max_seq_len``.
+        Time diffs are seconds from the history's last timestamp, padded on
+        the left to ``max_seq_len``. Pairwise differences represent current
+        event times, not the reference's next-event query times.
 
         Returns
         -------
@@ -276,7 +277,7 @@ class MovieLensHSTUPreprocessor:
             ``{'train', 'val', 'test'}`` each containing numpy arrays for
             ``seq_tokens``, ``seq_positions``, ``seq_time_diffs``, ``targets``.
         """
-        print("\n按留一法生成 train/val/test 样本（滑动窗口 + 时间戳）...")
+        print(f"\n按留一法生成 train/val/test 样本（{self.training_sampling} + 时间戳）...")
         item_to_idx = vocab['item_to_idx'] if 'item_to_idx' in vocab else vocab
 
         splits = {
@@ -306,8 +307,7 @@ class MovieLensHSTUPreprocessor:
             seq_tokens = [item_to_idx.get(m, 0) for m in history]
             target_token = item_to_idx.get(target, 0)
 
-            # Time diffs relative to the prefix's last timestamp (query time),
-            # matching the Meta reference `query_time - timestamps`.
+            # Time diffs relative to the history's last timestamp.
             query_ts = history_ts[-1]
             seq_time_diffs = [query_ts - t for t in history_ts]
 
@@ -338,7 +338,8 @@ class MovieLensHSTUPreprocessor:
             kept_users += 1
 
             # Train: prefixes ending at items[1..N-3], excluding val/test targets.
-            for end_idx in range(1, N - 2):
+            train_ends = (N - 3,) if self.training_sampling == "user_sequence" else range(1, N - 2)
+            for end_idx in train_ends:
                 _append(splits['train'], sequence[:end_idx], timestamps[:end_idx], sequence[end_idx])
 
             # Val: input items[:N-2], target items[N-2].
@@ -395,10 +396,14 @@ class MovieLensHSTUPreprocessor:
             pickle.dump(vocab, f)
         print(f"保存词表到 {vocab_file}")
 
+        with open(os.path.join(self.output_dir, 'preprocessing_config.json'), 'w', encoding='utf-8') as f:
+            json.dump({'training_sampling': self.training_sampling, 'max_seq_len': self.max_seq_len, 'validation_holdout': 1, 'test_holdout': 1}, f, indent=2)
+            f.write('\n')
+
     def preprocess(self):
         """Run the full preprocessing pipeline."""
         print("=" * 80)
-        print("MovieLens-1M HSTU data preprocessing - sliding window with timestamps")
+        print(f"MovieLens-1M HSTU data preprocessing - {self.training_sampling} with timestamps")
         print("=" * 80)
 
         # 1. 加载数据
@@ -424,7 +429,7 @@ class MovieLensHSTUPreprocessor:
         print("=" * 80)
         print("\n关键改进:")
         print("✅ 采用留一法 (leave-last-out per user): 末位=test, 倒数第二=val, 余下做训练前缀")
-        print("✅ 训练前缀采用滑动窗口，覆盖每个用户的全部上下文")
+        print(f"✅ 训练采样模式: {self.training_sampling}，每条历史最多 {self.max_seq_len} 个交互")
         print("✅ 添加冷启动过滤，提高数据质量")
         print("✅ 支持时间戳处理，计算时间差用于时间感知建模")
 
@@ -436,6 +441,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="MovieLens-1M preprocessing for HSTU")
     parser.add_argument("--data_dir", default=script_dir, help="Directory containing MovieLens-1M raw files")
     parser.add_argument("--output_dir", default=None, help="Output directory")
+    parser.add_argument("--training_sampling", choices=["all_prefixes", "user_sequence"], default="user_sequence", help="Keep one recent training sequence per user (default) or expand all training prefixes")
     parser.add_argument("--no_download", action="store_true", help="Skip download and use existing local files")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing downloaded/extracted files")
     args = parser.parse_args()
@@ -451,5 +457,5 @@ if __name__ == '__main__':
     if not ensure_movielens_data(data_dir, download=not args.no_download, overwrite=args.overwrite):
         raise SystemExit(1)
 
-    preprocessor = MovieLensHSTUPreprocessor(data_dir=data_dir, output_dir=output_dir)
+    preprocessor = MovieLensHSTUPreprocessor(data_dir=data_dir, output_dir=output_dir, training_sampling=args.training_sampling)
     preprocessor.preprocess()

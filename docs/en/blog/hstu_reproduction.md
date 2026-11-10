@@ -201,6 +201,29 @@ This format allows `rab` to recover the relative time differences between events
 
 `seq_positions` is retained for data-interface compatibility. The current `HSTUModel` generates position indices internally from the sequence length during `forward`, and `SeqTrainer` does not use the batch's `seq_positions`.
 
+### MovieLens per-user sequence sampling
+
+The MovieLens preprocessor uses `user_sequence` by default: one recent training sequence per eligible user, with next-token loss at every valid position.
+
+Each user's final interaction is reserved for test and the penultimate interaction for validation. For `1 2 3 4 5 6 7 8`, `user_sequence` trains on input `1 2 3 4 5` with position-wise labels `2 3 4 5 6`; validation targets `7` and test targets `8`. With a maximum input length of 200, the window contains at most the last 201 training interactions; older interactions are omitted. This adopts per-user sampling while retaining this project's independent validation split, left padding, and current-event time bias. It does not reproduce the full official training protocol.
+
+Run from the repository root. The training example defaults to 101 epochs:
+
+```bash
+python examples/generative/data/ml-1m/preprocess_ml_hstu.py \
+    --training_sampling user_sequence \
+    --output_dir outputs/hstu_ml_user_sequence/data
+mkdir -p outputs/hstu_ml_user_sequence/model
+python examples/generative/run_hstu_movielens.py \
+    --dataset_path "$PWD/outputs/hstu_ml_user_sequence/data" \
+    --save_dir outputs/hstu_ml_user_sequence/model \
+    --device cuda --epoch 101 --batch_size 128
+```
+
+`preprocessing_config.json` records the sampling mode, maximum length, and holdout counts.
+
+Each epoch visits all eligible users, with one training sample per user. Select model weights using the validation set, and record optimizer updates and elapsed time. Use the test set for the final evaluation.
+
 ### 5.3 Training Objective
 
 `SeqTrainer` uses full-sequence next-token cross-entropy:
