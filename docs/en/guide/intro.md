@@ -26,7 +26,7 @@ description: Overview of Torch-RecHub project architecture, features, and design
 
 ## Overall Architecture
 
-![Architecture Design Diagram](/img/project_framework.png "Architecture Design Diagram")
+![Architecture Design Diagram](/img/project_framework_en.png "Architecture Design Diagram")
 
 ## Core Components
 

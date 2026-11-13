@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 ![Torch-RecHub 横幅](docs/public/img/banner.png)
 
@@ -18,7 +18,7 @@
 
 [English](README.md) | 简体中文
 
-![架构图](docs/public/img/project_framework.png)
+![架构图](docs/public/img/project_framework_zh.png)
 
 </div>
 
@@ -396,4 +396,4 @@ ctr_trainer.visualization(save_path="model.pdf", dpi=300)  # 保存为高清 PDF
 
 ---
 
-*最后更新: [2026-08-03]*
+*最后更新: [2026-11-13]*
