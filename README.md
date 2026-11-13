@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 ![Torch-RecHub Banner](https://raw.githubusercontent.com/datawhalechina/torch-rechub/main/docs/public/img/banner.png)
 
@@ -18,7 +18,7 @@
 
 English | [简体中文](README_zh.md)
 
-![Project Framework](https://raw.githubusercontent.com/datawhalechina/torch-rechub/main/docs/public/img/project_framework.png)
+![Project Framework](docs/public/img/project_framework_en.png)
 
 </div>
 
@@ -391,4 +391,4 @@ If you use this framework in your research or work, please consider citing:
 [![torch-rechub stats](https://mv.datawhale.cc/badges/torch-rechub.png)](https://mv.datawhale.cc/repo-badge?repo=torch-rechub)
 ---
 
-*Last updated: [2026-08-03]*
+*Last updated: [2026-11-13]*
