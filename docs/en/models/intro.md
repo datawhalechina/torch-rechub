@@ -116,6 +116,15 @@ trainer = MatchTrainer(model, mode=0, device="cpu")
 trainer.fit(train_dataloader)
 ```
 
+## Model Papers
+
+* **Ranking** — [DeepFM](https://arxiv.org/abs/1703.04247), [Wide&Deep](https://arxiv.org/abs/1606.07792), [DCN](https://arxiv.org/abs/1708.05123), [DCNv2](https://arxiv.org/abs/2008.13535), [DIN](https://arxiv.org/abs/1706.06978), [DIEN](https://arxiv.org/abs/1809.03672), [BST](https://arxiv.org/abs/1905.06874), [AFM](https://arxiv.org/abs/1708.04617), [AutoInt](https://arxiv.org/abs/1810.11921), [FiBiNET](https://doi.org/10.1145/3298689.3347043), [FAT-DeepFFM](https://arxiv.org/abs/1905.06336), [EDCN](https://dlp-kdd.github.io/assets/pdf/DLP-KDD_2021_paper_12.pdf).
+* **Retrieval** — [DSSM](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf), [YouTubeDNN](https://dl.acm.org/doi/10.1145/2959100.2959190), [YouTubeSBC](https://doi.org/10.1145/3298689.3346996), [MIND](https://arxiv.org/abs/1904.08030), [SINE](https://arxiv.org/abs/2102.09267), [GRU4Rec](https://arxiv.org/abs/1511.06939), [SASRec](https://arxiv.org/abs/1808.09781), [NARM](https://arxiv.org/abs/1711.04725), [STAMP](https://doi.org/10.1145/3219819.3219950), [ComiRec](https://arxiv.org/abs/2005.09347).
+* **Multi-task learning** — [ESMM](https://arxiv.org/abs/1804.07931), [MMoE](https://dl.acm.org/doi/10.1145/3219819.3220007), [PLE](https://dl.acm.org/doi/10.1145/3383313.3412236), [AITM](https://arxiv.org/abs/2105.08489).
+* **Sequential and generative recommendation** — [HSTU](https://arxiv.org/abs/2402.17152), [HLLM](https://arxiv.org/abs/2409.12740), [TIGER](https://arxiv.org/abs/2305.05065).
+
+The FAT-DeepFFM paper also describes DeepFFM, its base model.
+
 ## Contributing a New Model
 
 If you would like to contribute a new model, see the [Contributing Guide](/community/contributing) and follow the project's coding standards and documentation requirements.

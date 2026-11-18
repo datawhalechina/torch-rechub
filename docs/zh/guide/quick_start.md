@@ -263,14 +263,14 @@ print(f"用户向量形状: {user_embedding.shape}")
 print(f"物品向量形状: {item_embedding.shape}")
 ```
 
-如果你更希望直接跑示例脚本，也可以执行：
+按[安装指南](./install.md)完成源码安装后，从仓库根目录运行 MovieLens 示例。它使用 Annoy 对双塔输出的向量做 Top-K 检索评估。
 
 ```bash
 cd examples/matching
-python run_ml_dssm.py --epoch 2 --device cpu
+uv run --extra annoy python run_ml_dssm.py --epoch 1 --device cpu
 ```
 
-如果你在 Windows / Notebook 环境下运行脚本时遇到 DataLoader 多进程问题，更推荐直接执行上面的 Python 代码块，因为当前脚本没有暴露 `num_workers` 参数，而召回场景通常需要显式设置 `num_workers=0`。
+模型权重默认保存在 `examples/matching/data/ml-1m/saved/`。
 
 ---
 
