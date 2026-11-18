@@ -263,14 +263,14 @@ print(f"User embedding shape: {user_embedding.shape}")
 print(f"Item embedding shape: {item_embedding.shape}")
 ```
 
-If you prefer running the example script directly, you can also execute:
+After installing [from source](./install.md), start in the repository root to run the MovieLens example. It uses Annoy to evaluate top-K retrieval on the embeddings from the two towers.
 
 ```bash
 cd examples/matching
-python run_ml_dssm.py --epoch 2 --device cpu
+uv run --extra annoy python run_ml_dssm.py --epoch 1 --device cpu
 ```
 
-If you hit DataLoader multiprocessing issues in Windows or notebook environments, it is better to run the Python code block above directly, because the script does not currently expose a `num_workers` argument while retrieval examples often need `num_workers=0`.
+The script saves the model weights to `examples/matching/data/ml-1m/saved/` by default.
 
 ---
 
