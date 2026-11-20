@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="486" viewBox="0 0 720 486" role="img" aria-labelledby="title desc" xml:lang="zh-CN">
+  <title id="title">导出 ONNX 后，预测分数变了吗？</title>
+  <desc id="desc">同一条已编码的记录分别送入 PyTorch FP32 和导出的 ONNX FP32。示例预测相差 0.000001，用给定的容差核对。确认导出结果后，可以在 CPU 尝试动态 INT8 或在 GPU 尝试 FP16。用同一批样本再次比较分数和整体指标，并在目标设备上实测耗时。</desc>
+  <style>
+    text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #152A43; }
+    .title { font-size: 30px; font-weight: 700; }
+    .heading { font-size: 23px; font-weight: 650; }
+    .label { font-size: 20px; font-weight: 600; }
+    .note { font-size: 18px; fill: #40566C; }
+    .mono { font-family: Consolas, "Liberation Mono", monospace; }
+    .score { font-size: 22px; }
+    .wire { fill: none; stroke: #62778A; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .fine { fill: none; stroke: #B3C5CE; stroke-width: 1.5; }
+  </style>
+  <rect x="1" y="1" width="718" height="484" rx="16" fill="#F8FAFC" stroke="#D7E2EA"/>
+  <text class="title" x="32" y="49">导出 ONNX 后，预测分数变了吗？</text>
+  <text class="note" x="32" y="80">同一条曝光记录只编码一次。下面用一组示例分数演示核对过程。</text>
+
+  <!-- One input is run through the original model and the FP32 export. -->
+  <g aria-hidden="true">
+    <path d="M55 118h49l14 14v42H55z" fill="#FFF" stroke="#58758A" stroke-width="2" stroke-linejoin="round"/>
+    <path class="wire" d="M104 118v14h14"/>
+    <rect x="64" y="137" width="44" height="9" rx="2" fill="#DDF3ED"/>
+    <path class="fine" d="M64 150h43m-43 9h43m-22-23v28"/>
+    <path class="wire" d="M128 151h30m0 0v-21h37m-37 21v30h37"/>
+    <path class="wire" d="m190 125 6 5-6 5m0 41 6 5-6 5"/>
+    <circle cx="158" cy="151" r="3.2" fill="#62778A"/>
+  </g>
+  <text class="note" x="86" y="205" text-anchor="middle">测试样本</text>
+  <text class="label" x="211" y="137">PyTorch FP32</text>
+  <text class="label" x="211" y="188">ONNX FP32</text>
+  <path class="fine" d="M346 130h22m-22 51h22"/>
+  <text class="score mono" x="380" y="137">0.730001</text>
+  <text class="score mono" x="380" y="188">0.730002</text>
+  <path class="wire" d="M495 130h12v51h-12m12-26h17"/>
+  <text class="note" x="543" y="145">分数差</text>
+  <text class="mono" x="543" y="174" style="fill:#006C67;font-size:23px;font-weight:700">0.000001</text>
+
+  <rect x="32" y="224" width="656" height="45" rx="7" fill="#DDF3ED"/>
+  <path d="m48 246 5 5 9-11" fill="none" stroke="#006C67" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="note" x="74" y="253" style="fill:#005B55;font-weight:600">核对 FP32 的误差</text>
+  <text class="mono" x="675" y="253" text-anchor="end" style="font-size:17px;fill:#005B55">rtol = 1e-4   ·   atol = 1e-6</text>
+
+  <text class="heading" x="32" y="313">FP32 校验通过后，按推理设备选择</text>
+  <path class="fine" d="M32 328h656m-328 10v55"/>
+  <!-- Distinct device silhouettes identify the two conversion choices. -->
+  <g stroke="#006C67" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="38" y="345" width="37" height="37" rx="5" fill="#DDF3ED"/>
+    <rect x="46" y="353" width="21" height="21" rx="2"/>
+    <path d="M47 340v5m9-5v5m9-5v5m-18 37v5m9-5v5m9-5v5m-32-33h5m-5 9h5m-5 9h5m37-18h5m-5 9h5m-5 9h5"/>
+  </g>
+  <text class="label" x="95" y="357">CPU</text>
+  <text class="note" x="95" y="384">动态 INT8 量化</text>
+  <g stroke="#994519" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M384 346v38m1-33h46v26h-46z" fill="#FFF0DF"/>
+    <circle cx="409" cy="364" r="8"/>
+    <path d="M408 360v3l-3 2m5 0 2 2m-19 11v4h15v-4"/>
+  </g>
+  <text class="label" x="447" y="357">GPU</text>
+  <text class="note" x="447" y="384">FP16 转换</text>
+
+  <path class="fine" d="M32 408h656"/>
+  <text class="note" x="32" y="439">在同一批样本上对照 FP32，复查分数、AUC 和 LogLoss。</text>
+  <text class="note" x="32" y="465">在目标设备上计时，再决定是否使用低精度模型。</text>
+</svg>

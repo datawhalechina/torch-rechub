@@ -5,92 +5,38 @@ description: Torch-RecHub 项目贡献指南，包括 Bug 报告、功能请求�
 
 # 贡献指南
 
-感谢您对 Torch-RecHub 的兴趣！我们欢迎各种形式的贡献，包括但不限于：
+发现示例跑不通、教程少了一步，或想给项目补一个模型，都可以提 Issue 或 PR。报告问题时，请写明运行的示例、Python 和 PyTorch 版本，附上触发问题的命令和报错。这样别人可以从同一步开始排查。[项目 Issues](https://github.com/datawhalechina/torch-rechub/issues)
 
-- 🐛 Bug 报告
-- 💡 功能建议
-- 📝 文档改进
-- 🔧 代码贡献
-- 🧪 测试用例
-- 📖 教程和示例
+## 准备本地环境
 
-## 🚀 快速开始
-
-### 开发环境设置
+先在 GitHub 上 Fork 仓库，把下面的 `YOUR_USERNAME` 换成自己的账号，再克隆代码、创建分支。
 
 ```bash
 # 1. Fork 并克隆仓库
 git clone https://github.com/YOUR_USERNAME/torch-rechub.git
 cd torch-rechub
 
-# 2. 创建环境并安装开发与全部可选依赖
-# uv sync 会以可编辑方式安装当前项目，无需再执行 pip install -e .
-uv sync --all-extras
-
-# 3. 创建工作分支
-git switch -c docs/update-guide
+git switch -c pr/update-guide
 ```
 
-### 开发工作流
+改文档和改 Python 代码用到的工具不同。选这次改动对应的一节即可。
 
-1. **Fork 仓库**：点击右上角的 "Fork" 按钮。
-2. **创建分支并进行修改**：实现新功能或修复 Bug。
-3. **格式化代码**：在提交前运行代码格式化以确保代码风格一致：
-   ```bash
-   uv run python config/format_code.py
-   ```
-4. **提交更改**：`git commit -m "feat: add new feature"` 或 `git commit -m "fix: fix some issue"`（推荐遵循 [Conventional Commits](https://www.conventionalcommits.org/)）。
-5. **推送到分支**：`git push -u origin your-branch-name`
-6. **创建 Pull Request**：返回原始仓库页面，点击 "New pull request"，将您的分支与主仓库的 `main` 分支进行比较，然后提交 PR。
+## 修改文档
 
-## 📋 代码规范
+中文页面放在 `docs/zh/`，英文对应页面在 `docs/en/`。如果改动影响操作步骤或参数，也要同步另一种语言。在仓库根目录运行：
 
-### 分支命名
+```bash
+npm ci
+npm run docs:build
+```
 
-- `feature/feature-name` - 新功能
-- `fix/bug-description` - Bug 修复
-- `docs/update-install-guide` - 文档更新（这里是 Git 分支名）
-- `test/test-description` - 测试添加
+编辑时可用 `npm run docs:dev` 边写边看。提交前打开改过的页面，点一下相关链接。如果你改的是示例，按新的步骤跑一遍，确认输出与文中描述一致。
 
-### 提交信息
+## 修改 Python 代码
 
-我们遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
+在仓库根目录运行 `uv sync` 安装开发依赖。改动涉及可选功能时，一起安装对应的依赖，例如用 `uv sync --extra onnx` 准备 ONNX 导出环境。
 
-- `feat: 添加新的推荐模型`
-- `fix: 解决训练循环中的内存泄漏`
-- `docs: 更新安装指南`
-- `test: 为 DeepFM 模型添加单元测试`
-- `refactor: 优化数据加载管道`
-
-### Pull Request 流程
-
-1. **推送您的分支**
-   ```bash
-   git push -u origin your-branch-name
-   ```
-
-2. **创建 Pull Request**
-   - 访问 GitHub 仓库页面
-   - 点击 "New pull request"
-   - 选择您的分支
-   - 填写 PR 模板
-
-3. **PR 要求**
-   - 清晰的更改描述
-   - 解释为什么需要这些更改
-   - 列出相关的 Issue（如果有）
-   - 包含测试说明
-   - 添加截图（如适用）
-
-## 🧪 测试指南
-
-### 编写测试
-
-- **单元测试**：测试单个函数或类
-- **集成测试**：测试模块之间的交互
-- **端到端测试**：测试完整的工作流
-
-### 运行测试
+新增模型可以参考同一任务下的现有实现，在 `examples/` 放一个使用示例，给出需要的特征、启动命令和运行结果。修复已有模型时，先用能复现问题的小样本验证，再运行相关测试。
 
 ```bash
 # 运行所有测试
@@ -103,7 +49,7 @@ uv run pytest tests/test_e2e_ranking.py
 uv run pytest --cov=torch_rechub
 ```
 
-默认测试不启动外部服务。Milvus 集成测试在本地服务启动后手动运行：
+多数测试直接在本机运行。要检查 Milvus 集成，先启动本地 Milvus 服务，再在 PowerShell 中运行：
 
 ```powershell
 # PowerShell
@@ -111,83 +57,12 @@ $env:RUN_MILVUS_TESTS = "1"
 uv run --extra milvus pytest tests/test_serving.py -m integration
 ```
 
-## 📝 文档
+提交 Python 改动前，运行 `uv run python config/format_code.py` 格式化代码，再检查本次差异。
 
-### 文档类型
+## 提交 Pull Request
 
-- **API 文档**：代码中的文档字符串
-- **用户指南**：`docs/` 目录中的文件
-- **教程**：`tutorials/` 目录中的 Jupyter 笔记本
-- **README**：项目介绍和快速开始
+1. 用一句话写清改动，例如 `docs: 补充排序示例的数据路径` 或 `fix: 修正序列特征的掩码`。
+2. 用 `git push -u origin pr/update-guide` 推送到自己的 Fork。如果分支名不同，换成自己的分支名。
+3. 在 GitHub 上向原仓库的 `main` 分支创建 PR。按模板写明原先遇到什么问题、改了哪里、用什么命令验证。有相关 Issue 时附上编号。
 
-### 文档规范
-
-- 使用 Markdown 格式
-- 包含代码示例
-- 提供清晰的分步说明
-- 保持英文和中文版本同步
-- Python 文档字符串使用项目现有的 NumPy/SciPy 风格（`Parameters` / `Returns` 等分节）
-
-### 本地构建文档
-
-```bash
-npm ci
-npm run docs:build
-```
-
-提交文档修改时，请至少运行一次 `npm run docs:build`，并保持 `docs/zh` 和 `docs/en` 中对应页面同步。
-
-## 🎯 贡献想法
-
-### 适合初学者的任务
-
-- 📖 改进文档和注释
-- 🧪 添加测试用例
-- 🐛 修复简单的 Bug
-- 📝 翻译文档
-- 💡 添加示例代码
-- 🔧 代码格式化和风格改进
-
-### 高级贡献
-
-- 🚀 实现新的推荐算法
-- ⚡ 性能优化
-- 🏗️ 架构改进
-- 📊 添加新的评估指标
-- 🛠️ 开发工具和脚本
-- 🔬 研究论文实现
-
-### 模型实现指南
-
-实现新模型时：
-
-1. **遵循现有模式**：查看现有模型的结构
-2. **添加全面的测试**：包括单元测试和集成测试
-3. **提供示例**：在 `examples/` 目录中添加使用示例
-4. **详细文档**：包括文档字符串和 README 更新
-5. **性能基准**：与现有实现进行比较
-
-## 📞 获取帮助
-
-如果您在贡献过程中遇到问题：
-
-1. **查看现有 Issues**：可能有相关讨论
-2. **创建新 Issue**：清楚地描述您的问题
-3. **加入讨论**：在相关 Issues 或 PR 中提问
-4. **联系维护者**：通过 GitHub 或电子邮件
-
-## 🏆 认可
-
-我们重视每一项贡献！所有贡献者将在以下位置获得认可：
-
-- README 中的贡献者列表
-- 发布说明中的致谢
-- 重大贡献的特别提及
-
-## 📜 行为准则
-
-请遵守我们的 [行为准则](https://github.com/datawhalechina/torch-rechub/blob/main/CODE_OF_CONDUCT.md) 以确保友好和包容的社区环境。
-
----
-
-再次感谢您的贡献！每一项贡献都让 Torch-RecHub 变得更好。🎉
+参与讨论时请遵守项目的[行为准则](https://github.com/datawhalechina/torch-rechub/blob/main/CODE_OF_CONDUCT.md)。

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="448" viewBox="0 0 720 448" lang="zh-CN" role="img" aria-labelledby="title desc">
+  <title id="title">训练结束后，用哪一轮权重？</title>
+  <desc id="desc">以 CTRTrainer 的三轮训练为例。验证 AUC 从 0.70 升到 0.75，再降到 0.73。第一、二轮保存权重，第三轮保留第二轮的权重。</desc>
+  <style>
+    text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; fill: #152A43; }
+    .muted { fill: #40566C; }
+    .mono { font-family: Consolas, "Liberation Mono", monospace; }
+    .tick { fill: #40566C; font-size: 17px; }
+    .value { fill: #006C67; font-size: 24px; font-weight: 700; }
+  </style>
+  <rect x="1" y="1" width="718" height="446" rx="18" fill="#F8FAFC" stroke="#D3DFE6"/>
+  <text x="32" y="49" font-size="29" font-weight="700">训练结束后，用哪一轮权重？</text>
+  <text x="32" y="81" class="muted" font-size="19">CTRTrainer 每轮验证一次，AUC 超过历史最好值时保存权重。</text>
+  <text x="32" y="121" font-size="18" font-weight="600">验证 AUC</text>
+  <g stroke="#CEDBE2" stroke-dasharray="4 5">
+    <path d="M88 141H676 M88 195H676 M88 249H676"/>
+  </g>
+  <g class="mono" text-anchor="end">
+    <text x="76" y="147" class="tick">0.76</text>
+    <text x="76" y="201" class="tick">0.73</text>
+    <text x="76" y="255" class="tick">0.70</text>
+  </g>
+  <path d="M200 249L415 159L630 195" fill="none" stroke="#006C67" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="415" cy="159" r="14" fill="#C7E9E4"/>
+  <g stroke="#006C67" stroke-width="3">
+    <circle cx="200" cy="249" r="6" fill="#F8FAFC"/>
+    <circle cx="415" cy="159" r="6" fill="#006C67"/>
+    <circle cx="630" cy="195" r="6" fill="#F8FAFC"/>
+  </g>
+  <g class="mono" text-anchor="middle">
+    <text x="200" y="228" class="value">0.70</text>
+    <text x="415" y="132" class="value">0.75</text>
+    <text x="630" y="174" class="value">0.73</text>
+  </g>
+  <g text-anchor="middle" font-size="19" font-weight="600">
+    <text x="200" y="285">第 1 轮</text>
+    <text x="415" y="285">第 2 轮</text>
+    <text x="630" y="285">第 3 轮</text>
+  </g>
+  <line x1="32" x2="688" y1="302" y2="302" stroke="#CBD8E1"/>
+  <text x="32" y="336" class="muted" font-size="17">磁盘上的权重</text>
+  <g font-size="18" text-anchor="middle">
+    <text x="200" y="336">保存第 1 轮</text>
+    <text x="415" y="336" font-weight="700" style="fill:#006C67">更新为第 2 轮</text>
+    <text x="630" y="336">保留第 2 轮</text>
+  </g>
+  <rect x="32" y="364" width="656" height="58" rx="9" fill="#DDF3ED"/>
+  <g transform="translate(52 379)" fill="none" stroke="#006C67" stroke-width="2.3" stroke-linejoin="round">
+    <path d="M2 0h17l7 7v21H2z M19 0v8h7"/>
+    <path d="m7 17 4 4 9-10"/>
+  </g>
+  <text x="95" y="401" font-size="21" font-weight="650">训练结束，模型恢复第 2 轮的权重。</text>
+</svg>

@@ -1,167 +1,40 @@
 ---
 title: Callbacks
-description: Torch-RecHub training callbacks
+description: Use validation metrics to stop training and keep the best weights
 ---
 
 # Callbacks
 
-Callbacks are tools that perform specific operations during training, used to implement early stopping, model saving, learning rate adjustment, and more. Torch-RecHub provides a simple and easy-to-use callback interface.
+## Early stopping in a trainer
 
-## EarlyStopper
+Suppose the first three validation AUCs are 0.70, 0.75 and 0.73. At the end of epoch two, `CTRTrainer` writes that epoch's weights to `model_path/model.pth`. The third score is lower, so the file still contains the second epoch's weights. A tie also leaves the saved weights in place.
 
-EarlyStopper is an early stopping utility that stops training when validation performance stops improving, preventing overfitting and saving training time.
-
-### Features
-
-- Monitor validation metrics (e.g., AUC)
-- Trigger early stopping when metrics don't improve for consecutive epochs
-- Keep a deep copy of the best model weights in memory
-
-`EarlyStopper` always uses higher-is-better AUC semantics, so it is not suitable for directly monitoring a loss that should be minimized. It does not write anything to disk. If training reaches the maximum epoch without triggering early stopping, the Trainer does not automatically restore the best weights held in memory.
-
-### Usage
-
-```python
-from torch_rechub.basic.callback import EarlyStopper
-
-# Create early stopper
-early_stopper = EarlyStopper(patience=10)
-
-# Use in training loop
-for epoch in range(n_epoch):
-    # Train one epoch
-    train_one_epoch(model, train_dataloader)
-
-    # Validate
-    val_auc = evaluate(model, val_dataloader)
-
-    # Check if early stopping is needed
-    if early_stopper.stop_training(val_auc, model.state_dict()):
-        print(f'Early stopping at epoch {epoch}')
-        print(f'Best validation AUC: {early_stopper.best_auc}')
-        # Restore best weights
-        model.load_state_dict(early_stopper.best_weights)
-        break
-```
-
-### Parameters
-
-| Parameter | Type | Description | Default |
-| --- | --- | --- | --- |
-| `patience` | int | Early stopping patience, i.e., how many consecutive epochs without improvement before stopping | Required |
-
-### Attributes
-
-| Attribute | Type | Description |
-| --- | --- | --- |
-| `best_auc` | float | Best recorded validation AUC |
-| `best_weights` | dict | Deep copy of best model weights |
-| `trial_counter` | int | Current count of consecutive epochs without improvement |
-
-### Methods
-
-#### stop_training(val_auc, weights)
-
-Determine whether to stop training.
-
-**Parameters:**
-- `val_auc` (float): Current validation AUC score
-- `weights` (dict): Current model weights (`model.state_dict()`)
-
-**Returns:**
-- `bool`: Returns `True` if training should stop, otherwise `False`
-
-## Using with Trainer
-
-Torch-RecHub trainers have built-in early stopping functionality, controlled via the `earlystop_patience` parameter:
+The example runs for at most 20 epochs and stops after three consecutive epochs without improvement. When `fit()` returns normally, `trainer.model` holds the weights from the highest validation AUC. If you interrupt training, you can load the weights already saved to disk.
 
 ```python
 from pathlib import Path
 from torch_rechub.trainers import CTRTrainer
 
-model_dir = Path("saved/model")
+model_dir = Path("saved/deepfm")
 model_dir.mkdir(parents=True, exist_ok=True)
-
-trainer = CTRTrainer(
-    model=model,
-    optimizer_params={"lr": 0.001},
-    n_epoch=50,
-    earlystop_patience=10,  # Early stopping patience
-    device="cuda:0",
-    model_path=str(model_dir)
-)
-
-trainer.fit(train_dataloader, val_dataloader)
+trainer = CTRTrainer(model, n_epoch=20, earlystop_patience=3, model_path=str(model_dir))
+trainer.fit(train_dl, val_dl)
 ```
 
-## Complete Example
+For multi-task training, choose the task to monitor with `earlystop_taskid`. AUC is maximized by default. To monitor a regression task's MSE, pass `earlystop_mode="min"`. [Trainer inputs and evaluation results](/core/evaluation)
+
+## Use a custom training loop
+
+After each validation pass, give `stop_training` the metric and current weights. The example monitors validation loss with `mode="min"`, so lower is better. The stopper keeps the best score in `best_auc` and the corresponding weights in `best_weights`. Both live in memory. Save them to disk in your loop if you need a checkpoint.
 
 ```python
-import torch
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.callback import EarlyStopper
 
-# Create model
-model = DeepFM(
-    deep_features=deep_features,
-    fm_features=fm_features,
-    mlp_params={"dims": [256, 128], "dropout": 0.2}
-)
-
-# Method 1: Use Trainer's built-in early stopping
-trainer = CTRTrainer(
-    model=model,
-    optimizer_params={"lr": 0.001, "weight_decay": 1e-5},
-    n_epoch=50,
-    earlystop_patience=10,
-    device="cuda:0"
-)
-trainer.fit(train_dl, val_dl)
-
-# Method 2: Manual EarlyStopper usage
-early_stopper = EarlyStopper(patience=10)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-criterion = torch.nn.BCELoss()
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model.to(device)
-
-for epoch in range(50):
-    model.train()
-    for x_dict, y in train_dl:
-        # Training step
-        x_dict = {name: value.to(device) for name, value in x_dict.items()}
-        y = y.float().to(device)
-        optimizer.zero_grad()
-        prediction = model(x_dict)
-        loss = criterion(prediction, y.view_as(prediction))
-        loss.backward()
-        optimizer.step()
-
-    # Validation
-    model.eval()
-    val_auc = evaluate(model, val_dl)
-    print(f"Epoch {epoch}, Val AUC: {val_auc:.4f}")
-
-    # Early stopping check
-    if early_stopper.stop_training(val_auc, model.state_dict()):
-        print(f"Early stopping! Best AUC: {early_stopper.best_auc:.4f}")
-        model.load_state_dict(early_stopper.best_weights)
+stopper = EarlyStopper(patience=3, mode="min")
+for epoch in range(n_epoch):
+    train_one_epoch(model, train_dl)
+    val_loss = validation_loss(model, val_dl)
+    if stopper.stop_training(val_loss, model.state_dict()):
         break
+model.load_state_dict(stopper.best_weights)
 ```
-
-## Best Practices
-
-1. **Choose appropriate patience value**:
-   - Too small may cause premature stopping, missing better results
-   - Too large may waste training time
-   - Recommend starting with 5-10
-
-2. **Combine with learning rate scheduling**:
-   - Try reducing learning rate before early stopping
-   - Use `scheduler_fn` and `scheduler_params` to configure learning rate scheduler
-
-3. **Save checkpoints**:
-   - The early stopper keeps the best weights only in memory; call `load_state_dict` explicitly when needed
-   - The Trainer writes weights to `model_path` when `fit()` finishes, but the directory must already exist; if early stopping did not trigger, it writes the weights from the final epoch
-

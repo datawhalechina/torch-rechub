@@ -1,16 +1,22 @@
 # 召回
 
-## Movielens
+## MovieLens
 
-使用ml-1m数据集，使用其中原始特征7个user特征`'user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip',"cate_id"`，2个item特征`"movie_id", "cate_id"`，一共9个sparse特征。
+MovieLens DSSM 的用户塔使用 `user_id`、`gender`、`age`、`occupation`、`zip` 和观影历史 `hist_movie_id`。物品塔使用 `movie_id` 和 `cate_id`。
 
-- 构造用户观看历史特征``hist_movie_id``，使用`mean`池化该序列embedding
-- 使用随机负采样构造负样本 (sample_method=0)，内含随机负采样、word2vec负采样、流行度负采样、Tencent负采样等多种方法
-- 将每个用户最后一条观看记录设置为测试集
-- 原始数据下载地址：https://grouplens.org/datasets/movielens/1m/
-- 处理完整数据csv获取方式：从[官方原始数据](https://grouplens.org/datasets/movielens/1m/)下载后运行 [preprocess_ml.py](./data/ml-1m/preprocess_ml.py) 复现，或使用楼内已验证的备用网盘（见 issue #201）
+- 历史电影与候选电影共用嵌入表，DSSM 对有效历史位置做平均池化。
+- `run_ml_dssm.py` 默认使用 `sample_method=1`，按物品频次的 0.75 次幂采负例。均匀随机采样对应 `sample_method=0`。加 `--in_batch_neg` 则从批内其他正交互取得负例。
+- 把每位用户最后一次与电影的交互留给测试，用它检查推荐列表是否命中。
 
-以下指标使用example中的相同参数在ml-1m上测试得到
+第一次运行可以直接用仓库中的 `ml-1m_sample.csv`。要换完整数据，下载 [GroupLens 的 MovieLens 1M](https://grouplens.org/datasets/movielens/1m/)，把 `users.dat`、`ratings.dat`、`movies.dat` 放在 `examples/matching/data/ml-1m/` 下。从仓库根目录执行下面两步。[预处理脚本](./data/ml-1m/preprocess_ml.py) 会把评分、电影和用户表合成 `data/ml-1m/ml-1m.csv`。备用数据来源见 [issue #201](https://github.com/datawhalechina/torch-rechub/issues/201)。
+
+```bash
+cd examples/matching
+uv run python data/ml-1m/preprocess_ml.py
+uv run --extra annoy python run_ml_dssm.py --dataset_path data/ml-1m/ml-1m.csv --device cpu
+```
+
+下表是项目此前用完整 MovieLens 1M 和示例参数得到的记录。每个用户留出一部电影，所以 Hit@100 与 Recall@100 数值相同。
 
 | Model\Metrics | Hit@100 | Recall@100 | Precision@100 |
 |---------------|---------|------------|---------------|
@@ -19,26 +25,23 @@
 | FacebookDSSM  | 2.85%   | 2.85%      | 0.03%         |
 | YoutubeSBC    | 17.83%  | 17.83%     | 0.18%         |
 
+## 双塔示例的样本和标签
 
-
-## 双塔模型对比
+下表按各示例的默认训练方式说明标签的含义。特别留意两种 `0` 的区别，DSSM 中表示负例，YoutubeDNN 中表示正电影在候选列表的第一个位置。
 
 | 模型         | 学习模式   | 损失函数  | 样本构造                                                     | label                              |
 | ------------ | ---------- | --------- | ------------------------------------------------------------ | ---------------------------------- |
 | DSSM         | point-wise | BCE       | 全局负采样，一条负样本对应label 0                            | 1或0                               |
 | YoutubeDNN   | list-wise  | CE        | 全局负采样，每条正样本对应k条负样本                          | 0（item_list中第一个位置为正样本） |
 | YoutubeSBC   | list-wise  | CE        | Batch内随机负采样，每条正样本对应k条负样本，加入采样权重做纠偏处理 | 0（item_list中第一个位置为正样本） |
-| FacebookDSSM | pair-wise  | BPR/Hinge | 全局负采样，每条正样本对应1个负样本，需扩充负样本item其他属性特征 | 无label                            |
-
-
+| FacebookDSSM | pair-wise  | BPR       | 全局负采样，每条正样本对应1个负样本，需扩充负样本item其他属性特征 | 按正负对打分，无需分类标签                            |
 
 ## YiDian-News
 
-一点资讯 CTR 比赛数据集的处理版，用于点击率预估（CTR Prediction）和推荐系统排序任务。
+这份比赛数据记录了新闻曝光和点击，可用 `click` 作为点击率预测的标签。
 
 ### 全量数据
-* 原始数据为NewsDataset.zip[(下载链接)](https://aistudio.baidu.com/dataset/detail/389517)
-主数据按体积分为 32 个 CSV 分卷：
+[下载比赛数据](https://aistudio.baidu.com/dataset/detail/389517)后，处理版的完整数据由 32 个 CSV 分卷组成。
 
 - `yidian_news_processed_part_0001.csv`
 - ...
@@ -52,7 +55,7 @@
 python merge_csv_big.py "yidian_news_processed_part_*.csv" yidian_news_processed.csv
 ```
 
-合并后的 `yidian_news_processed.csv` 可直接用于训练或离线分析。数据体量较大，快速验证流程时建议优先使用 `_sample.csv`。
+调试读取和字段映射时，先用 1,000 行的样本即可。
 
 #### 数据列表
 
@@ -70,22 +73,11 @@ python merge_csv_big.py "yidian_news_processed_part_*.csv" yidian_news_processed
 4. `duration` 为消费时长，单位为秒；
 5. 原始训练数据取自用户历史 12 天的行为日志，测试数据采样自第 13 天的用户展现日志。
 
-
-
 ## Million Song Dataset
-百万歌曲音乐数据集（事实上这个数据集很很多种，同时也有不同社区对它进行处理，我们只选取它数据量比较少且文件结构简单的一个）
+Million Song Dataset 由 The Echo Nest 和 LabROSA 合作完成。这里用其中的播放记录构造用户与歌曲的交互，每条记录包含匿名用户 ID、歌曲 ID 和播放次数。
 
-### 数据集说明
-1.这个项目由The Echonest和LABRosa一起完成
-
-2.数据集主要是多年间外国音乐的量化特征，包含了百万用户对几十万首歌曲的播放记录（train_triplets.txt，2.9G）和这些歌曲的详细信息（triplets_metadata.db，700M）。
-
-### 数据格式
-1.用户的播放记录数据集train_triplets.txt:`用户,歌曲,播放次数`，其中用户和歌曲都匿名
-
-2.歌曲的详细信息数据集triplets_metadata.db:`歌曲的发布时间,作者,作者热度,...`等
-
-由于数据集很大，测试训练时可以从.txt文件中选取200万条数据作为我们的数据集。
+- `train_triplets.txt`（约 2.9 GB）记录百万用户对几十万首歌曲的播放情况。调试时可以先读取其中 200 万条。
+- `triplets_metadata.db`（约 700 MB）提供发行时间、作者和作者热度等歌曲信息。
 
 
 [数据集下载](http://millionsongdataset.com/sites/default/files/challenge/train_triplets.txt.zip)
@@ -94,23 +86,17 @@ python merge_csv_big.py "yidian_news_processed_part_*.csv" yidian_news_processed
 
 ## Book-Crossing
 
-针对美国 Book-crossing 网站关于用户对书籍的评级行为进行分析，数据包含 27.8万个匿名用户，提供 115万 个评级(显式/隐式)，涉及约 27.1万本书。增删改查合并后的数据包含约71.9万个评级。
+Book-Crossing 收录约 27.8 万名匿名用户对 27.1 万本书的 115 万条显式或隐式评分。项目此前使用的合并数据约有 71.9 万条评分。
 
 [数据集下载和说明](https://www.kaggle.com/datasets/ruchi798/bookcrossing-dataset)
 
 
 ## Session based recommendation datasets
-#### 序列推荐的基准数据集目前包括:
-* YOOCHOOSE: [ACM RecSys Challenge 2015](https://recsys.acm.org/recsys15/challenge/) 所使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `train-item-views.csv` 文件。该文件包含四个原始特征：`"session_id", "item_id", "time","category"`。该数据目前可以在 [Kaggle](https://www.kaggle.com/datasets/chadgostopp/recsys-challenge-2015) 网站下载。
-* DIGINETICA: [CIKM Cup 2016](https://competitions.codalab.org/competitions/11161) 使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `yoochoose-clicks.dat` 文件。该文件包含五个原始特征：`"sessionId", “userId”, "itemId", "time", "timeframe", "eventdate"`。该数据目前可以在 [google drive](https://drive.google.com/drive/folders/0B7XZSACQf0KdXzZFS21DblRxQ3c?resourcekey=0-3k4O5YlwnZf0cNeTZ5Y_Uw) 下载。
+会话推荐用同一次访问中的点击顺序预测下一个物品。以下两份数据分别用于电商点击流实验。
+* YOOCHOOSE: [ACM RecSys Challenge 2015](https://recsys.acm.org/recsys15/challenge/) 所使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `yoochoose-clicks.dat` 文件。该文件包含四个原始特征：`"session_id", "item_id", "time","category"`。该数据目前可以在 [Kaggle](https://www.kaggle.com/datasets/chadgostopp/recsys-challenge-2015) 网站下载。
+* DIGINETICA: [CIKM Cup 2016](https://competitions.codalab.org/competitions/11161) 使用的电商网站点击流数据集。构建序列推荐数据只用到该数据集的 `train-item-views.csv` 文件。预处理时主要用到会话 ID、物品 ID 和时间字段。该数据目前可以在 [google drive](https://drive.google.com/drive/folders/0B7XZSACQf0KdXzZFS21DblRxQ3c?resourcekey=0-3k4O5YlwnZf0cNeTZ5Y_Uw) 下载。
 
-#### 测试结果
+按[预处理脚本](./data/session_based/preprocess_session_based.py)选定数据集与切分比例后，用相同候选集比较 Recall@20 等指标。记录测试集切分比例和候选物品范围，便于复查结果。
 
-|       | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | YOOC.1/64<br> Recall@20 | DIGI.<br> Recall@20 | DIGI.<br> Recall@20 |
-|:-----:|:-----------------------:|:-----------------------:|:-----------------------:|:-----------------------:|:-------------------:|:-------------------:|
-|  NARM |          0.6746         |          0.2827         |          0.7028         |          0.2909         |        0.5829       |        0.2603       |
-| STAMP |          0.6675         |          0.2859         |          0.7079         |          0.3074         |        0.5578       |        0.2303       |
-
-* __Neural Attentive Session-based Recommendation__ ([Li et al., CIKM'17](https://arxiv.org/abs/1711.04725.
-* __STAMP: Short-Term Attention/Memory Priority Model for Session-based Recommendation__  ([Liu et al., KDD'18](https://dl.acm.org/doi/10.1145/3219819.3219950))
-* 注：以上指标可使用论文中实验章节提到的训练参数测试得到。排序指标 `top_k` 则需要调整成 `20`。
+- [NARM 论文](https://arxiv.org/abs/1711.04725)
+- [STAMP 论文](https://dl.acm.org/doi/10.1145/3219819.3219950)

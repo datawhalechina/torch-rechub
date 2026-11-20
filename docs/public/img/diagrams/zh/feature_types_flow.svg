@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="470" viewBox="0 0 720 470" lang="zh" xml:lang="zh" role="img" aria-labelledby="title desc">
+  <title id="title">一条观影记录里的三种特征</title>
+  <desc id="desc">年龄 28 直接作为数值输入。电影编号 3 对应电影嵌入表 E 的第 3 行。观影历史 [7, 4, 0] 通过同一张表查向量，0 是补位，平均时只计算编号 7 和 4 的向量。</desc>
+  <defs>
+    <style>
+      text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #152A43; }
+      .title { font-size: 29px; font-weight: 700; }
+      .sub, .label, .muted { fill: #40566C; }
+      .sub { font-size: 18px; }
+      .label { font-size: 17px; font-weight: 600; }
+      .muted { font-size: 17px; }
+      .mono, .mono-sm, .num { font-family: Consolas, "Liberation Mono", Menlo, monospace; }
+      .mono { font-size: 20px; }
+      .mono-sm { font-size: 18px; }
+      .num { font-size: 23px; font-weight: 600; }
+      .teal { fill: #006C67; }
+      .amber { fill: #994519; }
+    </style>
+    <pattern id="padding" width="7" height="7" patternUnits="userSpaceOnUse">
+      <rect width="7" height="7" fill="#FFF0DF"/>
+      <path d="M-1 1 L1 -1 M0 7 L7 0 M6 8 L8 6" stroke="#E9D0AF" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect x="1" y="1" width="718" height="468" rx="16" fill="#F8FAFC" stroke="#D5DFE5"/>
+  <text x="32" y="51" class="title">一条观影记录里的三种特征</text>
+  <text x="32" y="84" class="sub">候选电影和历史电影共用嵌入表 E，每个编号对应表中的一行。</text>
+  <path d="M32 108 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="138" class="label">字段与特征类</text>
+  <text x="228" y="138" class="label">输入值</text>
+  <text x="444" y="138" class="label">模型读到什么</text>
+  <path d="M32 151 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="184" class="mono">age</text>
+  <text x="32" y="211" class="mono-sm muted">DenseFeature</text>
+  <text x="228" y="190" class="num">28</text>
+  <path d="M397 183 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="190" class="num">28.0</text>
+  <text x="444" y="213" class="muted">直接使用数值</text>
+  <path d="M32 232 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="266" class="mono">movie_id</text>
+  <text x="32" y="293" class="mono-sm muted">SparseFeature</text>
+  <rect x="228" y="245" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="249.5" y="270" class="num teal" text-anchor="middle">3</text>
+  <path d="M397 264 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="270" class="num teal">E[3]</text>
+  <text x="444" y="293" class="muted">取出编号 3 的电影向量</text>
+  <path d="M32 313 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="347" class="mono">hist_movie_id</text>
+  <text x="32" y="374" class="mono-sm muted">SequenceFeature</text>
+  <rect x="228" y="326" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="249.5" y="351" class="num teal" text-anchor="middle">7</text>
+  <rect x="276" y="326" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="297.5" y="351" class="num teal" text-anchor="middle">4</text>
+  <rect x="324" y="326" width="43" height="36" rx="5" fill="url(#padding)"/>
+  <text x="345.5" y="351" class="num amber" text-anchor="middle">0</text>
+  <path d="M397 344 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="351" class="mono teal">(E[7] + E[4]) / 2</text>
+  <text x="444" y="377" class="muted">只对两部看过的电影取平均</text>
+  <text x="215" y="400" class="muted" text-anchor="end">mask</text>
+  <text x="249.5" y="400" class="mono-sm teal" text-anchor="middle">1</text>
+  <text x="297.5" y="400" class="mono-sm teal" text-anchor="middle">1</text>
+  <text x="345.5" y="400" class="mono-sm amber" text-anchor="middle">0</text>
+  <path d="M32 413 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="447" class="mono-sm">padding_idx=0</text>
+  <text x="198" y="447" class="muted">补位不计入平均值。</text>
+</svg>

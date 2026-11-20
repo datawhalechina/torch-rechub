@@ -1,31 +1,29 @@
 ---
-title: ONNX Export & Quantization
-description: Torch-RecHub model export to ONNX and quantization
+title: ONNX export and quantization
+description: Export a trained model to ONNX, verify its predictions, and try INT8 or FP16 inference
 ---
 
-# ONNX Export & Quantization
+# ONNX export and quantization
 
-Torch-RecHub supports exporting trained models to ONNX for cross-platform inference deployment. This page covers the complete usage and recommended practices for **ONNX export** and **quantization (INT8/FP16)** in production inference scenarios that require low latency and low memory usage.
+Export a trained model as a `.onnx` file to run predictions with ONNX Runtime. Start with FP32 and compare its score against PyTorch for one test record. Once the scores agree, try INT8 or FP16 on the device that will serve the model. [Check both scores on one record](/serving/demo)
 
-![ONNX export and quantization pipeline](/img/diagrams/onnx_quantization_flow.png)
+![Compare predictions on the same input before testing INT8 on CPU or FP16 on GPU](/img/diagrams/en/onnx_quantization_flow.svg)
 
-## Install Dependencies
+## Install the dependencies
 
-ONNX-related dependencies are optional and can be installed as needed:
+Install the ONNX extra in the environment you use for export.
 
 ```bash
 pip install "torch-rechub[onnx]"
 ```
 
-Notes:
-- `torch-rechub[onnx]` installs `ml-dtypes`, `onnx`, `onnxscript`, `onnxruntime`, and `onnxconverter-common` for FP16 conversion.
-- For GPU inference, use the `onnxruntime-gpu` package that matches your local CUDA version and driver, and verify that your environment actually imports the intended Runtime variant.
+This extra includes the CPU build of ONNX Runtime and the FP16 conversion tools. For NVIDIA GPU inference, use an `onnxruntime-gpu` build that matches your CUDA installation and driver. Check that `onnxruntime.get_available_providers()` includes `CUDAExecutionProvider`.
 
-## Export to ONNX (Trainer export_onnx)
+## Export with the trainer
 
-Every Torch-RecHub trainer provides an `export_onnx()` method (CTR/Matching/MTL/Seq). The export process automatically constructs dummy inputs and supports a **dynamic batch size**.
+Each `trainer` below comes from the corresponding training example. By default, the exporter builds sample inputs from the feature definitions. If you have a test batch, pass it as `dummy_input` to match the actual input shapes. With a dynamic batch dimension, the exported model accepts one or more records per call.
 
-### Export CTR Models (Ranking/Re-ranking)
+### Export a click-through rate model
 
 ```python
 from torch_rechub.trainers import CTRTrainer
@@ -34,21 +32,21 @@ from torch_rechub.trainers import CTRTrainer
 trainer.export_onnx("deepfm.onnx")
 ```
 
-### Export Matching Models (Retrieval): Full Model / Separate Towers
+### Export a retrieval model or its towers
 
-For two-tower models, it is generally best to export the user tower and item tower separately so their embeddings can be computed independently online:
+If you can precompute item vectors, export the two towers separately. The offline index builder runs the item tower, and each new request runs the user tower. You can also export the complete model using the default `MatchTrainer` export mode.
 
 ```python
 from torch_rechub.trainers import MatchTrainer
 
-# Export the user tower (for user embeddings)
+# Export the user tower to compute user embeddings.
 trainer.export_onnx("user_tower.onnx", mode="user")
 
-# Export the item tower (for item embeddings)
+# Export the item tower to compute item embeddings.
 trainer.export_onnx("item_tower.onnx", mode="item")
 ```
 
-### Export Multi-Task Models (MTL)
+### Export a multi-task model
 
 ```python
 from torch_rechub.trainers import MTLTrainer
@@ -56,52 +54,38 @@ from torch_rechub.trainers import MTLTrainer
 trainer.export_onnx("mmoe.onnx")
 ```
 
-### Export Arguments and Advanced Control (onnx_export_kwargs)
+### Pass options to the PyTorch exporter
 
-To select an exporter or pass arguments to `torch.onnx.export()` that are not already used by the wrapper, provide them through `onnx_export_kwargs`:
+Use `onnx_export_kwargs` to select the PyTorch exporter. Here, `dynamo=False` selects the legacy exporter. Options already set by Torch-RecHub cannot be repeated in this dictionary.
 
 ```python
 trainer.export_onnx(
     "model.onnx",
-    dynamic_batch=True,  # Dynamic batch size (recommended)
+    dynamic_batch=True,  # Allow a variable batch size.
     onnx_export_kwargs={
-        "dynamo": False,  # Force the legacy exporter in this example
+        "dynamo": False,  # Use the legacy exporter for this example.
     },
 )
 ```
 
-The wrapper already sets `f`, `input_names`, `output_names`, `opset_version`, `do_constant_folding`, `verbose`, and the automatically generated `dynamic_axes`. Do not repeat them in `onnx_export_kwargs`, or a `ValueError` will be raised.
+The wrapper sets `f`, `input_names`, `output_names`, `opset_version`, `do_constant_folding`, `verbose` and the automatically generated `dynamic_axes`. Passing one of these again in `onnx_export_kwargs` raises `ValueError`.
 
-Exporter selection recommendations:
-- **CTR / Matching / MTL**: By default, first try `dynamo=True`, expressing the dynamic batch through `dynamic_shapes`; on failure, the exporter automatically falls back to the legacy exporter and `dynamic_axes`.
-- **SeqTrainer**: Dynamic batch and sequence lengths use the legacy exporter by default; for fixed shapes, you can explicitly pass `dynamo=True` when needed.
-- **Older PyTorch versions**: If `dynamo` is unsupported, the exporter ignores the argument and uses a compatible path. Operator coverage may still differ across PyTorch versions.
+Start with the default exporter for most models. The CTR, matching and multi-task trainers first try Dynamo with `dynamic_shapes` for a variable batch size. If that fails, they fall back to the legacy exporter with `dynamic_axes`. The wrapper also uses the legacy exporter on PyTorch versions that lack the `dynamo` argument. For sequence models, `SeqTrainer` defaults to the legacy exporter when the batch size or sequence length varies. You can explicitly select Dynamo for fixed input shapes.
 
-### Inspect the ONNX Model Structure
+### Inspect the exported model
 
-After exporting to ONNX, you can inspect the model structure online with [Netron](https://netron.app/):
+Open the `.onnx` file in Netron to see input names, data types and tensor shapes. Use these to build the input dictionary for ONNX Runtime. [Netron](https://netron.app/)
 
-1. Open https://netron.app/
-2. Drag or upload the exported `.onnx` file
-3. Inspect the model's network structure, layer parameters, and tensor shapes
+## Choose a lower-precision format
 
-> **Tip**: Netron supports multiple model formats (ONNX, TensorFlow, PyTorch, and others) and is a convenient tool for debugging and validating exported models.
+Choose the format for the machine that will run inference.
 
-## ONNX Quantization
+- **CPU.** Try `int8` for dynamic quantization of supported operators such as linear layers and matrix multiplication.
+- **GPU with half-precision support.** Try `fp16` to reduce the size of floating-point weights. The speed depends on the hardware and the operators in the model.
 
-FP32 is often not the best choice for production inference. Two common compression methods are:
-- **INT8 dynamic quantization**: Intended for **CPU** inference, primarily quantizing operations such as Linear/MatMul. Measure performance and accuracy on your own data.
-- **FP16 conversion**: Intended for **GPUs** supporting FP16. It reduces floating-point weight storage; throughput depends on hardware and operator support.
+Both modes work with standard single-file ONNX models. Models over 2 GB with external weights and GPU INT8 calibration require other tools. Both examples below start from the same `model_fp32.onnx`.
 
-These are not two GPU presets selected by VRAM size. The INT8 entry point does not implement TensorRT GPU INT8 calibration, and this utility does not handle models with more than 2 GB of external weights.
-
-Torch-RecHub provides a unified API in its quantization module:
-
-```python
-from torch_rechub.utils.quantization import quantize_model
-```
-
-### 1) INT8 Dynamic Quantization (Recommended for CPU)
+### 1. Dynamic INT8 quantization for CPU
 
 ```python
 from torch_rechub.utils.quantization import quantize_model
@@ -109,16 +93,18 @@ from torch_rechub.utils.quantization import quantize_model
 quantize_model("model_fp32.onnx", "model_int8.onnx", mode="int8")
 ```
 
-Optional arguments:
-- `per_channel=True`: Enable per-channel quantization for weights
-- `reduce_range=True`: Reduce the quantization range, which may be more stable on some CPUs
-- `weight_type="qint8"|"quint8"`: Weight quantization type
+You can adjust how INT8 weights are represented with the following options.
+- `per_channel=True` enables per-channel weight quantization.
+- `reduce_range=True` reduces the range of integer values used for quantization.
+- `weight_type` selects the quantized weight type, either `"qint8"` or `"quint8"`.
 
-Existing `dynamic_int8`/`dynamic` aliases and node-selection arguments remain available; unsupported arguments are no longer silently discarded. `optimize_model` is supported only by ORT < 1.16 and retains the original `False` default. ORT >= 1.16 removed that argument, so explicitly requesting `True` raises a clear error. Use ORT's separate `quant_pre_process()` step if graph optimization is needed.
+Existing scripts can still use `dynamic_int8` or `dynamic` as aliases for `int8`. Pass node filters to quantize only selected nodes.
 
-Compatibility: some Dynamo-exported Gemm models contain duplicated weight-shape metadata that becomes stale when ORT transposes the weights. ORT >= 1.18 accepts a ModelProto directly, allowing this utility to remove redundant `value_info` entries matching initializer names in an in-memory copy while preserving other intermediate metadata and the original file. The exporter is unchanged. Older ORT versions retain the original file-path interface; if they encounter this Dynamo/Gemm issue, explicitly export with `trainer.export_onnx(..., onnx_export_kwargs={"dynamo": False})` or pass `dynamo=False` to `torch.onnx.export()`.
+**What if my script uses `optimize_model=True`?** ONNX Runtime removed this argument in version 1.16. If your model needs preprocessing, run ONNX Runtime's `quant_pre_process()` before quantization.
 
-### 2) FP16 Conversion (Recommended for GPU)
+**What if a Dynamo-exported Gemm node has conflicting shapes?** With ONNX Runtime 1.18 or later, the conversion utility can clear duplicate shape information in memory and preserve the original ONNX file. With an older Runtime, re-export the model with `onnx_export_kwargs={"dynamo": False}` and quantize that file.
+
+### 2. FP16 conversion for GPU
 
 ```python
 from torch_rechub.utils.quantization import quantize_model
@@ -126,32 +112,30 @@ from torch_rechub.utils.quantization import quantize_model
 quantize_model("model_fp32.onnx", "model_fp16.onnx", mode="fp16")
 ```
 
-Both the Python API and CLI default to `keep_io_types=True`, retaining FP32 floating-point inputs/outputs. Integer category IDs are unchanged. Set `keep_io_types=False`, or pass `--no-keep-io-types` to the CLI, to convert floating-point I/O too. The existing `float16` alias is preserved.
+The default, `keep_io_types=True`, keeps floating-point inputs and outputs in FP32, so callers can reuse the original inputs. Integer category IDs retain their type. If your caller will supply half-precision floating-point inputs, pass `keep_io_types=False` or the CLI flag `--no-keep-io-types`. Older scripts can still use the mode name `float16`.
 
-## Example Scripts and Benchmarks
+## Run the examples and compare inference times
 
-The repository provides scripts for quick validation:
+Run the following commands from the repository root and substitute your own model paths.
 
-### Quantization Scripts
+### Quantization script
 
 ```bash
 python examples/serving/quantize_onnx.py --input model_fp32.onnx --output model_int8.onnx --mode int8
 python examples/serving/quantize_onnx.py --input model_fp32.onnx --output model_fp16.onnx --mode fp16
 ```
 
-### Performance Comparison Scripts
+### Inference benchmark
 
-Compare **model size** and **inference latency** across FP32, INT8, and FP16:
+Compare file sizes and inference times for FP32, INT8 and FP16 models.
 
 ```bash
 python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --int8 model_int8.onnx --inputs batch.npz
 python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --inputs batch.npz --provider CUDAExecutionProvider
 ```
 
-Save one batch of preprocessed inputs in `batch.npz`, keyed by the ONNX input names, for example `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`. Integer arrays must use the model's required dtype. Every compared model receives this same batch; only floating-point dtype conversion is applied when a model uses FP16 I/O.
+Use `batch.npz` to fix the inputs for the comparison. The keys must match the ONNX input names, as in `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`. For category IDs, masks or sequence lengths, use real values produced by the training preprocessing and preserve the type of each field. For models with only floating-point inputs, you can omit `--inputs` to use random inputs generated with a fixed seed.
 
-Without `--inputs`, fixed-seed demo data is generated only for floating-point inputs. IDs, masks and lengths require real input data rather than guessed vocabulary sizes or valid values. The script checks that the requested provider is available and successfully registered instead of reporting CPU fallback as GPU success; registering CUDA still does not mean that every operator runs on GPU.
+The script feeds the same batch to each model. If FP16 conversion changed a floating-point input type, the script casts it as needed. GPU mode checks whether the CUDA provider is registered. The device used for each operator still depends on the model and Runtime.
 
-Reported size covers the `.onnx` file only, excluding external weights. The benchmark fixes ORT CPU operator threads to one. Latency includes input/output copies rather than measuring GPU kernel time alone.
-
-> A successful export only confirms that the model file was generated. Before production use, run both PyTorch and ONNX Runtime on real samples to compare output shapes, numerical errors, and dynamic batching, then reevaluate business metrics after quantization. The benchmark script does not replace these consistency checks.
+The size reported is for the `.onnx` file alone. CPU operators use a single thread, and timings include input and output copies. After comparing speed, evaluate metrics such as ranking AUC and LogLoss on the same validation set before and after quantization.

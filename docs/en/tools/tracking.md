@@ -1,51 +1,69 @@
 ---
-title: Experiment Tracking
-description: Torch-RecHub experiment logging and comparison
+title: Experiment tracking
+description: Record and compare training runs in Torch-RecHub
 ---
 
-# Experiment Tracking (Lite)
+# Experiment tracking
 
-Torch-RecHub offers optional experiment tracking with:
-- **Weights & Biases (wandb)**
-- **SwanLab**
-- **TensorBoardX**
+To compare two DeepFM runs, record the loss and validation AUC after each epoch. TensorBoardX writes curves to local files. If your team uses W&B or SwanLab, pass its logger to the same `model_logger` argument. Leave the argument at its default to follow progress in the terminal.
 
-Goal: zero overhead by default. If you want tracking, pass `model_logger` to a Trainer.
+## Save a local training curve
 
-## Installation
+Install `tensorboardX` in the training environment and `tensorboard` to view the curves. Continue in the Python session from the DeepFM Quick Start so `model`, `train_dl` and `val_dl` are available. [DeepFM Quick Start](/guide/quick_start)
 
-```bash
-# all tracking deps
-pip install "torch-rechub[tracking]"
+```python
+from torch_rechub.basic.tracking import TensorBoardXLogger
+from torch_rechub.trainers import CTRTrainer
 
-# or individually
-pip install wandb
-pip install swanlab
-pip install tensorboardX
+logger = TensorBoardXLogger(log_dir="./runs/deepfm")
+trainer = CTRTrainer(model, n_epoch=2, device="cpu", model_logger=logger)
+trainer.fit(train_dl, val_dl)
 ```
 
-## Quickstart
+After training, `./runs/deepfm` contains the event files. Start TensorBoard from the same working directory and open the address printed in the terminal to see `train/loss`, `learning_rate` and `val/auc`. For a second experiment, choose a directory such as `./runs/deepfm-lr2` so you can distinguish the curves.
+
+```bash
+tensorboard --logdir ./runs
+```
+
+## Track experiments with W&B or SwanLab
+
+Install `wandb` for W&B or `swanlab` for SwanLab in the current Python environment. To install all three backends, run `pip install "torch-rechub[tracking]"`. Sign in with your account or set the platform's API key in the terminal where you start training.
+
+```bash
+# bash/zsh: set the variable in the current shell.
+export WANDB_API_KEY="..."
+export SWANLAB_API_KEY="..."
+```
+
+```powershell
+# PowerShell: set the variable for the current session.
+$env:WANDB_API_KEY = "..."
+$env:SWANLAB_API_KEY = "..."
+```
+
+This example logs a run named `exp1` under the W&B project `my-ctr`. For SwanLab, use `SwanLabLogger(project="my-ctr", experiment_name="exp1")` instead.
 
 ```python
 from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.tracking import WandbLogger
 
-logger = WandbLogger(project="my-ctr", name="exp1")  # optional
+logger = WandbLogger(project="my-ctr", name="exp1")  # Optional
 
 trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3},
     n_epoch=10,
-    model_logger=logger,   # pass None for zero tracking
+    model_logger=logger,   # Use None to leave tracking off.
 )
 
 trainer.fit(train_dl, val_dl)
-# Logger is automatically closed after fit(), no need to call finish() manually
+# The trainer closes its logger when fit() finishes.
 ```
 
-### Multiple loggers
+### Use more than one logger
 
-`model_logger` can be a single instance or a list:
+To keep local curves and share metrics with your team, pass a list of loggers. This example uses all three backends. You can use any subset.
 
 ```python
 from torch_rechub.basic.tracking import TensorBoardXLogger, WandbLogger, SwanLabLogger
@@ -57,225 +75,44 @@ sb = SwanLabLogger(project="my-ctr")
 trainer = CTRTrainer(model, model_logger=[tb, wb, sb])
 ```
 
-### Configure API keys
+## Metrics by trainer
 
-```bash
-# bash/zsh: set only in the current shell
-export WANDB_API_KEY="..."
-export SWANLAB_API_KEY="..."
-```
+The trainer logs hyperparameters at the start and training metrics after each epoch. Validation metrics appear when you supply validation data. For multi-task runs, `i` starts at zero and follows the task order passed to the trainer.
 
-```powershell
-# PowerShell: set only in the current session
-$env:WANDB_API_KEY = "..."
-$env:SWANLAB_API_KEY = "..."
-```
+| Trainer | Common metrics |
+| --- | --- |
+| `CTRTrainer`, `MatchTrainer` | `train/loss`, `learning_rate`, `val/auc` |
+| `MTLTrainer` | `train/task_i_loss`, `val/task_i_score` and `learning_rate`, plus `loss_weight/task_i` when using adaptive task weights |
+| `SeqTrainer` | `train/loss`, `learning_rate`, `val/loss`, `val/accuracy` |
+| `RQVAETrainer` | `train/loss`, `train/recon_loss` and, at evaluation, `val/collision_rate` |
 
-You can also use each platform's login command or a secret-management service.
+### Log additional metrics after fit()
 
-Do not hard-code real API keys or commit them to the repository.
-
-### Overhead when disabled
-
-When `model_logger=None`, training runs without any tracking calls—no extra cost.
-
-## Supported Trainers
-
-| Trainer        | Supported | Auto-logged Metrics                                                            |
-| -------------- | --------- | ------------------------------------------------------------------------------ |
-| `CTRTrainer`   | ✅         | `train/loss`, `learning_rate`, `val/auc`                                       |
-| `MatchTrainer` | ✅         | `train/loss`, `learning_rate`, `val/auc`                                       |
-| `MTLTrainer`   | ✅         | `train/task_i_loss`, `learning_rate`, `val/task_i_score`, `loss_weight/task_i` |
-| `SeqTrainer`   | ✅         | `train/loss`, `learning_rate`, `val/loss`, `val/accuracy`                      |
-
-## Lifecycle Management
-
-### Automatic Management (Recommended)
-
-Trainer automatically manages the logger lifecycle:
-
-```python
-logger = WandbLogger(project="demo")
-trainer = CTRTrainer(model, model_logger=logger)
-
-trainer.fit(train_dl, val_dl)
-# ✅ fit() internally calls:
-#    1. logger.log_hyperparams() - at training start
-#    2. logger.log_metrics()     - at end of each epoch
-#    3. logger.finish()          - at training end
-```
-
-### Logging Additional Metrics After fit()
-
-Since `fit()` automatically calls `finish()` to close the logger, if you need to log test metrics after training, use one of these approaches:
-
-**Approach A: Manual management (don't pass to Trainer)**
-
-```python
-logger = WandbLogger(project="demo")
-
-# Don't pass to Trainer
-trainer = CTRTrainer(model, model_logger=None)
-trainer.fit(train_dl, val_dl)
-
-# Log manually
-test_auc = trainer.evaluate(trainer.model, test_dl)
-logger.log_metrics({"test/auc": test_auc})
-logger.finish()  # Close manually
-```
-
-**Approach B: Create a new logger for test metrics**
+The trainer closes its logger when `fit()` returns normally. To record a test AUC afterwards, start a separate run with a name that distinguishes it from the training run.
 
 ```python
 logger = WandbLogger(project="demo", name="train-exp1")
 trainer = CTRTrainer(model, model_logger=logger)
-trainer.fit(train_dl, val_dl)  # logger is closed
+trainer.fit(train_dl, val_dl)  # The training logger is now closed.
 
-# Create new logger for test results
+# Create a new logger for the test results.
 test_logger = WandbLogger(project="demo", name="test-exp1")
 test_auc = trainer.evaluate(trainer.model, test_dl)
 test_logger.log_metrics({"test/auc": test_auc})
 test_logger.finish()
 ```
 
-## API Overview
-
-### BaseLogger Interface
+If you only need the final test AUC, manage the logger yourself. Log the result once after testing, then close the logger.
 
 ```python
-class BaseLogger:
-    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
-        """Log metric values"""
-        pass
+logger = WandbLogger(project="demo")
 
-    def log_hyperparams(self, params: Dict[str, Any]) -> None:
-        """Log hyperparameters"""
-        pass
-
-    def finish(self) -> None:
-        """Close logger and release resources"""
-        pass
-```
-
-### Logger Implementations
-
-**WandbLogger**
-
-```text
-WandbLogger(
-    project: str,              # Project name (required)
-    name: str = None,          # Run name
-    config: dict = None,       # Initial config/hyperparameters
-    tags: List[str] = None,    # Tags
-    notes: str = None,         # Notes
-    dir: str = None,           # Local cache directory
-    **kwargs                   # Additional args for wandb.init()
-)
-```
-
-**SwanLabLogger**
-
-```text
-SwanLabLogger(
-    project: str = None,           # Project name
-    experiment_name: str = None,   # Experiment name
-    description: str = None,       # Description
-    config: dict = None,           # Initial config
-    logdir: str = None,            # Log directory
-    **kwargs                       # Additional args for swanlab.init()
-)
-```
-
-**TensorBoardXLogger**
-
-```text
-TensorBoardXLogger(
-    log_dir: str,          # Log directory (required)
-    comment: str = "",     # Suffix for directory name
-    **kwargs               # Additional args for SummaryWriter
-)
-```
-
-## Full Example
-
-```python
-import torch
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.tracking import WandbLogger, SwanLabLogger, TensorBoardXLogger
-
-# Config
-SEED = 2022
-EPOCH = 10
-LR = 1e-3
-BATCH_SIZE = 2048
-
-# Choose loggers (can use multiple)
-loggers = []
-
-# Local TensorBoard
-loggers.append(TensorBoardXLogger(log_dir=f"./runs/deepfm-{SEED}"))
-
-# Cloud WandB
-loggers.append(WandbLogger(
-    project="ctr-experiment",
-    name=f"deepfm-{SEED}",
-    config={"seed": SEED, "lr": LR, "batch_size": BATCH_SIZE},
-    tags=["deepfm", "criteo"]
-))
-
-# Prepare model and data (omitted)
-model = DeepFM(...)
-train_dl, val_dl, test_dl = ...
-
-# Train
-trainer = CTRTrainer(
-    model,
-    optimizer_params={"lr": LR, "weight_decay": 1e-5},
-    n_epoch=EPOCH,
-    earlystop_patience=3,
-    device="cuda:0",
-    model_logger=loggers,  # Pass logger list
-)
-
+# Keep this logger outside the trainer.
+trainer = CTRTrainer(model, model_logger=None)
 trainer.fit(train_dl, val_dl)
-# Training complete, all loggers automatically closed
 
-# Evaluate test set
+# Log the test result.
 test_auc = trainer.evaluate(trainer.model, test_dl)
-print(f"Test AUC: {test_auc}")
+logger.log_metrics({"test/auc": test_auc})
+logger.finish()  # Close the logger.
 ```
-
-## FAQ
-
-**1. How to skip tracking?**
-
-Don't pass `model_logger` or pass `None` (default value).
-
-**2. What if a library is not installed?**
-
-Creating the corresponding logger raises a friendly `ImportError`; other features still work.
-
-**3. Why does `log_metrics()` fail after `fit()`?**
-
-Because `fit()` automatically calls `finish()` to close the logger. To log metrics after training, see the "Logging Additional Metrics After fit()" section above.
-
-**4. Can I disable automatic hyperparameter logging?**
-
-Not currently supported. Trainer automatically logs hyperparameters once at training start. For full customization, don't pass `model_logger` and manage manually.
-
-**5. How to view TensorBoard logs?**
-
-```bash
-tensorboard --logdir ./runs
-```
-
-## Best Practices
-
-| Scenario                         | Recommendation                              |
-| -------------------------------- | ------------------------------------------- |
-| Local quick debug                | `TensorBoardXLogger`                        |
-| Team collaboration/cloud logging | `WandbLogger` or `SwanLabLogger`            |
-| Both local + cloud               | Pass a list of multiple loggers             |
-| No tracking needed               | Don't pass `model_logger` (zero overhead)   |
-| Need to log test metrics         | Manage logger manually or create new logger |

@@ -1,23 +1,17 @@
 ---
-title: Multi-Task Models
-description: Torch-RecHub multi-task learning models detailed introduction
+title: Multi-task models
+description: Multi-task recommendation models and label order in Torch-RecHub
 ---
 
-# Multi-Task Models
+# Multi-task models
 
-Multi-task learning is a machine learning paradigm that improves model generalization and performance by learning multiple related tasks simultaneously. In recommendation systems, multi-task models are commonly used to jointly optimize multiple related objectives such as click-through rate (CTR), conversion rate (CVR), and user retention.
+One product impression can carry several labels, such as a click and a purchase. A multi-task model reads that row and predicts a separate output column for each target. Choose the column order before training. Use the same order for the labels, task types and metric names. [Ali-CCP multi-task tutorial](/tutorials/pipeline)
 
 ## 1. SharedBottom
 
-### Description
+SharedBottom passes the features through a shared network, then sends its output to a separate tower for each task. It is a simple baseline when comparing several targets.
 
-SharedBottom is a classic multi-task learning model where all tasks share a bottom network, with task-specific networks on top.
-
-### Core Principles
-
-- **Shared Bottom**: All tasks share a bottom neural network to learn shared representations
-- **Task-specific Towers**: Each task has its own tower network to learn task-specific representations
-- **Joint Training**: All tasks are trained simultaneously, updating shared bottom and task-specific towers through backpropagation
+A task’s loss updates its own tower and the shared bottom network. The order of `task_types` determines how each column is produced. Classification outputs a probability and regression outputs a numeric value.
 
 ### Usage
 
@@ -25,20 +19,20 @@ SharedBottom is a classic multi-task learning model where all tasks share a bott
 from torch_rechub.models.multi_task import SharedBottom
 from torch_rechub.basic.features import SparseFeature, DenseFeature
 
-# Define features
+# Define the features
 common_features = [
     SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
     DenseFeature(name="age", embed_dim=1)
 ]
 
-# Create model
+# Create the model
 model = SharedBottom(
     features=common_features,
     task_types=["classification", "classification"],  # Two classification tasks
     bottom_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
     tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Task 1 tower params
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Task 2 tower params
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # First task tower
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Second task tower
     ]
 )
 ```
@@ -47,42 +41,29 @@ model = SharedBottom(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Shared feature list for all tasks | None |
-| task_types | list | Task type list, supports "classification" and "regression" | None |
-| bottom_params | dict | Shared bottom network parameters | None |
-| tower_params_list | list | Task-specific tower network parameters list | None |
-
-### Use Cases
-
-- Scenarios with highly related tasks
-- Limited data scenarios
-- Limited computational resources
+| features | list | Features shared by all tasks | Required |
+| task_types | list | Ordered task types: "classification" or "regression" | Required |
+| bottom_params | dict | Shared bottom network parameters | Required |
+| tower_params_list | list | Network parameters for each task tower | Required |
 
 ## 2. ESMM
 
-### Description
+ESMM models conversion after a click. Its two towers estimate click probability (CTR) and conversion probability given a click (CVR). Their product estimates the probability of both a click and a conversion on an impression (CTCVR).
 
-ESMM (Entire Space Multi-Task Model) is a multi-task learning model designed to address sample selection bias, particularly suitable for joint CTR and CVR optimization.
-
-### Paper Reference
+### Paper
 
 ```
 Xiao, Jun, et al. "Entire space multi-task model: An effective approach for estimating post-click conversion rate." Proceedings of the 41st international ACM SIGIR conference on research & development in information retrieval. 2018.
 ```
 
-### Core Principles
-
-- **Full-space Modeling**: Models CTR and CVR in the entire sample space to avoid sample selection bias
-- **Cascade Relationship**: Leverages the cascade relationship between CTR and CVR (CTCVR = CTR * CVR)
-- **Shared Bottom**: CTR and CVR tasks share the bottom network
-- **Task-specific Towers**: Each task has its own tower network
+The towers share the input embeddings and learn their own tower weights. Here ESMM returns three columns in the order `[cvr, ctr, ctcvr]`. `MTLTrainer` uses the second (CTR) and third (CTCVR) columns to compute the training loss.
 
 ### Usage
 
 ```python
 from torch_rechub.models.multi_task import ESMM
 
-# Create model
+# Create the model
 model = ESMM(
     user_features=user_features,
     item_features=item_features,
@@ -95,52 +76,42 @@ model = ESMM(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| user_features | list | User-side sparse features | required |
-| item_features | list | Item-side sparse features | required |
-| cvr_params | dict | CVR-tower MLP parameters | required |
-| ctr_params | dict | CTR-tower MLP parameters | required |
+| user_features | list | User-side sparse features | Required |
+| item_features | list | Item-side sparse features | Required |
+| cvr_params | dict | MLP parameters for the CVR tower | Required |
+| ctr_params | dict | MLP parameters for the CTR tower | Required |
 
-`ESMM.forward()` always returns columns in `[cvr, ctr, ctcvr]` order. Labels passed to `MTLTrainer` must use the same `[B, 3]` order and `task_types` must contain three `"classification"` entries. For ESMM, the trainer directly optimizes only the CTR and CTCVR losses.
-
-### Use Cases
-
-- Joint CTR and CVR optimization
-- Scenarios with sample selection bias
-- E-commerce recommendation
+Pass labels to `MTLTrainer` with shape `[B, 3]` and column order `[cvr, ctr, ctcvr]`. Set all three entries of `task_types` to `"classification"`.
 
 ## 3. MMOE
 
-### Description
+In MMOE, several small networks called experts each process the same input. Each task has its own gating network that decides how much each expert contributes for this example.
 
-MMOE (Multi-gate Mixture-of-Experts) is a multi-gate mixture-of-experts model that learns different expert combinations for different tasks through multiple expert networks and gating mechanisms.
-
-### Paper Reference
+### Paper
 
 ```
 Ma, Jiaqi, et al. "Modeling task relationships in multi-task learning with multi-gate mixture-of-experts." Proceedings of the 24th ACM SIGKDD international conference on knowledge discovery & data mining. 2018.
 ```
 
-### Core Principles
-
-- **Expert Networks**: Multiple independent expert networks, each learning different feature representations
-- **Gating Mechanism**: Each task has its own gating network to dynamically select expert combinations
-- **Task-specific Towers**: Each task has its own tower network
-- **Joint Training**: All tasks are trained simultaneously, updating expert networks, gating networks, and task-specific towers
+Click prediction and watch-time prediction can share the same experts and still give them different weights. `n_expert` controls how many experts to use. Set `tower_params_list` in task order to configure the output networks.
 
 ### Usage
 
 ```python
+import os
+import numpy as np
+
 from torch_rechub.models.multi_task import MMOE
 
-# Create model
+# Create the model
 model = MMOE(
     features=common_features,
-    task_types=["classification", "regression"],  # Classification and regression tasks
-    n_expert=8,  # Number of expert networks
+    task_types=["classification", "regression"],  # One classification task and one regression task
+    n_expert=8,  # Number of experts
     expert_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
     tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Classification tower params
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Regression tower params
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Classification tower parameters
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Regression tower parameters
     ]
 )
 ```
@@ -149,54 +120,40 @@ model = MMOE(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Shared feature list for all tasks | None |
-| task_types | list | Task type list, supports "classification" and "regression" | None |
-| n_expert | int | Number of expert networks | None |
-| expert_params | dict | Expert network parameters | None |
-| tower_params_list | list | Task-specific tower network parameters list | None |
-
-### Use Cases
-
-- Scenarios with task conflicts
-- Multiple tasks scenarios
-- Scenarios requiring dynamic task weight adjustment
+| features | list | Features shared by all tasks | Required |
+| task_types | list | Ordered task types: "classification" or "regression" | Required |
+| n_expert | int | Number of expert networks | Required |
+| expert_params | dict | Expert network parameters | Required |
+| tower_params_list | list | Network parameters for each task tower | Required |
 
 ## 4. PLE
 
-### Description
+PLE provides dedicated experts for each task along with a pool of shared experts. The click task can use both its own experts and the shared ones. Another task can choose its own combination.
 
-PLE (Progressive Layered Extraction) is a progressive layered extraction model that introduces task-specific experts and shared experts to mitigate negative transfer.
-
-### Paper Reference
+### Paper
 
 ```
 Tang, Hongyan, et al. "Progressive layered extraction (ple): A novel multi-task learning (mtl) model for personalized recommendations." Fourteenth ACM Conference on Recommender Systems. 2020.
 ```
 
-### Core Principles
-
-- **Layered Structure**: Contains multiple PLE layers, each with task-specific and shared experts
-- **Task-specific Experts**: Expert networks useful only for specific tasks
-- **Shared Experts**: Expert networks useful for all tasks
-- **Gating Mechanism**: Each task has its own gating network to select expert combinations
-- **Progressive Extraction**: Progressively extracts task-specific and shared representations through multi-layer PLE structure
+Experts and gates can be stacked in several layers. When comparing PLE and MMOE, examine each task’s validation metric to see whether one task improves at the expense of another.
 
 ### Usage
 
 ```python
 from torch_rechub.models.multi_task import PLE
 
-# Create model
+# Create the model
 model = PLE(
     features=common_features,
     task_types=["classification", "regression"],
-    n_level=2,  # Number of PLE layers
-    n_expert_specific=4,  # Number of task-specific experts per layer
-    n_expert_shared=4,  # Number of shared experts per layer
+    n_level=2,  # Number of PLE levels
+    n_expert_specific=4,  # Task-specific experts per task at each level
+    n_expert_shared=4,  # Shared experts per level
     expert_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
     tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Classification tower params
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Regression tower params
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Classification tower parameters
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Regression tower parameters
     ]
 )
 ```
@@ -205,52 +162,39 @@ model = PLE(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Shared feature list for all tasks | None |
-| task_types | list | Task type list, supports "classification" and "regression" | None |
-| n_level | int | Number of PLE layers | None |
-| n_expert_specific | int | Number of task-specific experts per layer | None |
-| n_expert_shared | int | Number of shared experts per layer | None |
-| expert_params | dict | Expert network parameters | None |
-| tower_params_list | list | Task-specific tower network parameters list | None |
-
-### Use Cases
-
-- Scenarios with strong task conflicts
-- Scenarios requiring negative transfer mitigation
-- Complex multi-task learning scenarios
+| features | list | Features shared by all tasks | Required |
+| task_types | list | Ordered task types: "classification" or "regression" | Required |
+| n_level | int | Number of PLE levels | Required |
+| n_expert_specific | int | Task-specific experts per task at each level | Required |
+| n_expert_shared | int | Shared experts per level | Required |
+| expert_params | dict | Expert network parameters | Required |
+| tower_params_list | list | Network parameters for each task tower | Required |
 
 ## 5. AITM
 
-### Description
+AITM is designed for ordered binary targets such as clicking, adding to the cart and purchasing. A later stage can use the preceding stage’s representation, so ordering the tasks is part of configuring the model.
 
-AITM (Adaptive Information Transfer Multi-task) is an adaptive information transfer multi-task model that automatically learns information transfer relationships between tasks.
-
-### Paper Reference
+### Paper
 
 ```
 Tang, Jiaxi, et al. "Learning Task Relationships in Multi-task Learning with Adaptive Information Transfer." Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
 ```
 
-### Core Principles
-
-- **Information Transfer Mechanism**: Automatically learns information transfer relationships between tasks
-- **Task-specific Networks**: Each task has its own network
-- **Attention Mechanism**: Uses attention mechanism to adaptively transfer information between tasks
-- **Joint Training**: All tasks are trained simultaneously, updating task-specific networks and information transfer mechanism
+Each task uses its own bottom network to compute a representation. Attention incorporates the information passed from the previous task. Each tower outputs a probability.
 
 ### Usage
 
 ```python
 from torch_rechub.models.multi_task import AITM
 
-# Create model
+# Create the model
 model = AITM(
     features=common_features,
     n_task=2,
     bottom_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
     tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # Task 1 tower params
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Task 2 tower params
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},  # First task tower
+        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}   # Second task tower
     ],
 )
 ```
@@ -259,180 +203,23 @@ model = AITM(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Shared feature list for all tasks | None |
-| n_task | int | Number of ordered dependent binary-classification tasks | required |
-| bottom_params | dict | Bottom MLP parameters for each task | required |
-| tower_params_list | list | Task-specific tower network parameters list | None |
+| features | list | Features shared by all tasks | Required |
+| n_task | int | Number of ordered binary classification tasks | Required |
+| bottom_params | dict | Bottom MLP parameters for each task | Required |
+| tower_params_list | list | Network parameters for each task tower | Required |
 
-All AITM tasks are currently fixed to binary classification, and information is transferred from each task column to the next. The constructor does not accept `task_types` or `attention_params`.
+AITM uses binary classification for every task and passes information forward in task-column order. Its constructor does not accept `task_types` or `attention_params`.
 
-### Use Cases
+## 6. Choosing a multi-task model
 
-- Scenarios with task dependencies
-- Scenarios requiring adaptive information transfer
-- Complex multi-task learning scenarios
+When several labels describe the same impression, start with SharedBottom and check how well it learns each task. Compare MMOE and PLE to let tasks learn how much information to share. ESMM is suited to conversions that follow clicks. AITM passes information through a sequence of known funnel stages.
 
-## 6. Model Comparison
+## 7. Training and checking labels
 
-| Model | Complexity | Expressiveness | Efficiency | Use Cases |
-| --- | --- | --- | --- | --- |
-| SharedBottom | Low | Medium | High | Highly related tasks, limited resources |
-| ESMM | Low | Medium | High | CTR/CVR joint optimization, sample selection bias |
-| MMOE | Medium | High | Medium | Task conflicts, multi-task scenarios |
-| PLE | High | High | Low | Complex multi-task, negative transfer mitigation |
-| AITM | Medium | High | Medium | Task dependencies, adaptive information transfer |
+The [Ali-CCP tutorial](/tutorials/pipeline) has runnable training and evaluation examples. MMOE and PLE use two label columns, `[cvr, ctr]`. ESMM uses `[cvr, ctr, ctcvr]`, with `ctcvr = ctr * cvr`. Label the scores returned by `evaluate` in the same order to check each task independently.
 
-## 7. Usage Recommendations
+## 8. Reading multi-task validation results
 
-1. **Choose models based on task relationships**:
-   - For highly related tasks, use SharedBottom
-   - For task conflicts, use MMOE or PLE
-   - For task dependencies, use AITM
-   - For CTR/CVR joint optimization, use ESMM
+Suppose the model outputs `[cvr, ctr]`. Printing CTR first would label the conversion AUC as click AUC. Check that validation labels, prediction columns and printed names line up before comparing scores. Conversions are usually rarer than clicks, so also check that the validation set contains both positive and negative examples for each task.
 
-2. **Choose models based on computational resources**:
-   - With limited resources, use SharedBottom or ESMM
-   - With sufficient resources, try MMOE, PLE, or AITM
-
-3. **Choose models based on data volume**:
-   - With limited data, use simple models (e.g., SharedBottom)
-   - With large data, try more complex models (e.g., PLE, AITM)
-
-4. **Multi-task weight adjustment**:
-   - Adjust loss weights to balance task importance
-   - The currently usable adaptive method is `adaptive_params={"method": "uwl"}`.
-
-## 8. Complete Training Example
-
-```python
-import os
-import numpy as np
-
-from torch_rechub.models.multi_task import MMOE
-from torch_rechub.trainers import MTLTrainer
-from torch_rechub.utils.data import DataGenerator
-from torch_rechub.basic.features import SparseFeature, DenseFeature
-
-# 1. Define features
-common_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SparseFeature(name="city", vocab_size=100, embed_dim=16),
-    DenseFeature(name="age", embed_dim=1),
-    DenseFeature(name="income", embed_dim=1)
-]
-
-# 2. Prepare data
-# Assume x contains all features, y contains labels for two tasks
-x = {
-    "user_id": user_id_data,
-    "city": city_data,
-    "age": age_data,
-    "income": income_data
-}
-y = np.column_stack([task1_labels, task2_labels])
-
-# 3. Create data generator
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-# 4. Create model
-model = MMOE(
-    features=common_features,
-    task_types=["classification", "classification"],
-    n_expert=8,
-    expert_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
-    tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}
-    ]
-)
-
-# 5. Create trainer
-trainer = MTLTrainer(
-    model=model,
-    task_types=["classification", "classification"],
-    optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
-    adaptive_params={"method": "uwl"},  # currently usable adaptive weighting
-    n_epoch=50,
-    earlystop_patience=10,
-    device="cpu",
-    model_path="saved/mmoe"
-)
-
-# 6. Train model
-os.makedirs("saved/mmoe", exist_ok=True)
-trainer.fit(train_dl, val_dl)
-
-# 7. Evaluate model
-scores = trainer.evaluate(trainer.model, test_dl)
-print(f"Task 1 AUC: {scores[0]}")
-print(f"Task 2 AUC: {scores[1]}")
-
-# 8. Export ONNX model
-trainer.export_onnx("mmoe.onnx")
-
-# 9. Model prediction
-preds = trainer.predict(trainer.model, test_dl)
-print(f"Predictions shape: {np.array(preds).shape}")
-```
-
-## 9. FAQ
-
-### Q: How to handle data distribution differences between tasks?
-A: Try the following approaches:
-- Standardize or normalize data for each task
-- Use task-specific embedding layers
-- Adjust task weights to balance task importance
-- Use the currently supported UWL adaptive weighting.
-
-### Q: How to mitigate negative transfer in multi-task learning?
-A: Try the following approaches:
-- Use PLE model with task-specific and shared experts
-- Use attention mechanism to adaptively select information transfer between tasks
-- Reduce shared layer depth, increase task-specific layer depth
-- Try model selection strategies to choose appropriate task combinations
-
-### Q: How to choose appropriate task combinations?
-A: Consider the following factors:
-- Task correlation: Choose highly correlated task combinations
-- Task importance: Choose tasks more important to business
-- Data volume: Choose tasks with sufficient data
-- Computational resources: Consider model computational complexity
-
-### Q: How to evaluate multi-task model performance?
-A: Common evaluation metrics include:
-- Individual task metrics (e.g., AUC, F1, RMSE)
-- Weighted average of all task metrics
-- Pareto optimal analysis: Find the best balance among multiple tasks
-- Business metrics: Final business impact (e.g., CTR improvement, CVR improvement)
-
-### Q: How to tune multi-task model hyperparameters?
-A: Try the following approaches:
-- Grid search or random search: Tune expert count, network depth, dropout rate, etc.
-- Bayesian optimization: More efficient hyperparameter search
-- Transfer learning: Start from simple model hyperparameters
-- Rules of thumb: Expert count typically 4-16, network depth 2-4 layers
-
-## 10. Multi-Task Learning Applications in Recommendation Systems
-
-1. **E-commerce Recommendation**:
-   - Jointly optimize CTR, CVR, and average order value
-   - Optimize product recommendation, ad recommendation, personalized search
-
-2. **Content Recommendation**:
-   - Jointly optimize CTR, reading time, like rate, comment rate
-   - Optimize news recommendation, video recommendation, music recommendation
-
-3. **Social Media**:
-   - Jointly optimize friend recommendation, content recommendation, ad recommendation
-   - Optimize user retention, activity, engagement rate
-
-4. **Financial Recommendation**:
-   - Jointly optimize loan application rate, repayment rate, default rate
-   - Optimize financial product recommendation, credit card recommendation
-
-## 11. Current Implementation Boundaries
-
-- Models on this page consume structured `Feature` inputs; the project does not include text, image, or audio encoders.
-- Task count is configured explicitly through `task_types` or `n_task`. The current implementations target experiments with a small number of tasks and do not provide sparse gating or distributed training for hundreds or thousands of tasks.
-- UWL is the currently usable adaptive-loss method in `MTLTrainer`. `gradnorm` and `metabalance` cannot complete normal training in the current implementation and should not be enabled.
+When the two losses have very different scales, `MTLTrainer` can learn loss weights with `adaptive_params={"method": "uwl"}`. Start with the default weights and compare both variants on the same validation set.

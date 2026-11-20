@@ -1,50 +1,60 @@
 ---
-title: Data Pipeline
-description: Torch-RecHub data loading and preprocessing
+title: Loading data
+description: Batch encoded features and labels for training, or stream larger datasets from Parquet files.
 ---
 
-# Data Pipeline
+# Loading data
 
-Torch-RecHub provides common dataset classes, DataLoader generators, and preprocessing utilities. These components pass data that is **already encoded and padded** to models; category vocabularies, missing values, and split policy remain the user's responsibility.
+A ranking example contains a set of features and a label. Encode categories such as cities and movies as integers, then pad the histories in a batch to a common length. The DataLoader can now pass the examples to the trainer. [Feature definitions](/core/features)
+
+![Two movie impressions form a batch with one tensor per feature and a separate click-label tensor](/img/diagrams/en/data_pipeline.svg)
 
 ## Datasets
 
 ### TorchDataset
-Training/validation dataset with features and labels.
+
+`dataset[i]` returns the features and label for row `i`. The keys of `x` are feature names. The value at index `i` in every column must belong to the same record as `y[i]`.
 
 ```python
 from torch_rechub.utils.data import TorchDataset
-# x may be a feature-to-array/Tensor mapping or a DataFrame
+
+# x can be a DataFrame or a mapping from feature names to arrays or tensors.
 dataset = TorchDataset(x, y)
 ```
 
-`x` must support `.items()`, and each column must support row indexing. A feature dictionary or `pandas.DataFrame` is typical.
+If you pass a DataFrame, its columns must support indexing by row numbers starting at zero. A split may retain the original row index. Call `reset_index(drop=True)` or convert the columns to arrays first.
 
 ### PredictDataset
-Prediction-only dataset (features only).
+
+When you compute user or item embeddings, you often have only the features. `PredictDataset` returns a dictionary of features for one row.
 
 ```python
 from torch_rechub.utils.data import PredictDataset
+
+# A dataset for inference
 dataset = PredictDataset(x)
 ```
 
-## Data Generators
+## Data generators
 
 ### DataGenerator
-Build dataloaders for ranking / multi-task models.
+
+`DataGenerator` can randomly split your features and labels into three sets. The two fractions below set aside rows for training and validation. The remaining rows go to the test set.
 
 ```python
 from torch_rechub.utils.data import DataGenerator
 
+# Create the data generator.
 dg = DataGenerator(x, y)
+# Create the data loaders.
 train_dl, val_dl, test_dl = dg.generate_dataloader(
-    split_ratio=[0.7, 0.1],  # 70% train, 10% validation, remaining 20% test
-    batch_size=256,
-    num_workers=8,
+    split_ratio=[0.7, 0.1],  # 70% for training, 10% for validation and the remaining 20% for testing
+    batch_size=256,           # Examples per batch
+    num_workers=8             # Number of data-loading worker processes
 )
 ```
 
-`split_ratio` contains the train and validation fractions; the test set uses the remainder. If the data is already split, omit `split_ratio` and pass each split explicitly:
+If you have already split the data by time or business rules, construct `dg` with the training set. Pass the validation and test features and labels separately.
 
 ```python
 train_dl, val_dl, test_dl = dg.generate_dataloader(
@@ -56,44 +66,60 @@ train_dl, val_dl, test_dl = dg.generate_dataloader(
 )
 ```
 
-> The automatic path uses `torch.utils.data.random_split`. Call `torch.manual_seed(...)` before creating the DataLoaders when a reproducible split is required.
+The `split_ratio` option calls `torch.utils.data.random_split`. To reproduce the split, set `torch.manual_seed(...)` before creating the DataLoaders.
 
 ### MatchDataGenerator
-Build dataloaders for matching/retrieval models.
+
+Two-tower retrieval uses three loaders. `train_dl` supplies training examples. `test_dl` reads the user features in test-user order, and `item_dl` reads the item features in catalog order. Keeping these last two orders intact lets you map each output embedding back to its user or movie.
 
 ```python
 from torch_rechub.utils.data import MatchDataGenerator
 
+# Create the retrieval data generator.
 dg = MatchDataGenerator(x, y)
+# Create the data loaders.
 train_dl, test_dl, item_dl = dg.generate_dataloader(
-    x_test_user=x_test_user,
-    x_all_item=x_all_item,
-    batch_size=256,
-    num_workers=8,
+    x_test_user=x_test_user,  # Features for test users
+    x_all_item=x_all_item,    # Features for the item catalog
+    batch_size=256,           # Examples per batch
+    num_workers=8             # Number of data-loading worker processes
 )
 ```
 
 ## Utilities
 
 ### get_auto_embedding_dim
-Compute embedding dim from vocab size: ``int(floor(6 * num_classes**0.25))``.
+
+Choose an embedding width based on the number of categories.
 
 ```python
 from torch_rechub.utils.data import get_auto_embedding_dim
+
+# Choose an embedding width from the number of categories.
 embed_dim = get_auto_embedding_dim(num_classes=1000)
 ```
 
+`num_classes` is the category count. The returned width is `int(np.floor(6 * np.pow(num_classes, 0.25)))`.
+
 ### get_loss_func
-Return the default loss by task type. Classification returns `torch.nn.BCELoss`, so its input must be a probability in `[0, 1]`, not an unprocessed logit. Regression returns `torch.nn.MSELoss`.
+
+Select the loss for a classification or regression task.
 
 ```python
 from torch_rechub.utils.data import get_loss_func
-loss_fn = get_loss_func(task_type="classification")
+
+# Binary classification loss
+loss_func = get_loss_func(task_type="classification")
+# Regression loss
+loss_func = get_loss_func(task_type="regression")
 ```
 
-## Sequence Data
+- `task_type="classification"` returns `torch.nn.BCELoss`, which expects predicted probabilities in `[0, 1]`. Apply sigmoid first if your model returns logits.
+- `task_type="regression"` returns `torch.nn.MSELoss`.
 
-`SequenceDataGenerator` is used by next-item tasks such as HSTU and HLLM. It accepts four NumPy arrays with the same first dimension. Each batch is `(seq_tokens, seq_positions, seq_time_diffs, targets)`.
+## Sequence data
+
+`SequenceDataGenerator` prepares next-item examples for HSTU and HLLM. Its four NumPy arrays must have the same length along the first dimension. Each batch yields `(seq_tokens, seq_positions, seq_time_diffs, targets)`.
 
 ```python
 from torch_rechub.utils.data import SequenceDataGenerator
@@ -105,28 +131,26 @@ generator = SequenceDataGenerator(
     seq_time_diffs,
 )
 
-# Already split data: the return value is a one-element tuple
+# Already split: the return value is a one-element tuple.
 train_dl = generator.generate_dataloader(
     batch_size=32,
     num_workers=0,
 )[0]
 
-# Automatic splitting requires three ratios that sum to 1
+# For an automatic split, pass three proportions that add up to 1.
 train_dl, val_dl, test_dl = generator.generate_dataloader(
     batch_size=32,
     split_ratio=(0.7, 0.1, 0.2),
 )
 ```
 
-## Parquet Streaming Dataset
+## Streaming Parquet data
 
-In industrial scenarios, feature engineering is typically done by **PySpark** on big data clusters, with data volumes reaching GB to TB scale. Using `spark_df.toPandas()` directly causes Driver OOM.
+If your training data is already in Parquet files, read it one batch at a time. For example, you can give `ParquetIterableDataset` the `part-*.parquet` files written by Spark and skip collecting the entire table on one machine with `toPandas()`.
 
-Torch-RecHub provides `ParquetIterableDataset` for streaming Parquet files generated by Spark without loading all data into memory.
+### Install the dependency
 
-### Installation
-
-Parquet data loading requires the `bigdata` extra:
+Install the `bigdata` extra to read Parquet.
 
 ```bash
 python -m pip install "torch-rechub[bigdata]"
@@ -134,44 +158,42 @@ python -m pip install "torch-rechub[bigdata]"
 
 ### ParquetIterableDataset
 
-Inherits from `torch.utils.data.IterableDataset` with multi-worker support.
+The dataset below reads up to 1,024 rows at a time. Each dictionary it yields is already a batch, so set `batch_size=None` on the outer DataLoader. `split_label` separates the `label` column to produce the `(feature_dict, labels)` pair the ranking trainer expects.
 
 ```python
 from torch.utils.data import DataLoader
 from torch_rechub.data.dataset import ParquetIterableDataset
 
+# Create a streaming dataset.
 dataset = ParquetIterableDataset(
     ["/data/train1.parquet", "/data/train2.parquet"],
-    columns=["user_id", "item_id", "label"],  # Optional
-    batch_size=1024,
+    columns=["user_id", "item_id", "label"],  # Optional subset of columns to read
+    batch_size=1024,  # Maximum rows per batch
 )
 
-loader = DataLoader(dataset, batch_size=None, num_workers=4)
+# The dataset yields a batch at a time. Separate the label from the model inputs.
+def split_label(batch):
+    x = {name: value for name, value in batch.items() if name != "label"}
+    return x, batch["label"]
 
-for batch in loader:
-    user_id = batch["user_id"]  # torch.Tensor
-    item_id = batch["item_id"]  # torch.Tensor
-    label = batch["label"]      # torch.Tensor
+loader = DataLoader(dataset, batch_size=None, collate_fn=split_label)
 ```
 
-**Parameters:**
-- `file_paths`: List of Parquet file paths
-- `columns`: Column names to read; `None` reads all columns
-- `batch_size`: Rows per batch (default: 1024)
+Pass `loader` to `CTRTrainer.fit` to start training. To compute validation AUC after each epoch, use `DataGenerator` to prepare a validation loader with a defined length and call `trainer.fit(loader, val_dl)`. Use the same feature names and label meanings in both datasets. On Windows, define `split_label` at module level so worker processes can import it.
 
-**Features:**
-- **Streaming**: Uses PyArrow Scanner for constant memory usage
-- **Multi-worker**: Automatically partitions files across workers
-- **Type conversion**: Converts PyArrow arrays to PyTorch Tensors
-- **Nested arrays**: Supports Spark `Array` columns as 2D Tensors
+- `file_paths` lists the Parquet files to read.
+- `columns` selects which columns to read. The default, `None`, reads them all.
+- `batch_size` sets the maximum rows per batch and defaults to 1,024.
 
-### Working with Spark
+Multiple workers divide the files among themselves. With only one file, adding workers does not split that file into smaller pieces.
+
+### Read files written by Spark
 
 ```python
-# ========== Spark Side ==========
+# Write the files in Spark.
 # df.write.parquet("/data/train.parquet")
 
-# ========== PyTorch Side ==========
+# Read the files in PyTorch.
 import glob
 from torch.utils.data import DataLoader
 from torch_rechub.data.dataset import ParquetIterableDataset
@@ -181,28 +203,17 @@ dataset = ParquetIterableDataset(file_paths, batch_size=2048)
 loader = DataLoader(dataset, batch_size=None, num_workers=8)
 ```
 
-### Supported Types
+### Supported data types
 
-| Parquet/Arrow Type | Result |
-|-------------------|--------|
+| Parquet / Arrow type | PyTorch output |
+| --- | --- |
 | int8/16/32/64 | torch.float32 |
 | float32/64 | torch.float32 |
 | boolean | torch.float32 |
-| list/array | torch.Tensor (2D) |
+| list/array | 2D torch.Tensor |
 
-> **Note**: Nested arrays require equal row lengths; otherwise raises `ValueError`.
+Array columns, such as Spark's `Array<Float>`, must have the same length in every row. Unequal lengths raise `ValueError`.
 
-> **Type limits**: The current converter does not support Arrow string columns. Encode category strings as numeric IDs before writing Parquet. Every supported scalar column, including integer IDs, becomes `torch.float32`; models cast embedding inputs back to integer indices. Because `float32` cannot represent every integer above `2^24` exactly, remap large business IDs to compact contiguous indices first.
+The converter does not support Arrow string columns. Encode categories as numeric IDs before writing them to Parquet. All supported scalar columns, including integer IDs, become `torch.float32`, and the embedding layer casts its inputs back to integer indices. Since `float32` cannot represent every integer above `2^24` exactly, map large external IDs to compact, consecutive indices first.
 
-## Typical Flow
-
-![Data pipeline](/img/diagrams/data_pipeline.png)
-
-1. Define features (Dense/Sparse/Sequence).
-2. Load raw data.
-3. Encode categorical features (e.g., LabelEncoder).
-4. Process sequences (pad/truncate).
-5. Construct samples (e.g., negative sampling).
-6. Use DataGenerator, MatchDataGenerator, or SequenceDataGenerator to build dataloaders for the task.
-7. Train models with the trainers.
-
+For a complete ranking example, see [Prepare the Criteo inputs](/guide/quick_start#criteo-input). To build histories and retrieval examples from interaction records, see the [MovieLens retrieval tutorial](/tutorials/retrieval).

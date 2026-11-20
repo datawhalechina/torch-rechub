@@ -5,21 +5,13 @@ description: Torch-RecHub 生成式推荐模型详细介绍
 
 # 生成式推荐模型
 
-本页的“生成式推荐”指用序列模型预测或生成下一个 item token / 语义 ID。当前实现面向 next-item recommendation，并不生成推荐理由、商品文案或自然语言对话。
+给定一个用户看过的电影，下面的模型都围绕“下一部可能是哪部”来训练。HSTU 和 HLLM 给候选电影打分。TIGER 则逐段生成下一部电影的编码，这串编码叫语义 ID，可以先用 RQ-VAE 从电影向量中学出来。
 
 ## 1. HSTUModel
 
-### 功能描述
+HSTU 读取按时间排列的物品 ID。训练时，前两部电影用来预测第三部，前三部用来预测第四部，以此类推。不同长度的记录用 `0` 补齐，损失会忽略这些补位。
 
-HSTU（Hierarchical Sequential Transduction Units）是面向 next-item prediction 的自回归序列推荐模型。Torch-RecHub 中的 `HSTUModel` 接收 padding 后的 item token 序列，以及可选的逐位置时间差特征，并在每个序列位置输出 item 词表上的 logits。
-
-### 核心原理
-
-- **Eq. 2 UVQK 投影**：对联合 `UVQK` 投影先整体做一次 `SiLU`，再 split，因此 `U`、`V`、`Q`、`K` 都经过同一个非线性。
-- **Eq. 3 注意力偏置**：将 per-head 的桶化相对位置/时间偏置 `rab^{p,t}` 加到 attention scores，再做 `silu(scores) / max_seq_len`。
-- **Eq. 4 门控输出**：使用 `LayerNorm(A V) * U` 后接一个输出线性层，不再使用 concat-u/x 旁路，也没有额外 FFN。
-- **外部残差**：`HSTUBlock` 中每层按 `x = x + HSTULayer(x)` 包裹。
-- **生成式训练**：按 next-token 目标训练，并在 loss 中忽略 PAD token `0`。
+如果有交互时间，可以把每个位置的时间差一并传给模型。注意力得分会加上由相对位置和时间差查出的偏置，本实现的各个头共享这组偏置。核心层与论文公式的对应见 [HSTU 复现说明](/zh/blog/hstu_reproduction)。
 
 ### 使用方法
 
@@ -29,21 +21,21 @@ import torch
 from torch_rechub.models.generative import HSTUModel
 
 model = HSTUModel(
-    vocab_size=100000,
+    vocab_size=128,
     d_model=128,
     n_heads=4,
     n_layers=2,
     dqk=32,
     dv=32,
-    max_seq_len=200,
+    max_seq_len=16,
     num_time_buckets=128,
     time_bucket_unit="seconds",
 )
 
-seq_tokens = torch.randint(1, 100000, (32, 200))
+seq_tokens = torch.randint(1, 128, (2, 16))
 time_diffs = torch.zeros_like(seq_tokens)  # 相对查询时间的秒级时间差
 logits = model(seq_tokens, time_diffs)
-print(logits.shape)  # torch.Size([32, 200, 100000])
+print(logits.shape)  # torch.Size([2, 16, 128])
 ```
 
 ### 参数说明
@@ -64,23 +56,11 @@ print(logits.shape)  # torch.Size([32, 200, 100000])
 | time_bucket_divisor | float | 桶化后再除以该值，用于调节 bucket 范围 | 1.0 |
 | tie_embeddings | bool | 输出投影是否与 token embedding 共享权重 | True |
 
-### 适用场景
-
-- 大规模序列推荐
-- 长序列建模
-- next-item prediction
-
 ## 2. HLLMModel
 
-### 功能描述
+HLLM 也读用户的观看顺序，但每部电影的初始向量来自片名、类型等文本。先在训练前算好这些向量，再用冻结的向量表训练用户侧的 Transformer。
 
-`HLLMModel` 是一个轻量化的序列推荐实现：先在模型外用 LLM 生成 item embedding，然后冻结这张表，只训练用户序列 Transformer。它不会在 `forward` 中加载 BERT/LLM，也不接收 `user_features` / `item_features` 特征列表。
-
-### 核心原理
-
-- **离线 item 语义表**：`item_embeddings[token_id]` 必须与训练数据的 token ID 对齐，row 0 为 PAD
-- **用户序列模型**：位置编码、可选时间桶 embedding 和相对位置 bias
-- **余弦打分**：Transformer 输出与冻结 item embedding 归一化后做矩阵乘，返回全词表 logits
+词表把某部电影编码成 42 时，`item_embeddings[42]` 就必须存这部电影的向量。训练后，模型用用户历史的表示和候选电影表示计算余弦相似度。
 
 ### 使用方法
 
@@ -112,28 +92,20 @@ print(logits.shape)  # [32, 50, vocab_size]
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| item_embeddings | Tensor or str | `[vocab_size, d_model]` 的预计算 embedding，或 `torch.load` 可读的文件路径 | 必填 |
+| item_embeddings | Tensor or str | 按物品 ID 排列的二维向量表，或 `torch.load` 可读的文件路径 | 必填 |
 | vocab_size | int | 包含 PAD=0 的词表大小，必须等于 embedding 行数 | 必填 |
-| d_model | int | Transformer 维度，必须等于 embedding 列数 | 512 |
+| d_model | int | 用户编码器宽度。与原始物品向量宽度不同时需设置 `project_items=True` | 512 |
 | n_heads / n_layers | int | Transformer 头数 / 层数 | 8 / 4 |
 | max_seq_len | int | 最大序列长度 | 256 |
 | use_rel_pos_bias | bool | 是否使用相对位置 bias | True |
 | use_time_embedding | bool | 是否使用时间差 embedding | True |
 | temperature | float | 余弦 logits 温度 | 0.07 |
 
-### 适用场景
-
-- 已能离线生成且按 token ID 对齐 item embedding 的场景
-- next-item 序列预测
-- 希望固定 item 语义空间、只训练用户序列塔的场景
-
 ## 3. RQVAEModel
 
-### 功能描述
+RQ-VAE 接收已有的物品向量，为每个物品找出一组离散编号。第一级码本选出最接近的向量，下一级再编码剩下的误差。这些编号可以写成 `<a_12><b_7><c_91>`，作为 TIGER 训练时的语义 ID。
 
-RQ-VAE 将每个 item 的连续 embedding 经过多级残差向量量化，转换为离散 codebook 索引。这些索引再格式化为 `<a_12><b_7><c_91>` 一类语义 ID，是 TIGER 的 item token 来源。
-
-### 最小训练与语义 ID 链路
+### 用 RQ-VAE 为每个物品生成语义 ID
 
 ```python
 import os
@@ -187,34 +159,24 @@ semantic_ids = model.generate_semantic_ids(
 
 ## 4. TIGERModel
 
-### 功能描述
+TIGER（Transformer Index for GEnerative Recommenders）把用户看过的电影转换成语义 ID，送给 T5，再逐个预测下一部电影的 ID 片段。
 
-TIGER（Transformer Index for GEnerative Recommenders）把推荐建模成"生成下一个 item 的语义 ID"的序列到序列任务。每个 item 先由 RQ-VAE 量化成一串 codebook token（语义 ID，如 `<a_1><b_3><c_5>`），TIGER 基于 T5 自回归地生成下一个 item 的语义 ID，再通过前缀受限的 beam search 约束到合法 item 上。`TIGERModel` 继承自 `transformers` 的 `T5ForConditionalGeneration`。
-
-### 核心原理
-
-- **语义 ID**：用 RQ-VAE 对 item embedding 做多级残差量化，得到每个 item 的 codebook token 序列，相似 item 共享前缀，天然带有层次结构。
-- **序列到序列**：输入是用户历史 item 的语义 ID 拼接，标签是下一个 item 的语义 ID，按 T5 的 teacher-forcing 交叉熵训练。
-- **新增 token**：训练前把所有语义 ID token 加入 tokenizer 并调用 `resize_token_embeddings`，否则 `<a_1>` 这类 token 会被 T5 切成子词。
-- **受限生成**：推理时用 `Trie` 构建 `prefix_allowed_tokens_fn`，保证 beam search 只生成语义 ID 表中合法的 item。
+假设片库中以 `<a_1>` 开头的 ID 只接 `<b_3>` 或 `<b_7>`，生成第一段后就只允许从这两段中选。示例把所有电影的语义 ID 放进一棵前缀树，在每步解码时查出可以接在后面的 token。
 
 ### 使用方法
 
-完整工作流（生成 toy 数据 / 训练 / 测试，以及真实数据的 RQ-VAE → TIGER 流水线）见 [TIGER 复现说明](/zh/blog/tiger_reproduction) 与示例脚本 `examples/generative/run_tiger_movielens.py`、`run_tiger_amazon_books.py`。模型最小用法：
+下面用三个语义 ID 片段构造一个小型 T5，看看模型需要怎样的词表和配置。要训练和评估这个模型，可以顺着 [TIGER 复现说明](/zh/blog/tiger_reproduction) 先跑合成数据，再换成 MovieLens 或 Amazon Books。
 
 ```python
-from transformers import T5Config, T5Tokenizer
-
+from transformers import T5Config
 from torch_rechub.models.generative.tiger import TIGERModel
 
-tokenizer = T5Tokenizer.from_pretrained("t5-small")
-tokenizer.add_tokens(["<a_1>", "<b_3>", "<c_5>"])  # 语义 ID token
-
-config = T5Config.from_pretrained("t5-small")
-config.vocab_size = len(tokenizer)
+tokenizer = TIGERModel.build_tokenizer(["<a_1>", "<b_3>", "<c_5>"])
+config = T5Config(vocab_size=len(tokenizer), d_model=128, d_ff=512, num_layers=2,
+                  num_heads=4, pad_token_id=tokenizer.pad_token_id,
+                  eos_token_id=tokenizer.eos_token_id, decoder_start_token_id=tokenizer.pad_token_id)
 model = TIGERModel(config)
 model.set_hyper(temperature=1.0)
-model.resize_token_embeddings(len(tokenizer))
 ```
 
 ### 参数说明
@@ -224,29 +186,16 @@ model.resize_token_embeddings(len(tokenizer))
 | config | T5Config | T5 配置，其中 `vocab_size` 需为加入语义 ID token 之后的词表大小 | 必填 |
 | temperature | float | 通过 `set_hyper` 设置，用于缩放 logits 的温度 | 1.0 |
 
-### 适用场景
-
-- 基于语义 ID 的生成式检索
-- item 数量极大、需要压缩 item 表示的场景
-- 希望用多段离散 token 表示 item 的序列推荐实验
-
 ## 5. 模型比较
 
-| 模型 | 复杂度 | 表达能力 | 计算效率 | 适用场景 |
-| --- | --- | --- | --- | --- |
-| HSTUModel | 中 | 高 | 中 | next-item 预测、长序列建模 |
-| HLLMModel | 中 | 中 | 中 | 使用预计算 LLM item embedding 的序列推荐 |
-| RQVAEModel | 中 | 中 | 中 | 将连续 item embedding 量化为 TIGER 语义 ID |
-| TIGERModel | 高 | 高 | 中 | 基于语义 ID 的生成式检索、超大 item 空间 |
+| 手头的数据 | 训练目标 | 得到什么 |
+| --- | --- | --- |
+| 用户交互序列，可附带时间戳 | HSTU 根据历史预测下一个物品 | 候选物品的分数 |
+| 交互序列和按物品 ID 排好的文本向量 | HLLM 学习怎样利用这些向量预测下一步 | 用户历史与候选物品的匹配分数 |
+| 物品向量 | RQ-VAE 学习重建这些向量 | 物品 ID 到语义 ID 的对照表 |
+| 交互序列和语义 ID 对照表 | TIGER 预测下一件物品的语义 ID | 可以在对照表里找到的候选编码 |
 
-## 6. 使用建议
-
-1. 直接对 item token 做 next-item 预测时，使用 HSTUModel。
-2. 已有按 token ID 对齐的 item embedding，且希望冻结 item 语义空间时，使用 HLLMModel。
-3. 使用 TIGER 前，先用 RQVAEModel 生成语义 ID；量化和生成两个阶段必须复用同一份 item 行号映射。
-4. HSTU/HLLM 的输出是 `[batch, seq_len, vocab_size]`，词表较大时需先估算 logits 的显存占用。
-
-## 7. 代码示例：完整的生成式推荐模型训练流程
+## 用 SeqTrainer 训练 HSTU
 
 ```python
 import os
@@ -319,9 +268,8 @@ test_loss, top1_acc = trainer.evaluate(test_dl)
 print(f"test_loss={test_loss:.4f}, top1_acc={top1_acc:.4f}")
 ```
 
-## 8. 当前实现边界
+## 显存与评估
 
-- `SeqTrainer` 训练 HSTU/HLLM，并报告 loss 与 token-level top-1 accuracy；它没有内置 Recall@K、NDCG@K、BLEU 或 ROUGE 评估。
-- RQ-VAE 与 TIGER 是两阶段流程：先离线量化 item embedding，再训练 TIGER。项目不会自动生成原始 item embedding。
-- 当前训练器可选用单机 `DataParallel`，但没有 DDP、多机分布式、流水线并行或自动混合精度训练流程。
-- 本模块没有内置生产服务、TensorRT、边缘部署、自然语言内容生成或多模态推荐能力。需要这些能力时，应在项目外自行实现并验证。
+HSTU 和 HLLM 对全词表打分时，分数张量的形状是 `[批大小, 序列长度, 词表大小]`。如果词表占用太多显存，单卡训练可以用 `loss_type="sampled_softmax"`，例如 `loss_params={"num_negatives": 32}` 表示每个目标采 32 个负物品。CUDA 上还可以开启 `amp=True`，或用 `accumulation_steps` 分几批累积梯度再更新。
+
+`SeqTrainer.evaluate()` 返回损失和留出目标的 Top-1 准确率。要看前十个推荐里有哪些物品，可以用 `predict(data_loader, top_k=10)` 分块检索。数据准备、单卡参数以及脚本打印的 Hit@K 和 NDCG@K 见 [HSTU](/zh/blog/hstu_reproduction)、[HLLM](/zh/blog/hllm_reproduction) 和 [TIGER](/zh/blog/tiger_reproduction) 的运行说明。

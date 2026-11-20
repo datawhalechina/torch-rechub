@@ -5,7 +5,7 @@ description: Torch-RecHub multi-task learning tutorial covering Ali-CCP data pre
 
 # Multi-Task Learning Tutorial
 
-This tutorial uses the built-in `Ali-CCP` sample dataset to introduce the actual multi-task training flow in Torch-RecHub. All code snippets assume you are running from the **repository root**.
+Each Ali-CCP impression records two outcomes: whether the user clicked and whether they purchased. We'll train MMOE and PLE on the same samples and compare their AUCs for each task. Then we'll train ESMM to see how its labels capture the relationship between clicks and purchases. Run the examples from the repository root.
 
 ## 1. Data Preparation
 
@@ -18,7 +18,8 @@ df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
 df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
 df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
 
-# Concatenate train / val / test first so feature definitions stay consistent.
+# These samples share a category encoding and already have train, validation and test splits.
+# For raw business data, fit the vocabulary on the training split.
 train_idx = df_train.shape[0]
 val_idx = train_idx + df_val.shape[0]
 
@@ -40,41 +41,37 @@ sparse_cols = [
     if col not in dense_cols and col not in ["cvr_label", "ctr_label", "ctcvr_label"]
 ]
 
-# In multi-task learning, all tasks share the same bottom input feature set by default.
-features = [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
-    DenseFeature(col) for col in dense_cols
-]
-
-label_cols = ["cvr_label", "ctr_label"]
-used_cols = sparse_cols + dense_cols
+def make_features():
+    return [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
+        DenseFeature(col) for col in dense_cols
+    ]
 ```
 
-### 3. Build train / validation / test loaders
+### 3. Prepare features and labels for the model
+
+`label_cols` determines the output order. We put purchases first and clicks second, so column 0 of `y_train` holds purchase labels and column 1 holds click labels. Read predictions and AUCs in the same order.
 
 ```python
 from torch_rechub.utils.data import DataGenerator
 
-# In multi-task settings, y becomes a 2D label matrix instead of a single label vector.
-x_train = {name: data[name].values[:train_idx] for name in used_cols}
-y_train = data[label_cols].values[:train_idx]
+def make_loaders(feature_cols, label_cols):
+    def split(part):
+        return {name: part[name].to_numpy() for name in feature_cols}, part[label_cols].to_numpy()
 
-x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
-y_val = data[label_cols].values[train_idx:val_idx]
+    x_train, y_train = split(data.iloc[:train_idx])
+    x_val, y_val = split(data.iloc[train_idx:val_idx])
+    x_test, y_test = split(data.iloc[val_idx:])
+    return DataGenerator(x_train, y_train).generate_dataloader(
+        x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=256,
+    )
 
-x_test = {name: data[name].values[val_idx:] for name in used_cols}
-y_test = data[label_cols].values[val_idx:]
-
-dg = DataGenerator(x_train, y_train)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    x_val=x_val,
-    y_val=y_val,
-    x_test=x_test,
-    y_test=y_test,
-    batch_size=1024,
-)
+label_cols = ["cvr_label", "ctr_label"]
+train_dl, val_dl, test_dl = make_loaders(sparse_cols + dense_cols, label_cols)
 ```
 
 ## 2. MMOE
+
+The two tasks share a pool of expert networks. Each task has a gate that learns how much weight to give each expert's output when predicting a click or a purchase.
 
 ```python
 from torch_rechub.models.multi_task import MMOE
@@ -82,7 +79,7 @@ from torch_rechub.trainers import MTLTrainer
 
 # MMOE: shared experts + task-specific gates
 model = MMOE(
-    features=features,
+    features=make_features(),
     task_types=["classification", "classification"],
     n_expert=8,
     expert_params={"dims": [16]},
@@ -118,13 +115,14 @@ print(f"Test AUC: {auc}")  # [cvr_auc, ctr_auc]
 
 ## 3. PLE
 
+PLE has separate experts for clicks and purchases as well as shared experts. Reuse the DataLoaders above and call `make_features()` again so PLE starts with its own embedding weights.
+
 ```python
 from torch_rechub.models.multi_task import PLE
 
-# PLE is often more stable than MMOE when task differences are larger,
-# because it separates shared and task-specific experts.
+# Give PLE fresh feature objects. Its experts include both shared and task-specific networks.
 model = PLE(
-    features=features,
+    features=make_features(),
     task_types=["classification", "classification"],
     n_level=1,
     n_expert_specific=2,
@@ -156,10 +154,7 @@ mtl_trainer.fit(train_dl, val_dl)
 
 ## 4. ESMM
 
-`ESMM` differs from `MMOE / PLE` in two ways:
-
-- it only uses sparse features
-- its label order is usually `["cvr_label", "ctr_label", "ctcvr_label"]`
+This example splits the categorical fields into user features and item features. In addition to the purchase and click labels, compute `ctcvr_label`, which is 1 when the impression led to both a click and a purchase. Use the following column order for training, validation and testing.
 
 ```python
 from torch_rechub.models.multi_task import ESMM
@@ -171,94 +166,29 @@ user_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col i
 item_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in item_cols]
 
 label_cols = ["cvr_label", "ctr_label", "ctcvr_label"]
-x_train = {name: data[name].values[:train_idx] for name in sparse_cols}
-y_train = data[label_cols].values[:train_idx]
-```
+esmm_train, esmm_val, esmm_test = make_loaders(sparse_cols, label_cols)
 
-```python
-# ESMM estimates CTR / CVR / CTCVR jointly from user and item feature towers.
 model = ESMM(
-    user_features,
-    item_features,
-    cvr_params={"dims": [16, 8]},
-    ctr_params={"dims": [16, 8]},
+    user_features, item_features,
+    cvr_params={"dims": [16, 8]}, ctr_params={"dims": [16, 8]},
 )
-```
-
-## 5. Trainer Interface
-
-```python
-from torch_rechub.trainers import MTLTrainer
-
-trainer = MTLTrainer(
-    model,
-    task_types=["classification", "classification"],
-    optimizer_params={"lr": 1e-3},
-    regularization_params={"embedding_l2": 0.0, "dense_l2": 0.0},
-    adaptive_params=None,   # Optional: {"method": "uwl"}
-    n_epoch=10,
-    earlystop_taskid=0,
-    earlystop_patience=10,
-    device="cpu",
-    model_path="./saved/mtl",
-)
-```
-
-Only equal weighting (`None`) and UWL are currently recommended. The `gradnorm` / `metabalance` branches in `MTLTrainer.train_one_epoch()` reference an unassigned `loss` before regularization is added and are not usable configurations.
-
-ESMM is a special case: it returns `[cvr, ctr, ctcvr]`. Build its DataLoader with three label columns and configure the trainer as follows:
-
-```python
+os.makedirs("./saved/esmm", exist_ok=True)
 esmm_trainer = MTLTrainer(
-    model,
-    task_types=["classification", "classification", "classification"],
-    optimizer_params={"lr": 1e-3},
-    n_epoch=10,
-    device="cpu",
-    model_path="./saved/esmm",
+    model, task_types=["classification"] * 3, n_epoch=2,
+    device="cpu", model_path="./saved/esmm",
 )
+esmm_trainer.fit(esmm_train, esmm_val)
+scores = esmm_trainer.evaluate(esmm_trainer.model, esmm_test)
+print(dict(zip(label_cols, scores)))
 ```
 
-## 6. Evaluation and Tuning Suggestions
+For example, a click without a purchase gives `[0, 1, 0]`. The model outputs CVR, CTR and CTCVR in that order. The loss uses CTR and CTCVR, and evaluation returns three scores in the same order as the columns.
 
-### 1. Evaluation output
+## 5. How do I read the evaluation results?
 
-```python
-scores = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
-print(scores)
-```
+For MMOE and PLE, `evaluate()` returns purchase AUC first and click AUC second. The bundled validation and test sets each contain 50 rows and just one purchase. Moving that one row up or down the ranking can change purchase AUC substantially. Check the positive counts for each task before comparing models on your own data.
 
-`evaluate()` returns a list ordered by `task_types`, for example:
-
-- `[cvr_auc, ctr_auc]`
-- or three task scores in the ESMM case
-
-### 2. What to tune first
-
-- `MMOE`: start with `n_expert`
-- `PLE`: start with `n_level / n_expert_specific / n_expert_shared`
-- if task imbalance is obvious: try `adaptive_params={"method": "uwl"}`
-- if multi-task AUC is unstable: reduce the learning rate first, then shrink expert/tower dimensions
-
-## 7. FAQ
-
-### Q1: Why not use `from torch_rechub.utils import DataGenerator` here?
-
-Because `DataGenerator` lives in `torch_rechub.utils.data`, not in the top-level `torch_rechub.utils` namespace.
-
-### Q2: Why use `n_epoch` instead of `n_epochs`?
-
-The actual parameter name in `MTLTrainer` is `n_epoch`.
-
-### Q3: Why is there no `evaluate_multi_task()` helper?
-
-The framework directly uses `MTLTrainer.evaluate(model, data_loader)`, which returns a list of task scores.
-
-### Q4: Why call `os.makedirs(...)` before training?
-
-`MTLTrainer` does not create `model_path` automatically, so the examples create the save directory explicitly.
-
-### Q5: Where should I go next?
+To change the number or depth of the experts, see the individual model tutorials.
 
 - [MMOE tutorial](/tutorials/models/multi_task/mmoe)
 - [PLE tutorial](/tutorials/models/multi_task/ple)

@@ -1,13 +1,13 @@
 ---
 title: YoutubeDNN Tutorial
-description: Complete tutorial for the YoutubeDNN deep retrieval model
+description: Train YoutubeDNN on candidate movies and export user and movie embeddings separately
 ---
 
 # YoutubeDNN Tutorial
 
 ## 1. Model Overview and Use Cases
 
-YoutubeDNN is a deep neural retrieval model proposed by Google at RecSys 2016 and is one of the core components of the YouTube recommendation system. Unlike DSSM, YoutubeDNN uses **list-wise training** (global ranking with Softmax). In the original paper, the item tower directly uses an embedding rather than passing it through a DNN.
+YoutubeDNN uses a user's attributes and viewing history to compute a user vector. Each movie vector comes directly from the movie ID embedding table. During training, the model picks the observed movie from a list of candidates. At recommendation time, the same user vector can search the whole catalog.
 
 **Paper**: [Deep Neural Networks for YouTube Recommendations](https://dl.acm.org/doi/10.1145/2959100.2959190)
 
@@ -17,23 +17,13 @@ YoutubeDNN is a deep neural retrieval model proposed by Google at RecSys 2016 an
   <img src="/img/models/youtube_dnn_arch.png" alt="YoutubeDNN Model Architecture" width="400"/>
 </div>
 
-- **User Tower**: maps user attributes and behavior sequences to a user embedding through a DNN
-- **Item Tower**: directly uses item embeddings (without a DNN)
-- **Training**: list-wise training with Softmax and negative sampling
-- **Negative Sampling**: this tutorial uses `generate_seq_feature_match(..., mode=2)` to generate an explicit `neg_items` list; the model applies sampled softmax to the positive item and these negatives
-
-### Suitable Scenarios
-
-- Retrieval from a large candidate set
-- Scenarios with rich user behavior sequences
-- Video and content recommendation systems
-- Scenarios that require list-wise ranking optimization
+The user network on the left produces one vector. On the right, positive and negative movies share one embedding table. Both sides must use the same output width to compute similarity.
 
 ---
 
 ## 2. Data Preparation and Preprocessing
 
-This tutorial uses the **MovieLens-1M** dataset. YoutubeDNN uses `mode=2` to generate list-wise training data containing one positive item and multiple negative items.
+This MovieLens example uses `mode=2`. With `neg_ratio=3`, each row has four candidates: the observed movie first, followed by three sampled negatives. The target is the candidate position `0`.
 
 ```python
 import os
@@ -90,12 +80,12 @@ user_features = [
 ]
 user_features += [
     SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"],
-                    embed_dim=16, pooling="mean", shared_with="movie_id")
+                    embed_dim=16, pooling="mean", shared_with="movie_id", padding_idx=0)
 ]
 
 # Item features (movie_id embedding only)
 item_features = [
-    SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16)
+    SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, padding_idx=0)
 ]
 
 # Negative-item feature
@@ -133,7 +123,7 @@ model = YoutubeDNN(
 ### 3.2 Parameter Details
 
 | Parameter | Type | Description | Recommended Value |
-|-----------|------|-------------|-------------------|
+|------|------|------|--------|
 | `user_features` | `list[Feature]` | User-side features | User attributes + sequence |
 | `item_features` | `list[Feature]` | Positive-item features | Item ID |
 | `neg_item_feature` | `list[Feature]` | Negative-item features | `SequenceFeature` + `pooling="concat"` |
@@ -172,7 +162,7 @@ trainer.fit(train_dl)
 ### DSSM vs. YoutubeDNN Training Modes
 
 | Item | DSSM (`mode=0`) | YoutubeDNN (`mode=2`) |
-|------|-----------------|-----------------------|
+|--------|--------------|---------------------|
 | Training objective | Point-wise (BCE) | List-wise (Softmax) |
 | Negative sampling | Independent negative samples | A list containing one positive and multiple negative items |
 | Labels | 0/1 | Always 0 (the first item in the list is positive) |
@@ -202,10 +192,7 @@ print(f"Item Embedding: {item_embedding.shape}")
 
 ## 6. Tuning Recommendations
 
-1. **User Tower dimensions**: YoutubeDNN's User Tower dimensions should decrease layer by layer (for example, `[128, 64, 16]`); the final dimension determines the embedding size
-2. **Number of negative samples**: `neg_ratio=3~10`; more negatives can often improve quality but increase training time
-3. **Sequence length**: `seq_max_len=50` is a good starting point and can be adjusted according to the actual user-behavior distribution
-4. **Temperature**: as with DSSM, `0.02` is a recommended starting point
+The user network's output width and the movie `embed_dim` are both 16 here. Increasing `neg_ratio` adds more candidate movies and more similarity calculations per training example. `seq_max_len` sets how many past interactions the user tower can see.
 
 ### 6.1 Vector Retrieval and Deployment
 
@@ -230,7 +217,7 @@ indices, distances = faiss_index.query(user_embedding[0].cpu().numpy().astype(np
 faiss_index.save_index("youtube_dnn_item.index")
 ```
 
-> For **more vector-retrieval details**, see section “6.2 Vector Retrieval and Deployment” in the [DSSM tutorial](/en/tutorials/models/matching/dssm), which explains each backend's dependencies and implementation boundaries.
+> For **more vector-retrieval details**, see section “6.2 Vector Retrieval and Deployment” in the [DSSM tutorial](/tutorials/models/matching/dssm), which explains each backend's dependencies and implementation boundaries.
 
 ---
 
@@ -277,98 +264,24 @@ exporter.export("youtube_item_tower.onnx", mode="item")
 ## 9. FAQ and Troubleshooting
 
 ### Q1: What are the main differences between YoutubeDNN and DSSM?
-
-- **Different training objectives**: DSSM is point-wise, whereas YoutubeDNN is list-wise
-- **Different Item Towers**: DSSM has a DNN in its Item Tower, whereas YoutubeDNN only uses an embedding
-- **Different loss functions**: DSSM uses BCE, whereas YoutubeDNN uses Softmax
+This YoutubeDNN example computes cross-entropy over a candidate list. The DSSM tutorial scores individual user–movie pairs by default and also supports in-batch sampling. The item towers differ as well: YoutubeDNN looks up the movie ID embedding directly, while DSSM feeds several movie fields through an item tower.
 
 ### Q2: Why does `y_train` contain only zeros?
-
 In list-wise (`mode=2`) training, label `0` means that the item in the **first position** of the list is positive. The model must learn to rank that positive item above the negatives.
 
 ### Q3: Why does `neg_item_feature` use `pooling="concat"`?
-
 The negative samples form a list of multiple items. `pooling="concat"` preserves them in a `[batch_size, n_neg, embed_dim]` tensor for the list-wise computation.
 
 ### Q4: How can I export ONNX models for online deployment?
-
 Use `ONNXExporter` to export the User and Item Towers separately. Run the User Tower with ONNX Runtime online, then retrieve items from a vector index such as Faiss or Milvus.
 
 ---
 
-## Complete Example
+## Run the example script
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder
+Run this from the repository root. The script saves the ID maps and weights, then evaluates the recommendations.
 
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.models.matching import YoutubeDNN
-from torch_rechub.trainers import MatchTrainer
-from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
-
-
-def main():
-    torch.manual_seed(2022)
-    save_dir = "./saved/youtube_dnn/"
-    os.makedirs(save_dir, exist_ok=True)
-
-    data = pd.read_csv("examples/matching/data/ml-1m/ml-1m_sample.csv")
-    data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
-    sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', 'cate_id']
-    user_col, item_col = "user_id", "movie_id"
-
-    feature_max_idx = {}
-    for feature in sparse_features:
-        lbe = LabelEncoder()
-        data[feature] = lbe.fit_transform(data[feature]) + 1
-        feature_max_idx[feature] = data[feature].max() + 1
-
-    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
-    item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
-
-    df_train, df_test = generate_seq_feature_match(
-        data, user_col, item_col, time_col="timestamp",
-        item_attribute_cols=[], sample_method=1, mode=2, neg_ratio=3, min_item=0
-    )
-    x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-    y_train = np.array([0] * df_train.shape[0])
-    x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-
-    user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
-    user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id")]
-    item_features = [SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16)]
-    neg_item_feature = [SequenceFeature("neg_items", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="concat", shared_with="movie_id")]
-
-    all_item = df_to_dict(item_profile)
-    test_user = x_test
-
-    dg = MatchDataGenerator(x=x_train, y=y_train)
-    model = YoutubeDNN(user_features, item_features, neg_item_feature, user_params={"dims": [128, 64, 16]}, temperature=0.02)
-
-    trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-                           n_epoch=10, device="cpu", model_path=save_dir)
-
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
-    trainer.fit(train_dl)
-
-    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
-    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
-    print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
-
-    # Vector retrieval
-    annoy = Annoy(n_trees=10)
-    annoy.fit(item_embedding)
-    for i in range(min(5, len(user_embedding))):
-        indices, distances = annoy.query(user_embedding[i], n=10)
-        print(f"User {i} -> Top-10 Items: {indices}")
-
-
-if __name__ == "__main__":
-    main()
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_youtube_dnn.py --epoch 1 --device cpu
 ```

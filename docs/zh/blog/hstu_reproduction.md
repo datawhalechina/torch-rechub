@@ -5,11 +5,9 @@ description: Meta HSTU 模型在 torch-rechub 中的复现说明，包括架构�
 
 # HSTU 模型在 torch-rechub 中的复现说明
 
-本文件说明当前 `torch-rechub` 中 HSTU（Hierarchical Sequential Transduction Units）的实现状态。核心层已经按论文 Eq. 2-4 和 Meta reference 的主要路径对齐：联合 UVQK 投影先做 SiLU、attention scores 加 `rab^{p,t}`、输出侧只保留 `f_2(Norm(AV) * U)`，层间残差放在 `HSTUBlock` 外部。
+HSTU 读入用户按时间排列的观看记录，预测下一部电影。它既利用顺序，也能利用两次观看隔了多久。第一次运行可先看下面的 MovieLens 命令，检查训练后是否打印了 Hit@K 和 NDCG@K。想对照论文读源码，再从第 2 节的三条公式看起。
 
-当前实现面向单卡学习与小规模复现，可通过 `sampled_softmax`、AMP 和梯度累积降低训练显存。核心层遵循 HSTU 的计算路径，但时间偏置仍使用当前事件间的时间差，数据处理和训练配置也不等同于官方实验；不承诺论文指标或官方 checkpoint 兼容。核心层修正前的本项目权重需要重新训练。
-
----
+这里用单任务的下一物品预测来复现 HSTU 核心层。位置和时间的处理、数据切分、训练预算与原论文都有差异。早期版本用过另一种核心层输出结构，升级这类旧实验时需要重新训练。
 
 ## 1. 模块划分
 
@@ -29,9 +27,9 @@ description: Meta HSTU 模型在 torch-rechub 中的复现说明，包括架构�
   - `torch_rechub/trainers/seq_trainer.py`：`SeqTrainer`。
   - `examples/generative/run_hstu_movielens.py`、`examples/generative/run_hstu_amazon_books.py`：训练与 ranking 评估示例。
 
-### 最小复现命令
+### 在 MovieLens 上跑一轮训练
 
-以下命令均从仓库根目录执行。`processed/` 数据不是仓库内置样本，而是预处理脚本生成的目录：
+从仓库根目录先运行预处理，生成 `processed/` 中的词表和训练数据，再启动训练。
 
 ```bash
 pip install -e .
@@ -39,25 +37,22 @@ pip install -e .
 # 缺少 MovieLens 原始文件时会自动下载；已有文件可加 --no_download
 python examples/generative/data/ml-1m/preprocess_ml_hstu.py
 
-# CPU 冒烟运行；正式实验通常改用 --device cuda 和更多 epoch
+# 在 CPU 上跑一个真实数据 epoch
 mkdir -p outputs/hstu_ml
 python examples/generative/run_hstu_movielens.py \
     --device cpu --epoch 1 --batch_size 16 \
     --save_dir outputs/hstu_ml
 ```
 
-Amazon Books 对应命令为：
+使用单张 CUDA 卡时，可以在相同的 MovieLens 预处理结果上运行下面的起步配置。每批 8 条历史，保留最近 32 次交互，每个目标采 32 个负物品，每两批更新一次参数。训练结束后脚本还会在留出的物品上打印 Hit@K 和 NDCG@K。
 
 ```bash
-python examples/generative/data/amazon-books/preprocess_amazon_books.py \
-    --data_source bytedance
-mkdir -p outputs/hstu_amazon
-python examples/generative/run_hstu_amazon_books.py \
-    --device cuda --epoch 3 --batch_size 64 \
-    --save_dir outputs/hstu_amazon
+python examples/generative/run_hstu_movielens.py --device cuda --epoch 1 --batch_size 8 --max_seq_len 32 --loss_type sampled_softmax --num_negatives 32 --accumulation_steps 2 --amp --save_dir outputs/hstu_ml
 ```
 
-预处理器会重写输出目录中的 `vocab.pkl` 与三个 split 文件。要保留已有产物，请先备份或通过 `--output_dir` 写到新目录。训练 Amazon Books 时会生成 `[B, L, V]` 全词表 logits；脚本默认参数以约 24 GB GPU 为参考，显存不足时优先降低 `--batch_size` 和 `--max_seq_len`。
+在 RTX 5080（16 GB）上，用 MovieLens-1M 的用户 1–32、每人最近最多 24 条交互验证了上述参数。子集含 578 部电影，训练、验证、测试各 32 条用户序列。PyTorch 统计的峰值张量显存约 20 MiB，包含训练和评估，不含驱动、CUDA 上下文与缓存保留量。完整数据集需按实际词表和序列长度测量。
+
+Amazon Books 使用 `examples/generative/data/amazon-books/preprocess_amazon_books.py` 生成输入，训练脚本为 `examples/generative/run_hstu_amazon_books.py`。Amazon Books 的训练脚本也支持上述单卡采样参数。采用默认交叉熵时，训练开销随 `[batch, 序列长度, 词表大小]` 增长。预处理会写入词表和三个数据切分，新实验请选独立输出目录。
 
 ---
 
@@ -71,7 +66,7 @@ python examples/generative/run_hstu_amazon_books.py \
 proj_out = F.silu(self.proj1(self.norm_in(x)))
 ```
 
-这里的 `SiLU` 作用在完整 `UVQK` 投影上，然后再 split。因此 `U`、`V`、`Q`、`K` 四路都经过同一个非线性，避免只对 gate 侧单独激活。
+注意两步的顺序：先对完整投影做 `SiLU`，再拆成四组。因此 `U`、`V`、`Q`、`K` 都经过了同一个非线性变换。
 
 ### 2.2 Eq. 3：attention score 加 `rab^{p,t}`
 
@@ -84,12 +79,7 @@ attn_weights = silu(scores) / max_seq_len
 AV = attn_weights @ V
 ```
 
-关键点：
-
-- `rab^{p,t}` 是所有 head 共享的可学习 bias，来自相对位置差和相对时间差的桶化结果。
-- bias 加在 attention scores 上，而不是加到输入 token embedding 上。
-- HSTU 使用 `silu(scores) / N`，不是 Transformer 标准 softmax。
-- causal mask 会阻止当前位置看未来 token；padding mask 会屏蔽 PAD 作为 key 的位置。
+同样两个物品，隔一天出现和隔一年出现，模型可以学到不同的偏置。`rab` 把相对位置差和时间差映射到对应的偏置值，加到注意力得分上，所有注意力头共用这张表。接着用 `silu(scores) / N` 计算权重。掩码让每个位置只看当前及更早的有效物品，跳过补位。
 
 `RelativeBucketedTimeAndPositionBias` 的输入 `time_diffs` 约定为 `query_time - timestamp[i]`。做 pairwise 差时 anchor 会抵消，得到两两事件之间的相对时间差。
 
@@ -102,11 +92,7 @@ gated = LayerNorm(AV) * U
 output = f2(gated)
 ```
 
-注意：
-
-- `U` 已经在 Eq. 2 的联合投影里经过 `SiLU`，这里不再二次 `SiLU(U)`。
-- `proj2` 只接收 gated attention output。
-- 不再拼接 `[U, x, gated]`，也没有单独的 position-wise FFN。
+`U` 在生成时已经经过 `SiLU`，可以直接用它给归一化后的注意力输出加门控。`proj2` 只接收这个乘积。
 
 ### 2.4 外部残差
 
@@ -117,7 +103,7 @@ for layer in self.layers:
     x = x + layer(x, padding_mask=padding_mask, time_diffs=time_diffs)
 ```
 
-这避免让 `proj2` 自己学习恒等映射，也与 HSTU 论文/reference 的层间残差形式一致。
+这样，上一层的输入可以直接传给下一层，`HSTULayer` 只需学出要加上的变化。
 
 ---
 
@@ -140,21 +126,15 @@ bucket = clamp(bucket / time_bucket_divisor, 0, num_time_buckets)
 
 当 `time_diffs=None` 时，`rab` 退化为 position-only bias，输出形状为 `(1, H, L, L)`；传入 `time_diffs` 时输出形状为 `(B, H, L, L)`。当前 `HSTULayer` 为此模块设置 `n_heads=1`，再广播到各 attention head，共享同一组 bias。
 
-### 3.2 `RelPosBias` 的定位
+### 3.2 源码中的另一种位置偏置
 
-`RelPosBias` 仍保留在 `hstu_utils.py`，但它是 legacy 的相对位置 bias：
+`hstu_utils.py` 中还保留了 `RelPosBias`，供 HLLM 和旧实验使用。阅读 HSTU 的注意力计算时，请看 `RelativeBucketedTimeAndPositionBias`。
 
-- HLLM 仍会复用它。
-- 兼容旧实验时可以单独使用。
-- 当前 HSTU 主路径不再使用它，HSTU attention score 上的相对位置/时间建模由 `RelativeBucketedTimeAndPositionBias` 负责。
+## 4. 从观看序列到候选物品分数
 
----
+`HSTUModel` 先把物品 ID 序列转成向量，送入 `HSTUBlock` 后，再为每个位置算出词表中各物品的分数。
 
-## 4. HSTUModel 包装层
-
-`HSTUModel` 负责把 item token 序列转换成 hidden states，调用 `HSTUBlock`，并输出 vocab logits。
-
-当前包装层包含：
+从输入端到输出端，依次经过下面几步：
 
 - `token_embedding(vocab_size, d_model, padding_idx=0)`。
 - 绝对 `position_embedding(max_seq_len, d_model)`。
@@ -173,7 +153,7 @@ PAD token 约定为 `0`。模型会在输入 embedding 后和 HSTU 输出后显�
 
 ## 5. 数据与训练约定
 
-### 5.1 时间差语义
+### 5.1 每个位置的时间差怎样算
 
 预处理脚本生成的 `seq_time_diffs` 采用以下语义：
 
@@ -189,7 +169,7 @@ query_time  = 400
 time_diffs  = [300, 200, 100, 0]
 ```
 
-这个格式可以让 `rab` 通过两两相减恢复事件间相对时间差。
+两项都减过同一个查询时间，所以再做差时，这个公共时间会抵消。模型仍然能算出两次行为相隔多久。
 
 ### 5.2 数据集格式
 
@@ -237,29 +217,8 @@ PAD token `0` 通过 `ignore_index=0` 从 loss 中排除。验证/测试中的 `
 
 ---
 
-## 6. 与 Meta reference 的一致性和差异
+## 6. 与 Meta 实现的对照
 
-主要一致点：
+核对核心层时可以按这三个位置读：联合投影后的 `SiLU` 对应论文公式 2，得分上的相对位置和时间偏置对应公式 3，`LayerNorm(AV) * U` 后接输出投影对应公式 4。残差由外层的 `HSTUBlock` 相加。
 
-- Eq. 2：完整 `UVQK` 投影先 `SiLU` 再 split。
-- Eq. 3：attention score 加 per-head `rab^{p,t}`，再做 `silu(scores) / N`。
-- Eq. 4：`f_2(LayerNorm(AV) * U)`，无 concat-u/x 旁路、无额外 FFN。
-- 层间残差：由 `HSTUBlock` 在层外执行。
-- 时间差：推荐使用 `query_time - timestamp[i]` 的 anchor-delta 形式。
-
-仍保留的工程差异：
-
-- 未包含 DLRM、多任务头和复杂特征交叉，本实现聚焦单任务 next-item prediction。
-- `HSTUModel` 包装层保留绝对位置 embedding 和可选输入侧时间 embedding；核心 HSTU layer 已通过 `rab^{p,t}` 注入相对位置/时间 bias。
-- 当前没有封装多步自回归解码、beam search 等生成接口。
-- 初始化和部分训练配置不追求 bit-level 复现。
-
----
-
-## 7. 近期 HSTU 相关改动摘要
-
-- 修正 Eq. 2：`SiLU` 从只作用于 gate 侧改为作用于完整 `UVQK` 投影。
-- 修正 Eq. 3：新增 `RelativeBucketedTimeAndPositionBias`，并在 attention score 上接入 `rab^{p,t}`。
-- 修正 Eq. 4：移除 `[U, x, gated]` concat 输出旁路，`proj2` 只投影 gated attention output。
-- 修正层间结构：`HSTUBlock` 改为外部残差 `x = x + layer(x)`。
-- 更新文档与 API 说明：明确 `RelPosBias` 是 legacy/HLLM 路径，HSTU 主路径使用 `rab^{p,t}`。
+影响实验可比性的差异主要在核心层之外。本项目额外保留了输入端的绝对位置嵌入和可选时间嵌入。注意力偏置取当前交互事件之间的时间差。MovieLens 示例按用户留一条训练序列，单独划出验证目标，训练和评估只做下一物品预测。复用实验结果时，应同时记录这些约定和训练预算。

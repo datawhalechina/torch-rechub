@@ -1,66 +1,60 @@
 ---
-title: Production Deployment Overview
-description: Torch-RecHub model deployment guide
+title: Serving trained models
+description: Prepare a ranker or a two-tower retrieval model for serving
 ---
 
-# Production Deployment Overview
+# Serving trained models
 
-Torch-RecHub provides deployment components such as ONNX export, quantization, and vector indexing. Production environments still require you to supply engineering capabilities such as feature services, API services, monitoring, canary releases, and disaster recovery.
+DeepFM scores a user–item pair. To serve it, keep its feature vocabularies and normalization parameters alongside its weights. DSSM retrieves candidates from a catalog. Compute the item vectors ahead of time, then save the search index together with the item IDs in the same order.
 
-## Deployment Process Overview
+You can try both tasks locally. Compare the PyTorch and ONNX scores for one record, or use a user vector to retrieve movie IDs. [Make a prediction with a trained model](/serving/demo)
 
-![End-to-end production deployment pipeline](/img/diagrams/serving_pipeline.png)
+## How a recommendation request is served
 
-## Core Features
+![Build the item index offline, then retrieve and rank candidates for a user request](/img/diagrams/en/serving_pipeline.svg)
 
-| Feature | Description | Documentation |
-| --- | --- | --- |
-| **ONNX Export** | Export PyTorch models to ONNX format | [ONNX Export & Quantization](/serving/onnx) |
-| **Model Quantization** | INT8/FP16 quantization to reduce inference latency | [ONNX Export & Quantization](/serving/onnx) |
-| **Vector Retrieval** | Annoy/FAISS/Milvus vector indexes | [Vector Retrieval Wrapper](/serving/vector_index) |
-| **Online Serving** | Deployment examples and best practices | [Online Serving Example](/serving/demo) |
+## Quick start
 
-## Quick Start
+### 1. Export to ONNX
 
-### 1. ONNX Export
+A ranking model can be exported in one piece. For two-tower retrieval, export the towers separately so an offline job can use the item tower to build the index and each new request only needs the user tower. Here, `ctr_trainer` and `match_trainer` refer to the trainers from the completed examples. [Export options](/serving/onnx)
 
 ```python
-from torch_rechub.trainers import CTRTrainer, MatchTrainer
+# Continue with the ranking trainer that holds the best validation weights.
+ctr_trainer.export_onnx("model_fp32.onnx")
 
-# Export the ranking model after training
-ctr_trainer = CTRTrainer(ctr_model)
-ctr_trainer.export_onnx("model.onnx")
-
-# Export the two towers separately
-match_trainer = MatchTrainer(match_model)
+# Export each tower separately.
+# Use the matching trainer from the completed retrieval example.
 match_trainer.export_onnx("user_tower.onnx", mode="user")
 match_trainer.export_onnx("item_tower.onnx", mode="item")
 ```
 
-### 2. Model Quantization
+### 2. Quantize the model
+
+Keep the original FP32 file. Try INT8 for a CPU or FP16 for a GPU that supports half precision. Compare scores and latency against FP32 on the same real inputs before choosing a model to serve.
 
 ```python
 from torch_rechub.utils.quantization import quantize_model
 
-# INT8 quantization (recommended for CPU)
+# Dynamic INT8 quantization for CPU inference
 quantize_model("model_fp32.onnx", "model_int8.onnx", mode="int8")
 
-# FP16 quantization (recommended for GPU)
+# FP16 conversion for a GPU with half-precision support
 quantize_model("model_fp32.onnx", "model_fp16.onnx", mode="fp16")
 ```
 
-### 3. Vector Retrieval
+### 3. Search an item index
 
-The current `torch_rechub.serving` package loads the Annoy, FAISS, and Milvus backends when imported. Install all retrieval extras before using the unified factory:
+Build a Faiss index from item vectors, then query it for the top 10 candidates for each user vector. The returned `ids` are row numbers. Look them up in the item ID table you saved when building the index. [Vector indexes](/serving/vector_index)
 
 ```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
+pip install "torch-rechub[faiss]"
 ```
 
 ```python
 from torch_rechub.serving import builder_factory
 
-# Create a FAISS index
+# Build a Faiss index.
 builder = builder_factory("faiss", index_type="HNSW", metric="IP")
 
 with builder.from_embeddings(item_embeddings) as indexer:
@@ -68,24 +62,8 @@ with builder.from_embeddings(item_embeddings) as indexer:
     indexer.save("item.index")
 ```
 
-## Deployment Architecture Recommendations
+## Connect the model to your service
 
-### Ranking Model Deployment
+When a ranking request arrives, transform the candidate features using the saved training vocabularies and normalization parameters. Pass them to ONNX Runtime and return the candidates in score order.
 
-```
-User request → Feature service → ONNX Runtime → Ranking results
-```
-
-### Retrieval Model Deployment
-
-```
-User request → User tower inference → Vector retrieval → Retrieved results
-                ↓
-        Offline item tower computation → Vector index
-```
-
-## Next Steps
-
-- Learn how to use [ONNX Export & Quantization](/serving/onnx) in detail
-- Learn how to configure the [Vector Retrieval Wrapper](/serving/vector_index)
-- See the [Online Serving Example](/serving/demo) for the complete deployment workflow
+For retrieval, run the item tower when updating the catalog offline. Write the index and its ordered ID table together. At request time, run the user tower once, query the index and return the candidate IDs. Torch-RecHub provides the export and search interfaces. Your application handles incoming requests.

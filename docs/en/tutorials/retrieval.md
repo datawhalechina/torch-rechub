@@ -5,7 +5,7 @@ description: Torch-RecHub retrieval tutorial covering DSSM, GRU4Rec, MIND, and v
 
 # Retrieval Tutorial
 
-This tutorial focuses on the common retrieval workflow: building user/item features, generating sequence samples, training two-tower or sequence retrieval models, exporting embeddings, and running ANN search. All examples assume you are running from the **repository root** and using the built-in `MovieLens-1M` sample dataset.
+Given a user's viewing history, how do you find ten more movies to recommend? We'll train DSSM on the MovieLens sample, compute user and movie embeddings, and check whether the recommendations include the user's last recorded interaction. Run the examples from the repository root.
 
 ## 1. Data Preparation
 
@@ -27,14 +27,18 @@ user_col, item_col = "user_id", "movie_id"
 sparse_features = ["user_id", "movie_id", "gender", "age", "occupation", "zip", "cate_id"]
 ```
 
-### 2. Encode features and build profiles
+### 2. Encode IDs and build the user and movie tables
+
+Treat the sample's movies as a known catalog. `user_profile` has one row per user, and `item_profile` has one row per movie. Train on encoded IDs and keep `raw_movie_ids` to look up the original movie IDs when displaying recommendations. With production logs, use the vocabulary and catalog that were available at prediction time.
 
 ```python
 feature_max_idx = {}
 for feature in sparse_features:
     lbe = LabelEncoder()
-    # Reserve 0 for padding, consistent with the embedding conventions in the framework.
+    # Adding 1 leaves index 0 available for padding.
     data[feature] = lbe.fit_transform(data[feature]) + 1
+    if feature == item_col:
+        raw_movie_ids = lbe.classes_
     feature_max_idx[feature] = data[feature].max() + 1
 
 # Profile tables store static user/item attributes and will later be merged into the sequence samples.
@@ -44,10 +48,10 @@ item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
 
 ### 3. Generate sequence samples
 
-#### DSSM (point-wise)
+By default, each positive interaction gets three negative examples. Positives have label 1 and negatives have label 0. To try in-batch sampling, set `in_batch_neg=True` below and rerun from this point. The training set then contains only positive interactions, and the trainer takes negatives from the other movies in the batch.
 
 ```python
-# point-wise: each user-item sample gets an independent 0/1 label
+in_batch_neg = False
 df_train, df_test = generate_seq_feature_match(
     data,
     user_col=user_col,
@@ -56,6 +60,7 @@ df_train, df_test = generate_seq_feature_match(
     item_attribute_cols=[],
     sample_method=1,
     mode=0,
+    in_batch_neg=in_batch_neg,
     neg_ratio=3,
     min_item=0,
 )
@@ -64,45 +69,6 @@ df_train, df_test = generate_seq_feature_match(
 x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 y_train = x_train.pop("label")
 x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-```
-
-#### GRU4Rec / MIND (list-wise)
-
-```python
-# list-wise: each positive sample is paired with multiple negatives
-df_train, df_test = generate_seq_feature_match(
-    data,
-    user_col=user_col,
-    item_col=item_col,
-    time_col="timestamp",
-    item_attribute_cols=[],
-    sample_method=1,
-    mode=2,
-    neg_ratio=3,
-    min_item=0,
-)
-
-x_train = gen_model_input(
-    df_train,
-    user_profile,
-    user_col,
-    item_profile,
-    item_col,
-    seq_max_len=50,
-    padding="post",
-    truncating="post",
-)
-y_train = [0] * len(df_train)  # In list-wise mode, the first position is the positive sample.
-x_test = gen_model_input(
-    df_test,
-    user_profile,
-    user_col,
-    item_profile,
-    item_col,
-    seq_max_len=50,
-    padding="post",
-    truncating="post",
-)
 ```
 
 ## 2. DSSM: Basic Two-Tower Retrieval
@@ -118,13 +84,13 @@ user_features = [
     for name in user_cols
 ]
 user_features += [
-    # In DSSM, the history sequence is compressed into a single fixed-length vector.
+    # DSSM uses mean pooling to turn each user's history into a fixed-length vector.
     SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="mean", shared_with="movie_id")
+                    pooling="mean", shared_with="movie_id", padding_idx=0)
 ]
 
 item_features = [
-    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16)
+    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16, padding_idx=0)
     for name in item_cols
 ]
 
@@ -152,7 +118,7 @@ train_dl, test_dl, item_dl = dg.generate_dataloader(
     num_workers=0,  # More stable for Windows / notebook environments.
 )
 
-# DSSM is the standard two-tower retrieval baseline.
+# Both towers output 64-dimensional vectors.
 model = DSSM(
     user_features=user_features,
     item_features=item_features,
@@ -161,162 +127,72 @@ model = DSSM(
     item_params={"dims": [256, 128, 64], "activation": "prelu"},
 )
 
-os.makedirs("./saved/dssm", exist_ok=True)
+# Create the directory before training so the trainer can save the weights.
+save_dir = "./saved/dssm_inbatch" if in_batch_neg else "./saved/dssm"
+os.makedirs(save_dir, exist_ok=True)
 
 trainer = MatchTrainer(
     model,
     mode=0,
+    in_batch_neg=in_batch_neg,
     optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
     n_epoch=2,
     device="cpu",  # Change to "cuda:0" for GPU.
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 
 trainer.fit(train_dl)
 ```
 
-### 3. In-batch negatives (optional)
+For a batch of three positive pairs, scoring each of the three users against all three movies gives a 3 × 3 matrix. The first user's positive is movie 1, the second user's is movie 2, and the third user's is movie 3. All positives therefore lie on the diagonal. Each batch needs at least two positive pairs.
 
-For models with `user_tower()` / `item_tower()` methods whose outputs are both 2-D tensors, such as DSSM, `MatchTrainer` can use other items in the same batch as negatives:
+### 3. Export embeddings
 
-```python
-os.makedirs("./saved/dssm_inbatch", exist_ok=True)
-
-trainer = MatchTrainer(
-    model,
-    mode=0,
-    in_batch_neg=True,
-    in_batch_neg_ratio=3,
-    hard_negative=False,  # True selects the highest-scoring negatives in this batch
-    sampler_seed=2022,
-    optimizer_params={"lr": 1e-4},
-    n_epoch=2,
-    device="cpu",
-    model_path="./saved/dssm_inbatch",
-)
-```
-
-This mode builds a `[B, B]` user-item score matrix. Each diagonal pair `(user_i, item_i)` must be the original positive pair; only off-diagonal positions are negative candidates. Batch size must be greater than 1 and `in_batch_neg_ratio <= batch_size - 1`. Other true positives in the batch can still become false negatives. `sampler_seed` makes random sampling reproducible.
-
-### 4. Export embeddings
+`test_dl` builds the user inputs from each user's held-out example. `item_dl` iterates over the full movie catalog. In the two shapes printed below, the first dimension counts user records or movies respectively. Both second dimensions should be 64, the output width of each tower.
 
 ```python
 user_embedding = trainer.inference_embedding(
     model=model,
     mode="user",
     data_loader=test_dl,
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 item_embedding = trainer.inference_embedding(
     model=model,
     mode="item",
     data_loader=item_dl,
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 
 print(user_embedding.shape, item_embedding.shape)
 ```
 
-## 3. Sequential Retrieval: GRU4Rec / MIND
+## 3. Retrieve ten movies and check for a hit
 
-Compared with DSSM, these models differ mainly in two ways:
-
-- they need list-wise training samples with `mode=2`
-- both history sequences and negative samples should use `SequenceFeature(..., pooling="concat")`
-
-### 1. Define sequence features
-
-```python
-user_cols = ["user_id", "gender", "age", "occupation", "zip"]
-
-user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-history_features = [
-    # The full sequence tensor is required here and will be modeled inside GRU4Rec / MIND.
-    SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="concat", shared_with="movie_id")
-]
-item_features = [SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16)]
-neg_item_feature = [
-    # In list-wise training, negative items are also kept as a full sequence tensor.
-    SequenceFeature("neg_items", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="concat", shared_with="movie_id")
-]
-```
-
-### 2. GRU4Rec
-
-```python
-from torch_rechub.models.matching import GRU4Rec
-
-# GRU4Rec models sequential interest evolution with an RNN.
-model = GRU4Rec(
-    user_features,
-    history_features,
-    item_features,
-    neg_item_feature,
-    user_params={"dims": [128, 64, 16]},
-    temperature=0.02,
-)
-```
-
-### 3. MIND
-
-```python
-from torch_rechub.models.matching import MIND
-
-# MIND decomposes a user into multiple interest capsules, which helps when user interests are diverse.
-model = MIND(
-    user_features,
-    history_features,
-    item_features,
-    neg_item_feature,
-    max_length=50,
-    temperature=0.02,
-)
-```
-
-### 4. Training pattern
-
-```python
-import os
-
-# For sequence retrieval, num_workers=0 is still recommended, especially on Windows.
-dg = MatchDataGenerator(x=x_train, y=y_train)
-train_dl, test_dl, item_dl = dg.generate_dataloader(
-    test_user,
-    all_item,
-    batch_size=256,
-    num_workers=0,
-)
-
-os.makedirs("./saved/matching_sequence", exist_ok=True)
-
-trainer = MatchTrainer(
-    model,
-    mode=2,
-    optimizer_params={"lr": 1e-3, "weight_decay": 1e-6},
-    n_epoch=2,
-    device="cpu",  # Change to "cuda:0" for GPU.
-    model_path="./saved/matching_sequence",
-)
-
-trainer.fit(train_dl)
-```
-
-## 4. Vector Search
-
-Torch-RecHub provides wrappers for `Annoy / Faiss / Milvus`. A minimal example:
+Install the `annoy` extra first. Annoy returns row numbers in the movie embedding table. Use those rows to find the encoded `movie_id` values, then map them back to the original IDs. The example prints `Hit@10` for one user: 1 if the held-out movie appears in the top ten, 0 otherwise.
 
 ```python
 from torch_rechub.utils.match import Annoy
 
-annoy = Annoy(n_trees=10)
-annoy.fit(item_embedding)
-similar_items, scores = annoy.query(user_embedding[0], n=10)
-print(similar_items)
+index = Annoy(n_trees=10)
+index.fit(item_embedding)
+rows, distances = index.query(user_embedding[0], n=10)
+recommended = raw_movie_ids[all_item[item_col][rows] - 1]
+held_out = raw_movie_ids[test_user[item_col][0] - 1]
+print("Recommended movies", recommended.tolist())
+print("Held-out movie", held_out, "Hit@10", int(held_out in recommended))
 ```
 
-> If the dependency is missing, install it first, for example: `pip install "torch-rechub[annoy]"`.
+## 4. Train with explicit candidate lists
+
+The list-wise YoutubeDNN, GRU4Rec and MIND examples put one positive item and a set of negatives in each row. Scores have shape `[B, 1 + K]`. The positive is in column 0, so every cross-entropy target is 0. Choose a command below and run it from the repository root to build the samples, train and evaluate.
+
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_youtube_dnn.py --epoch 1 --device cpu
+uv run --extra annoy python run_ml_gru4rec.py --epoch 1 --device cpu
+uv run --extra annoy python run_ml_mind.py --epoch 1 --device cpu
+```
 
 ## 5. FAQ
 
@@ -327,13 +203,13 @@ print(similar_items)
 
 ### Q2: Why create `./saved/...` before training?
 
-`MatchTrainer` does not create `model_path` automatically, so the examples create the directory explicitly.
+Create the model directory with `os.makedirs(path, exist_ok=True)` before training. `MatchTrainer` expects `model_path` to exist.
 
 ### Q3: Why set `num_workers=0` on Windows?
 
 Retrieval pipelines create three DataLoaders at once: training, user inference, and item inference. In Windows and notebook environments, multiple workers are more likely to cause permission or handle issues, so `num_workers=0` is the safer default.
 
-### Q4: Where should I go next?
+### Training and retrieval examples by model
 
 - [DSSM tutorial](/tutorials/models/matching/dssm)
 - [YoutubeDNN tutorial](/tutorials/models/matching/youtube_dnn)

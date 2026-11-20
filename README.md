@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/public/img/banner.png" width="560" alt="Torch-RecHub">
+<img src="docs/public/img/banner.png" alt="Torch-RecHub">
 
 **Study 30+ PyTorch recommender models alongside their papers, from two-tower retrieval to generative recommendation, and train them on your own data.**
 

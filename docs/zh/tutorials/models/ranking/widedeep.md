@@ -1,83 +1,25 @@
 ---
 title: Wide&Deep 使用示例
-description: Wide&Deep 模型完整使用教程 —— 从数据准备到模型训练与评估
+description: 把 Criteo 的连续字段和类别字段分别交给 WideDeep 的线性层与多层网络
 ---
 
 # Wide&Deep 使用示例
 
 ## 1. 模型简介与适用场景
 
-Wide&Deep 是 Google 在 DLRS'2016 上提出的经典推荐模型，结合了线性模型（Wide 部分）的记忆能力和深度神经网络（Deep 部分）的泛化能力，是工业界应用最广泛的基线模型之一。
+Wide&Deep 为一条广告曝光算两次分数。这个 Criteo 示例把连续字段交给线性层，把类别字段的嵌入交给多层网络，然后合并两个分数得到点击概率。
 
 **论文**: [Wide & Deep Learning for Recommender Systems](https://arxiv.org/abs/1606.07792)
 
 ### 模型结构
 
-- **Wide 部分**：线性模型，捕获特征间的共现关系（记忆）
-- **Deep 部分**：多层 MLP，通过 Embedding 学习特征的泛化表示
-- **联合训练**：Wide 和 Deep 的输出相加后通过 Sigmoid 得到最终预测
-
-### 适用场景
-
-- 推荐系统基线模型
-- 需要同时利用记忆和泛化能力的场景
-- 快速验证数据特征有效性
+`wide_features` 决定哪些字段直接进入线性层，`deep_features` 决定哪些字段经过多层网络。输入分组由你决定，两组允许重叠。
 
 ---
 
 ## 2. 数据准备与预处理
 
-本示例使用 Criteo 广告点击数据集，数据准备流程与 DeepFM 相同。
-
-```python
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from tqdm import tqdm
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
-
-# 加载数据
-data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-
-# 区分特征类型
-dense_features = [f for f in data.columns if f.startswith("I")]
-sparse_features = [f for f in data.columns if f.startswith("C")]
-
-# 缺失值处理
-data[sparse_features] = data[sparse_features].fillna("0")
-data[dense_features] = data[dense_features].fillna(0)
-
-# 连续特征归一化
-scaler = MinMaxScaler()
-data[dense_features] = scaler.fit_transform(data[dense_features])
-
-# 类别特征编码
-for feat in tqdm(sparse_features):
-    lbe = LabelEncoder()
-    data[feat] = lbe.fit_transform(data[feat])
-
-# 定义特征
-dense_feas = [DenseFeature(name) for name in dense_features]
-sparse_feas = [
-    SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
-    for name in sparse_features
-]
-
-y = data["label"]
-del data["label"]
-x = data
-
-# 创建 DataLoader
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    split_ratio=[0.7, 0.1], batch_size=2048
-)
-```
-
----
+先在同一个 Python 会话中完成[准备 Criteo 输入](/zh/guide/quick_start#criteo-input)。下面会用到两组特征 `dense_feas`、`sparse_feas` 和三个 DataLoader。若刚刚训练过另一个模型，可以复用数据切分，创建模型前重新构造特征对象。
 
 ## 3. 模型配置与参数说明
 
@@ -107,9 +49,7 @@ model = WideDeep(
 | `mlp_params.dropout` | `float` | Dropout 比率 | 0.1 ~ 0.3 |
 | `mlp_params.activation` | `str` | 激活函数 | `"relu"` |
 
-> **Wide 与 Deep 的特征划分**:
-> - **Wide 部分**适合放入低维连续特征（如年龄、价格）或手工交叉特征
-> - **Deep 部分**适合放入高维类别特征（如用户ID、城市），通过 Embedding 降维
+如果有手工组合字段，也可以把它放到 Wide 分支。例如把“城市 × 时段”编码为一个类别字段，线性层就能直接为这个组合打分。
 
 ---
 
@@ -117,6 +57,7 @@ model = WideDeep(
 
 ```python
 import os
+import torch
 from torch_rechub.trainers import CTRTrainer
 
 torch.manual_seed(2022)
@@ -125,7 +66,7 @@ os.makedirs("./saved/widedeep", exist_ok=True)
 trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
-    n_epoch=50,
+    n_epoch=2,
     earlystop_patience=10,
     device="cpu",                   # GPU: "cuda:0"
     model_path="./saved/widedeep"
@@ -143,111 +84,23 @@ auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
-### 预期性能
-
-| 数据规模 | 预期 AUC |
-|----------|----------|
-| Sample (1万条) | 0.68 ~ 0.73 |
-| Full (4500万条) | 0.78 ~ 0.80 |
-
-Wide&Deep 作为基线模型，AUC 通常略低于 DeepFM，但训练速度更快。
-
----
+仓库随附的 Criteo 样本只有 115 行，适合检查模型能否训练和评估。要比较不同模型的点击预测效果，请使用更大的数据集，并为各模型保留同样的训练、验证和测试样本。[基准测试](/zh/tools/benchmark)
 
 ## 6. 参数调优建议
 
-1. **Wide 和 Deep 特征划分**是最关键的选择：
-   - 经验法则：连续特征 → Wide，类别特征 → Deep
-   - 也可以让两部分共用全部特征
-
-2. **MLP 结构**：WideDeep 的 Deep 部分不宜过深，`[256, 128]` 通常足够
-
-3. **学习率**：推荐从 `1e-3` 开始搜索
-
----
+要检验一个新字段是否有用，可以保持训练和验证数据不变，只把这个字段加进 `wide_features` 或 `deep_features`，再比较验证 AUC。
 
 ## 7. 常见问题与解决方案
 
-### Q1: Wide 部分和 Deep 部分应该使用相同特征吗？
-建议分开使用：Wide 部分侧重记忆能力，适合低维特征；Deep 部分侧重泛化，适合高维类别特征。但也可以让两部分使用相同特征，模型仍然有效。
+### 什么时候值得试 DeepFM？
 
-### Q2: WideDeep 和 DeepFM 哪个好？
-一般来说 DeepFM 优于 WideDeep，因为 FM 部分自动学习二阶交叉，而 WideDeep 的 Wide 部分只做线性变换。但 WideDeep 结构更简单、训练更快。
-
-### Q3: 如何添加交叉特征到 Wide 部分？
-可以在数据预处理阶段手动构造交叉特征 (如 `city_x_gender`)，然后作为新的 SparseFeature 加入 `wide_features`.
+Wide 分支直接使用你提供的字段。如果想让模型自动计算多个类别字段间的两两交互，可以在相同数据上比较 DeepFM，再同时查看验证 AUC 和训练耗时。[DeepFM 教程](/zh/tutorials/models/ranking/deepfm)
 
 ---
 
-## 完整代码
+## 运行仓库示例
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from tqdm import tqdm
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.models.ranking import WideDeep
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import DataGenerator
-
-
-def main():
-    torch.manual_seed(2022)
-    os.makedirs("./saved/widedeep", exist_ok=True)
-
-    data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-    dense_features = [f for f in data.columns if f.startswith("I")]
-    sparse_features = [f for f in data.columns if f.startswith("C")]
-
-    data[sparse_features] = data[sparse_features].fillna("0")
-    data[dense_features] = data[dense_features].fillna(0)
-
-    scaler = MinMaxScaler()
-    data[dense_features] = scaler.fit_transform(data[dense_features])
-
-    for feat in tqdm(sparse_features):
-        lbe = LabelEncoder()
-        data[feat] = lbe.fit_transform(data[feat])
-
-    dense_feas = [DenseFeature(name) for name in dense_features]
-    sparse_feas = [
-        SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
-        for name in sparse_features
-    ]
-
-    y = data["label"]
-    del data["label"]
-    x = data
-
-    dg = DataGenerator(x, y)
-    train_dl, val_dl, test_dl = dg.generate_dataloader(
-        split_ratio=[0.7, 0.1], batch_size=2048
-    )
-
-    model = WideDeep(
-        wide_features=dense_feas,
-        deep_features=sparse_feas,
-        mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"}
-    )
-
-    trainer = CTRTrainer(
-        model,
-        optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
-        n_epoch=50,
-        earlystop_patience=10,
-        device="cpu",
-        model_path="./saved/widedeep"
-    )
-    trainer.fit(train_dl, val_dl)
-
-    auc = trainer.evaluate(trainer.model, test_dl)
-    print(f"Test AUC: {auc:.4f}")
-
-
-if __name__ == "__main__":
-    main()
+```bash
+cd examples/ranking
+uv run python run_criteo.py --model_name widedeep --epoch 1 --device cpu
 ```

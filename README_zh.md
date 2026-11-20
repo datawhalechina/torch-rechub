@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/public/img/banner.png" width="560" alt="Torch-RecHub">
+<img src="docs/public/img/banner.png" alt="Torch-RecHub">
 
 **对照论文读懂推荐模型，再用自己的数据验证效果——从双塔召回到生成式推荐，这里有 30 多种可训练的 PyTorch 实现。**
 

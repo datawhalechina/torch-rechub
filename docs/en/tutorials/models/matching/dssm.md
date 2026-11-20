@@ -1,13 +1,13 @@
 ---
 title: DSSM Tutorial
-description: A complete DSSM two-tower tutorial—from data preparation to vector retrieval
+description: Train DSSM on MovieLens, export user and movie embeddings, and retrieve candidates
 ---
 
 # DSSM Tutorial
 
 ## 1. Model Overview and Use Cases
 
-DSSM (Deep Structured Semantic Model) is a classic two-tower model proposed by Microsoft at CIKM 2013. It maps users and items through separate DNN towers into the same vector space and computes matching scores with cosine similarity. It is one of the most commonly used base models in the **retrieval stage** of recommendation systems.
+DSSM encodes users and movies separately. The user tower reads profile attributes and viewing history, and the item tower reads movie IDs and genres. After training, you can compute the catalog's movie embeddings once and look up the closest movies for each user.
 
 **Paper**: [Learning Deep Structured Semantic Models for Web Search using Clickthrough Data](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf)
 
@@ -17,22 +17,13 @@ DSSM (Deep Structured Semantic Model) is a classic two-tower model proposed by M
   <img src="/img/models/dssm_arch.png" alt="DSSM Model Architecture" width="500"/>
 </div>
 
-- **User Tower**: maps user features to a vector representation
-- **Item Tower**: maps item features to a vector representation
-- **Similarity calculation**: computes user-item matching scores with cosine similarity or a dot product
-
-### Suitable Scenarios
-
-- Retrieval stage of recommendation systems
-- Fast filtering of large candidate sets through vector search
-- Search relevance matching
-- Online real-time services, because the two-tower structure supports offline precomputation of user/item vectors
+Each side of the diagram can run independently. Both towers produce 64-dimensional vectors in this example. Their cosine similarity determines the match score.
 
 ---
 
 ## 2. Data Preparation and Preprocessing
 
-This example uses the **MovieLens-1M** dataset, which contains about one million user ratings of movies.
+Each row of the bundled MovieLens-1M sample gives a user, a movie and the time the user rated it. The example treats that interaction as a positive. It does not use the rating value as a regression target.
 
 ### 2.1 Load and Process Data
 
@@ -59,11 +50,19 @@ user_col, item_col = "user_id", "movie_id"
 ### 2.2 Encode Features
 
 ```python
+raw_id_maps = {}
 feature_max_idx = {}
 for feature in sparse_features:
     lbe = LabelEncoder()
     data[feature] = lbe.fit_transform(data[feature]) + 1
     feature_max_idx[feature] = data[feature].max() + 1
+
+    # Map the encoded user and movie IDs back to their original values for evaluation.
+    if feature in (user_col, item_col):
+        raw_id_maps[feature] = dict(enumerate(lbe.classes_, start=1))
+
+os.makedirs("saved/dssm", exist_ok=True)
+np.save("saved/dssm/raw_id_maps.npy", [raw_id_maps[user_col], raw_id_maps[item_col]])
 
 # Extract user/item profiles
 user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
@@ -78,8 +77,8 @@ df_train, df_test = generate_seq_feature_match(
     data, user_col, item_col,
     time_col="timestamp",
     item_attribute_cols=[],
-    sample_method=1,    # Random negative sampling
-    mode=0,             # Point-wise
+    sample_method=1,    # Sample in proportion to item popularity raised to the power of 0.75.
+    mode=0,             # point-wise
     neg_ratio=3,        # Negative-sample ratio
     min_item=0
 )
@@ -109,13 +108,13 @@ user_features += [
         vocab_size=feature_max_idx["movie_id"],
         embed_dim=16,
         pooling="mean",           # Sequence aggregation method
-        shared_with="movie_id"    # Share the embedding with movie_id
+        shared_with="movie_id", padding_idx=0,
     )
 ]
 
 # Item features
 item_features = [
-    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16)
+    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16, padding_idx=0)
     for name in item_cols
 ]
 
@@ -148,7 +147,7 @@ model = DSSM(
     temperature=1.0,  # Used by full-batch in-batch training, not point-wise BCE
     user_params={
         "dims": [256, 128, 64],
-        "activation": "prelu"      # PReLU usually works better here
+        "activation": "prelu"      # Use PReLU in the hidden layers.
     },
     item_params={
         "dims": [256, 128, 64],
@@ -160,15 +159,15 @@ model = DSSM(
 ### 3.2 Parameter Details
 
 | Parameter | Type | Description | Suggested Value |
-|-----------|------|-------------|-----------------|
+|------|------|------|--------|
 | `user_features` | `list[Feature]` | User-side feature list | User attributes + behavior sequence |
 | `item_features` | `list[Feature]` | Item-side feature list | Item ID + attributes |
-| `temperature` | `float` | Finite positive temperature for full-batch in-batch cross entropy; does not affect point-wise BCE | Default 1.0; example 0.02 |
+| `temperature` | `float` | Finite positive temperature for in-batch cross-entropy | Default: 1.0 |
 | `user_params.dims` | `list[int]` | User Tower MLP dimensions | `[256, 128, 64]` |
 | `item_params.dims` | `list[int]` | Item Tower MLP dimensions | `[256, 128, 64]` |
-| `*_params.activation` | `str` | Activation function | `"prelu"` recommended |
+| `*_params.activation` | `str` | Activation function | `"prelu"` in this example |
 
-> The default full-batch in-batch path in `MatchTrainer` uses `temperature`. The point-wise DSSM `forward` still returns the sigmoid of unscaled cosine similarity.
+In the default training setup, DSSM computes the cosine similarity between the user and movie vectors, then applies a sigmoid. The in-batch example in section 4.3 also uses `temperature`.
 
 ---
 
@@ -202,12 +201,12 @@ trainer.fit(train_dl)
 ### 4.2 Training Mode Reference
 
 | mode | Training Method | Loss Function | Description |
-|------|-----------------|---------------|-------------|
+|------|---------|---------|------|
 | 0 | Point-wise | BCE Loss | Computes each sample independently |
 | 1 | Pair-wise | BPR Loss | Requires the model to return `(pos_score, neg_score)`, as `FaceBookDSSM` does |
 | 2 | List-wise | Softmax Loss | Requires the model to return `[B, 1+n_neg]` logits, as `YoutubeDNN` / `MIND` do |
 
-`mode` defines the trainer's loss contract; it cannot be switched arbitrarily for the same DSSM instance. The scalar probability output of the DSSM on this page requires `mode=0`.
+This DSSM returns one score per user–movie pair, so we use `mode=0`. The other modes in the table expect different output shapes.
 
 ### 4.3 Single-Device In-Batch Training
 
@@ -217,28 +216,11 @@ Run from `examples/matching`:
 python run_ml_dssm.py --in_batch_neg --batch_size 256 --temperature 0.02 --device cpu
 ```
 
-Use `--device cuda:0` for one GPU. The example generates positive interactions with `neg_ratio=0` and uses a separate data cache. Without `--in_batch_neg`, it keeps the original offline negatives and BCE training.
+To run on a single NVIDIA GPU, replace `--device cpu` with `--device cuda:0`. The script builds the training data for the selected sampling mode. Omit `--in_batch_neg` to train with positive and negative examples and the default BCE loss.
 
-The other MovieLens retrieval examples also support `--in_batch_neg`. Existing code usually needs two changes:
+For in-batch training, put one observed user–movie interaction in each row. With `B` rows, both towers produce `B` vectors. The trainer computes `user_emb @ item_emb.T / model.temperature` and learns to rank the movie on each row's diagonal above the others. The same positional rule applies if a movie occurs twice in a batch. At least two rows are required. The trainer skips a final batch of one.
 
-```python
-df_train, df_test = generate_seq_feature_match(data, user_col, item_col, "timestamp", in_batch_neg=True)
-trainer = MatchTrainer(model, in_batch_neg=True)
-```
-
-The data helper produces positive pairs. Existing model parameters, training modes, and inference interfaces keep their original form. The default model `forward()` still returns its original scores; the trainer temporarily switches the existing `model.mode` during the in-batch forward and restores it afterwards. No embedding-output switch or prediction-code migration is required.
-
-All public matching models support this entry point. MIND/ComiRec retain positive-item-based interest selection; YoutubeSBC retains sampling-bias correction. NARM/STAMP can use their existing next-item ID labels directly: enable `run_sbr.py --in_batch_neg`. Custom session histories use post-padding, and `y` must contain actual next-item IDs unless an explicit `item_feature` and corresponding item column are supplied. SASRec retains its original per-position positive/negative training; in-batch training uses the positive item at the last valid sequence position.
-
-Normalization follows each model's original scoring: DSSM/YoutubeDNN use normalized vectors, YoutubeSBC uses cosine scores, and NARM/STAMP/SINE retain dot products. The trainer does not impose a shared embedding scale, keeping training aligned with the existing retrieval evaluation.
-
-This in-batch entry point currently supports a single device (`cpu` or one CUDA GPU). Multi-GPU support is maintained separately.
-
-For paired data, each row must be a positive user-item interaction without offline negative rows. DSSM's towers provide normalized embeddings; `MatchTrainer(model, in_batch_neg=True)` computes `user_emb @ item_emb.T / model.temperature` and applies cross entropy with diagonal targets `arange(B)`. Training labels `y` are placeholders for explicit user-item pairs; next-item labels for session models supply the actual target item IDs. Explicit random/hard sampling and BPR configurations retain their existing paths.
-
-This simple version treats all off-diagonal entries as negatives without duplicate-item masking. It adds no sampling-probability correction beyond YoutubeSBC's own correction. Repeated items can therefore become false negatives. Use `batch_size >= 2`; singleton batches are skipped with a warning, and an epoch with no usable batches raises an error.
-
-Evaluate retrieval using the embeddings as shown below. A positive-only training dataset is not an AUC validation dataset: AUC validation through `fit(..., val_dataloader=...)` still requires genuine binary labels.
+The [retrieval tutorial](/tutorials/retrieval) shows the full Python example. Use the same flag when building the training set and configuring the trainer, and load that run's weights when exporting embeddings. Evaluate the retrieved movies against held-out interactions. To measure AUC as well, prepare a separate validation set with both 0 and 1 labels.
 
 ---
 
@@ -279,7 +261,7 @@ match_evaluation(
     item_embedding,
     test_user,
     all_item,
-    raw_id_maps="examples/matching/data/ml-1m/saved/raw_id_maps.npy",
+    raw_id_maps="saved/dssm/raw_id_maps.npy",
     topk=10,
 )
 ```
@@ -290,10 +272,7 @@ match_evaluation(
 
 ### 6.1 Key Tuning Points
 
-1. **Activation function**: `"prelu"` usually works better than `"relu"` (as recommended in the original paper)
-2. **Embedding dimension**: the final output dimensions of the User and Item Towers should match (determined by `dims[-1]`)
-3. **Negative-sample ratio**: `neg_ratio=3~5` usually works well
-4. **Learning rate**: a smaller learning rate such as `1e-4` is recommended for matching tasks
+You can change the hidden widths of the towers independently. Their final widths must match for the dot product. In the default point-wise setup, `neg_ratio=3` pairs three negatives with each positive. For full in-batch training, the actual batch size determines how many movie candidates each user sees.
 
 ### 6.2 Vector Retrieval and Deployment
 
@@ -348,65 +327,12 @@ faiss_index.load_index("item_faiss.index")
 
 > **Choosing a Faiss index type** (the practical scale limit depends on dimensionality, memory, and retrieval parameters, so benchmark your own workload):
 > | Type | Characteristics | Suitable Scenario |
-> |------|-----------------|-------------------|
+> |------|------|---------|
 > | `flat` | Exact search; no training required | Small scale or a recall baseline |
 > | `ivf` | Inverted-file index; requires training | Trading off speed against recall |
 > | `hnsw` | Graph index; no training required | High-recall requirements |
 
-#### Option 3: Milvus (Legacy Wrapper for Isolated Local Experiments Only)
-
-```bash
-pip install "torch-rechub[milvus]"
-# Start a Milvus service first: https://milvus.io/docs/install_standalone-docker.md
-```
-
-::: danger Data-deletion risk
-The legacy `torch_rechub.utils.match.Milvus` deletes any existing collection with the fixed name `rechub` when it is constructed, then recreates it. Do not run the following example against a Milvus instance that stores real data.
-:::
-
-```python
-from torch_rechub.utils.match import Milvus
-from pymilvus import connections
-
-# Connect to Milvus and insert embeddings
-connections.connect(alias="default", host="localhost", port="19530")
-milvus = Milvus(dim=item_embedding.shape[1], host="localhost", port="19530")
-milvus.fit(item_embedding)
-
-# Query the Top-10
-indices, distances = milvus.query(user_embedding, n=10)
-```
-
-#### Using the New Serving API (Builder/Indexer Pattern)
-
-The project also provides a more standardized `serving` module. At present, importing `torch_rechub.serving` loads all three backends eagerly, so install all three dependency groups even if this example uses only Faiss:
-
-```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
-```
-
-The example below uses Faiss. `top_k` is this API's parameter name, and the return order is `(indices, distances)`:
-
-```python
-from torch_rechub.serving import builder_factory
-
-# Create a Builder through the factory (supports "annoy" / "faiss" / "milvus")
-builder = builder_factory("faiss", index_type="Flat", metric="L2")
-
-# Build the index and query it
-with builder.from_embeddings(item_embedding) as indexer:
-    indices, distances = indexer.query(user_embedding[:5], top_k=10)
-    print(indices, distances)
-    indexer.save("item.index")
-
-# Load from a file
-with builder.from_index_file("item.index") as indexer:
-    indices, distances = indexer.query(user_embedding[:5], top_k=10)
-```
-
-The Milvus Builder in the Serving API deletes its temporary collection when the context exits and does not support `from_index_file`; therefore, it is not currently a persistent production-serving wrapper either.
-
----
+For a persistent local index, see [Map index rows back to the original movie IDs](/serving/demo). Before using Milvus, read about [temporary collection lifetimes](/serving/vector_index). The legacy `torch_rechub.utils.match.Milvus` constructor deletes any existing collection named `rechub`.
 
 ## 7. Model Visualization
 
@@ -508,123 +434,42 @@ print(f"User Embedding shape: {output[0].shape}")
 ## 9. FAQ and Troubleshooting
 
 ### Q1: Must the `dims` of the User Tower and Item Tower be identical?
-
 Their final output dimensions (`dims[-1]`) must match because the model needs to compute similarity. Their intermediate dimensions may differ.
 
 ### Q2: How do I add user behavior sequence features?
-
 Define the historical behavior sequence with `SequenceFeature` and share its embedding with the item ID through `shared_with`:
 
 ```python
 SequenceFeature("hist_movie_id", vocab_size=n_movie,
                 embed_dim=16, pooling="mean",
-                shared_with="movie_id")
+                shared_with="movie_id", padding_idx=0)
 ```
 
 ### Q3: How can DSSM be deployed efficiently online?
-
 The key is to **decouple users and items**:
-
 1. Compute all item embeddings offline and store them in a vector database (Faiss/Milvus)
 2. Compute user embeddings in real time with ONNX Runtime
 3. Retrieve the most similar Top-K items through ANN search
 
 ### Q4: Does `temperature` affect the current DSSM implementation?
-
-Default full-batch in-batch training uses it to scale logits. Point-wise BCE is unchanged: `DSSM.forward()` still does not perform temperature scaling.
+With in-batch sampling, the trainer divides each similarity by `temperature` before computing cross-entropy. Changing the temperature has no effect in the default point-wise example.
 
 ### Q5: How should I choose among Annoy, Faiss, and Milvus?
 
 | Characteristic | Annoy | Faiss | Milvus |
+|------|-------|-------|--------|
 |----------------|-------|--------|--------|
-| Installation complexity | Simple | Moderate | Requires a service |
 | Project optional dependency | `annoy` | `faiss-cpu` | `pymilvus` |
 | Persistence | Can save indexes | Can save indexes | The current Serving context deletes its temporary collection on exit |
 | Current recommendation | Rapid prototyping | Single-node experiments and benchmarking | Validate only in an isolated instance; do not use directly for persistent production data |
 
 ---
 
-## Complete Example
+## Run the example script
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder
+Run this from the repository root. The script saves the ID maps and weights, then evaluates the recommendations.
 
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.models.matching import DSSM
-from torch_rechub.trainers import MatchTrainer
-from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
-
-
-def main():
-    torch.manual_seed(2022)
-    save_dir = "./saved/dssm/"
-    os.makedirs(save_dir, exist_ok=True)
-
-    # 1. Process data
-    data = pd.read_csv("examples/matching/data/ml-1m/ml-1m_sample.csv")
-    data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
-    sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', 'cate_id']
-    user_col, item_col = "user_id", "movie_id"
-
-    feature_max_idx = {}
-    for feature in sparse_features:
-        lbe = LabelEncoder()
-        data[feature] = lbe.fit_transform(data[feature]) + 1
-        feature_max_idx[feature] = data[feature].max() + 1
-
-    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
-    item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
-
-    # 2. Build sequence features
-    df_train, df_test = generate_seq_feature_match(
-        data, user_col, item_col, time_col="timestamp",
-        item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=3, min_item=0
-    )
-    x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-    y_train = x_train["label"]
-    x_train = {k: v for k, v in x_train.items() if k != "label"}
-    x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-
-    # 3. Define features
-    user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
-    item_cols = ['movie_id', 'cate_id']
-    user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id")]
-    item_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in item_cols]
-
-    all_item = df_to_dict(item_profile)
-    test_user = x_test
-
-    # 4. Create the model
-    dg = MatchDataGenerator(x=x_train, y=y_train)
-    model = DSSM(user_features, item_features, temperature=1.0,
-                 user_params={"dims": [256, 128, 64], "activation": "prelu"},
-                 item_params={"dims": [256, 128, 64], "activation": "prelu"})
-
-    # 5. Train
-    trainer = MatchTrainer(model, mode=0, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-                           n_epoch=10, device="cpu", model_path=save_dir)
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=4096, num_workers=0)
-    trainer.fit(train_dl)
-
-    # 6. Generate embeddings
-    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
-    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
-    print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
-
-    # 7. Retrieve vectors with Annoy
-    annoy = Annoy(n_trees=10)
-    annoy.fit(item_embedding)
-    for i in range(min(5, len(user_embedding))):
-        indices, distances = annoy.query(user_embedding[i], n=10)
-        print(f"User {i} -> Top-10 Items: {indices}")
-
-
-if __name__ == "__main__":
-    main()
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_dssm.py --epoch 1 --device cpu
 ```

@@ -5,7 +5,7 @@ description: Torch-RecHub 多任务学习教程，覆盖 Ali-CCP 数据准备、
 
 # 多任务学习教程
 
-本教程使用仓库内置的 `Ali-CCP` 样本数据，介绍当前 Torch-RecHub 中多任务学习模型的真实训练方式。文中的代码默认在**仓库根目录**执行。
+Ali-CCP 的一条记录有两个结果，用户有没有点击，以及有没有购买。我们先用同一批样本训练 MMOE 和 PLE，对照两个任务各自的 AUC。最后换成 ESMM，看看点击和购买之间的关系如何体现在标签里。请从仓库根目录运行。
 
 ## 一、数据准备
 
@@ -18,7 +18,8 @@ df_train = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_train_sample.csv")
 df_val = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_val_sample.csv")
 df_test = pd.read_csv("examples/ranking/data/ali-ccp/ali_ccp_test_sample.csv")
 
-# 先把 train / val / test 拼起来统一做特征定义，后面再按索引切回去
+# 仓库样本已使用同一套类别编码，保留给定的三份切分。
+# 换成原始业务数据时，词表只在训练集上拟合。
 train_idx = df_train.shape[0]
 val_idx = train_idx + df_val.shape[0]
 
@@ -40,41 +41,37 @@ sparse_cols = [
     if col not in dense_cols and col not in ["cvr_label", "ctr_label", "ctcvr_label"]
 ]
 
-# 多任务场景里，所有任务默认共享同一套底层输入特征
-features = [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
-    DenseFeature(col) for col in dense_cols
-]
-
-label_cols = ["cvr_label", "ctr_label"]
-used_cols = sparse_cols + dense_cols
+def make_features():
+    return [SparseFeature(col, data[col].max() + 1, embed_dim=4) for col in sparse_cols] + [
+        DenseFeature(col) for col in dense_cols
+    ]
 ```
 
-### 3. 构建训练 / 验证 / 测试集
+### 3. 按模型组织特征和标签
+
+`label_cols` 决定了输出顺序。下面先放购买，再放点击，因此 `y_train` 的第 0 列是购买标签，第 1 列是点击标签。后面查看预测和 AUC 时也按这个顺序读取。
 
 ```python
 from torch_rechub.utils.data import DataGenerator
 
-# DataGenerator 在多任务场景下仍然复用同一套接口，只是 y 变成二维标签
-x_train = {name: data[name].values[:train_idx] for name in used_cols}
-y_train = data[label_cols].values[:train_idx]
+def make_loaders(feature_cols, label_cols):
+    def split(part):
+        return {name: part[name].to_numpy() for name in feature_cols}, part[label_cols].to_numpy()
 
-x_val = {name: data[name].values[train_idx:val_idx] for name in used_cols}
-y_val = data[label_cols].values[train_idx:val_idx]
+    x_train, y_train = split(data.iloc[:train_idx])
+    x_val, y_val = split(data.iloc[train_idx:val_idx])
+    x_test, y_test = split(data.iloc[val_idx:])
+    return DataGenerator(x_train, y_train).generate_dataloader(
+        x_val=x_val, y_val=y_val, x_test=x_test, y_test=y_test, batch_size=256,
+    )
 
-x_test = {name: data[name].values[val_idx:] for name in used_cols}
-y_test = data[label_cols].values[val_idx:]
-
-dg = DataGenerator(x_train, y_train)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    x_val=x_val,
-    y_val=y_val,
-    x_test=x_test,
-    y_test=y_test,
-    batch_size=1024,
-)
+label_cols = ["cvr_label", "ctr_label"]
+train_dl, val_dl, test_dl = make_loaders(sparse_cols + dense_cols, label_cols)
 ```
 
 ## 二、MMOE
+
+两个任务使用同一组专家网络。点击和购买各有一个门控网络，分别学习该给每个专家的输出多大权重。
 
 ```python
 from torch_rechub.models.multi_task import MMOE
@@ -82,7 +79,7 @@ from torch_rechub.trainers import MTLTrainer
 
 # MMOE：共享 expert + 任务专属 gate，是最常见的多任务基线
 model = MMOE(
-    features=features,
+    features=make_features(),
     task_types=["classification", "classification"],
     n_expert=8,
     expert_params={"dims": [16]},
@@ -118,12 +115,14 @@ print(f"Test AUC: {auc}")  # [cvr_auc, ctr_auc]
 
 ## 三、PLE
 
+PLE 为点击和购买各留了一组专属专家，同时保留共享专家。可以沿用上面的 DataLoader。这里再次调用 `make_features()`，让 PLE 从自己的嵌入参数开始训练。
+
 ```python
 from torch_rechub.models.multi_task import PLE
 
-# PLE 在任务差异更大时通常比 MMOE 更稳，因为它区分 shared / task-specific experts
+# 每个模型使用独立的 Feature 实例，PLE 同时包含共享专家和任务专属专家
 model = PLE(
-    features=features,
+    features=make_features(),
     task_types=["classification", "classification"],
     n_level=1,
     n_expert_specific=2,
@@ -155,7 +154,7 @@ mtl_trainer.fit(train_dl, val_dl)
 
 ## 四、ESMM
 
-`ESMM` 的输入与 `MMOE / PLE` 不同：它只使用稀疏特征，并且标签顺序通常为 `["cvr_label", "ctr_label", "ctcvr_label"]`。
+这个例子把类别特征分成用户侧和物品侧两组。除了购买、点击，还要计算第三列 `ctcvr_label`，表示同一条曝光是否既点击又购买。训练、验证和测试都按下面的顺序取这三列。
 
 ```python
 from torch_rechub.models.multi_task import ESMM
@@ -167,94 +166,29 @@ user_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col i
 item_features = [SparseFeature(col, data[col].max() + 1, embed_dim=16) for col in item_cols]
 
 label_cols = ["cvr_label", "ctr_label", "ctcvr_label"]
-x_train = {name: data[name].values[:train_idx] for name in sparse_cols}
-y_train = data[label_cols].values[:train_idx]
-```
+esmm_train, esmm_val, esmm_test = make_loaders(sparse_cols, label_cols)
 
-```python
-# ESMM 会把 user tower 和 item tower 的组合用于估计 CTR / CVR / CTCVR
 model = ESMM(
-    user_features,
-    item_features,
-    cvr_params={"dims": [16, 8]},
-    ctr_params={"dims": [16, 8]},
+    user_features, item_features,
+    cvr_params={"dims": [16, 8]}, ctr_params={"dims": [16, 8]},
 )
-```
-
-## 五、训练器接口
-
-```python
-from torch_rechub.trainers import MTLTrainer
-
-trainer = MTLTrainer(
-    model,
-    task_types=["classification", "classification"],
-    optimizer_params={"lr": 1e-3},
-    regularization_params={"embedding_l2": 0.0, "dense_l2": 0.0},
-    adaptive_params=None,   # 可选: {"method": "uwl"}
-    n_epoch=10,
-    earlystop_taskid=0,
-    earlystop_patience=10,
-    device="cpu",
-    model_path="./saved/mtl",
-)
-```
-
-> 当前只建议使用等权损失（`None`）或 UWL。`gradnorm` / `metabalance` 分支在当前 `MTLTrainer.train_one_epoch()` 中会在合并正则项前引用未赋值的 `loss`，不应当作可用配置。
-
-ESMM 是一个特例：它输出 `[cvr, ctr, ctcvr]`，因此必须重新用三列标签构建 DataLoader，并把训练器配置为：
-
-```python
+os.makedirs("./saved/esmm", exist_ok=True)
 esmm_trainer = MTLTrainer(
-    model,
-    task_types=["classification", "classification", "classification"],
-    optimizer_params={"lr": 1e-3},
-    n_epoch=10,
-    device="cpu",
-    model_path="./saved/esmm",
+    model, task_types=["classification"] * 3, n_epoch=2,
+    device="cpu", model_path="./saved/esmm",
 )
+esmm_trainer.fit(esmm_train, esmm_val)
+scores = esmm_trainer.evaluate(esmm_trainer.model, esmm_test)
+print(dict(zip(label_cols, scores)))
 ```
 
-## 六、评估与调优建议
+例如，一条“点击、未购买”记录对应三列 `[0, 1, 0]`。模型按 CVR、CTR、CTCVR 的顺序输出，训练损失取 CTR 和 CTCVR 两项，评估按同一列序返回三个分数。
 
-### 1. 评估输出
+## 五、怎样读评估结果？
 
-```python
-scores = mtl_trainer.evaluate(mtl_trainer.model, test_dl)
-print(scores)
-```
+对 MMOE 和 PLE，`evaluate()` 返回的第一个 AUC 对应购买，第二个对应点击。仓库的验证集和测试集各有 50 行，其中购买正例各只有一条。若这条记录的排名变化，购买 AUC 就可能明显波动。换成业务数据时，先查看每个任务有多少正例，再比较模型。
 
-`evaluate()` 会返回一个列表，顺序与 `task_types` 一致。例如：
-
-- `[cvr_auc, ctr_auc]`
-- 或 ESMM 下的三个任务分数
-
-### 2. 调优重点
-
-- `MMOE`：优先调 `n_expert`
-- `PLE`：优先调 `n_level / n_expert_specific / n_expert_shared`
-- 任务失衡明显时：尝试 `adaptive_params={"method": "uwl"}`
-- 多任务 AUC 波动较大时：先减小学习率，再缩短专家网络维度
-
-## 七、常见问题
-
-### Q1：为什么这页不再使用 `from torch_rechub.utils import DataGenerator`？
-
-因为 `DataGenerator` 位于 `torch_rechub.utils.data`，不是从 `torch_rechub.utils` 顶层导出。
-
-### Q2：为什么文档不再使用 `n_epochs`？
-
-`MTLTrainer` 的参数名是 `n_epoch`。
-
-### Q3：为什么这里没有 `evaluate_multi_task()`？
-
-框架直接使用 `MTLTrainer.evaluate(model, data_loader)`，返回每个任务的分数列表，不存在 `evaluate_multi_task()` 这个公开函数。
-
-### Q4：为什么训练前要先执行 `os.makedirs`？
-
-`MTLTrainer` 不会自动创建 `model_path` 目录，因此文档示例中显式创建保存目录。
-
-### Q5：还想继续看具体模型页？
+想单独调整专家网络的数量或层数，可从对应的模型教程接着看。
 
 - [MMOE 教程](/zh/tutorials/models/multi_task/mmoe)
 - [PLE 教程](/zh/tutorials/models/multi_task/ple)

@@ -5,124 +5,68 @@ description: 召回模型的损失函数、相似度度量和温度缩放的完�
 
 # 召回模型训练指南
 
-## 一、乱七八糟的Loss？—— 3种训练方式
+## 一、训练一条样本时，模型在比较什么？
 
-召回中，一般的训练方式分为三种：point-wise、pair-wise、list-wise。在RecHub中，用参数***mode***来指定训练方式，每一种不同的训练方式也对应不同的Loss。
+同一条观看记录可以变成几种不同的训练样本。以用户看过电影 A 为例，`MatchTrainer` 的 `mode` 决定训练器怎样使用模型返回的分数。
 
-### 1.1 Point wise (mode = 0)
+### 1.1 对每个用户和物品配对打分（mode = 0）
 
-> 🥰**核心思想：将召回视为二分类。**
+一行是“用户、电影、标签”。正样本的标签是 1，负样本的标签是 0。默认 DSSM 输出一个介于 0 和 1 之间的分数，训练器用二元交叉熵（BCE）衡量它和标签的差距。
 
-对于一个召回模型，输入二元组\<User, Item>，输出$P(User, Item)$，表示User对Item的感兴趣程度。
+### 1.2 比较一对正负物品（mode = 1）
 
-训练目标为：若物品为正样本，输出应尽可能接近1，负样本则输出尽可能接近0。
-
-采用的Loss最常见的就是BCELoss（Binary Cross Entropy Loss）。
-
-### 1.2 Pair wise (mode = 1)
-
-> 😝**核心思想：用户对正样本感兴趣的程度应该大于负样本。**
-
-对于一个召回模型，输入三元组\<User, ItemPositive, ItemNegative\>，输出兴趣得分$P(User, ItemPositive)$，$P(User, ItemNegative)$，表示用户对正样本物品和负样本物品的兴趣得分。
-
-训练目标为：正样本的兴趣得分应尽可能大于负样本的兴趣得分。
-
-框架中采用的Loss为BPRLoss（Bayes Personalized Ranking Loss）。Loss的公式这里放一个公式，详细可以参考[这里](https://www.cnblogs.com/pinard/p/9128682.html "这里")（链接里的内容和下面的公式有些细微的差别，但是思想是一样的）
+给同一个用户选一部看过的电影 A 和一部采样的电影 B。FaceBookDSSM 返回两个分数，BPR 损失看的是它们的差：A 比 B 高得越多，损失越小。不需要把这两个分数分别拟合到 1 和 0。
 
 $$
-Loss=\frac{1}{N}\sum^N\ _{i=1}-log(sigmoid(pos\_score - neg\_score))
+L = -\frac{1}{N}\sum_{i=1}^{N}\log\sigma(s_i^+ - s_i^-)
 $$
 
-***
+其中 $s_i^+$ 和 $s_i^-$ 分别是第 $i$ 个用户样本的正例分和负例分。[BPR 推导](https://www.cnblogs.com/pinard/p/9128682.html)
 
-### 1.3 List wise（mode = 2）
+### 1.3 从一组候选里选出正例（mode = 2）
 
-> 😇**核心思想：用户对正样本感兴趣的程度应该大于负样本 。**
+如果给用户的候选列表是 `[A, B, C, D]`，而 A 是正例，目标标签就是它在列表中的位置 `0`。YoutubeDNN 为四部电影分别打分，训练器把这四个原始分数直接交给交叉熵。这里的任务是在这组候选中选中 A。
 
-嗯？怎么和Pair wise一样？
+DSSM 使用批内负采样时，其他用户这一批的正物品也能充当候选。这种情况下即使设置 `mode=0`，训练器也会改用交叉熵。具体如何构造一批样本见[召回训练教程](/zh/tutorials/retrieval)。
 
-没错！List wise的训练方式的思想和Pair wise是一样的，只不过实现上不同。
+## 二、用哪种距离检索用户向量和物品向量？
 
-对于一个召回模型，输入N+2元组$<User, ItemPositive, ItemNeg\_1, ... , ItemNeg\_N>$，输出用户对1个正样本和N个负样本的兴趣得分。
+以 DSSM 为例，两个塔都输出长度为 1 的向量。训练时用点积打分，用物品索引检索时又常看到 cosine、angular 等名字。它们怎样对应？
 
-训练目标为：对正样本的兴趣得分应该尽可能大于其他所有负样本的兴趣得分。
+### 余弦相似度和点积
 
-框架中采用的 Loss 为 `torch.nn.CrossEntropyLoss`。模型应输出未归一化 logits；该损失内部组合 `LogSoftmax` 与 `NLLLoss`，标签是正样本在候选列表中的位置。
-
-> PS：这里的 List wise 容易和 Ranking 中的 listwise 混淆。后者通常直接优化或近似排序列表目标，并用 MAP、NDCG 等顺序敏感指标评价；这里则是在一个正样本与若干负样本之间做多分类。
-
-## 二、两个向量有多远？—— 3 种衡量指标
-
-> 🤔给定一个用户向量和一个物品向量，如何衡量他们之间的相似度？
-
-先定义用户向量$user \in \mathcal R^D$，$item\in \mathcal R^D$，D表示用户向量和物品向量的维度。
-
-### 2.1 cosine
-
-初中学过：
+余弦相似度等于两个向量的点积除以它们的长度乘积：
 
 $$
-cos(a,b)=\frac{<a,b>}{|a|*|b|}
+\cos(a,b)=\frac{a^\top b}{\lVert a\rVert\,\lVert b\rVert}
 $$
 
-表示两个向量的夹角，会输出一个\[-1, 1]之间的实数，我们就可以以此作为相似度的衡量依据：两个向量之间角度越小，就越相似。
+两个向量的方向越接近，余弦值越接近 1。分别做过 L2 归一化后，分母等于 1，所以直接算点积就等于算余弦相似度。如果换了模型，要先看它导出的向量是否做过同样的归一化。
 
-RecHub 中 DSSM、YouTubeDNN、MIND、ComiRec、GRU4Rec 等实现会对塔输出做 L2 归一化，再以内积得到 cosine 相似度；其他序列召回实现的输出约定并不完全相同。接入自定义模型或切换架构时，应以对应 `forward()` 为准。
+### 欧氏距离
 
-### 2.2 dot
-
-即向量的内积，用$<a,b> $表示向量a、b的内积。
-
-一个很简单的思想是：**如果将a、b 向量L2 normalize，即 $\tilde{a}=\frac{a}{|a|}\ ,\tilde{b}=\frac{b}{|b|}$，然后直接将 $\tilde{a}、\tilde{b}$求内积，就等价于于 $cos(a,b)$**。 （很容易，这里就不推导了）
-
-当前多种双塔/多兴趣实现采用这种写法：先计算 user/item embedding，分别做 L2 normalize，再计算内积。它避免重复显式计算向量范数，也便于用 angular/IP 索引检索；但这不是仓库内所有 matching 模型的统一保证。
-
-### 2.3 Euclidian Distance（欧氏距离）
-
-欧氏距离即我们生活中“距离”的含义。
-
-> 🙋**经过L2 Norm后的向量a,b，最大化其cosine相似度与最小化其欧氏距离，是等价的**
-
-为什么？见下面公式：
+对于长度均为 1 的两个向量，把欧氏距离的平方展开：
 
 $$
-\begin{align*}
-  EuclidianDistance(a,b)^2 &= \sum_{i=1}^N(a_i-b_i)^2 \\
-    &= \sum_{i=1}^Na_i^2+\sum_{i=1}^Nb_i^2-\sum_{i=1}^N2*a_i*b_i\\
-    &= 2-2*\sum_{i=1}^Na_i*b_i \\
-    &= 2*(1-cos(a,b))
-\end{align*}
+\lVert a-b\rVert^2 = \lVert a\rVert^2 + \lVert b\rVert^2 - 2a^\top b = 2-2\cos(a,b)
 $$
 
-两点解释一下：
+所以按余弦相似度从大到小排列，与按欧氏距离从小到大排列，得到的顺序相同。项目里的 Annoy 封装默认使用 `angular`，它对于单位向量也随余弦相似度的增大而减小。记住分数和距离的方向不同，合并多个检索结果时才不会把最不相似的电影排在前面。
 
-1. 第二行到第三行，$\sum\ _{i=1}^N a\_i^2=1$。为什么？因为a是L2 Norm后的向量。b同理。
-2. 第三行到第四行，$\sum_{i=1}^Na_i*b_i$，即向量a、b的内积，因为a、b已经L2 Norm，所以相当于cos。
+## 三、为什么要除以温度？
 
-旧版 matching 评估工具 `torch_rechub.utils.match.Annoy` 默认使用 `angular` 度量，而不是 `euclidean`。对 L2 归一化向量，angular 距离与 cosine 相似度单调对应；若显式切换后端或 metric，训练打分和检索度量应保持一致。
-
-> 🙋**小结：L2 Norm后的两个向量，max dot等价于max cosine等价于min EuclidianDistance**
-
-## 三、 温度系数有多热？
-
-> 在此之前，请先确认明白[torch.nn.CrossEntropyLoss](https://blog.csdn.net/sdutstudent/article/details/116097064 "torch.nn.CrossEntropyLoss")中都进行了什么运算（LogSoftmax + NLLLoss），这对阅读源码也是关键的信息。这里是[官方文档](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html "官方文档")。
-
-假设一个场景：采用List wise的训练方式，1个正样本，3个负样本，cosine相似度作为训练过程中的衡量指标。
-
-假设此时我的模型完美的预测了一条训练数据，即输出的logits为（1, -1, -1, -1），按理说我的Loss应该为0，至少应该很小。但此时如果采用CrossEntropyLoss，得到的Loss是：
+还是四部候选电影。设 A 是正例，四个余弦得分分别是 `[1, -1, -1, -1]`。A 已经排第一，但 softmax 分给它的概率还不到 1，这时交叉熵约为：
 
 $$
--log(exp(1)/(exp(1)+exp(-1)*3))=0.341
+-\log\frac{e^1}{e^1+3e^{-1}} \approx 0.341
 $$
 
-但此时如果对logits除上一个温度系数$temperature=0.2 $，即logits为（5, -5, -5, -5），经过CrossEntropyLoss，得到的Loss是：
+把四个得分都除以温度 `0.2`，输入交叉熵的数就成了 `[5, -5, -5, -5]`。同一个正例的损失变为：
 
 $$
--log(exp(5)/(exp(5)+exp(-5)*3))=0.016
+-\log\frac{e^5}{e^5+3e^{-5}} \approx 0.00013619
 $$
 
-这样就会得到一个很小到可以忽略不计的Loss了。
+候选的顺序始终没有变。较低的温度会让 softmax 给最高分候选更大的概率。如果排第一的是负例，降低温度也会放大这次错误。可以对照 [PyTorch 的交叉熵定义](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html)核算上面的例子。
 
-也就是说，**对logits除上一个temperature的作用是扩大logits中每个元素中的上下限，拉回softmax运算的敏感范围** 。
-
-L2 normalize 常与 temperature 搭配使用，但 temperature 是否生效取决于具体模型：例如 DSSM-SENet、YouTubeDNN 会缩放 logits，而基础 DSSM 当前保留了参数但未在 `forward()` 中应用。不要仅凭构造函数存在 `temperature` 参数就假设它已参与训练。
+基础 DSSM 默认按点积取 sigmoid，再用 BCE 训练，这条路径不做温度缩放。开启批内采样时，`MatchTrainer` 会读取模型的 `temperature` 缩放候选得分。YoutubeDNN 在其默认前向计算中就会使用这个参数。

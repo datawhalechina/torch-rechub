@@ -54,9 +54,9 @@ def get_movielens_data(data_path, load_cache=False, in_batch_neg=False):
     item_cols = ['movie_id', "cate_id"]
 
     user_features = [SparseFeature(feature_name, vocab_size=feature_max_idx[feature_name], embed_dim=16) for feature_name in user_cols]
-    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id")]
+    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id", padding_idx=0)]
 
-    item_features = [SparseFeature(feature_name, vocab_size=feature_max_idx[feature_name], embed_dim=16) for feature_name in item_cols]
+    item_features = [SparseFeature(feature_name, vocab_size=feature_max_idx[feature_name], embed_dim=16, padding_idx=0) for feature_name in item_cols]
 
     all_item = df_to_dict(item_profile)
     test_user = x_test

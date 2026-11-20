@@ -1,13 +1,13 @@
 ---
 title: DIN 使用示例
-description: Deep Interest Network (DIN) 模型完整使用教程 —— 擅长捕捉用户历史行为中的多样化兴趣
+description: 用当前候选商品为每条历史行为分配注意力权重
 ---
 
 # DIN 使用示例
 
 ## 1. 模型简介与适用场景
 
-DIN (Deep Interest Network) 是阿里妈妈在 KDD'2018 提出的经典推荐模型。针对电商场景中用户兴趣的**多样性**和**局部激活**特征（用户当前的点击通常只与其历史行为中的一小部分相关），DIN 引入了**目标注意力机制 (Target Attention/Activation Unit)**，根据当前候选物品（Target Item），动态计算用户历史行为序列的权重，从而自适应地捕捉用户的动态兴趣。
+同一个用户既看过耳机，也看过显示器。现在候选商品是一副耳机，哪些历史记录对点击预测更有帮助？DIN 用候选商品给每条历史记录算一个权重，再把历史汇总成向量。换一个候选，历史记录的权重也会跟着变。
 
 **论文**: [Deep Interest Network for Click-Through Rate Prediction](https://arxiv.org/abs/1706.06978)
 
@@ -17,22 +17,13 @@ DIN (Deep Interest Network) 是阿里妈妈在 KDD'2018 提出的经典推荐模
   <img src="/img/models/din_arch.png" alt="DIN Model Architecture" width="600"/>
 </div>
 
-- **Base 模型**: 类似于一个标准的 Embedding + MLP 结构
-- **Activation Unit**: DIN 的核心。利用目标物品特征与用户历史序列特征计算 Attention 分数（权重），将历史序列聚合成一个固定维度的表示。
-- **Dice 激活函数**: 论文提出的一种数据依赖的激活函数，能自适应地调整修正点，优于 PReLU。
-
-### 适用场景
-
-- CTR 预估（点击率预测）
-- 电商推荐排序
-- 拥有丰富且较长的**用户行为序列**数据（如浏览历史、点击历史等）
-- 候选物品种类繁多，用户兴趣分散的场景
+图中的 Activation Unit 接收一个候选向量和一串历史向量，输出与该候选相关的历史表示。最后再结合候选商品本身和用户特征计算点击概率。
 
 ---
 
 ## 2. 数据准备与预处理
 
-本示例使用 **Amazon Electronics** 样本数据集。该数据集包含了用户对商品的交互行为以及时间戳。主要构建了用户的商品历史序列、类目历史序列。
+Amazon Electronics 样本里有用户 ID、商品 ID、商品类目和交互时间。下面按时间生成样本，每一行都保留候选商品之前的商品历史和类目历史。
 
 ### 2.1 加载和构建序列数据
 
@@ -75,8 +66,8 @@ features = [
 
 # 2. 当前候选物品特征
 target_features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0),
 ]
 
 # 3. 历史行为序列特征 (History Features)
@@ -87,17 +78,19 @@ history_features = [
         vocab_size=n_items + 1,
         embed_dim=8,
         pooling="concat",     # 必须使用 concat，交给 Activation Unit 处理
-        shared_with="target_item_id"
+        shared_with="target_item_id", padding_idx=0
     ),
     SequenceFeature(
         "hist_cate_id",
         vocab_size=n_cates + 1,
         embed_dim=8,
         pooling="concat",     # 必须使用 concat
-        shared_with="target_cate_id"
+        shared_with="target_cate_id", padding_idx=0
     )
 ]
 ```
+
+对历史 `[3, 0, 0]`，有效位置是 `[1, 0, 0]`。`shared_with` 让候选与历史使用同一张表，`padding_idx=0` 让注意力忽略补齐的位置。
 
 ### 2.3 构建输入字典和 DataLoader
 
@@ -150,7 +143,7 @@ model = DIN(
 | `mlp_params` | `dict` | 顶层预测 MLP 的参数（`activation` 已内置为 `dice`，无需传入） | `{"dims": [256, 128]}` |
 | `attention_mlp_params` | `dict` | 目标注意力网络 (Activation Unit) 的参数（默认 `activation="dice"`, `use_softmax=False`） | `{"dims": [256, 128]}` |
 
-> **关键提醒**: `history_features` 和 `target_features` 应当在物理意义上成对出现（如 `hist_item_id` 对应 `target_item_id`），并且必须通过 `shared_with` 共享 Embedding 表！
+商品 ID 要和商品 ID 配对，类目也要和类目配对。两个字段即使碰巧都是 8 维，若把商品和类目顺序放反，注意力计算比较的就是两种不同含义的向量。
 
 ---
 
@@ -191,20 +184,17 @@ print(f"Test AUC: {auc:.4f}")
 
 ## 6. 参数调优建议
 
-1. **激活函数选择**：DIN 论文提出了 `Dice` 激活函数，通常比默认的 `ReLU` 或 `PReLU` 在大规模稀疏数据上表现更好。
-2. **Attention Softmax**：`attention_mlp_params` 中的 `use_softmax=False` 是论文中的设计（允许聚合后的向量长度动态变化，表示兴趣强度的总和）。
-3. **序列长度限制**：历史序列过长会增加计算延迟。线上通常截断最近的 20~50 次交互记录。
-4. **共享 Embedding**：确保历史 ID 和目标 ID 使用了同一个 LookUp Table，这是 Attention 起作用的物理基础。
+本例中 `use_softmax=False`，注意力网络算出的权重直接参与加权求和。若改为 `True`，模型会在有效历史位置上归一化权重。比较两种设置时请保留相同的历史长度和训练数据。
 
 ---
 
 ## 7. 常见问题与解决方案
 
 ### Q1: `SequenceFeature` 为什么要用 `pooling="concat"`?
-因为 DIN 需要自己处理序列融合，它需要拿到 `[batch, seq_len, embed_dim]` 这样 3D 格式的张量丢给 Activation Unit，而不是先做平均 (`mean` pooling)。
+DIN 要为每个历史位置分别打分。`pooling="concat"` 保留 `[batch, seq_len, embed_dim]` 里的时间维度，注意力网络才能逐个比较候选和历史商品。
 
 ### Q2: 报错 `dimension mismatch` 或张量大小不对？
-检查 `target_features` 和 `history_features` 传入模型的顺序和数量是否严格对应。模型内部是基于 zip 的逻辑将第 $i$ 个 `history_feature` 与第 $i$ 个 `target_feature` 进行 Attention 计算的。
+先核对两个列表的长度和顺序。如果历史的第一个字段是 `hist_item_id`，目标的第一个字段就应是 `target_item_id`，并使用相同的嵌入维度。
 
 ---
 
@@ -265,12 +255,12 @@ def main():
         SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
     ]
     target_features = [
-        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0)
     ]
     history_features = [
-        SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-        SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
+        SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id", padding_idx=0),
+        SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id", padding_idx=0)
     ]
 
     # 4. 构建数据字典和 DataLoader

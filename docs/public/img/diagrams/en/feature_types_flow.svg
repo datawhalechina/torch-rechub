@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="470" viewBox="0 0 720 470" lang="en" xml:lang="en" role="img" aria-labelledby="title desc">
+  <title id="title">Three feature types in a movie record</title>
+  <desc id="desc">Age 28 is a numeric input. Movie ID 3 selects row 3 from embedding table E. History IDs [7, 4, 0] use the same table. With 0 as padding, mean pooling averages only rows 7 and 4.</desc>
+  <defs>
+    <style>
+      text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #152A43; }
+      .title { font-size: 29px; font-weight: 700; }
+      .sub, .label, .muted { fill: #40566C; }
+      .sub { font-size: 18px; }
+      .label { font-size: 17px; font-weight: 600; }
+      .muted { font-size: 17px; }
+      .mono, .mono-sm, .num { font-family: Consolas, "Liberation Mono", Menlo, monospace; }
+      .mono { font-size: 20px; }
+      .mono-sm { font-size: 18px; }
+      .num { font-size: 23px; font-weight: 600; }
+      .teal { fill: #006C67; }
+      .amber { fill: #994519; }
+    </style>
+    <pattern id="padding" width="7" height="7" patternUnits="userSpaceOnUse">
+      <rect width="7" height="7" fill="#FFF0DF"/>
+      <path d="M-1 1 L1 -1 M0 7 L7 0 M6 8 L8 6" stroke="#E9D0AF" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect x="1" y="1" width="718" height="468" rx="16" fill="#F8FAFC" stroke="#D5DFE5"/>
+  <text x="32" y="51" class="title">Three feature types in a movie record</text>
+  <text x="32" y="84" class="sub">Candidate and history IDs look up rows in the same movie table, E.</text>
+  <path d="M32 108 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="138" class="label">Field and feature type</text>
+  <text x="228" y="138" class="label">Encoded input</text>
+  <text x="444" y="138" class="label">Model representation</text>
+  <path d="M32 151 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="184" class="mono">age</text>
+  <text x="32" y="211" class="mono-sm muted">DenseFeature</text>
+  <text x="228" y="190" class="num">28</text>
+  <path d="M397 183 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="190" class="num">28.0</text>
+  <text x="444" y="213" class="muted">Use the numeric value</text>
+  <path d="M32 232 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="266" class="mono">movie_id</text>
+  <text x="32" y="293" class="mono-sm muted">SparseFeature</text>
+  <rect x="228" y="245" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="249.5" y="270" class="num teal" text-anchor="middle">3</text>
+  <path d="M397 264 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="270" class="num teal">E[3]</text>
+  <text x="444" y="293" class="muted">Look up the vector for ID 3</text>
+  <path d="M32 313 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="347" class="mono">hist_movie_id</text>
+  <text x="32" y="374" class="mono-sm muted">SequenceFeature</text>
+  <rect x="228" y="326" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="249.5" y="351" class="num teal" text-anchor="middle">7</text>
+  <rect x="276" y="326" width="43" height="36" rx="5" fill="#DDF3ED"/>
+  <text x="297.5" y="351" class="num teal" text-anchor="middle">4</text>
+  <rect x="324" y="326" width="43" height="36" rx="5" fill="url(#padding)"/>
+  <text x="345.5" y="351" class="num amber" text-anchor="middle">0</text>
+  <path d="M397 344 h25 m-7 -6 7 6 -7 6" fill="none" stroke="#8295A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="444" y="351" class="mono teal">(E[7] + E[4]) / 2</text>
+  <text x="444" y="377" class="muted">Average the two watched movies</text>
+  <text x="215" y="400" class="muted" text-anchor="end">mask</text>
+  <text x="249.5" y="400" class="mono-sm teal" text-anchor="middle">1</text>
+  <text x="297.5" y="400" class="mono-sm teal" text-anchor="middle">1</text>
+  <text x="345.5" y="400" class="mono-sm amber" text-anchor="middle">0</text>
+  <path d="M32 413 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="447" class="mono-sm">padding_idx=0</text>
+  <text x="198" y="447" class="muted">Padding is excluded from the mean.</text>
+</svg>

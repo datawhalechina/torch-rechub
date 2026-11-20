@@ -5,21 +5,17 @@ description: Torch-RecHub 向量检索工具
 
 # 向量检索封装
 
-Torch-RecHub 提供了统一的向量检索接口，支持三种主流的近似最近邻（ANN）检索库：**Annoy**、**FAISS** 和 **Milvus**。通过标准化的 Builder-Indexer 模式，用户可以方便地在不同检索后端之间切换。
+双塔模型为每个物品算出一个向量。给用户做召回时，用这个用户的向量查索引，取回最接近的物品。Annoy、Faiss 和 Milvus 都使用下面的 `from_embeddings` 建索引、`query` 查候选，区别主要在索引的保存方式和运行环境。
 
-![向量索引 Builder-Indexer 组件关系图](/img/diagrams/vector_index_builder_indexer.png)
+![用物品向量建索引，再按查询返回的行号找回原始电影 ID](/img/diagrams/zh/vector_index_builder_indexer.svg)
 
 ## 安装
 
-当前 `torch_rechub.serving` 在导入时会同时加载三个后端。即使只调用其中一个，也需要安装全部检索 extra：
-
-```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
-```
-
-这是当前包导入方式的限制，不代表运行时必须同时使用三个后端。
+下面的例子使用 Faiss，在当前 Python 环境运行 `pip install "torch-rechub[faiss]"` 即可。使用 Annoy 或 Milvus 时，安装本页对应后端的依赖。
 
 ## 快速开始
+
+先用 1,000 个物品和 10 个用户的随机向量看清输入输出。每个向量都是 64 维，每位用户取 10 个候选，所以 `ids` 和 `scores` 的形状都是 `[10, 10]`。实际召回时，用物品塔和用户塔算出的向量替换随机数。
 
 ```python
 import torch
@@ -35,6 +31,7 @@ builder = builder_factory("faiss", index_type="Flat", metric="L2")
 with builder.from_embeddings(item_embeddings) as indexer:
     # 查询 Top-K
     ids, scores = indexer.query(user_embeddings, top_k=10)
+    # ids 是向量行号。部署时用与 item_embeddings 等长、同序的物品 ID 表还原结果。
     # 保存索引
     indexer.save("item.index")
 
@@ -43,14 +40,15 @@ with builder.from_index_file("item.index") as indexer:
     ids, scores = indexer.query(user_embeddings, top_k=10)
 ```
 
-第二个返回值的语义由度量决定：L2/angular 通常是越小越近的距离，IP/COSINE 通常是越大越相似的分数。不要在不同度量之间直接比较该数值。
+`ids[0]` 是第一位用户的候选行号。例如行号 7 对应传入 `item_embeddings` 的第 8 行。保存索引时，记得保留一份顺序相同的物品 ID 表，供之后把行号换回原始 ID。[用电影 ID 还原查询结果](/zh/serving/demo)
+
+这里的 `scores` 是 Faiss 的 L2 平方距离，越小越近。改用内积（`IP`）或余弦相似度（`COSINE`）时，分数越大越相似。
 
 ## 核心概念
 
 ### Builder-Indexer 模式
 
-- **Builder**：负责索引的构建配置，通过 `builder_factory` 工厂函数创建
-- **Indexer**：负责具体的查询和保存操作，通过 Builder 的上下文管理器获取
+`builder` 记住后端名称、向量维度和距离度量。调用 `builder.from_embeddings(...)` 后，在 `with` 块里用 `indexer.query(...)` 查询。Annoy 和 Faiss 都可以把这份索引存成文件，下次用 `from_index_file(...)` 重新打开。
 
 ### 工厂函数
 
@@ -69,15 +67,15 @@ builder = builder_factory(model, **builder_config)
 
 ## Annoy
 
-[Annoy](https://github.com/spotify/annoy)（Approximate Nearest Neighbors Oh Yeah）是 Spotify 开源的近似最近邻搜索库，特点是内存友好、支持文件内存映射。
+Annoy 适合提前建好索引、把文件部署到本机的召回流程。加载时会将索引文件映射到内存。[Annoy 项目](https://github.com/spotify/annoy)
 
 ### 后端依赖
 
 ```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
+pip install "torch-rechub[annoy]"
 ```
 
-> ⚠️ **注意**：Annoy 包含 C++ 扩展。如果 PyPI 没有适配当前 Python/平台的 wheel，安装时会转为本地编译：Linux/macOS 需要可用的 `gcc`/`g++` 或 `clang`，Windows 需要 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)。不要从来源不明的第三方站点安装二进制 wheel。
+Annoy 包含 C++ 扩展。如果当前平台没有预编译包，Linux/macOS 需要 GCC 或 Clang，Windows 需要 Visual Studio Build Tools。[Windows 安装问题](/zh/community/faq)
 
 ### 参数说明
 
@@ -95,7 +93,7 @@ builder = builder_factory(
 | 参数      | 类型  | 默认值      | 说明                                                                  |
 | --------- | ----- | ----------- | --------------------------------------------------------------------- |
 | `d`       | `int` | 必需        | 向量维度                                                              |
-| `metric`  | `str` | `"angular"` | 距离度量：`"angular"`（余弦）、`"euclidean"`（欧氏）、`"dot"`（点积） |
+| `metric`  | `str` | `"angular"` | 距离度量：`"angular"`（角距离）、`"euclidean"`（欧氏）、`"dot"`（点积） |
 | `n_trees` | `int` | `10`        | 构建的树数量，越多精度越高但构建越慢                                  |
 | `threads` | `int` | `-1`        | 构建线程数，`-1` 表示使用所有可用核心                                 |
 | `searchk` | `int` | `-1`        | 搜索时检查的节点数，`-1` 表示 `n_trees * top_k`                       |
@@ -109,7 +107,7 @@ from torch_rechub.serving import builder_factory
 item_embeddings = torch.randn(1000, 64, dtype=torch.float32)
 user_embeddings = torch.randn(10, 64, dtype=torch.float32)
 
-# 使用余弦相似度
+# 使用 angular 距离，越小越相似
 builder = builder_factory(
     "annoy",
     d=64,
@@ -122,7 +120,7 @@ with builder.from_embeddings(item_embeddings) as indexer:
     ids, distances = indexer.query(user_embeddings, top_k=10)
     indexer.save("annoy.index")
     
-print(f"召回物品ID: {ids}")
+print(f"候选物品行号: {ids}")
 print(f"距离: {distances}")
 ```
 
@@ -130,23 +128,21 @@ print(f"距离: {distances}")
 
 ## FAISS
 
-[FAISS](https://github.com/facebookresearch/faiss)（Facebook AI Similarity Search）是 Meta 开源的高性能相似性搜索库，支持多种索引类型。Torch-RecHub 当前封装创建的是 CPU 索引，没有执行 CPU→GPU 索引转换。
+Faiss 可以做精确搜索，也可以用近似索引减少查询时访问的候选数量。Torch-RecHub 的 `FaissBuilder` 在 CPU 上构建和查询索引。[Faiss 项目](https://github.com/facebookresearch/faiss)
 
 ### 后端依赖
 
 ```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
+pip install "torch-rechub[faiss]"
 ```
-
-`faiss-gpu` 本身提供 GPU 能力，但当前 `FaissBuilder` 不会把索引转移到 GPU；通过本页 API 使用的仍是 CPU 路径。
 
 ### 支持的索引类型
 
-| 索引类型 | 说明                 | 适用场景               |
-| -------- | -------------------- | ---------------------- |
-| `Flat`   | 暴力搜索，精确结果   | 小规模数据（< 10万）   |
-| `HNSW`   | 基于图的近似搜索     | 中等规模，高召回率要求 |
-| `IVF`    | 倒排索引，聚类后搜索 | 大规模数据             |
+| 索引 | 查询方式 | 什么时候试 |
+| --- | --- | --- |
+| `Flat` | 逐一比较所有物品向量 | 先得到精确结果，作为后面比较召回率的参照 |
+| `HNSW` | 沿索引图访问邻近向量 | 希望缩短查询时间，且内存能容下索引图 |
+| `IVF` | 先聚类，查询时只搜索选中的簇 | 物品库较大，准备好用 `nprobe` 调整搜索范围 |
 
 ### 参数说明
 
@@ -226,15 +222,15 @@ with builder.from_embeddings(item_embeddings) as indexer:
 
 ## Milvus
 
-[Milvus](https://milvus.io/) 是一个云原生向量数据库，支持分布式部署和多种索引算法，适合生产环境的大规模向量检索。
+已有运行中的 Milvus 服务时，可以用同样的 `query` 接口测试服务端的索引。下面的示例会创建一个临时集合（collection），退出 `with` 时删除。[Milvus 项目](https://milvus.io/)
 
 ### 后端依赖与服务
 
 ```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
+pip install "torch-rechub[milvus]"
 ```
 
-> **注意**：使用 Milvus 还需要先启动服务。Milvus Standalone 包含额外组件，不能只运行一个未带启动命令的镜像；请按 [Milvus 官方 Docker 安装文档](https://milvus.io/docs/install_standalone-docker.md) 启动与检查服务。
+上面的命令安装 Python 客户端。还没有服务时，先按 Milvus 的安装文档启动 Standalone 并确认能够连接，再运行查询示例。[Milvus Docker 安装文档](https://milvus.io/docs/install_standalone-docker.md)
 
 ### 支持的索引类型
 
@@ -322,13 +318,13 @@ with builder.from_embeddings(item_embeddings) as indexer:
     # 当前封装不支持本地 save
 ```
 
-`MilvusBuilder.from_embeddings()` 会创建随机命名的临时 collection，并在退出 `with` 时执行 `drop()`；`save()` 和 `from_index_file()` 也未实现。因此这段封装适合一次性实验，不是持久化在线 collection 的管理接口。长期服务请直接用 Milvus 客户端创建和维护 collection。
+需要下次还能查询同一份数据时，请用 Milvus 客户端自己创建并维护集合。本例的 `save()` 和 `from_index_file()` 均未实现。
 
 ---
 
 ## 完整示例：召回模型评估
 
-以下是一个单兴趣（用户与物品 embedding 均为二维张量）的双塔模型向量化评估示例。MIND/ComiRec 等输出 `[batch, interests, dim]` 的多兴趣模型需要先展开兴趣并定义去重、合并策略，不能直接套用此函数。
+下面用测试用户的向量查询物品索引，再把候选行号换成原始物品 ID，与测试集保留的真实交互比较。这里每个用户只有一个向量，输入的用户表和物品表分别与两组向量逐行对应。MIND 和 ComiRec 每人有多个兴趣向量，需要先分别查询，再合并同一用户的候选。[MIND 多兴趣召回示例](/zh/tutorials/models/matching/mind)
 
 ```python
 import collections
@@ -427,23 +423,7 @@ def match_evaluation(
 
 ## 性能对比与选型建议
 
-| 特性         | Annoy      | FAISS    | Milvus       |
-| ------------ | ---------- | -------- | ------------ |
-| **安装难度** | 简单       | 中等     | 需要服务     |
-| **内存占用** | 低         | 中等     | 依赖服务配置 |
-| **构建速度** | 慢         | 快       | 快           |
-| **查询速度** | 中等       | 快       | 快           |
-| **当前封装 GPU 路径** | ❌   | ❌        | 由 Milvus 服务决定 |
-| **分布式**   | ❌          | ❌        | ✅            |
-| **当前封装适用场景** | 小规模离线 | 中大规模离线 | 临时实验 |
-
-### 选型建议
-
-- **快速原型/小数据集**：使用 **Annoy**，安装简单，内存友好
-- **中大规模离线计算**：使用 **FAISS**；当前封装走 CPU 路径
-- **持久化在线服务**：Milvus 服务本身支持分布式和动态更新，但应直接使用 Milvus 客户端管理 collection，而不是当前会自动删除 collection 的上下文封装
-
----
+如果想把索引存成本地文件，Annoy 和 Faiss 都支持 `save()`。MovieLens 教程给出了 Annoy 的完整例子。需要精确搜索做对照，或想比较 HNSW 和 IVF，就用 Faiss。已经在维护 Milvus 服务，可以用这里的临时集合做离线评估，长期保存集合则交给自己的服务。[从用户向量查回电影 ID](/zh/serving/demo)
 
 ## API 参考
 
@@ -479,4 +459,4 @@ class BaseIndexer(abc.ABC):
         """保存索引到文件"""
 ```
 
-以上是抽象接口；具体后端并非都实现持久化方法。当前 Milvus 后端的 `from_index_file()` 与 `save()` 会抛出 `NotImplementedError`。
+`from_index_file()` 和 `save()` 适用于 Annoy 和 Faiss。对当前的 Milvus 后端调用这两个方法会得到 `NotImplementedError`。
