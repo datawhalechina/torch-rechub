@@ -5,9 +5,9 @@ description: Torch-RecHub 模型 ONNX 导出与量化
 
 # ONNX 导出与量化
 
-Torch-RecHub 已支持将训练好的模型导出为 ONNX，用于跨平台推理部署。面向工业推理场景（低延迟、低内存）， **ONNX 导出** 与 **量化（INT8/FP16）** 的完整用法与建议实践。
+训练完成后，可以把模型导出为 `.onnx` 文件，用 ONNX Runtime 运行预测。先导出一份 FP32 模型，拿测试集里的一条记录与 PyTorch 对比分数。确认两边一致后，再根据推理设备尝试 INT8 或 FP16。[用同一条记录核对分数](/zh/serving/demo)
 
-![ONNX 导出与量化链路图](/img/diagrams/onnx_quantization_flow.png)
+![模型从 PyTorch 导出到 ONNX，再进行量化的步骤](/img/diagrams/onnx_quantization_flow.png)
 
 ## 安装依赖
 
@@ -17,13 +17,11 @@ ONNX 相关依赖是可选的，按需安装：
 pip install "torch-rechub[onnx]"
 ```
 
-说明：
-- `torch-rechub[onnx]` 会安装 `ml-dtypes`、`onnx`、`onnxscript`、`onnxruntime`，以及用于 FP16 转换的 `onnxconverter-common`。
-- 如需 GPU 推理，请改用与本机 CUDA/驱动匹配的 `onnxruntime-gpu`，并确认环境中实际导入的是期望的 Runtime 变体。
+这组依赖包含 CPU 版 ONNX Runtime 和 FP16 转换工具。在 NVIDIA GPU 上做推理时，换成与本机 CUDA 和驱动匹配的 `onnxruntime-gpu`，用 `onnxruntime.get_available_providers()` 确认列表里有 `CUDAExecutionProvider`。
 
 ## 导出 ONNX（训练器 export_onnx）
 
-Torch-RecHub 各训练器均提供 `export_onnx()` 方法（CTR/Matching/MTL/Seq），导出过程会自动构造 dummy input，并可支持 **动态 batch size**。
+下面的 `trainer` 都指各自示例中已经训练好的训练器。默认根据特征定义生成示例输入。已有测试批次时，也可以传 `dummy_input`，让导出的字段形状和实际输入一致。启用动态 batch 后，同一模型可以一次预测一条或多条记录。
 
 ### CTR（排序/精排）导出
 
@@ -36,7 +34,7 @@ trainer.export_onnx("deepfm.onnx")
 
 ### Matching（召回）导出：全模型 / 双塔分导
 
-双塔模型通常建议分开导出用户塔与物品塔，线上分别做 embedding 计算：
+如果物品向量可以提前算好，分别导出两个塔。物品塔留给离线建索引的任务，用户塔用于处理新请求。也可以按 `MatchTrainer` 的默认模式导出完整模型。
 
 ```python
 from torch_rechub.trainers import MatchTrainer
@@ -58,7 +56,7 @@ trainer.export_onnx("mmoe.onnx")
 
 ### 导出参数与高级控制（onnx_export_kwargs）
 
-如需选择导出器或传入封装尚未占用的 `torch.onnx.export()` 参数，可以通过 `onnx_export_kwargs` 透传：
+如果要指定 PyTorch 使用哪个导出器，把选项放在 `onnx_export_kwargs` 里。下面的 `dynamo=False` 会让 PyTorch 使用旧版导出器。Torch-RecHub 已设置的参数不能在这个字典里重复传入。
 
 ```python
 trainer.export_onnx(
@@ -72,34 +70,20 @@ trainer.export_onnx(
 
 `f`、`input_names`、`output_names`、`opset_version`、`do_constant_folding`、`verbose` 和自动生成的 `dynamic_axes` 已由封装设置，不得在 `onnx_export_kwargs` 中重复传入，否则会抛出 `ValueError`。
 
-导出器选择建议：
-- **CTR / Matching / MTL**：默认先尝试 `dynamo=True`，动态 batch 通过 `dynamic_shapes` 表达；失败时会自动回退到 legacy 导出器与 `dynamic_axes`。
-- **SeqTrainer**：动态 batch/序列长度默认使用 legacy 导出器；固定 shape 时可按需显式传 `dynamo=True`。
-- **老版本 PyTorch**：若不支持 `dynamo`，导出器会忽略该参数并使用兼容路径。不同 PyTorch 版本的算子覆盖仍可能不同。
+多数模型可以先用默认导出器。CTR、Matching 和 MTL 会先尝试 Dynamo，用 `dynamic_shapes` 表示可变的批大小，失败时回到旧导出器的 `dynamic_axes`。如果当前 PyTorch 版本没有 `dynamo` 参数，封装会使用旧导出器。序列模型需要动态批大小或序列长度时，`SeqTrainer` 默认使用旧导出器，输入形状固定时可显式选择 Dynamo。
 
 ### 查看 ONNX 模型结构
 
-导出 ONNX 后，可以使用 [Netron](https://netron.app/) 在线查看模型结构：
-
-1. 打开 https://netron.app/
-2. 拖拽或上传导出的 `.onnx` 文件
-3. 即可可视化查看模型的网络结构、各层参数和张量形状
-
-> **提示**：Netron 支持多种模型格式（ONNX、TensorFlow、PyTorch 等），是调试和验证导出模型的便捷工具。
+把导出的 `.onnx` 文件拖到 Netron，可以查看输入名、数据类型和张量形状。这些信息在准备 ONNX Runtime 的输入字典时用得上。[Netron](https://netron.app/)
 
 ## ONNX 量化（Quantization）
 
-在工业推理中，FP32 往往不是最优解。常用两类压缩方式：
-- **INT8 动态量化（Dynamic Quantization）**：用于 **CPU** 推理，主要量化 Linear/MatMul 等算子。是否加速、精度是否满足要求，需要用自己的数据测量。
-- **FP16 转换**：用于支持 FP16 的 **GPU** 推理，可以降低浮点权重占用；实际吞吐取决于显卡与算子支持。
+选择哪种模式，先看模型最后在哪台机器上运行。
 
-这两个模式不是按显存大小划分的两档 GPU 量化。当前 INT8 接口不包含 TensorRT 的 GPU INT8 校准流程，也不处理超过 2 GB 的外部权重大模型。
+- **CPU 推理**可以试 `int8`。它对线性层、矩阵乘法等支持的算子做动态量化。
+- **支持半精度的 GPU 推理**可以试 `fp16`。浮点权重占用的空间会变小，实际速度取决于显卡和模型用到的算子。
 
-Torch-RecHub 在量化模块提供统一 API：
-
-```python
-from torch_rechub.utils.quantization import quantize_model
-```
+这两个模式处理常规单文件 ONNX 模型。超过 2 GB 的外部权重模型和 GPU INT8 校准需要另外的工具。下面两个例子分别从同一份 `model_fp32.onnx` 开始。
 
 ### 1) INT8 动态量化（推荐 CPU）
 
@@ -109,14 +93,16 @@ from torch_rechub.utils.quantization import quantize_model
 quantize_model("model_fp32.onnx", "model_int8.onnx", mode="int8")
 ```
 
-可选参数（按需）：
+需要调整 INT8 权重的表示方式时，可设置以下参数。
 - `per_channel=True`：对权重启用 per-channel 量化
-- `reduce_range=True`：缩小量化范围（部分 CPU 可能更稳）
+- `reduce_range=True`：缩小量化时可用的整数范围
 - `weight_type="qint8"|"quint8"`：权重量化类型
 
-原有 `dynamic_int8`、`dynamic` 模式别名和节点筛选参数继续可用；不再静默丢弃不受支持的参数。`optimize_model` 只在 ORT < 1.16 中可用，且保留原默认 `False`；ORT >= 1.16 已移除该参数，显式设置 `True` 会清楚报错。如需优化，请先单独使用 ORT 的 `quant_pre_process()`。
+旧脚本中的 `dynamic_int8`、`dynamic` 仍可作为 `int8` 的别名。需要只量化某些节点时，仍可传节点筛选参数。
 
-兼容说明：部分 Dynamo 导出的 Gemm 模型在 ORT 转置权重后会留下冲突的重复 shape 元信息。ORT >= 1.18 支持直接接收 ModelProto，本工具会在内存副本中移除与 initializer 重名的冗余 `value_info`，保留其他中间张量元信息与原文件，避免该冲突；不改变导出器。更旧 ORT 仍使用原来的文件路径接口，如遇到这类 Dynamo/Gemm 问题，可显式使用 `trainer.export_onnx(..., onnx_export_kwargs={"dynamo": False})` 或给 `torch.onnx.export()` 传 `dynamo=False`。
+**旧脚本用了 `optimize_model=True` 怎么办？** ONNX Runtime 从 1.16 起移除了这个参数。如果需要预处理模型，先运行 ORT 的 `quant_pre_process()`，再量化。
+
+**Dynamo 导出的 Gemm 层在量化时遇到形状冲突怎么办？** ONNX Runtime 1.18 起，转换工具可以在内存中清理重复的形状信息，原始 ONNX 文件会保留。旧版 Runtime 遇到这个错误时，可以用 `onnx_export_kwargs={"dynamo": False}` 重新导出，再做量化。
 
 ### 2) FP16 转换（推荐 GPU）
 
@@ -126,11 +112,11 @@ from torch_rechub.utils.quantization import quantize_model
 quantize_model("model_fp32.onnx", "model_fp16.onnx", mode="fp16")
 ```
 
-Python API 与命令行均默认 `keep_io_types=True`，保留浮点输入/输出为 FP32；整数类别 ID 不改变。只有显式设置 `keep_io_types=False` 或 CLI 的 `--no-keep-io-types` 时，才转换浮点 I/O。`float16` 模式别名继续支持。
+默认的 `keep_io_types=True` 会让浮点输入和输出继续使用 FP32，因此调用方可以沿用原来的输入。整数类别 ID 仍用原类型。如果推理端也准备改用半精度浮点输入，传 `keep_io_types=False`，命令行对应 `--no-keep-io-types`。旧脚本使用的模式名 `float16` 也可继续使用。
 
 ## 脚本示例与基准测试（Benchmark）
 
-仓库内提供脚本，便于快速验证：
+下面的命令从仓库根目录运行，文件名替换成自己的模型路径。
 
 ### 量化脚本
 
@@ -148,11 +134,9 @@ python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --
 python examples/serving/benchmark_onnx_quantization.py --fp32 model_fp32.onnx --fp16 model_fp16.onnx --inputs batch.npz --provider CUDAExecutionProvider
 ```
 
-`batch.npz` 保存一批已完成预处理的真实输入，键必须与 ONNX 输入名一致，例如 `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`。整数组件必须使用模型要求的 dtype。所有待比较模型共用这批输入；如果 FP16 模型改变了浮点 I/O 类型，脚本只做相应的浮点 dtype 转换。
+用 `batch.npz` 固定本次比较的输入。键与 ONNX 的输入名一致，例如 `np.savez("batch.npz", user_id=user_ids, item_id=item_ids)`。有类别 ID、掩码或序列长度时，传入经过训练时预处理的真实值，并保持各字段的数据类型。只有浮点输入的模型也可以省略 `--inputs`，此时脚本使用固定种子的随机数。
 
-没有 `--inputs` 时，脚本只为浮点输入生成固定随机种子的演示数据；类别 ID、mask、长度等整数/布尔输入必须提供真实数据，避免猜测词表和有效取值。脚本检查 provider 是否可用并成功注册，不会把 CPU 回退误报成 GPU 成功；注册 CUDA 仍不代表全部节点运行在 GPU。
+同一批样本会依次送入各个模型。如果 FP16 模型改变了浮点输入类型，脚本会做相应的类型转换。GPU 模式会检查 CUDA provider 是否已注册，具体算子在哪个设备执行仍取决于模型和 Runtime。
 
-打印的文件大小仅指 `.onnx` 文件，不包含外部权重；基准固定 ORT CPU 算子线程为 1，耗时包含输入/输出拷贝，不是纯 GPU kernel 耗时。
-
-> 导出成功只说明模型文件已生成。上线前还应使用真实样本分别运行 PyTorch 与 ONNX Runtime，核对输出形状、数值误差和动态 batch，并在量化后重新评估业务指标；基准脚本不会替代这些一致性检查。
+结果中的文件大小只统计 `.onnx` 本身。CPU 算子固定使用一个线程，计时包含输入和输出的拷贝。比较速度之后，还要在同一份验证集上检查量化前后的指标，例如排序模型的 AUC 和 LogLoss。
 

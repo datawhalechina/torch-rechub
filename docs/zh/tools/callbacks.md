@@ -5,163 +5,37 @@ description: Torch-RecHub 训练回调函数
 
 # 回调函数
 
-回调函数是在训练过程中执行特定操作的工具，用于实现早停、模型保存、学习率调整等功能。Torch-RecHub 提供了简洁易用的回调函数接口。
+## 训练器中的早停
 
-## EarlyStopper
+假设前三轮的验证 AUC 分别为 0.70、0.75、0.73。第二轮结束时，`CTRTrainer` 会把权重写到 `model_path/model.pth`。第三轮比第二轮低，文件里仍是第二轮的权重。分数持平也沿用上次保存的结果。
 
-EarlyStopper 是一个早停器，用于在验证集性能不再提升时停止训练，防止过拟合并节省训练时间。
-
-### 功能描述
-
-- 监控验证集指标（如 AUC）
-- 当指标连续多轮没有提升时触发早停
-- 在内存中深拷贝最佳模型权重
-
-`EarlyStopper` 固定按“越大越好”的 AUC 语义工作，不适合直接监控需要最小化的 loss。它本身不写磁盘；若训练在达到最大 epoch 前没有触发早停，Trainer 也不会自动恢复内存中的最佳权重。
-
-### 使用方法
-
-```python
-from torch_rechub.basic.callback import EarlyStopper
-
-# 创建早停器
-early_stopper = EarlyStopper(patience=10)
-
-# 在训练循环中使用
-for epoch in range(n_epoch):
-    # 训练一个 epoch
-    train_one_epoch(model, train_dataloader)
-
-    # 验证
-    val_auc = evaluate(model, val_dataloader)
-
-    # 检查是否需要早停
-    if early_stopper.stop_training(val_auc, model.state_dict()):
-        print(f'Early stopping at epoch {epoch}')
-        print(f'Best validation AUC: {early_stopper.best_auc}')
-        # 恢复最佳权重
-        model.load_state_dict(early_stopper.best_weights)
-        break
-```
-
-### 参数说明
-
-| 参数 | 类型 | 描述 | 默认值 |
-| --- | --- | --- | --- |
-| `patience` | int | 早停耐心值，即连续多少轮验证集性能没有提升就停止训练 | 必需 |
-
-### 属性说明
-
-| 属性 | 类型 | 描述 |
-| --- | --- | --- |
-| `best_auc` | float | 记录的最佳验证集 AUC |
-| `best_weights` | dict | 最佳模型权重的深拷贝 |
-| `trial_counter` | int | 当前连续未提升的轮数 |
-
-### 方法说明
-
-#### stop_training(val_auc, weights)
-
-判断是否需要停止训练。
-
-**参数：**
-- `val_auc` (float): 当前验证集 AUC 分数
-- `weights` (dict): 当前模型权重（`model.state_dict()`）
-
-**返回值：**
-- `bool`: 如果需要停止训练返回 `True`，否则返回 `False`
-
-## 在 Trainer 中使用
-
-Torch-RecHub 的训练器已经内置了早停功能，通过 `earlystop_patience` 参数控制：
+下面最多训练 20 轮，连续 3 轮没有提高就提前结束。`fit()` 正常返回后，`trainer.model` 已经载入验证 AUC 最高的那一轮。如果手动中断训练，可以从文件读取此前已经保存的权重。
 
 ```python
 from pathlib import Path
 from torch_rechub.trainers import CTRTrainer
 
-model_dir = Path("saved/model")
+model_dir = Path("saved/deepfm")
 model_dir.mkdir(parents=True, exist_ok=True)
-
-trainer = CTRTrainer(
-    model=model,
-    optimizer_params={"lr": 0.001},
-    n_epoch=50,
-    earlystop_patience=10,  # 早停耐心值
-    device="cuda:0",
-    model_path=str(model_dir)
-)
-
-trainer.fit(train_dataloader, val_dataloader)
+trainer = CTRTrainer(model, n_epoch=20, earlystop_patience=3, model_path=str(model_dir))
+trainer.fit(train_dl, val_dl)
 ```
 
-## 完整示例
+多任务训练用 `earlystop_taskid` 指定要监控的任务。AUC 取最大值（默认），选中回归任务的 MSE 时传 `earlystop_mode="min"`。各训练器的输入与评估输出见[训练与评估](/zh/core/evaluation)。
+
+## 自定义训练循环
+
+自己写训练循环时，每轮验证后把指标和当前权重传给 `stop_training`。下面监控的是验证损失，`mode="min"` 表示越低越好。最佳分数保存在 `best_auc`，对应的权重在 `best_weights`。这两个值都在内存中，需要留文件时由训练循环写入磁盘。
 
 ```python
-import torch
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
 from torch_rechub.basic.callback import EarlyStopper
 
-# 创建模型
-model = DeepFM(
-    deep_features=deep_features,
-    fm_features=fm_features,
-    mlp_params={"dims": [256, 128], "dropout": 0.2}
-)
-
-# 方式一：使用 Trainer 内置的早停
-trainer = CTRTrainer(
-    model=model,
-    optimizer_params={"lr": 0.001, "weight_decay": 1e-5},
-    n_epoch=50,
-    earlystop_patience=10,
-    device="cuda:0"
-)
-trainer.fit(train_dl, val_dl)
-
-# 方式二：手动使用 EarlyStopper
-early_stopper = EarlyStopper(patience=10)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-criterion = torch.nn.BCELoss()
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model.to(device)
-
-for epoch in range(50):
-    model.train()
-    for x_dict, y in train_dl:
-        # 训练步骤
-        x_dict = {name: value.to(device) for name, value in x_dict.items()}
-        y = y.float().to(device)
-        optimizer.zero_grad()
-        prediction = model(x_dict)
-        loss = criterion(prediction, y.view_as(prediction))
-        loss.backward()
-        optimizer.step()
-
-    # 验证
-    model.eval()
-    val_auc = evaluate(model, val_dl)
-    print(f"Epoch {epoch}, Val AUC: {val_auc:.4f}")
-
-    # 早停检查
-    if early_stopper.stop_training(val_auc, model.state_dict()):
-        print(f"Early stopping! Best AUC: {early_stopper.best_auc:.4f}")
-        model.load_state_dict(early_stopper.best_weights)
+stopper = EarlyStopper(patience=3, mode="min")
+for epoch in range(n_epoch):
+    train_one_epoch(model, train_dl)
+    val_loss = validation_loss(model, val_dl)
+    if stopper.stop_training(val_loss, model.state_dict()):
         break
+model.load_state_dict(stopper.best_weights)
 ```
-
-## 最佳实践
-
-1. **选择合适的 patience 值**：
-   - 太小可能导致过早停止，错过更好的结果
-   - 太大可能浪费训练时间
-   - 建议从 5-10 开始尝试
-
-2. **结合学习率调度**：
-   - 可以在早停前先尝试降低学习率
-   - 使用 `scheduler_fn` 和 `scheduler_params` 配置学习率调度器
-
-3. **保存检查点**：
-   - 早停器只在内存中保留最佳权重；需要时显式 `load_state_dict`
-   - Trainer 会在 `fit()` 结束时向 `model_path` 写权重，但目录必须预先存在；若未触发早停，写出的是最后一轮权重
 

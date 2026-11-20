@@ -1,19 +1,8 @@
 # Torch-RecHub Benchmark 设计
 
-本文档描述 Torch-RecHub 的 benchmark 设计方案。目标是在固定数据预处理、切分策略、训练预算、评价指标和结果格式的前提下，让不同模型的实验结果可以复现、可以横向比较。
+同一个模型换一种负采样方式，Recall 就可能变化。为了判断差异来自模型还是实验设置，每次运行都记录数据文件、切分、采样、随机种子和训练预算。这里说明召回、排序和多任务实验各自比较什么。具体命令见[运行说明](./README.md)。
 
-## 目标
-
-- 在相同数据集、切分方式、负采样设置、评价指标和训练预算下比较模型。
-- 将 benchmark 与 `examples/` 分离：`examples/` 侧重教学，benchmark 侧重可复现比较。
-- 每次运行同时保存机器可读结果 `result.yaml` 和人工可读摘要 `summary.md`。
-- 先从轻量级 MovieLens 召回 benchmark 做起，再扩展到排序和多任务。
-
-## 非目标
-
-- 当前阶段不是排行榜。第一阶段只验证 benchmark 基础设施和小样本可复现流程。
-- 不替代 `examples/` 中的教程脚本。
-- 默认不在 CI 中运行大规模完整 benchmark，避免拖慢贡献流程。
+仓库自带的小样本用于检查结果是否能复现。若要据此选线上模型，请换成业务数据，在相同条件下重新比较。
 
 ## 目录结构
 
@@ -44,9 +33,9 @@ benchmarks/
 └── suite.py
 ```
 
-## 第一阶段：Matching Benchmark
+## MovieLens 召回实验
 
-第一阶段支持 MovieLens sample 数据上的 list-wise 召回模型 benchmark。
+每条训练样本包含一部用户实际交互过的电影，以及从电影库中采到的负例。评估时为每位用户留出最后一次交互，检查这部电影排在推荐列表中的什么位置。
 
 支持模型：
 
@@ -58,8 +47,7 @@ benchmarks/
 数据集：
 
 - `examples/matching/data/ml-1m/ml-1m_sample.csv`
-- 通过 `generate_seq_feature_match(..., mode=2)` 构造 leave-one-out 风格的序列召回数据
-- 每条训练样本包含 1 个正样本物品和若干负样本物品
+- `generate_seq_feature_match(..., mode=2)` 构造候选列表，第一列放正例
 
 指标：
 
@@ -79,9 +67,9 @@ benchmarks/
 - 数据处理、训练、推理、评估耗时
 - 用户向量和物品向量形状
 
-## 第二阶段：Ranking Benchmark
+## Criteo 点击率实验
 
-第二阶段支持 Criteo sample 数据上的 CTR/ranking benchmark，使用固定随机种子和固定 `split_ratio` 生成训练集、验证集、测试集，并记录：
+三种模型使用同一份曝光样本和固定的随机种子。`split_ratio` 指定训练集与验证集占比，剩下的记录用作测试集。输出包括：
 
 - `AUC`
 - `LogLoss`
@@ -101,31 +89,25 @@ benchmarks/
 - 离散特征 `C*` 使用 `LabelEncoder` 编码
 - 稠密特征额外离散化为 `I*_cat`，用于 FM / embedding 交叉特征
 
-当前暂不把 `DIN` 放入第二阶段基础 CTR benchmark。`DIN` 依赖历史行为序列和 target item 特征，更适合后续单独加入 ranking-sequence benchmark。
+Criteo 的每行是一次曝光。训练 DIN 还需要按时间排列的交互历史和当前候选商品，可用[排序示例](../examples/ranking/README.md)中的 Amazon Electronics 数据。
 
-## 第三阶段：Multi-Task Benchmark
+## Census-Income 多任务实验
 
-增加多任务数据集和按任务拆分的指标：
+给定同一条人口普查记录，模型分别预测收入档位和是否从未结婚。报告中的 `cvr_label` 对应收入，`ctr_label` 对应婚姻状态。ESMM 另外使用两列标签的乘积 `ctcvr_label`。各个任务分别记录 AUC，`AUC_mean` 汇总有效任务的 AUC。报告还包括参数量和运行耗时。
 
-- 每个任务的 `AUC` / `LogLoss`
-- 跨任务平均指标
-- 参数量和运行耗时
-
-初始模型：
+支持模型：
 
 - `ESMM`
 - `MMOE`
 - `PLE`
 
-## CI 策略
+## 运行方式
 
-- CI 只运行极小样本、单 epoch 的 smoke benchmark。
-- 完整 benchmark suite 通过手动 workflow 或定时 workflow 运行。
-- benchmark 输出作为 artifact 保存，不自动提交到仓库。
+Benchmark 当前从仓库根目录手动执行。单个配置使用 `benchmarks/runner.py`，一组配置使用 `benchmarks/suite.py`，输出位于 `benchmark_results/`。[可运行的配置与命令](./README.md)
 
 ## 配置格式
 
-benchmark 配置使用 YAML，便于后续扩展多模型、多数据集和 suite 级别配置。
+下面的两份 YAML 分别对应 MovieLens 召回和 Criteo 排序实验。复查结果时，要连同 `dataset` 和 `trainer` 一起比较，仅有模型名称不足以重现实验。
 
 示例：
 

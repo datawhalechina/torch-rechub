@@ -5,7 +5,7 @@ description: Torch-RecHub 详细安装说明，包括稳定版和最新版安装
 
 # 安装指南
 
-本文档提供了 Torch-RecHub 的详细安装说明，包括稳定版和最新开发版的安装步骤。
+跟着教程运行仓库里的样本，建议直接安装源码。如果已有自己的训练项目，安装 PyPI 发布包就可以导入 `torch_rechub`。
 
 ## 系统要求
 
@@ -18,7 +18,7 @@ NumPy（1.26.4+）、pandas（2.1+）和 scikit-learn（1.4+）会随项目安�
 
 CPU 环境可直接选择稳定版或源码安装。使用 GPU 或 NPU 时，先按[设备示例](#按设备安装-pytorch)准备 PyTorch，再在同一个环境中安装 Torch-RecHub。
 
-### 稳定版（推荐用户使用）
+### 在已有项目中安装
 
 ```bash
 python -m pip install torch-rechub
@@ -26,7 +26,7 @@ python -m pip install torch-rechub
 
 ### 可选功能
 
-默认安装只包含核心训练依赖。按实际用途选择 extra：使用发布包时执行表中的 pip 命令；使用源码时，在仓库根目录运行 `uv sync --extra <name>`，例如 `uv sync --extra visualization`。
+基础安装可以训练 DeepFM、DSSM 等模型。需要画图、导出 ONNX 或做向量检索时，再加装对应的依赖。下表给的是发布包命令，在源码目录可以写成 `uv sync --extra visualization` 这样的形式。
 
 | 用途 | 安装命令 |
 |---|---|
@@ -41,11 +41,11 @@ python -m pip install torch-rechub
 
 渲染模型结构图还需在系统中安装 Graphviz，并确保命令行能找到 `dot`。
 
-运行脚本时，也可用 `uv run --extra <name> python <script.py>` 指定所需依赖组；多个依赖组可以重复传入 `--extra`。
+只在某个脚本里用到这些依赖时，可以直接运行 `uv run --extra <name> python <script.py>`。一个脚本用到两组依赖，就写两次 `--extra`。
 
-### 最新开发版
+### 从源码安装
 
-要安装包含最新功能的开发版本：
+示例脚本和样本数据随仓库提供。按下面的命令下载源码并创建 `.venv`。
 
 ```bash
 # 首先安装 uv（如果尚未安装）
@@ -61,9 +61,9 @@ uv sync
 
 已按设备安装 PyTorch 时，最后一步用 `uv pip install -e .` 将源码装到当前已激活的环境中，再用该环境的 `python` 运行示例。
 
-## 开发环境设置
+## 准备提交改动
 
-如果您想为 Torch-RecHub 做出贡献或使用源代码：
+准备提 PR 时，先在 GitHub 上 fork 仓库，再克隆自己的副本。把下面的 `YOUR_USERNAME` 换成你的用户名。
 
 ```bash
 # 1. Fork 并克隆仓库
@@ -79,9 +79,13 @@ uv run pytest
 
 ## 按设备安装 PyTorch
 
-NVIDIA GPU 按显卡和驱动选择 CUDA 版 PyTorch，AMD GPU 按显卡型号选择 ROCm 版 PyTorch，华为昇腾 NPU 先安装并加载 CANN，再选择配套的 PyTorch 和 `torch-npu`。具体组合可查阅 [PyTorch 安装向导](https://pytorch.org/get-started/locally/)、[AMD ROCm 文档](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/) 和[昇腾版本配套表](https://github.com/Ascend/pytorch/blob/master/COMPATIBILITY.md)。
+先看机器上装的是什么卡，再选 PyTorch 安装包。
 
-在已激活的 Python 环境中，按设备选择一条安装命令。使用 uv 时，可将 `python -m pip` 换成 `uv pip`。
+- NVIDIA GPU 需要与驱动兼容的 CUDA 版本。[PyTorch 安装向导](https://pytorch.org/get-started/locally/)
+- AMD GPU 先按显卡型号查找对应的 ROCm 安装包。[AMD ROCm 文档](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/)
+- 华为昇腾 NPU 先安装并加载 CANN，再按配套关系安装 PyTorch 和 `torch-npu`。[昇腾版本配套表](https://github.com/Ascend/pytorch/blob/master/COMPATIBILITY.md)
+
+下面各给一个安装示例。在已激活的 Python 环境中，选与你设备相符的一条。使用 uv 时，可将 `python -m pip` 换成 `uv pip`。
 
 ```bash
 # CPU（Linux 或 Windows 的纯 CPU 版本）
@@ -107,12 +111,15 @@ python -m pip install torch torch-npu
 python -c "import torch_rechub; print(torch_rechub.__version__)"
 ```
 
-## 故障排除
+使用加速卡时，在同一环境中选择对应的命令，确认 PyTorch 能在设备上创建张量。
 
-### 常见问题
+```bash
+# NVIDIA CUDA 或 AMD ROCm
+python -c "import torch; print(torch.zeros(1, device='cuda:0').device)"
 
-如果您遇到任何安装问题，请：
-1. 查看 [GitHub Issues](https://github.com/datawhalechina/torch-rechub/issues)
-2. 创建新的 Issue，并提供详细的错误信息和系统信息
-3. 参考 [常见问题解答](/zh/community/faq)
+# 华为昇腾，先加载 CANN 环境
+python -c "import torch, torch_npu; print(torch.zeros(1, device='npu:0').device)"
+```
+
+源码安装后如果提示找不到 `torch_rechub`，先在仓库根目录用 `uv run python` 重试，确认正在使用项目的 `.venv`。设备检查若报错，记下显卡型号、驱动或 CANN 版本、PyTorch 版本和完整报错，再到项目中查找相同情况。[常见问题](/zh/community/faq) · [GitHub Issues](https://github.com/datawhalechina/torch-rechub/issues)
 

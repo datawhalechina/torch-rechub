@@ -5,42 +5,19 @@ description: Torch-RecHub 模型训练与评估
 
 # 训练与评估
 
-Torch-RecHub 提供排序、召回、多任务和序列生成训练器。它们都提供 `fit` 和 ONNX 导出，但不同任务的 batch 格式、`evaluate` 参数和返回值不完全相同，请按下方各训练器的约定使用。
+DeepFM 为每条候选记录预测点击概率，用 `CTRTrainer`。DSSM 需要分别导出用户和物品向量，用 `MatchTrainer`。一条记录有多个预测目标时用 `MTLTrainer`。HSTU 和 HLLM 根据历史预测下一件物品，用 `SeqTrainer`。
 
 ![Trainer 工作流图](/img/diagrams/trainer_lifecycle.png)
 
-## 实验跟踪与可视化
-
-先安装对应的可选依赖：
-
-```bash
-python -m pip install "torch-rechub[tracking]"
-python -m pip install "torch-rechub[visualization]"
-python -m pip install "torch-rechub[onnx]"
-```
-
-- 支持 **WandB / SwanLab / TensorBoardX** 作为 `model_logger`，可传入单个实例或列表。
-- 自动记录训练/验证指标与超参数：`train/loss`、`learning_rate`、`val/auc`（CTR/Match）、`val/task_i_score`（MTL）、`val/accuracy`（Seq）。
-- 不需要记录时传 `model_logger=None`（默认）即可零开销。
-
-```python
-from torch_rechub.basic.tracking import WandbLogger, TensorBoardXLogger
-from torch_rechub.trainers import CTRTrainer
-
-wb = WandbLogger(project="rechub-demo", name="deepfm")
-tb = TensorBoardXLogger(log_dir="./runs/deepfm")
-
-trainer = CTRTrainer(model, model_logger=[wb, tb])
-trainer.fit(train_dataloader, val_dataloader)
-```
-
 ## 训练器
 
-> **保存目录**：当前 Trainer 不会自动创建 `model_path`，调用 `fit` 前需要自行创建。当早停真正触发时，Trainer 会先恢复已记录的最佳权重再保存；如果训练轮数结束前没有触发早停，保存的是最后一轮权重，不应默认其一定是验证集最优权重。
+使用 `CTRTrainer`、`MatchTrainer` 或 `MTLTrainer` 前，先创建存放权重的目录 `model_path`。以排序为例，`fit(train_dl, val_dl)` 每轮比较验证 AUC，只要超过之前的最好成绩，就把权重写入 `model.pth`。即使下一轮中途退出，已经写入的权重也能加载。训练正常结束时，`trainer.model` 会恢复到验证 AUC 最好的那一轮。只传 `train_dl` 时，训练结束后保存最后一轮。
+
+想看每个 batch 的损失和学习率，调用 `fit(train_dl, val_dl, log_interval=1)`。排序、召回和多任务训练器都接受这个参数。单卡训练用 `device="cuda:0"`，在同一台机器上用第 0、1 两张 CUDA 卡，可传 `device="cuda:0", gpus=[0, 1]`。
 
 ### CTRTrainer
 
-用于训练排序模型（CTR预测模型），如DeepFM、Wide&Deep、DCN等。
+先运行[准备 Criteo 输入](/zh/guide/quick_start#criteo-input)那一节，保留特征和三个 DataLoader。下面用 `train_dl` 更新参数，用 `val_dl` 选权重，最后才用 `test_dl` 算 AUC。
 
 ```python
 import os
@@ -49,7 +26,7 @@ from torch_rechub.trainers import CTRTrainer
 from torch_rechub.models.ranking import DeepFM
 
 # 创建模型
-model = DeepFM(deep_features=deep_features, fm_features=fm_features, mlp_params={"dims": [256, 128], "dropout": 0.2})
+model = DeepFM(deep_features=dense_feas + sparse_feas, fm_features=sparse_feas, mlp_params={"dims": [256, 128], "dropout": 0.2})
 
 # 创建训练器
 trainer = CTRTrainer(
@@ -57,41 +34,30 @@ trainer = CTRTrainer(
     optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
     n_epoch=50,
     earlystop_patience=10,
-    device="cuda:0",
+    device="cpu",
     model_path="saved/deepfm"
 )
 
 # 训练模型
 os.makedirs("saved/deepfm", exist_ok=True)
-trainer.fit(train_dataloader, val_dataloader)
+trainer.fit(train_dl, val_dl)
 
 # 评估模型
-auc = trainer.evaluate(trainer.model, test_dataloader)
+auc = trainer.evaluate(trainer.model, test_dl)
 
 # 导出ONNX模型
-trainer.export_onnx("deepfm.onnx")
+example_batch, _ = next(iter(test_dl))
+trainer.export_onnx("deepfm.onnx", dummy_input=example_batch)
 
 # 可视化模型
 trainer.visualization(save_path="deepfm_architecture.pdf")
 ```
 
-**参数说明：**
-- `model`：排序模型实例
-- `optimizer_fn`：优化器函数，默认torch.optim.Adam
-- `optimizer_params`：优化器参数
-- `regularization_params`：正则化参数字典，可包含 `embedding_l1`、`embedding_l2`、`dense_l1`、`dense_l2`
-- `scheduler_fn`：学习率调度器函数
-- `scheduler_params`：学习率调度器参数
-- `n_epoch`：训练轮数
-- `earlystop_patience`：早停耐心值
-- `device`：训练设备
-- `gpus`：多 GPU 设备 ID 列表；长度大于 1 时使用 `torch.nn.DataParallel`
-- `loss_mode`：损失模式，布尔值。True表示模型只返回预测值，False表示模型返回预测值和额外损失
-- `model_path`：模型保存路径
+`n_epoch` 是最多训练多少轮。`earlystop_patience` 决定验证指标连续多少轮没有改善就停止训练。上例最多训练 50 轮，容许连续 10 轮没有提升。`optimizer_params` 传给优化器，默认使用 `torch.optim.Adam`。如果模型的 `forward` 同时返回预测和额外损失，还要把 `loss_mode` 设为 `False`。
 
 ### MatchTrainer
 
-用于训练召回模型，如DSSM、YoutubeDNN、MIND等。
+下面用 DSSM 训练双塔。预测时，物品向量可以提前算好，用户向量按需要更新，所以两个塔可以各导出一个 ONNX 文件。
 
 ```python
 import os
@@ -100,7 +66,7 @@ from torch_rechub.trainers import MatchTrainer
 from torch_rechub.models.matching import DSSM
 
 # 创建模型
-model = DSSM(user_features=user_features, item_features=item_features, temperature=1.0,  # 当前 forward 尚未使用该参数
+model = DSSM(user_features=user_features, item_features=item_features, temperature=1.0,  # 用于批内采样的相似度缩放
              user_params={"dims": [256, 128, 64]}, item_params={"dims": [256, 128, 64]})
 
 # 创建训练器
@@ -124,27 +90,13 @@ trainer.export_onnx("user_tower.onnx", mode="user")
 trainer.export_onnx("item_tower.onnx", mode="item")
 ```
 
-**参数说明：**
-- `model`：召回模型实例
-- `mode`：训练模式，可选值：0（point-wise）、1（pair-wise）、2（list-wise）
-- `in_batch_neg`：是否对具有 `user_tower()` / `item_tower()` 的双塔模型使用 batch 内负采样
-- `in_batch_neg_ratio`：每个正样本从当前 batch 中采样的负样本数；为 `None` 时使用可用负样本
-- `hard_negative`：为 `True` 时选择当前 batch 内得分最高的负样本
-- `sampler_seed`：batch 内随机负采样的随机种子
-- `optimizer_fn`：优化器函数，默认torch.optim.Adam
-- `optimizer_params`：优化器参数
-- `regularization_params`：正则化参数字典，可包含 `embedding_l1`、`embedding_l2`、`dense_l1`、`dense_l2`
-- `scheduler_fn`：学习率调度器函数
-- `scheduler_params`：学习率调度器参数
-- `n_epoch`：训练轮数
-- `earlystop_patience`：早停耐心值
-- `device`：训练设备
-- `gpus`：多 GPU 设备 ID 列表；长度大于 1 时使用 `torch.nn.DataParallel`
-- `model_path`：模型保存路径
+`mode=0` 按单个用户与物品的配对学习 0/1 标签。`mode=1` 比较一正一负两个物品，`mode=2` 从一组候选里挑出正例。数据要按所选模式构造。
+
+如果用 DSSM 做批内采样，训练集只保留正交互，训练器开启 `in_batch_neg=True`。默认用同批其他行的物品作负例。可以通过 `in_batch_neg_ratio` 限制每个正例配几个负例，或用 `hard_negative=True` 优先选模型打分高的负例。[完整召回示例](/zh/tutorials/retrieval)
 
 ### MTLTrainer
 
-用于训练多任务模型，如MMoE、PLE、ESMM、SharedBottom等。
+下面的 MMOE 有两个分类任务。`task_types` 的顺序要和标签列、模型输出的顺序一致，训练器才能给每一列计算相应的损失。
 
 ```python
 import os
@@ -176,27 +128,13 @@ trainer.fit(train_dataloader, val_dataloader)
 trainer.export_onnx("mmoe.onnx")
 ```
 
-**参数说明：**
-- `model`：多任务模型实例
-- `task_types`：任务类型列表，可选值：classification、regression
-- `optimizer_fn`：优化器函数，默认torch.optim.Adam
-- `optimizer_params`：优化器参数
-- `regularization_params`：正则化参数字典，可包含 `embedding_l1`、`embedding_l2`、`dense_l1`、`dense_l2`
-- `scheduler_fn`：学习率调度器函数
-- `scheduler_params`：学习率调度器参数
-- `adaptive_params`：自适应损失权重参数；`None` 表示等权平均，本页示例使用 `{"method": "uwl"}`
-- `n_epoch`：训练轮数
-- `earlystop_taskid`：早停依赖的任务ID
-- `earlystop_patience`：早停耐心值
-- `device`：训练设备
-- `gpus`：多 GPU 设备 ID 列表；长度大于 1 时使用 `torch.nn.DataParallel`
-- `model_path`：模型保存路径
+`adaptive_params=None` 时，各任务的损失等权平均。上例指定 `{"method": "uwl"}`，让训练过程学习各任务的权重。
 
-> **早停指标方向**：`MTLTrainer` 当前始终把 `earlystop_taskid` 对应的分数当作“越大越好”。回归任务的默认指标是 MSE（越小越好），因此不要将回归任务选为当前早停主任务。
+早停只看选定的任务。`earlystop_taskid=0` 表示看第一列。若任务是 `["classification", "regression"]`，想用第二项的 MSE 选权重，就设置 `earlystop_taskid=1, earlystop_mode="min"`，这样 MSE 降低才算改善。[多任务教程](/zh/tutorials/pipeline)
 
 ### SeqTrainer
 
-用于 HSTU/HLLM 这类 next-item 序列模型。数据 batch 必须是 `(seq_tokens, seq_positions, seq_time_diffs, targets)`；评估返回 `(平均损失, top-1 准确率)`。
+HSTU 和 HLLM 每批接收 `(seq_tokens, seq_positions, seq_time_diffs, targets)`。这里 `evaluate(test_dataloader)` 返回两个值，分别是平均损失和预测的第一名正好是目标物品的比例。
 
 ```python
 import os
@@ -210,7 +148,7 @@ trainer = SeqTrainer(
     n_epoch=10,
     device="cpu",
     model_path="saved/hstu",
-    loss_type="cross_entropy",  # 另可选 "nce"
+    loss_type="cross_entropy",  # 单设备还可用 "sampled_softmax" 控制训练候选数量
 )
 
 history = trainer.fit(train_dataloader, val_dataloader)
@@ -219,6 +157,29 @@ trainer.export_onnx("hstu.onnx", vocab_size=model.vocab_size)
 ```
 
 `SeqTrainer` 不使用传入 batch 的 `seq_positions`；当前 HSTU/HLLM 由模型内部推导位置。`loss_type="cross_entropy"` 默认忽略 token `0`，因此数据处理需要保证 `0` 专用于 padding。
+
+## 实验跟踪与可视化
+
+需要保存训练曲线时安装 `tracking`。画模型结构图和导出 ONNX 分别用到 `visualization` 和 `onnx`，按需安装即可。
+
+```bash
+python -m pip install "torch-rechub[tracking]"
+python -m pip install "torch-rechub[visualization]"
+python -m pip install "torch-rechub[onnx]"
+```
+
+下面同时把每轮损失和验证指标写入 W&B 与本地 TensorBoard 日志。只用一种工具时，`model_logger` 直接传一个实例即可。默认训练进度会打印在终端。
+
+```python
+from torch_rechub.basic.tracking import WandbLogger, TensorBoardXLogger
+from torch_rechub.trainers import CTRTrainer
+
+wb = WandbLogger(project="rechub-demo", name="deepfm")
+tb = TensorBoardXLogger(log_dir="./runs/deepfm")
+
+trainer = CTRTrainer(model, model_logger=[wb, tb])
+trainer.fit(train_dataloader, val_dataloader)
+```
 
 ## 评估指标
 
@@ -244,41 +205,23 @@ novelty = novelty_score(recommendations, item_popularity, topKs=[10])
 ```
 
 - `auc_score` 和 `log_loss` 接收逐样本标签/分数并返回浮点数；AUC 越大越好，log loss 越小越好。
-- `gauc_score` 按用户分组计算 AUC；每个参与计算的用户分组都需要同时包含正负标签，可通过 `weights={user_id: weight}` 自定义加权。
+- `gauc_score` 按用户分组计算 AUC；跳过只有一类标签的用户。若没有兼具正负标签且权重大于零的用户，会抛出 `ValueError`，可通过 `weights={user_id: weight}` 自定义加权。
 - `topk_metrics` 计算 NDCG、MRR、Recall、Hit 和 Precision。`ground_truth` 与 `recommendations` 都是 `{user_id: [item_id, ...]}`，推荐列表至少需要包含 `max(topKs)` 个物品。
 - `diversity_score`、`coverage_score`、`novelty_score` 分别衡量列表内差异、目录覆盖和平均自信息，都是越大越好。
 
-`topk_metrics` 和三个超越准确率指标当前返回的是按指标分组的**已格式化字符串列表**，例如 `{"Recall": ["Recall@10: 0.1234"]}`，不是纯浮点数字典。`ndcg_score`、`hit_score`、`mrr_score`、`recall_score`、`precision_score` 也返回对应的字符串列表。
+`topk_metrics` 和多样性、覆盖率、新颖度函数都返回可直接打印的结果。例如 `ranking["Recall"]` 的内容形如 `["Recall@10: 0.1234"]`，列表元素是字符串。`ndcg_score`、`hit_score`、`mrr_score`、`recall_score`、`precision_score` 也返回对应的字符串列表。
 
 ## 回调函数
 
 ### EarlyStopper
 
-用于早停，当验证集上“越大越好”的指标不再提升时停止训练。
-
-```python
-from torch_rechub.basic.callback import EarlyStopper
-
-# 创建早停器
-early_stopper = EarlyStopper(patience=10)
-
-# 在训练过程中使用
-if early_stopper.stop_training(auc, model.state_dict()):
-    print(f'validation: best auc: {early_stopper.best_auc}')
-    model.load_state_dict(early_stopper.best_weights)
-    break
-```
-
-**参数说明：**
-- `patience`：早停耐心值，即连续多少轮验证集性能没有提升就停止训练
-
-`EarlyStopper` 当前没有 `delta`、`mode="min"` 或自定义指标方向参数，不能直接用来监控需要最小化的 loss/MSE。
+默认 `mode="max"` 监控 AUC，`mode="min"` 适用于 loss 或 MSE。普通训练直接使用 Trainer 的 `earlystop_patience` 即可。自定义训练循环和权重恢复示例见[回调函数](/zh/tools/callbacks)。
 
 ## 损失函数
 
 ### RegularizationLoss
 
-用于正则化，支持L1和L2正则化。
+要给嵌入表和全连接层设置不同的正则化系数，可以分别指定 `embedding_l1/l2` 和 `dense_l1/l2`。在排序、召回和多任务训练器里，这些系数可以直接传给 `regularization_params`。
 
 ```python
 from torch_rechub.basic.loss_func import RegularizationLoss
@@ -294,7 +237,7 @@ reg_loss_fn = RegularizationLoss(
 
 ### BPRLoss
 
-用于召回模型的 pairwise 损失。
+BPR 用于成对比较。对同一个用户，`pos_score` 是正例的分数，`neg_score` 是负例的分数，训练目标是让正例排在负例前面。
 
 ```python
 from torch_rechub.basic.loss_func import BPRLoss

@@ -5,7 +5,7 @@ description: Torch-RecHub 数据加载与预处理
 
 # 数据流水线
 
-Torch-RecHub 提供常用的数据集类、DataLoader 生成器和预处理工具。这些类负责把**已经完成编码和补齐**的数据交给模型；类别词表、缺失值和数据切分策略仍需使用者根据数据集处理。
+在排序任务里，一条训练样本包含一组特征和一个标签。先把城市、电影等类别换成整数，把同一批用户的历史补到相同长度，再让 DataLoader 把这些样本分批交给训练器。[特征定义](/zh/core/features)
 
 ![数据流水线图](/img/diagrams/data_pipeline.png)
 
@@ -13,7 +13,7 @@ Torch-RecHub 提供常用的数据集类、DataLoader 生成器和预处理工�
 
 ### TorchDataset
 
-用于训练和验证的数据集合，包含特征和标签。
+`dataset[i]` 取出第 `i` 行的特征和对应标签。`x` 用特征名作键，`y[i]` 要和各列的第 `i` 个值属于同一条记录。
 
 ```python
 from torch_rechub.utils.data import TorchDataset
@@ -22,13 +22,11 @@ from torch_rechub.utils.data import TorchDataset
 dataset = TorchDataset(x, y)
 ```
 
-**参数说明：**
-- `x`：支持 `.items()` 且每列可按行索引的数据，通常是特征字典或 `pandas.DataFrame`
-- `y`：标签数据
+传入 DataFrame 时，确保各列可以用从 `0` 开始的行号取值。切分后保留了原行索引的数据，可先调用 `reset_index(drop=True)` 或将各列转成数组。
 
 ### PredictDataset
 
-用于预测的数据集合，仅包含特征。
+算用户或物品向量时，手上往往只有特征。`PredictDataset` 每次返回一行特征字典。
 
 ```python
 from torch_rechub.utils.data import PredictDataset
@@ -37,14 +35,11 @@ from torch_rechub.utils.data import PredictDataset
 dataset = PredictDataset(x)
 ```
 
-**参数说明：**
-- `x`：特征字典，键为特征名称，值为特征数据
-
 ## 数据生成器
 
 ### DataGenerator
 
-用于生成排序模型和多任务模型的数据加载器。
+`DataGenerator` 可以把已有的特征和标签随机切为三份。下面两项比例分别留给训练集和验证集，余下的进测试集。
 
 ```python
 from torch_rechub.utils.data import DataGenerator
@@ -55,20 +50,11 @@ dg = DataGenerator(x, y)
 train_dl, val_dl, test_dl = dg.generate_dataloader(
     split_ratio=[0.7, 0.1],  # 70% 训练、10% 验证，剩余 20% 测试
     batch_size=256,           # 批次大小
-    num_workers=8             # 并行工作线程数
+    num_workers=8             # 读取数据的子进程数
 )
 ```
 
-**参数说明：**
-- `x`：特征数据
-- `y`：标签数据
-
-**generate_dataloader方法参数：**
-- `split_ratio`：长度为 2，分别是训练集和验证集比例；测试集使用剩余数据
-- `batch_size`：批次大小
-- `num_workers`：并行工作线程数
-
-如果数据已经分好，不要传 `split_ratio`，而是传入 `x_val, y_val, x_test, y_test`：
+如果已经按时间或业务规则切好了数据，用训练集创建 `dg`，把验证集和测试集分别传给下面四个参数。
 
 ```python
 train_dl, val_dl, test_dl = dg.generate_dataloader(
@@ -84,7 +70,7 @@ train_dl, val_dl, test_dl = dg.generate_dataloader(
 
 ### MatchDataGenerator
 
-用于生成召回模型的数据加载器。
+双塔召回要读三份数据。`train_dl` 提供训练样本，`test_dl` 按测试用户顺序提供用户侧特征，`item_dl` 按电影目录顺序提供物品侧特征。后两份保留输入顺序，后续可以把每一行向量对应回用户或电影。
 
 ```python
 from torch_rechub.utils.data import MatchDataGenerator
@@ -96,19 +82,9 @@ train_dl, test_dl, item_dl = dg.generate_dataloader(
     x_test_user=x_test_user,  # 测试用户数据
     x_all_item=x_all_item,    # 所有物品数据
     batch_size=256,           # 批次大小
-    num_workers=8             # 并行工作线程数
+    num_workers=8             # 读取数据的子进程数
 )
 ```
-
-**参数说明：**
-- `x`：特征数据
-- `y`：标签数据，可选
-
-**generate_dataloader方法参数：**
-- `x_test_user`：测试用户数据
-- `x_all_item`：所有物品数据
-- `batch_size`：批次大小
-- `num_workers`：并行工作线程数
 
 ## 工具函数
 
@@ -178,9 +154,7 @@ train_dl, val_dl, test_dl = generator.generate_dataloader(
 
 ## Parquet 流式数据加载
 
-在工业界场景中，特征工程通常由 **PySpark** 在大数据集群上完成，数据量可达 GB 到 TB 级别。直接使用 `spark_df.toPandas()` 会导致 Driver OOM。
-
-Torch-RecHub 提供 `ParquetIterableDataset`，支持从 Spark 生成的 Parquet 文件目录流式读取数据，无需将全部数据加载到内存。
+如果训练数据已经按文件存成 Parquet，可以直接逐批读。比如 Spark 写出了多个 `part-*.parquet`，把这些文件路径交给 `ParquetIterableDataset` 即可，省去用 `toPandas()` 把整张表收回一台机器的步骤。
 
 ### 安装依赖
 
@@ -192,7 +166,7 @@ python -m pip install "torch-rechub[bigdata]"
 
 ### ParquetIterableDataset
 
-继承自 `torch.utils.data.IterableDataset`，支持多进程数据加载。
+下面每次读出最多 1024 行。数据集返回的字典已经是一批数据，因此外层 `DataLoader` 用 `batch_size=None`。`split_label` 把字典里的 `label` 单独取出来，组成排序训练器接收的 `(特征字典, 标签)`。
 
 ```python
 from torch.utils.data import DataLoader
@@ -205,26 +179,22 @@ dataset = ParquetIterableDataset(
     batch_size=1024,  # 每批次读取的行数
 )
 
-# 创建 DataLoader（注意 batch_size=None）
-loader = DataLoader(dataset, batch_size=None, num_workers=4)
+# 每次读取的字典已经是一个 batch。collate_fn 把标签与模型输入分开。
+def split_label(batch):
+    x = {name: value for name, value in batch.items() if name != "label"}
+    return x, batch["label"]
 
-# 迭代数据
-for batch in loader:
-    user_id = batch["user_id"]  # torch.Tensor
-    item_id = batch["item_id"]  # torch.Tensor
-    label = batch["label"]      # torch.Tensor
+loader = DataLoader(dataset, batch_size=None, collate_fn=split_label)
 ```
+
+把 `loader` 传给 `CTRTrainer.fit` 就可以开始训练。要在每轮结束时算 AUC，可用 `DataGenerator` 准备一个有长度的 `val_dl`，再调用 `trainer.fit(loader, val_dl)`。两边的特征名和标签含义要一致。Windows 下使用多个 worker 时，把 `split_label` 放在模块顶层，便于子进程导入。
 
 **参数说明：**
 - `file_paths`：Parquet 文件路径列表
 - `columns`：要读取的列名列表，`None` 表示读取所有列
 - `batch_size`：每批次读取的行数，默认 1024
 
-**特性：**
-- **流式读取**：使用 PyArrow Scanner 逐批读取，内存占用恒定
-- **多进程支持**：自动将文件分配给不同 worker，避免重复读取
-- **类型转换**：自动将 PyArrow 数组转换为 PyTorch Tensor
-- **嵌套数组支持**：支持 Spark 的 `Array` 类型列，自动转换为 2D Tensor
+多个 worker 会分头读取不同的文件。如果只传一个文件，增加 worker 也不会把这个文件再拆开。
 
 ### 与 Spark 配合使用
 
@@ -255,12 +225,4 @@ loader = DataLoader(dataset, batch_size=None, num_workers=8)
 
 > **类型限制**：当前转换器不支持 Arrow 字符串列。请在生成 Parquet 前将类别字符串编码为数值 ID。所有受支持的标量列（包括整数 ID）都会转为 `torch.float32`；传入 Embedding 层时模型会再转为整数索引。`float32` 无法精确表示大于 `2^24` 的所有整数，因此请先将超大业务 ID 重映射到紧凑的连续索引。
 
-## 数据处理流程
-
-1. **特征定义**：使用DenseFeature、SparseFeature、SequenceFeature定义特征
-2. **数据加载**：加载原始数据
-3. **特征编码**：对类别型特征进行LabelEncoder编码
-4. **序列处理**：对序列特征进行填充、截断等处理
-5. **样本构造**：构造训练样本，包括负采样等
-6. **数据生成**：根据任务使用 DataGenerator、MatchDataGenerator 或 SequenceDataGenerator 生成数据加载器
-7. **模型训练**：将数据加载器传入模型进行训练
+排序数据的完整例子可以看[准备 Criteo 输入](/zh/guide/quick_start#criteo-input)。如果要从交互记录构造用户历史和召回样本，可以接着看[MovieLens 召回教程](/zh/tutorials/retrieval)。

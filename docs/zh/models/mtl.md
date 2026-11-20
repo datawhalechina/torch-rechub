@@ -5,19 +5,13 @@ description: Torch-RecHub 多任务模型详细介绍
 
 # 多任务模型
 
-多任务学习是一种机器学习范式，通过同时学习多个相关任务来提高模型的泛化能力和性能。在推荐系统中，多任务模型常用于同时优化点击率（CTR）、转化率（CVR）、用户留存等多个相关目标。
+同一次商品曝光可以带有多个标签，例如是否点击、是否购买。多任务模型读取这行样本，在不同的输出列预测不同目标。训练前先确定列的顺序，后面传给训练器的标签、任务类型和评估名称都按这个顺序填写。[Ali-CCP 多任务教程](/zh/tutorials/pipeline)
 
 ## 1. SharedBottom
 
-### 功能描述
+SharedBottom 先把一行样本的特征交给一个共享的底层网络，再把同一份结果送给各任务自己的输出网络（任务塔）。这是比较多个目标时最简单的起点。
 
-SharedBottom 是一种经典的多任务学习模型，所有任务共享底层网络，上层有各自的任务特定网络。
-
-### 核心原理
-
-- **共享底层**：所有任务共享一个底层神经网络，学习任务间的共享表示
-- **任务特定顶层**：每个任务有自己的顶层网络，学习任务特定的表示
-- **联合训练**：所有任务同时训练，通过反向传播更新共享底层和任务特定顶层
+某个任务的损失会更新自己的任务塔和共享底层。`task_types` 的顺序决定各列的输出方式，分类任务输出概率，回归任务输出数值。
 
 ### 使用方法
 
@@ -47,22 +41,14 @@ model = SharedBottom(
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| features | list | 所有任务共享的特征列表 | None |
-| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | None |
-| bottom_params | dict | 共享底层网络参数 | None |
-| tower_params_list | list | 任务特定顶层网络参数列表 | None |
-
-### 适用场景
-
-- 任务相关性强的场景
-- 数据量有限的场景
-- 计算资源有限的场景
+| features | list | 所有任务共享的特征列表 | 必填 |
+| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | 必填 |
+| bottom_params | dict | 共享底层网络参数 | 必填 |
+| tower_params_list | list | 任务特定顶层网络参数列表 | 必填 |
 
 ## 2. ESMM
 
-### 功能描述
-
-ESMM（Entire Space Multi-Task Model）是一种用于解决样本选择偏差问题的多任务学习模型，特别适用于CTR和CVR联合优化场景。
+ESMM 利用“先点击，再转化”的关系。两座塔分别预测点击概率（CTR）和点击后的转化概率（CVR），两者相乘就得到一次曝光既被点击又产生转化的概率（CTCVR）。
 
 ### 论文引用
 
@@ -70,12 +56,7 @@ ESMM（Entire Space Multi-Task Model）是一种用于解决样本选择偏差�
 Xiao, Jun, et al. "Entire space multi-task model: An effective approach for estimating post-click conversion rate." Proceedings of the 41st international ACM SIGIR conference on research & development in information retrieval. 2018.
 ```
 
-### 核心原理
-
-- **全空间建模**：在整个样本空间中建模CTR和CVR，避免样本选择偏差
-- **级联关系**：利用CTR和CVR的级联关系（CTCVR = CTR * CVR）
-- **共享底层**：CTR和CVR任务共享底层网络
-- **任务特定顶层**：每个任务有自己的顶层网络
+两个塔共用输入特征的嵌入，各自学习不同的权重。框架的 ESMM 返回 `[cvr, ctr, ctcvr]` 三列，`MTLTrainer` 用第二列 CTR 和第三列 CTCVR 计算训练损失。
 
 ### 使用方法
 
@@ -100,19 +81,11 @@ model = ESMM(
 | cvr_params | dict | CVR tower 的 MLP 参数 | 必填 |
 | ctr_params | dict | CTR tower 的 MLP 参数 | 必填 |
 
-`ESMM.forward()` 的列顺序固定为 `[cvr, ctr, ctcvr]`。使用 `MTLTrainer` 时，标签也要按这一顺序组成 `[B, 3]`，`task_types` 传入三个 `"classification"`。训练器针对 ESMM 只直接优化 CTR 和 CTCVR 两列损失。
-
-### 适用场景
-
-- 点击率（CTR）和转化率（CVR）联合优化
-- 存在样本选择偏差的场景
-- 电商推荐场景
+传给 `MTLTrainer` 的标签也按 `[cvr, ctr, ctcvr]` 排列，形状为 `[B, 3]`，`task_types` 填三个 `"classification"`。
 
 ## 3. MMOE
 
-### 功能描述
-
-MMOE（Multi-gate Mixture-of-Experts）是一种多门控专家混合模型，通过多个专家网络和门控机制，为不同任务学习不同的专家组合。
+MMOE 让多个小网络（专家）各自处理同一份输入。每个任务都有自己的门控网络，决定当前样本应从各专家的输出里取多少。
 
 ### 论文引用
 
@@ -120,12 +93,7 @@ MMOE（Multi-gate Mixture-of-Experts）是一种多门控专家混合模型，�
 Ma, Jiaqi, et al. "Modeling task relationships in multi-task learning with multi-gate mixture-of-experts." Proceedings of the 24th ACM SIGKDD international conference on knowledge discovery & data mining. 2018.
 ```
 
-### 核心原理
-
-- **专家网络**：多个独立的专家网络，每个专家网络学习不同的特征表示
-- **门控机制**：每个任务有自己的门控网络，动态选择专家网络的组合
-- **任务特定顶层**：每个任务有自己的顶层网络
-- **联合训练**：所有任务同时训练，更新专家网络、门控网络和任务特定顶层
+例如预测点击和预测停留时长可以共用专家，但两组门控权重可以不同。`n_expert` 控制专家数，`tower_params_list` 按任务顺序配置各自的输出网络。
 
 ### 使用方法
 
@@ -152,23 +120,15 @@ model = MMOE(
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| features | list | 所有任务共享的特征列表 | None |
-| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | None |
-| n_expert | int | 专家网络数量 | None |
-| expert_params | dict | 专家网络参数 | None |
-| tower_params_list | list | 任务特定顶层网络参数列表 | None |
-
-### 适用场景
-
-- 任务间存在冲突的场景
-- 任务数量较多的场景
-- 需要动态调整任务权重的场景
+| features | list | 所有任务共享的特征列表 | 必填 |
+| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | 必填 |
+| n_expert | int | 专家网络数量 | 必填 |
+| expert_params | dict | 专家网络参数 | 必填 |
+| tower_params_list | list | 任务特定顶层网络参数列表 | 必填 |
 
 ## 4. PLE
 
-### 功能描述
-
-PLE（Progressive Layered Extraction）是一种渐进式分层提取模型，引入了任务特定专家和共享专家，缓解了负迁移问题。
+PLE 给每个任务保留专用专家，也保留一组共享专家。点击任务可以从自己的专家和共享专家中取信息，另一个任务有自己的选择。
 
 ### 论文引用
 
@@ -176,13 +136,7 @@ PLE（Progressive Layered Extraction）是一种渐进式分层提取模型，�
 Tang, Hongyan, et al. "Progressive layered extraction (ple): A novel multi-task learning (mtl) model for personalized recommendations." Fourteenth ACM Conference on Recommender Systems. 2020.
 ```
 
-### 核心原理
-
-- **分层结构**：包含多个PLE层，每层有任务特定专家和共享专家
-- **任务特定专家**：只对特定任务有用的专家网络
-- **共享专家**：对所有任务都有用的专家网络
-- **门控机制**：每个任务有自己的门控网络，选择专家网络的组合
-- **渐进式提取**：通过多层PLE结构，渐进式提取任务特定和共享表示
+模型可以叠加多层专家与门控。比较 PLE 与 MMOE 时，分别看每个任务的验证指标，才能发现某个任务的提升是否伴随另一个任务的下降。
 
 ### 使用方法
 
@@ -208,25 +162,17 @@ model = PLE(
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| features | list | 所有任务共享的特征列表 | None |
-| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | None |
-| n_level | int | PLE层数 | None |
-| n_expert_specific | int | 每层任务特定专家数量 | None |
-| n_expert_shared | int | 每层共享专家数量 | None |
-| expert_params | dict | 专家网络参数 | None |
-| tower_params_list | list | 任务特定顶层网络参数列表 | None |
-
-### 适用场景
-
-- 任务间存在较强冲突的场景
-- 需要缓解负迁移问题的场景
-- 复杂多任务学习场景
+| features | list | 所有任务共享的特征列表 | 必填 |
+| task_types | list | 任务类型列表，支持 "classification" 和 "regression" | 必填 |
+| n_level | int | PLE层数 | 必填 |
+| n_expert_specific | int | 每层任务特定专家数量 | 必填 |
+| n_expert_shared | int | 每层共享专家数量 | 必填 |
+| expert_params | dict | 专家网络参数 | 必填 |
+| tower_params_list | list | 任务特定顶层网络参数列表 | 必填 |
 
 ## 5. AITM
 
-### 功能描述
-
-AITM（Adaptive Information Transfer Multi-task）是一种自适应信息迁移多任务模型，能够自动学习任务间的信息迁移关系。
+AITM 适合有先后顺序的二分类目标，例如点击、加购、购买。后一阶段可以使用前一阶段的表示，所以任务排列顺序也是模型配置的一部分。
 
 ### 论文引用
 
@@ -234,12 +180,7 @@ AITM（Adaptive Information Transfer Multi-task）是一种自适应信息迁移
 Tang, Jiaxi, et al. "Learning Task Relationships in Multi-task Learning with Adaptive Information Transfer." Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
 ```
 
-### 核心原理
-
-- **信息迁移机制**：自动学习任务间的信息迁移关系
-- **任务特定网络**：每个任务有自己的网络
-- **注意力机制**：使用注意力机制自适应地传递任务间的信息
-- **联合训练**：所有任务同时训练，更新任务特定网络和信息迁移机制
+每个任务先由自己的底层网络计算表示，再通过注意力把前一任务传来的信息合进来。最后每个塔输出一个概率。
 
 ### 使用方法
 
@@ -262,180 +203,23 @@ model = AITM(
 
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
-| features | list | 所有任务共享的特征列表 | None |
+| features | list | 所有任务共享的特征列表 | 必填 |
 | n_task | int | 有顺序依赖的二分类任务数 | 必填 |
 | bottom_params | dict | 每个任务的 bottom MLP 参数 | 必填 |
-| tower_params_list | list | 任务特定顶层网络参数列表 | None |
+| tower_params_list | list | 任务特定顶层网络参数列表 | 必填 |
 
 AITM 当前所有任务都固定为二分类，并按任务列顺序从前一任务向后一任务传递信息；不接受 `task_types` 或 `attention_params`。
 
-### 适用场景
-
-- 任务间存在依赖关系的场景
-- 需要自适应信息迁移的场景
-- 复杂多任务学习场景
-
 ## 6. 模型比较
 
-| 模型 | 复杂度 | 表达能力 | 计算效率 | 适用场景 |
-| --- | --- | --- | --- | --- |
-| SharedBottom | 低 | 中 | 高 | 任务相关性强、资源有限 |
-| ESMM | 低 | 中 | 高 | CTR/CVR联合优化、样本选择偏差 |
-| MMOE | 中 | 高 | 中 | 任务冲突、多任务场景 |
-| PLE | 高 | 高 | 低 | 复杂多任务、负迁移缓解 |
-| AITM | 中 | 高 | 中 | 任务依赖、自适应信息迁移 |
+多个标签都针对同一次曝光时，可以先用 SharedBottom 建立基线，看看每个任务单独能学到什么程度。想让不同任务自己选择共享多少信息，再比较 MMOE 和 PLE。若要直接利用点击后才可能成交的关系，则看 ESMM。AITM 适合按明确的业务顺序传递信息。
 
-## 7. 使用建议
+## 7. 训练和检查标签
 
-1. **根据任务关系选择模型**：
-   - 任务相关性强时推荐使用 SharedBottom
-   - 任务间存在冲突时推荐使用 MMOE 或 PLE
-   - 任务间存在依赖关系时推荐使用 AITM
-   - 处理CTR/CVR联合优化时推荐使用 ESMM
+[Ali-CCP 多任务教程](/zh/tutorials/pipeline)给出了可运行的训练与评估示例。MMOE 和 PLE 使用 `[cvr, ctr]` 两列标签；ESMM 使用 `[cvr, ctr, ctcvr]` 三列，其中 `ctcvr = ctr * cvr`。按相同的顺序给 `evaluate` 返回的分数加上任务名，即可分别检查每个任务。
 
-2. **根据计算资源选择模型**：
-   - 计算资源有限时推荐使用 SharedBottom 或 ESMM
-   - 计算资源充足时可以尝试 MMOE、PLE 或 AITM
+## 8. 怎样读多任务的验证结果
 
-3. **根据数据量选择模型**：
-   - 数据量较小时推荐使用简单模型（如 SharedBottom）
-   - 数据量较大时可以尝试更复杂的模型（如 PLE、AITM）
+假设模型输出顺序是 `[cvr, ctr]`。如果打印时先标 CTR，就会把转化率的 AUC 当成点击率的 AUC。先检查验证标签、预测列、打印名称是否一一对应，再看两个任务各自是否改善。转化往往比点击少，还要检查验证集是否同时含有正例和负例。
 
-4. **多任务权重调整**：
-   - 可以通过调整损失权重来平衡不同任务的重要性
-   - 当前可使用 `adaptive_params={"method": "uwl"}` 做自适应权重
-
-## 8. 代码示例：完整的多任务模型训练流程
-
-```python
-import os
-import numpy as np
-
-from torch_rechub.models.multi_task import MMOE
-from torch_rechub.trainers import MTLTrainer
-from torch_rechub.utils.data import DataGenerator
-from torch_rechub.basic.features import SparseFeature, DenseFeature
-
-# 1. 定义特征
-common_features = [
-    SparseFeature(name="user_id", vocab_size=10000, embed_dim=32),
-    SparseFeature(name="city", vocab_size=100, embed_dim=16),
-    DenseFeature(name="age", embed_dim=1),
-    DenseFeature(name="income", embed_dim=1)
-]
-
-# 2. 准备数据
-# 假设 x 包含所有特征，y 是 [n_samples, n_tasks] 的二维数组
-x = {
-    "user_id": user_id_data,
-    "city": city_data,
-    "age": age_data,
-    "income": income_data
-}
-y = np.column_stack([task1_labels, task2_labels])
-
-# 3. 创建数据生成器
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-# 4. 创建模型
-model = MMOE(
-    features=common_features,
-    task_types=["classification", "classification"],
-    n_expert=8,
-    expert_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
-    tower_params_list=[
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"},
-        {"dims": [64, 32], "dropout": 0.2, "activation": "relu"}
-    ]
-)
-
-# 5. 创建训练器
-trainer = MTLTrainer(
-    model=model,
-    task_types=["classification", "classification"],
-    optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
-    adaptive_params={"method": "uwl"},  # 当前可用的自适应损失权重
-    n_epoch=50,
-    earlystop_patience=10,
-    device="cpu",
-    model_path="saved/mmoe"
-)
-
-# 6. 训练模型
-os.makedirs("saved/mmoe", exist_ok=True)
-trainer.fit(train_dl, val_dl)
-
-# 7. 评估模型
-scores = trainer.evaluate(trainer.model, test_dl)
-print(f"Task 1 AUC: {scores[0]}")
-print(f"Task 2 AUC: {scores[1]}")
-
-# 8. 导出ONNX模型
-trainer.export_onnx("mmoe.onnx")
-
-# 9. 模型预测
-preds = trainer.predict(trainer.model, test_dl)
-print(f"Predictions shape: {np.array(preds).shape}")
-```
-
-## 9. 常见问题与解决方案
-
-### Q: 如何处理不同任务的数据分布差异？
-A: 可以尝试以下方法：
-- 对每个任务的数据进行标准化或归一化
-- 使用任务特定的Embedding层
-- 调整任务权重，平衡不同任务的重要性
-- 使用当前可用的 UWL 自适应权重
-
-### Q: 如何缓解多任务学习中的负迁移问题？
-A: 可以尝试以下方法：
-- 使用 PLE 模型，引入任务特定专家和共享专家
-- 使用注意力机制，自适应地选择任务间的信息迁移
-- 减少共享层的深度，增加任务特定层的深度
-- 尝试使用模型选择策略，选择合适的任务组合
-
-### Q: 如何选择合适的任务组合？
-A: 可以考虑以下因素：
-- 任务间的相关性：选择相关性较高的任务组合
-- 任务的重要性：选择对业务更重要的任务
-- 数据量：选择数据量充足的任务
-- 计算资源：考虑模型的计算复杂度
-
-### Q: 如何评估多任务模型的效果？
-A: 常用的评估指标包括：
-- 单个任务的评估指标（如 AUC、F1、RMSE 等）
-- 所有任务指标的加权平均
-- 帕累托最优分析：在多个任务间寻找最佳平衡点
-- 业务指标：最终的业务效果（如点击率提升、转化率提升等）
-
-### Q: 如何调整多任务模型的超参数？
-A: 可以尝试以下方法：
-- 网格搜索或随机搜索：调整专家数量、网络深度、dropout率等
-- 贝叶斯优化：更高效地搜索最优超参数
-- 迁移学习：从简单模型的超参数开始调整
-- 经验法则：专家数量一般选择 4-16 个，网络深度选择 2-4 层
-
-## 10. 多任务学习在推荐系统中的应用场景
-
-1. **电商推荐**：
-   - 同时优化点击率（CTR）、转化率（CVR）、客单价
-   - 优化商品推荐、广告推荐、个性化搜索
-
-2. **内容推荐**：
-   - 同时优化点击率、阅读时长、点赞率、评论率
-   - 优化新闻推荐、视频推荐、音乐推荐
-
-3. **社交媒体**：
-   - 同时优化好友推荐、内容推荐、广告推荐
-   - 优化用户留存、活跃度、互动率
-
-4. **金融推荐**：
-   - 同时优化贷款申请率、还款率、逾期率
-   - 优化理财产品推荐、信用卡推荐
-
-## 11. 当前实现边界
-
-- 本页模型接收结构化 `Feature` 输入；项目没有内置文本、图像、音频等多模态编码器。
-- 任务数由 `task_types` 或 `n_task` 显式配置。当前实现面向少量任务实验，未提供数百/数千任务的稀疏门控或分布式训练方案。
-- `MTLTrainer` 当前可用的自适应损失方法是 UWL；`gradnorm` 与 `metabalance` 在现有实现中不能完成正常训练，请不要启用。
+两个任务的损失量级相差较大时，`MTLTrainer` 支持用 `adaptive_params={"method": "uwl"}` 学习损失权重。从默认权重开始，在同一份验证集上比较调整前后的各项指标。

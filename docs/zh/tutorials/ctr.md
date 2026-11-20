@@ -5,48 +5,13 @@ description: Torch-RecHub 排序模型教程，覆盖 WideDeep、DeepFM、DCN �
 
 # 排序模型教程
 
-本教程聚焦排序场景的共性训练流程：数据准备、特征定义、训练器使用、评估与常见扩展。文中的基础示例使用仓库内置的 `Criteo` 样本数据；序列模型部分使用 `Amazon Electronics` 样本数据。
+Criteo 样本每行是一条广告曝光记录，标签表示用户有没有点击。下面先用 DeepFM 为每条记录预测点击概率。第二个例子换成 Amazon 商品数据，加入用户看过的商品，演示 DIN 和 BST 如何给当前候选商品打分。
 
-## 一、基础排序链路（Criteo）
+## 一、用 Criteo 曝光记录预测点击
 
 ### 1. 数据准备与特征处理
 
-```python
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
-
-df = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-
-# 排序类基线模型一般都遵循“连续特征 + 类别特征”这套输入范式
-dense_features = [f"I{i}" for i in range(1, 14)]
-sparse_features = [f"C{i}" for i in range(1, 27)]
-
-# 缺失值处理方式尽量和仓库 examples 保持一致，避免复现差异
-df[sparse_features] = df[sparse_features].fillna("-996")
-df[dense_features] = df[dense_features].fillna(0)
-
-# 连续特征归一化，类别特征编码成离散 id
-scaler = MinMaxScaler()
-df[dense_features] = scaler.fit_transform(df[dense_features])
-
-for feat in sparse_features:
-    encoder = LabelEncoder()
-    df[feat] = encoder.fit_transform(df[feat].astype(str))
-
-# 这些 Feature 对象描述“这一列该怎么喂给模型”
-dense_feas = [DenseFeature(name) for name in dense_features]
-sparse_feas = [SparseFeature(name, vocab_size=df[name].nunique(), embed_dim=16) for name in sparse_features]
-
-x = df.drop(columns=["label"])
-y = df["label"]
-
-# DataGenerator 会自动按 split_ratio 划分训练 / 验证 / 测试集
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-```
+先在同一个 Python 会话中运行[准备 Criteo 输入](/zh/guide/quick_start#criteo-input)，保留两组特征 `dense_feas`、`sparse_feas` 和训练、验证、测试三个 DataLoader。对比多个模型时可以复用这三个 DataLoader。每次创建模型前重新构造特征对象，避免带入上一个模型训练过的嵌入参数。
 
 ### 2. WideDeep / DeepFM / DCN 的统一训练方式
 
@@ -56,7 +21,7 @@ from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
 from torch_rechub.trainers import CTRTrainer
 
 # 任选一种模型
-# DeepFM 适合做第一条排序链路；注释掉的 WideDeep / DCN 只是切换模型，不需要改数据流
+# 下面先训练 DeepFM。对比其他模型时，用后面对应的构造代码替换它。
 model = DeepFM(
     deep_features=dense_feas + sparse_feas,
     fm_features=sparse_feas,
@@ -91,17 +56,13 @@ auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
-### 3. 这一页适合什么模型？
+### 3. 如何比较这三个模型？
 
-- `WideDeep`：快速验证 wide + deep 结构
-- `DeepFM`：类别特征交互 + MLP 的经典基线
-- `DCN / DCNv2`：显式特征交叉
+保持训练集、验证集和测试集不变，每次只运行一个模型的构造代码。WideDeep 将线性层和多层网络的分数相加，DeepFM 多算一项两两特征的交互，DCN 则用交叉层学习特征组合。三者都可以交给同一个 `CTRTrainer` 接口训练。
 
-这些模型都使用同一套 `DenseFeature + SparseFeature + DataGenerator + CTRTrainer` 训练范式。
+## 二、用 DIN 或 BST 加入用户的浏览历史
 
-## 二、序列排序链路（DIN / BST）
-
-序列模型和基础排序模型最大的区别在于：需要额外生成历史行为序列，并且 `history_features` 与 `target_features` 要严格对应。
+这份样本带有交互时间。预测用户会不会点击某件商品时，只能把它之前的记录作为历史。例如，历史里的商品和类目要按同一顺序排列，才能知道每件商品属于哪个类目。
 
 ### 1. 使用 Amazon Electronics 样本数据构建序列
 
@@ -131,14 +92,14 @@ features = [
     SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8),
 ]
 target_features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0),
 ]
 
 history_features = [
     # 序列模型这里必须保留完整序列张量，所以用 concat 而不是 mean / sum
-    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id"),
+    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id", padding_idx=0),
 ]
 
 # 先把 DataFrame 转成 dict，再交给 DataGenerator，和 examples/ranking 的写法一致
@@ -234,24 +195,17 @@ visualize_model(model, save_path="model_architecture.png", dpi=300)
 
 ## 四、常见问题
 
-### Q1：为什么这页不直接覆盖所有排序模型的完整代码？
 
-因为排序模型可以分成两类：
 
-- 基础排序：`WideDeep / DeepFM / DCN`
-- 序列排序：`DIN / DIEN / BST`
+### 如何用 NVIDIA 显卡训练？
 
-它们的数据准备方式不同。这一页保留共性流程，具体参数和调优建议放在各模型页面中展开。
+在已装好 CUDA 版 PyTorch 的环境中，把创建 `CTRTrainer` 时的 `device` 改成 `"cuda:0"`。
 
-### Q2：如何切换到 GPU？
+### 权重会保存到哪里？
 
-将 `device="cpu"` 改成 `device="cuda:0"` 即可。
+`CTRTrainer` 把权重写入 `model_path` 指定的目录。示例训练前用 `os.makedirs` 建好这个目录。
 
-### Q3：为什么示例里先执行 `os.makedirs`？
-
-当前 `CTRTrainer` 会直接把权重保存到 `model_path`，不会自动创建目录。为了保证示例可以直接运行，建议在训练前先创建保存目录。
-
-### Q4：还想继续看更细的模型说明？
+### 各模型的配置示例
 
 - [DeepFM 教程](/zh/tutorials/models/ranking/deepfm)
 - [WideDeep 教程](/zh/tutorials/models/ranking/widedeep)

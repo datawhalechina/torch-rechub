@@ -1,29 +1,19 @@
 ---
 title: BST 使用示例
-description: Behavior Sequence Transformer (BST) 模型完整使用教程 —— 用 Transformer 建模用户行为序列
+description: 用 BST 把候选商品接入用户的行为序列，并计算点击概率
 ---
 
 # BST 使用示例
 
 ## 1. 模型简介与适用场景
 
-BST (Behavior Sequence Transformer) 是阿里巴巴在 2019 年提出的模型，将 **Transformer** 的 Self-Attention 机制引入推荐系统，通过多头注意力捕捉用户行为序列中**任意两个物品间的依赖关系**，而非像 DIN 那样仅关注目标物品与历史物品的关系。
+BST 把候选商品接在用户的浏览历史末尾，一起送入 Transformer。最后一个位置的输出就包含了候选商品和这段历史的关系。模型再结合用户特征，给这次候选打一个点击分数。
 
 **论文**: [Behavior Sequence Transformer for E-commerce Recommendation in Alibaba](https://arxiv.org/pdf/1905.06874)
 
 ### 模型结构
 
-> **注意**: 由于 BST 内部使用 Transformer 动态计算，torchview 暂时无法自动追踪其计算图，因此未提供架构可视化图。
-
-- **Embedding Layer**: 将用户特征、物品特征和行为序列编码为 Embedding
-- **Transformer Encoder**: 对行为序列 + 目标物品拼接后做 Self-Attention
-- **MLP Layer**: 将 Transformer 输出和其他特征拼接后，经 MLP 输出预测分数
-
-### 适用场景
-
-- CTR 预估
-- 行为序列较长且物品间存在复杂依赖的场景
-- 追求更好的序列建模能力（相比 DIN/DIEN 等 RNN-based 方法）
+例如，若输入有 3 个历史位置，候选商品就占第 4 个位置。Transformer 可以在这些位置之间计算注意力，补齐的历史位置会被遮住。
 
 ---
 
@@ -103,7 +93,7 @@ model = BST(
 | `features` | `list[Feature]` | 用户画像和上下文特征，不含历史与目标特征 | |
 | `history_features` | `list[Feature]` | 历史行为序列 (pooling=`"concat"`) | |
 | `target_features` | `list[Feature]` | 当前候选物品特征，其 `embed_dim` 总和必须等于历史特征的总和 | |
-| `mlp_params` | `dict` | 顶层 MLP 参数（`activation` 已内置为 `leakyrelu`，无需传入） | `{"dims": [256, 128]}` |
+| `mlp_params` | `dict` | 顶层预测网络的隐藏层宽度等参数。Transformer 内部的前馈层使用 LeakyReLU | `{"dims": [256, 128]}` |
 | `nhead` | `int` | Transformer 多头注意力头数 | 4 或 8 |
 | `dropout` | `float` | Transformer 内部 dropout | 0.1 ~ 0.3 |
 | `num_layers` | `int` | Transformer Encoder 层数 | 1 ~ 3 |
@@ -145,10 +135,7 @@ print(f"Test AUC: {auc:.4f}")
 
 ## 6. 参数调优建议
 
-1. **Transformer 层数** (`num_layers`): 1 层通常已经足够好，增加层数可能导致过拟合
-2. **多头数** (`nhead`): 需要能整除 `embed_dim`，通常 4 或 8
-3. **Dropout**: Transformer 容易过拟合，推荐 0.2~0.3
-4. **序列长度**: BST 的计算复杂度是 $O(n^2)$（Self-Attention），序列过长会显著增加延迟
+本例用一层 Transformer。调整 `nhead` 时先算出每个位置拼接后的向量宽度。例如本例是 16 维，设 `nhead=8`，每个头分到 2 维。调整历史长度时要给序列末尾的候选商品额外留一个位置。
 
 ---
 
@@ -161,12 +148,16 @@ print(f"Test AUC: {auc:.4f}")
 ### Q2: 特征维度和 nhead 不匹配导致报错？
 Transformer 要求 `sum(history_feature.embed_dim) % nhead == 0`，而且历史特征与目标特征的维度总和要相等。本例两个历史特征各为 8 维，Transformer 维度是 16。
 
+位置编码最多接收 `max_seq_len` 个位置，输入会把目标接在历史末尾。若历史长度为 50，`max_seq_len` 至少设为 51。
+
 ### Q3: BST 线上推理速度如何？
-Self-Attention 计算量为 $O(n^2d)$，短序列（<50）延迟可接受。长序列建议截断或使用 DIN 替代。
+一次前向计算需要比较序列中的各个位置，序列越长，注意力的计算开销越大。部署前用实际批大小、历史长度和设备测推理耗时。
 
 ---
 
 ## 8. 模型可视化
+
+安装项目的 `visualization` extra 和 Graphviz 后，可以在 Jupyter 查看计算图，也可以将图保存为 PNG。
 
 ```python
 from torch_rechub.utils.visualization import visualize_model

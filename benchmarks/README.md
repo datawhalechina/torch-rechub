@@ -1,40 +1,29 @@
 # Benchmarks
 
-benchmark 脚本用于做可复现的模型比较。它们和 `examples/` 分开维护：`examples/` 侧重教学和演示，`benchmarks/` 侧重固定实验协议和结果输出。
+想比较两个模型时，可以让它们使用同一份数据、同一种切分和相同的训练轮数。`benchmarks/configs/` 里已有三组小样本配置。第一次运行可以从下面的 MovieLens 示例开始。
 
 ## 运行 Matching Benchmark
 
-在仓库根目录执行：
+从仓库根目录安装实验依赖，再运行 MIND 配置。召回评估会用 Annoy 在电影向量里查候选。
 
 ```bash
-python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_mind.yaml
+uv sync --extra benchmark --extra annoy
+uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_mind.yaml
 ```
 
-第一阶段还提供以下配置：
+在同一份电影数据上，还可以运行 YoutubeDNN 和两个 ComiRec 模型。
 
 ```bash
-python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_youtube_dnn.yaml
-python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_dr.yaml
-python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_sa.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_youtube_dnn.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_dr.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_sa.yaml
 ```
 
-每次运行会写出：
-
-- `result.yaml`：结构化 benchmark 元数据和指标
-- `summary.md`：简洁的人类可读摘要
-- `model.pth`：`MatchTrainer` 保存的模型权重
-
-默认输出目录是：
-
-```text
-benchmark_results/
-```
-
-该目录已加入 `.gitignore`，不会提交到仓库。
+这条 MIND 命令把文件写到 `benchmark_results/matching/ml_1m_mind/`。打开 `summary.md` 看指标和耗时，`result.yaml` 里还有数据路径、模型参数和向量形状。`model.pth` 是本次训练保存的权重。其他实验写到各自配置里的 `output_dir`。
 
 ## 当前范围
 
-当前支持两类轻量 benchmark。
+仓库提供以下三类小样本配置。
 
 ### Matching / Retrieval
 
@@ -56,14 +45,14 @@ Criteo sample 数据：
 运行示例：
 
 ```bash
-python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_widedeep.yaml
-python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_deepfm.yaml
-python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_widedeep.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_deepfm.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml
 ```
 
 ### Multi-Task
 
-Census-Income sample 数据，双任务（income = cvr_label，marital status = ctr_label）：
+Census-Income 有两个分类任务。`cvr_label` 表示收入是否达到数据中的 50,000 美元档，`ctr_label` 表示婚姻状态是否为“从未结婚”。这两个列名沿用了推荐示例的命名。
 
 - `ESMM`（输出额外的 `ctcvr_label`）
 - `MMOE`
@@ -72,55 +61,52 @@ Census-Income sample 数据，双任务（income = cvr_label，marital status = 
 运行示例：
 
 ```bash
-python benchmarks/runner.py --config benchmarks/configs/multitask/census_esmm.yaml
-python benchmarks/runner.py --config benchmarks/configs/multitask/census_mmoe.yaml
-python benchmarks/runner.py --config benchmarks/configs/multitask/census_ple.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_esmm.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_mmoe.yaml
+uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_ple.yaml
 ```
 
-指标按任务命名（例如 `AUC[cvr_label]`、`AUC[ctr_label]`），并在任务超过 1 个时额外输出 `AUC_mean`。
+例如，`AUC[cvr_label]` 对应收入预测，`AUC[ctr_label]` 对应婚姻状态。`AUC_mean` 是各个可计算 AUC 的任务的平均值。
 
 ## 一次跑一组 (Suite)
 
 如果想一次跑多个 config 并得到一张对比表：
 
 ```bash
-python benchmarks/suite.py \
+uv run python benchmarks/suite.py \
   --configs "benchmarks/configs/matching/*.yaml" \
   --output  benchmark_results/suites/matching
 
-python benchmarks/suite.py \
+uv run python benchmarks/suite.py \
   --configs "benchmarks/configs/ranking/*.yaml" \
   --output  benchmark_results/suites/ranking
 ```
 
-Suite 会：
-
-- 依次跑每个 config，并调用 `runner.py` 相同的落地逻辑写各自的 `result.yaml` / `summary.md`
-- 在 `--output` 目录下额外写一份 `suite.yaml`（结构化）和 `suite.md`（对比表）
+每个配置仍把 `summary.md` 和 `result.yaml` 写到自己的目录。要并排比较所有模型，打开 `--output` 下的 `suite.md`。后续脚本需要读取整组结果时，用同目录的 `suite.yaml`。
 
 ## Config 校验
 
-加载 config 时会做轻量 schema 校验（必填字段 + 白名单 key），拼错的 key（如 `batchsize` → `batch_size`）会直接报错，不再静默 fallback 到默认值。
+如果把 `batch_size` 写成 `batchsize`，程序会在训练开始前指出配置里有未知字段。缺少必填项也会在这里报错。
 
 ## 指标注册
 
-Ranking 的 `metrics: [...]` 真正驱动指标选择；可选项由 `benchmarks/metrics.py::BINARY_RANKING_METRICS` 定义（当前支持 `AUC`、`LogLoss`、`Accuracy`、`MSE`）。要新增指标只需在字典里注册一个 `(y_true, y_pred) -> float`。拼写错误会在 `validate_config` 阶段就抛出。
+排序实验按 YAML 的 `metrics` 列表计算指标，可选 `AUC`、`LogLoss`、`Accuracy`、`MSE`。要添加指标，在 `benchmarks/metrics.py` 的 `BINARY_RANKING_METRICS` 中登记名称和函数。函数接收 `y_true` 与 `y_pred`，返回一个分数。
 
 ## 基线与回归检测
 
-`benchmarks/baselines/<task>.yaml` 按 config 相对路径记录每个指标的 `expected + tolerance`。跑 runner 或 suite 时加 `--check-baseline` 会比较新结果：任何指标偏离 tolerance 会非零退出。
+基线文件 `benchmarks/baselines/<task>.yaml` 为每个指标记录参考值 `expected` 和允许退步的幅度 `tolerance`。加上 `--check-baseline` 后，若指标向较差的方向变化且超出这个幅度，命令会以非零状态退出。例如 AUC 下降和 LogLoss 上升都可能触发检查。
 
 ```bash
 # 单次运行
-python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml --check-baseline
+uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml --check-baseline
 
 # 整组运行
-python benchmarks/suite.py \
+uv run python benchmarks/suite.py \
   --configs "benchmarks/configs/matching/*.yaml" \
   --output  benchmark_results/suites/matching \
   --check-baseline
 ```
 
-更新基线的工作流程：跑一次 suite 得到稳定结果 → 把 `benchmark_results/suites/<task>/suite.yaml` 里对应的 `metrics` 复制到 `benchmarks/baselines/<task>.yaml`，并给出合适的 `tolerance`。
+确认新的一组结果可以重复后，从 `benchmark_results/suites/<task>/suite.yaml` 取出相应指标，更新基线中的 `expected`，并按多次运行的波动设定 `tolerance`。
 
-更完整的路线图见 `BENCHMARK_DESIGN.md`。
+各任务的数据切分和指标见[实验设计](./BENCHMARK_DESIGN.md)。

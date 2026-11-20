@@ -5,9 +5,9 @@ description: torch-rechub 中轻量 HLLM 实现的数据准备、训练命令、
 
 # HLLM 模型在 torch-rechub 中的复现说明
 
-本文说明仓库当前 HLLM（Hierarchical Large Language Model for Recommendation）示例的可运行路径。这里实现的是“离线预计算 item 文本 embedding + 轻量 User Transformer”的版本，不是 ByteDance 官方端到端 HLLM 训练栈，也不应把本文结果当作论文指标复现。
+MovieLens 里既有观看顺序，也有电影名称和类型。HLLM 把这两份信息分两步用起来：先让语言模型为每部电影算一个文本向量，保存到磁盘。训练时按观看顺序查出这些向量，交给用户侧的 Transformer，预测接下来会看哪部电影。
 
-默认路径适合单卡实验：离线冻结 item 向量，训练小型 User Transformer；可用 `--d_model` 投影降维，并启用 `--loss_type sampled_softmax --amp`。模型接口也支持传入预训练 `user_model`，但示例默认不会加载它，更不包含两侧 LLM 的联合训练。16/24 GB 显存能容纳的规模取决于词表、序列长度和模型配置。
+这样只需在生成物品向量时运行语言模型，换一组用户侧参数也能复用同一份向量。这里的单卡示例固定物品向量，只训练用户侧。论文的端到端方案还会联合训练物品和用户两侧的模型。下面先跑 MovieLens，使用图书数据时再换到 Amazon Books 一节。
 
 ## 1. 代码入口
 
@@ -26,9 +26,9 @@ description: torch-rechub 中轻量 HLLM 实现的数据准备、训练命令、
 
 `examples/generative/data/*/processed/` 是运行预处理后生成的目录，仓库不提交其中的 `pkl` 或 embedding 文件。
 
-## 2. 当前模型做了什么
+## 2. 从物品文本到下一次观看
 
-### 2.1 Item 侧（离线且冻结）
+### 2.1 为每个物品保存一行向量
 
 预处理器支持两种 `--model_type`：
 
@@ -43,11 +43,11 @@ description: torch-rechub 中轻量 HLLM 实现的数据准备、训练命令、
 Compress the following sentence into embedding: title: {title}genres: {genres}
 ```
 
-Amazon Books 使用 `title` 与 `description`。脚本取最后一个 token 的隐藏状态，按 token id 行号写入 `item_embeddings_<model_type>.pt`；第 0 行保留给 PAD。`HLLMModel` 检查 token 行号对齐并冻结 item 向量；默认维度一致时直接归一化，设置较小的 `--d_model` 时用可训练投影衔接 User 编码器。
+Amazon Books 的输入文本取自 `title` 和 `description`。脚本取最后一个 token 的隐藏状态，把向量写到 `item_embeddings_<model_type>.pt`。第 0 行留给补位，其余行号由训练序列使用的词表决定。
 
-缺少文本的 token 会保留为零向量。预处理日志会打印覆盖数量，正式实验应检查该数字，不能只检查文件是否存在。
+例如，假设原始电影 ID 42 在 `vocab.pkl` 中查到的 `item_to_idx[42]` 等于 17。第 17 行就应该来自电影 42 的文本。交换两部电影的行号，矩阵形状依然正确，模型却会给用户读错电影。所以要把生成向量时的词表和向量文件一起保存。日志还会打印多少个物品有文本，缺少文本的行会保留为零向量。
 
-### 2.2 User 侧（训练）
+### 2.2 用观看历史训练用户编码器
 
 前向流程为：
 
@@ -64,18 +64,16 @@ seq_tokens [B, L]
 
 每个 block 使用 pre-norm 多头自注意力、前馈网络和残差连接。causal mask 与 padding mask 分别屏蔽未来 token 和 PAD key，并将 PAD 位置输出清零。
 
-### 2.3 训练目标与 `NCELoss` 的真实语义
+### 2.3 一段历史怎样产生训练目标
 
-`SeqTrainer` 训练整段 next-token 目标，而不是只训练最后一个位置：
+训练时，历史中的每个有效位置都用来预测下一个物品。例如：
 
 ```text
 logits[:, i, :]  -> seq_tokens[:, i + 1]
 logits[:, -1, :] -> held-out targets
 ```
 
-PAD 标签 `0` 被忽略。`--loss_type cross_entropy` 使用 `CrossEntropyLoss`；`--loss_type nce` 使用项目的 `NCELoss`。
-
-需要注意：当前 `NCELoss` 对全量词表 logits 做 temperature 缩放、`log_softmax` 和目标类负对数似然，并未采样噪声，也未自动构造 in-batch negatives。因此不能据此宣称采样 NCE 的计算加速或额外指标提升。两个 HLLM 训练脚本都给 `NCELoss` 传入 `temperature=1.0`，因为模型输出已经按 `0.07` 缩放，避免重复 temperature。
+训练器跳过补位标签 `0`。脚本默认的 `--loss_type nce` 仍会计算全词表得分，再对目标类别算负对数似然。得分已在模型内按温度缩放，所以脚本给损失函数传入的温度是 1。需要减少训练时的候选数时，选择 `--loss_type sampled_softmax`，用 `--num_negatives` 指定每个目标采多少个负例。`cross_entropy` 也使用全词表。
 
 ## 3. 安装与模型缓存
 
@@ -102,20 +100,12 @@ python examples/generative/data/ml-1m/preprocess_hllm_data.py \
     --model_type tinyllama \
     --device cuda
 
-# 3. 训练与评估
+# 3. 单卡训练。每批 8 条、序列最多 32 个物品，每个目标采 32 个负物品
 mkdir -p outputs/hllm_ml
-python examples/generative/run_hllm_movielens.py \
-    --model_type tinyllama \
-    --epoch 5 \
-    --batch_size 64 \
-    --learning_rate 1e-3 \
-    --weight_decay 1e-5 \
-    --max_seq_len 200 \
-    --loss_type nce \
-    --device cuda \
-    --save_dir outputs/hllm_ml \
-    --seed 2022
+python examples/generative/run_hllm_movielens.py --model_type tinyllama --device cuda --epoch 1 --batch_size 8 --max_seq_len 32 --d_model 128 --loss_type sampled_softmax --num_negatives 32 --accumulation_steps 2 --amp --save_dir outputs/hllm_ml
 ```
+
+在 RTX 5080（16 GB）上，用 MovieLens-1M 的用户 1–32、每人最近最多 24 条交互验证了上述训练参数。子集有 578 部电影，按物品 ID 取对应的 2048 维 TinyLlama 向量。训练和评估的 PyTorch 峰值张量显存约 38 MiB。此数值限于小样本的用户编码器阶段，生成文本向量需要另外测量。
 
 默认数据目录是 `examples/generative/data/ml-1m/processed/`，应包含：
 
@@ -128,7 +118,7 @@ movie_text_map.pkl
 item_embeddings_tinyllama.pt
 ```
 
-MovieLens 序列预处理采用按用户 leave-last-out：最后一次交互为 test target，倒数第二次为 validation target，之前的前缀生成训练样本；不是 70/10/20 用户随机划分。
+MovieLens 按每个用户的时间顺序留出样本。最后一次观看用来测试，倒数第二次用来验证，更早的观看记录用于训练。
 
 自定义目录时，两个预处理脚本必须使用同一个 `--output_dir`，训练时再通过 `--dataset_path` 指向该目录。训练脚本对显式相对 `--dataset_path` 的处理与脚本目录有关，自动化任务中建议传绝对路径。
 
@@ -176,30 +166,12 @@ item_embeddings_tinyllama.pt
 
 重新运行预处理会重写输出目录中的映射、split 和 embedding 文件。`--overwrite` 只描述下载文件的覆盖行为；要保留已有实验产物，请先备份或换一个 `--output_dir`。
 
-## 6. 资源与评估注意事项
+## 6. 训练结束后看哪些数字
 
-- 默认全词表训练会生成 `[B, L, V]` logits；`sampled_softmax` 则只计算正例与采样负例。大词表下可先选择采样训练，再降低 `--batch_size`、`--max_seq_len` 和 `--d_model`。
-- TinyLlama/Baichuan2 只在离线 embedding 生成阶段运行；训练阶段使用预计算 embedding，但 2048/4096 维 User Transformer 本身仍然较大。
-- 训练脚本报告 `SeqTrainer.evaluate()` 的 full-sequence loss、held-out top-1 accuracy，并额外计算 HR/NDCG@10/50/200。
-- HLLM 示例使用 `SeqTrainer.predict()` 分块检索候选，排除 PAD；是否过滤历史由 `filter_seen` 控制。比较论文或线上指标前，应统一该选项与候选集合。
-- 时间和显存受硬件、词表规模、序列长度与缓存状态影响；本文不提供未经基准脚本验证的固定耗时或百分比提升。
+日志里的 loss 衡量历史中各有效位置的预测误差，Top-1 准确率看的是每条验证或测试记录留出的那个目标。脚本还会计算 HR 和 NDCG（K 取 10、50、200）。前者看目标物品是否被找回，后者还看它排第几。比较两次实验时，候选片库和过滤已看物品的设置要一致。
 
-## 7. 与官方端到端 HLLM 的边界
+训练中显存紧张时，先看词表和用户侧模型各占多少。全词表打分需要一个 `[批大小, 序列长度, 词表大小]` 的张量，采样训练能减少最后一维的开销。`--d_model 128` 则用一个可训练的投影，把缓存的宽向量映射进更小的用户编码器。评估时 `SeqTrainer.predict()` 可以分块检索全库。
 
-当前仓库可以验证的能力：
+## 7. 与论文实验怎样比较
 
-- item 文本 embedding 按 token id 对齐并冻结；
-- causal User Transformer 输出全词表 cosine logits；
-- 支持 MovieLens-1M 与 Amazon Books 的预处理、训练和 top-k 评估示例；
-- 单机 `SeqTrainer` 支持全词表 CE、兼容旧接口的全词表 `NCELoss`，以及只计算正例和采样负例得分的 `sampled_softmax`。
-
-当前未实现或未对齐的部分：
-
-- Item LLM 与 User LLM 的端到端联合训练；
-- 官方大模型架构、可学习 item embedding token 与训练配置的逐项复刻；
-- 官方完整的负采样策略与训练协议；
-- DeepSpeed 或分布式训练；
-- 统一的历史候选过滤协议和论文指标复现实验；
-- 多步自回归解码与生产推理服务。
-
-现有测试覆盖 item embedding 行号/维度校验和 cosine logits 范围，但不证明与官方实现的指标一致。因此更准确的定位是轻量研究示例，而不是“97% 对齐”或可直接生产部署的官方复现。
+这套脚本适合回答“同一份冻结的文本向量，能否帮助预测下一次交互”。若要比较 ByteDance 官方 HLLM 的指标，还需要对齐两侧模型的架构和联合训练方式、数据切分、负采样和评估候选集。仓库中的小样本成绩只对应上面列出的配置。

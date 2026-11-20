@@ -1,13 +1,13 @@
 ---
 title: DIEN 使用示例
-description: Deep Interest Evolution Network (DIEN) 模型完整使用教程 —— 捕捉用户兴趣的动态演化
+description: 用商品交互序列训练 DIEN，并构造辅助损失需要的负历史
 ---
 
 # DIEN 使用示例
 
 ## 1. 模型简介
 
-DIEN (Deep Interest Evolution Network) 是阿里妈妈在 AAAI'2019 提出的模型，是 DIN 的进化版。
+DIEN 按先后顺序读取用户的行为历史，每读一步就更新一次兴趣表示。训练时，它还会比较用户下一步实际交互的商品和采样得到的负例。这个额外的训练目标称为辅助损失。
 
 **论文**: [Deep Interest Evolution Network for Click-Through Rate Prediction](https://arxiv.org/pdf/1809.03672)
 
@@ -23,8 +23,7 @@ DIEN (Deep Interest Evolution Network) 是阿里妈妈在 AAAI'2019 提出的模
 | 约定 | 说明 |
 |------|------|
 | padding index | 序列用 0 填充（`generate_seq_feature` 默认），所有序列特征和 target 特征都需显式设 `padding_idx=0` |
-| shared_with | `history_features` 和 `neg_history_features` 的 `shared_with` 必须指向 **target feature 的名字**，不能指向 history feature，因为 `EmbeddingLayer` 只把 `shared_with=None` 的特征注册为 embedding root |
-| loss_mode | `CTRTrainer` 需设 `loss_mode=False`，因为 `forward` 返回 `(prediction, aux_loss)` |
+| shared_with | `history_features` 和 `neg_history_features` 的 `shared_with` 必须指向 **target feature 的名字**，不能指向 history feature，因为 在这段代码里，`target_item_id` 创建商品嵌入表，两列历史 ID 都要到这张表查向量。`hist_item_id` 已经指向 `target_item_id`，因此负历史也直接写 `shared_with="target_item_id"`。
 
 ---
 
@@ -56,25 +55,10 @@ train, val, test = generate_seq_feature(
 
 ## 4. 负样本构造
 
-```python
-import random
-import numpy as np
+主任务的 `label` 表示是否点击当前候选商品。这里另外构造的 `neg_hist_item_id` 对应历史序列的各个位置，用于训练辅助任务。负商品的类目从 `item2cate` 查，保证商品和类目配对。
 
-def build_neg_history(split, hist_item_col, item2cate, n_items):
-    """逐时刻采样负 item，再通过 item2cate 查出对应 cate，保证属性一致。"""
-    seqs = split[hist_item_col]
-    neg_items = np.zeros_like(seqs)
-    neg_cates = np.zeros_like(seqs)
-    for i, row in enumerate(seqs):
-        for t, item in enumerate(row):
-            if item == 0:
-                continue
-            neg = item
-            while neg == item:
-                neg = random.randint(1, n_items)
-            neg_items[i, t] = neg
-            neg_cates[i, t] = item2cate.get(neg, 1)
-    return neg_items, neg_cates
+```python
+from examples.ranking.run_dien import build_neg_history
 
 train, val, test = df_to_dict(train), df_to_dict(val), df_to_dict(test)
 train_y, val_y, test_y = train.pop("label"), val.pop("label"), test.pop("label")
@@ -159,7 +143,7 @@ print(f"Test AUC: {auc:.4f}")
 ## 7. 常见问题
 
 ### Q1: DIEN 和 DIN 的核心区别？
-DIN 用 Activation Unit 做加权求和（静态），DIEN 用 GRU+AUGRU 建模兴趣的时序演化（动态），并引入辅助损失监督 GRU 中间状态。
+DIN 根据当前候选给历史记录分配权重。DIEN 还按时间顺序更新用户状态，并用下一步的真实商品和负样本来训练中间状态。
 
 ### Q2: shared_with 为什么要指向 target feature 而不是 history feature？
 `EmbeddingLayer` 只把 `shared_with=None` 的特征注册进 `embed_dict`。`history_features` 本身已经 `shared_with="target_*"`，所以 `embed_dict` 里没有 `hist_*` 这个 key，`neg_history_features` 的 `shared_with` 必须直接指向 target feature。
@@ -168,7 +152,7 @@ DIN 用 Activation Unit 做加权求和（静态），DIEN 用 GRU+AUGRU 建模�
 `history_features` 和 `neg_history_features` 共享 target feature 的 embedding 表。只有在 target feature 上设 `padding_idx=0`，embedding 表的 row 0 才真正是受保护的零向量。
 
 ### Q4: 序列长度建议？
-DIEN 计算随序列长度线性增长（GRU 逐步展开），通常限制在 20~50。
+GRU 会按顺序读取每一次历史行为。选择截断长度时，可以先看训练集中每位用户有多少次交互，再用几个候选长度比较验证 AUC 和训练耗时。
 
 ---
 

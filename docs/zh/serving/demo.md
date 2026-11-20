@@ -1,115 +1,59 @@
 ---
-title: 在线服务示例
-description: Torch-RecHub 在线服务部署示例
+title: 用训练好的模型做预测
+description: 核对 DeepFM 的 ONNX 分数，用 DSSM 和 Annoy 查找电影 ID
 ---
 
-# 在线服务示例
+# 从训练结果到一次预测
 
-本文档演示 Torch-RecHub 部署组件的基本串联方式。示例不包含 API 网关、并发控制、监控或持久化服务编排。
+下面各用一条输入检查训练结果。刚跑完 DeepFM，可以先核对导出前后的点击分数。刚跑完 DSSM，可以试着给一个用户找电影。每段代码都在对应的快速入门示例所在的 Python 会话里运行，分别需要 `onnx` 和 `annoy` 可选依赖。[快速入门](/zh/guide/quick_start)
 
-## 排序模型部署
+## 用同一条 Criteo 记录校验排序分数
 
-### 1. 导出 ONNX 模型
-
-```python
-from torch_rechub.trainers import CTRTrainer
-
-# 训练完成后导出
-trainer.export_onnx("deepfm.onnx", dynamic_batch=True)
-```
-
-### 2. ONNX Runtime 推理
+从留出的 `test` 表取第一条原始记录，只调用一次 `encode_features`，把同一份编码后的特征分别交给两个模型。`example_batch` 则取自实际的测试批次，让导出器看到和训练时一样的字段形状。
 
 ```python
 import numpy as np
 import onnxruntime as ort
-
-# 加载模型
-session = ort.InferenceSession("deepfm.onnx")
-
-# 准备输入
-inputs = {
-    "city": np.array([1, 2, 3], dtype=np.int64),
-    "age": np.array([0.5, 0.3, 0.8], dtype=np.float32),
-}
-
-# 推理
-outputs = session.run(None, inputs)
-predictions = outputs[0]
-```
-
-## 召回模型部署
-
-### 1. 导出双塔模型
-
-```python
-from torch_rechub.trainers import MatchTrainer
-
-# 分别导出用户塔和物品塔
-trainer.export_onnx("user_tower.onnx", mode="user")
-trainer.export_onnx("item_tower.onnx", mode="item")
-```
-
-### 2. 离线构建物品索引
-
-```python
-import numpy as np
-import onnxruntime as ort
-
-# 加载物品塔
-item_session = ort.InferenceSession("item_tower.onnx")
-
-# 计算所有物品的 embedding
-item_embeddings = []
-for batch in item_dataloader:
-    inputs = {k: v.numpy() for k, v in batch.items()}
-    emb = item_session.run(None, inputs)[0]
-    item_embeddings.append(emb)
-
-item_embeddings = np.concatenate(item_embeddings)
-```
-
-### 3. 在线召回服务（Milvus）
-
-统一工厂当前会同时导入三个后端，因此需要先安装 `pip install "torch-rechub[annoy,faiss,milvus]"`，并启动可连接的 Milvus 服务。
-
-```python
 import torch
+
+example_batch, _ = next(iter(test_dl))
+trainer.export_onnx("deepfm.onnx", dummy_input=example_batch)
+x = encode_features(test.iloc[:1])
+trainer.model.eval()
+with torch.no_grad():
+    score = trainer.model({name: torch.from_numpy(v) for name, v in x.items()}).cpu().numpy()
+
+session = ort.InferenceSession("deepfm.onnx", providers=["CPUExecutionProvider"])
+inputs = {field.name: x[field.name] for field in session.get_inputs()}
+onnx_score = session.run(None, inputs)[0]
+np.testing.assert_allclose(onnx_score, score, rtol=1e-4, atol=1e-6)
+print("点击分数", onnx_score.tolist())
+```
+
+能打印出“点击分数”，说明这条记录的两次预测在代码给定的误差范围内一致。遇到断言失败时，先核对字段名、形状和类型。类别 ID 应为 `int64`，连续字段为 `float32`。
+
+部署时把 `vocabs`、`scaler` 和连续字段的顺序 `dense_features` 随模型一起保存，新请求仍用训练时的 `encode_features` 编码。如果之后量化了模型，再用整份留出数据比较 AUC 和 LogLoss。
+
+## 从用户向量查回原始电影 ID
+
+`item_embedding` 的第 0 行是 `all_item` 中的第一部电影。如果 Annoy 返回行号 0，应该推荐的是这部电影。下面用 `movies.ann` 存索引，再用 `movie_ids.npy` 存一份同顺序的原始电影 ID。
+
+```python
 import numpy as np
-import onnxruntime as ort
 from torch_rechub.serving import builder_factory
 
-# 加载用户塔
-user_session = ort.InferenceSession("user_tower.onnx")
+builder = builder_factory("annoy", d=item_embedding.shape[1], metric="angular")
+row_to_movie = raw_movie_ids[all_item["movie_id"] - 1]
+np.save("movie_ids.npy", row_to_movie)
+with builder.from_embeddings(item_embedding.cpu()) as index:
+    index.save("movies.ann")
 
-# 连接 Milvus 服务
-embed_dim = 64  # embedding 维度
-builder = builder_factory(
-    "milvus",
-    d=embed_dim,
-    index_type="HNSW",
-    metric="IP",
-    host="localhost",
-    port=19530
-)
-
-# 将物品 embedding 写入 Milvus
-with builder.from_embeddings(torch.tensor(item_embeddings, dtype=torch.float32)) as indexer:
-    # 计算用户 embedding
-    user_inputs = {"user_id": np.array([123], dtype=np.int64)}
-    user_emb = user_session.run(None, user_inputs)[0]
-
-    # 向量检索
-    ids, scores = indexer.query(torch.tensor(user_emb, dtype=torch.float32), top_k=100)
-    recall_items = ids[0].tolist()
+row_to_movie = np.load("movie_ids.npy")
+with builder.from_index_file("movies.ann") as index:
+    rows, distances = index.query(user_embedding[:1].cpu(), top_k=min(10, len(row_to_movie)))
+movie_ids = row_to_movie[rows[0].numpy()]
+print("推荐电影", movie_ids.tolist())
 ```
 
-> 这里的 `MilvusBuilder.from_embeddings()` 只适合演示：它会创建临时 collection，并在退出 `with` 时删除。当前封装也不支持通过 `save()` 或 `from_index_file()` 管理持久化 Milvus collection；生产服务应直接使用 Milvus 客户端管理长期 collection。
-
-## 最佳实践
-
-1. **模型量化**：使用 INT8/FP16 量化降低推理延迟
-2. **批量推理**：合并请求进行批量推理提高吞吐
-3. **索引预热**：服务启动时预加载索引到内存
-4. **监控告警**：监控推理延迟和错误率
+代码最后打印的是原始电影 ID，可直接用来查片名。用新的用户请求试时，沿用训练时的词表和历史序列长度，用同一版用户塔生成查询向量。换了物品塔权重或电影排列顺序，记得一起更新 `movies.ann` 和 `movie_ids.npy`。[双塔导出与量化](/zh/serving/onnx) · [向量索引](/zh/serving/vector_index)
 

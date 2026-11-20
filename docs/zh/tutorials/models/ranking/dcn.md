@@ -1,13 +1,13 @@
 ---
 title: DCN / DCNv2 使用示例
-description: Deep & Cross Network 完整使用教程 —— 从数据准备到模型训练与评估
+description: 用相同的 Criteo 特征比较 DCN 和 DCNv2 的交叉层
 ---
 
 # DCN / DCNv2 使用示例
 
 ## 1. 模型简介与适用场景
 
-**DCN**（Deep & Cross Network）是 Google 在 ADKDD'2017 上提出的模型，通过交叉网络（Cross Network）**显式学习高阶特征交叉**，同时保持线性计算复杂度。**DCNv2** 是其增强版本，在 WWW'2021 发表，进一步提高了表达能力。
+DCN 用交叉层学习输入字段的组合关系，同时用多层网络处理同一批字段。例如，一条曝光里的两个字段可以单独起作用，也可以在同时出现时影响点击分数。下面用同一份 Criteo 样本训练 DCN 或 DCNv2。
 
 **论文**:
 - DCN: [Deep & Cross Network for Ad Click Predictions](https://arxiv.org/abs/1708.05123)
@@ -15,102 +15,29 @@ description: Deep & Cross Network 完整使用教程 —— 从数据准备到�
 
 ### 核心区别
 
-| 特性 | DCN | DCNv2 |
-|------|-----|-------|
-| 交叉方式 | 向量级交叉 | 矩阵级交叉 |
-| 表达能力 | 中等 | 更强 |
-| 参数数量 | 较少 | 较多 |
-
-### 适用场景
-
-- 需要显式特征交叉的 CTR 预测任务
-- 特征维度较高的场景
-- 对计算效率有要求的场景
+DCN 的每个交叉层使用一个权重向量。本项目的 DCNv2 默认把多个低秩专家的结果组合起来。传入 `use_low_rank_mixture=False`，才会使用完整的矩阵交叉层。两种模型都接受同一组输入特征。
 
 ---
 
 ## 2. 数据准备与预处理
 
-使用 Criteo 数据集，数据准备流程与 DeepFM 相同。
-
-```python
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from tqdm import tqdm
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
-
-data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-
-dense_features = [f for f in data.columns if f.startswith("I")]
-sparse_features = [f for f in data.columns if f.startswith("C")]
-
-data[sparse_features] = data[sparse_features].fillna("0")
-data[dense_features] = data[dense_features].fillna(0)
-
-scaler = MinMaxScaler()
-data[dense_features] = scaler.fit_transform(data[dense_features])
-
-for feat in tqdm(sparse_features):
-    lbe = LabelEncoder()
-    data[feat] = lbe.fit_transform(data[feat])
-
-dense_feas = [DenseFeature(name) for name in dense_features]
-sparse_feas = [
-    SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
-    for name in sparse_features
-]
-
-y = data["label"]
-del data["label"]
-x = data
-
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    split_ratio=[0.7, 0.1], batch_size=2048
-)
-```
-
----
+先在同一个 Python 会话中完成[准备 Criteo 输入](/zh/guide/quick_start#criteo-input)。下面会用到两组特征 `dense_feas`、`sparse_feas` 和三个 DataLoader。若刚刚训练过另一个模型，可以复用数据切分，创建模型前重新构造特征对象。
 
 ## 3. 模型配置与参数说明
 
-### 3.1 DCN
+选择一个模型构造并训练，将 `DCN` 换为 `DCNv2` 可运行另一种交叉层。独立对比时从数据准备重新开始，避免共用已训练的嵌入参数。
 
 ```python
-from torch_rechub.models.ranking import DCN
+from torch_rechub.models.ranking import DCN, DCNv2
 
-model_dcn = DCN(
-    features=dense_feas + sparse_feas,  # 全部特征
-    n_cross_layers=3,                    # Cross Network 层数
-    mlp_params={
-        "dims": [256, 128],
-    }
-)
-```
-
-> **注意**: DCN 使用统一的 `features` 参数（不像 DeepFM 需要分别指定 deep 和 fm 特征），Cross Network 和 Deep Network 共享同一组特征。
-
-### 3.2 DCNv2
-
-```python
-from torch_rechub.models.ranking import DCNv2
-
-model_dcnv2 = DCNv2(
+model = DCN(
     features=dense_feas + sparse_feas,
     n_cross_layers=3,
-    mlp_params={
-        "dims": [256, 128],
-        "dropout": 0.2,
-        "activation": "relu"
-    }
+    mlp_params={"dims": [256, 128]},
 )
 ```
 
-### 3.3 参数详解
+### 参数详解
 
 | 参数 | 类型 | 说明 | 建议值 |
 |------|------|------|--------|
@@ -125,18 +52,16 @@ model_dcnv2 = DCNv2(
 
 ```python
 import os
+import torch
 from torch_rechub.trainers import CTRTrainer
 
 torch.manual_seed(2022)
 os.makedirs("./saved/dcn", exist_ok=True)
 
-# 使用 DCN 或 DCNv2
-model = model_dcn  # 或 model_dcnv2
-
 trainer = CTRTrainer(
     model,
     optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
-    n_epoch=50,
+    n_epoch=2,
     earlystop_patience=10,
     device="cpu",
     model_path="./saved/dcn"
@@ -154,118 +79,23 @@ auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
-### DCN vs DCNv2 性能对比
-
-| 模型 | Criteo Sample AUC | 训练速度 |
-|------|-------------------|----------|
-| DCN  | 0.70 ~ 0.74       | 快       |
-| DCNv2 | 0.71 ~ 0.75      | 中等     |
-
-DCNv2 通常比 DCN 高 0.5% ~ 1.0% AUC，但训练时间略长。
-
----
+仓库随附的 Criteo 样本只有 115 行，适合检查模型能否训练和评估。要比较不同模型的点击预测效果，请使用更大的数据集，并为各模型保留同样的训练、验证和测试样本。[基准测试](/zh/tools/benchmark)
 
 ## 6. 参数调优建议
 
-1. **Cross 层数** (`n_cross_layers`): 核心超参数
-   - 层数越多，能学到的特征交叉阶数越高
-   - 但过多层数容易过拟合，建议 2~4 层
-
-2. **选择 DCN 还是 DCNv2**:
-   - 数据量较小 → DCN（参数少，不易过拟合）
-   - 数据量较大 → DCNv2（表达力更强）
-
-3. **MLP 与 Cross 的平衡**:
-   - MLP 层数和 Cross 层数不宜同时过大
-   - 推荐组合: Cross=3 + MLP=`[256, 128]`
-
----
+示例先用 3 个交叉层。要判断层数是否有帮助，可以固定数据切分和 MLP 的宽度，只改 `n_cross_layers`，比较验证集 AUC。换成 DCNv2 时记下是否使用低秩专家，这也会影响参数量。
 
 ## 7. 常见问题与解决方案
 
-### Q1: DCN 和 DCNv2 的区别是什么？
-DCN 使用向量级的特征交叉（参数量 O(d)），DCNv2 使用矩阵级的特征交叉（参数量 O(d²)），后者表达能力更强但参数更多。
+### 需要自己准备交叉特征吗？
 
-### Q2: n_cross_layers 设多少合适？
-经验上 2~4 层效果最佳。交叉层太多容易过拟合，且边际增益递减。
-
-### Q3: Cross Network 是否可以替代手工的特征交叉？
-Cross Network 的设计目的就是自动学习特征交叉，理论上可以替代手工交叉特征。但在某些业务场景下，结合手工特征工程可能进一步提升效果。
+直接传入 Criteo 的原始字段即可，交叉层会在训练中学习组合。如果业务数据里已经有手工组合字段，可以在相同切分下比较加上这一列前后的结果。
 
 ---
 
-## 完整代码
+## 运行仓库示例
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from tqdm import tqdm
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.models.ranking import DCN, DCNv2
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import DataGenerator
-
-
-def main(use_dcnv2=False):
-    torch.manual_seed(2022)
-    save_dir = f"./saved/{'dcnv2' if use_dcnv2 else 'dcn'}"
-    os.makedirs(save_dir, exist_ok=True)
-
-    data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-    dense_features = [f for f in data.columns if f.startswith("I")]
-    sparse_features = [f for f in data.columns if f.startswith("C")]
-
-    data[sparse_features] = data[sparse_features].fillna("0")
-    data[dense_features] = data[dense_features].fillna(0)
-
-    scaler = MinMaxScaler()
-    data[dense_features] = scaler.fit_transform(data[dense_features])
-
-    for feat in tqdm(sparse_features):
-        lbe = LabelEncoder()
-        data[feat] = lbe.fit_transform(data[feat])
-
-    dense_feas = [DenseFeature(name) for name in dense_features]
-    sparse_feas = [
-        SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
-        for name in sparse_features
-    ]
-
-    y = data["label"]
-    del data["label"]
-    x = data
-
-    dg = DataGenerator(x, y)
-    train_dl, val_dl, test_dl = dg.generate_dataloader(
-        split_ratio=[0.7, 0.1], batch_size=2048
-    )
-
-    # 选择模型
-    ModelClass = DCNv2 if use_dcnv2 else DCN
-    model = ModelClass(
-        features=dense_feas + sparse_feas,
-        n_cross_layers=3,
-        mlp_params={"dims": [256, 128]}
-    )
-
-    trainer = CTRTrainer(
-        model,
-        optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
-        n_epoch=50,
-        earlystop_patience=10,
-        device="cpu",
-        model_path=save_dir
-    )
-    trainer.fit(train_dl, val_dl)
-
-    auc = trainer.evaluate(trainer.model, test_dl)
-    print(f"Test AUC: {auc:.4f}")
-
-
-if __name__ == "__main__":
-    main(use_dcnv2=False)  # 改为 True 使用 DCNv2
+```bash
+cd examples/ranking
+uv run python run_criteo.py --model_name dcn --epoch 1 --device cpu
 ```

@@ -1,13 +1,13 @@
 ---
 title: PLE 使用示例
-description: Progressive Layered Extraction (PLE) 多任务模型完整使用教程
+description: 用 PLE 的共享专家和任务专属专家预测点击和购买
 ---
 
 # PLE 使用示例
 
 ## 1. 模型简介与适用场景
 
-PLE (Progressive Layered Extraction) 是腾讯在 RecSys'2020 提出的多任务学习模型。PLE 通过**渐进式分层提取** (Progressive Layered Extraction) 解决了多任务学习中的 **seesaw 现象**（即优化一个任务时损害另一个任务的表现），采用 **Customized Gate Control (CGC)** 机制，为每个任务设置专属的 Expert 和 Shared Expert，并通过 Gate 网络自适应地融合。
+如果点击和购买需要的特征不完全一样，PLE 允许为两个任务分别留一些专家网络。本例中，点击和购买各有 2 个专属专家，还共用 1 个专家。每个任务的门控网络把能访问的专家输出组合起来，再交给自己的预测层。
 
 **论文**: [Progressive Layered Extraction (PLE): A Novel Multi-Task Learning (MTL) Model for Personalized Recommendations](https://dl.acm.org/doi/abs/10.1145/3383313.3412236)
 
@@ -17,17 +17,7 @@ PLE (Progressive Layered Extraction) 是腾讯在 RecSys'2020 提出的多任务
   <img src="/img/models/ple_arch.png" alt="PLE Model Architecture" width="600"/>
 </div>
 
-- **Task-Specific Experts**: 每个任务有自己专属的 Expert 网络
-- **Shared Experts**: 所有任务共享的 Expert 网络
-- **Customized Gate (CGC)**: 每个任务的 Gate 网络融合 task-specific experts 和 shared experts 的输出
-- **Multi-Level**: 支持多层 CGC 堆叠，实现渐进式特征提取
-- **Task Towers**: 每个任务独立的预测 Tower
-
-### 适用场景
-
-- 多目标优化（如：同时优化 CTR + CVR，点击 + 收藏 + 购买）
-- 任务之间存在相关性但又有各自独立的需求
-- 需要比 MMOE 更强的任务区分能力的场景
+图中的一层包含专属专家、共享专家和选择专家的门控网络。`n_level` 表示叠多少层这样的结构。下面从一层开始，标签和 MMOE 教程保持相同顺序，方便逐项对照。
 
 ---
 
@@ -139,7 +129,7 @@ model = PLE(
 | `expert_params` | `dict` | Expert MLP 参数 | `{"dims": [16]}` |
 | `tower_params_list` | `list[dict]` | 每个 Task Tower 的 MLP 参数 | `{"dims": [8]}` |
 
-> **PLE vs MMOE**: MMOE 所有 Expert 都是共享的，PLE 区分了 task-specific 和 shared experts，通常在任务间相关性较低时效果更好。
+`n_expert_specific=2` 是每个任务的专属专家数。这里有两个任务，所以这一层共有 4 个专属专家，再加上 1 个共享专家。
 
 ---
 
@@ -168,12 +158,7 @@ mtl_trainer.fit(train_dl, val_dl)
 
 ### 多任务损失平衡方式
 
-| 方法 | adaptive_params | 说明 |
-|------|----------------|------|
-| 等权重 | 不设置 | 简单加和各任务 Loss |
-| UWL | `{"method": "uwl"}` | Uncertainty Weighting Loss |
-| GradNorm | `{"method": "gradnorm"}` | 当前 Trainer 分支存在未赋值 `loss`，暂不可用 |
-| MetaBalance | `{"method": "metabalance"}` | 当前 Trainer 分支存在未赋值 `loss`，暂不可用 |
+省略 `adaptive_params` 时，训练器等权合并任务损失。上面的 `uwl` 会在训练中学习各任务的损失权重。查看结果时仍应分别看购买和点击的 AUC。
 
 ---
 
@@ -188,24 +173,19 @@ print(f"Test AUC (CVR): {auc[0]:.4f}, Test AUC (CTR): {auc[1]:.4f}")
 
 ## 6. 参数调优建议
 
-1. **CGC 层数** (`n_level`): 1~2 层通常足够，更多层可能过拟合
-2. **Expert 数量**: `n_expert_specific` 通常 2~4，`n_expert_shared` 通常 1~2
-3. **损失平衡**: 当前可使用 UWL；GradNorm 和 MetaBalance 需等待 Trainer 修正后再启用
-4. **Tower 结构**: 保持较浅（1~2 层），因为 Expert 已经完成了特征提取
-
----
+若要与 MMOE 比较，先保留相同的训练集、任务顺序和损失权重设置。在一层 PLE 上改变每个任务的专属专家数，分别记录点击和购买 AUC。这样可以看清增加专家对哪个任务有帮助。
 
 ## 7. 常见问题与解决方案
 
-### Q1: PLE 和 MMOE 如何选择？
-- 如果任务间**相关性强**，MMOE 通常足够
-- 如果任务间**相关性弱**或存在**跷跷板效应**（seesaw），优先选择 PLE
+### Q1: PLE 和 MMOE 的区别在哪里？
+
+MMOE 的专家都可以被两个任务使用。PLE 给每个任务配置专属专家，另外配置一组共享专家。两者都能给同一批样本同时做点击和购买预测。
 
 ### Q2: 如何处理分类 + 回归混合任务？
-在 `task_types` 中分别指定：`["classification", "regression"]`，模型会自动应用不同的预测层（Sigmoid vs Identity）。
+在 `task_types` 中分别指定：`["classification", "regression"]`，模型会为两类任务使用相应的预测层。若以第二个任务的 MSE 早停，在 `MTLTrainer` 中指定 `earlystop_taskid=1, earlystop_mode="min"`。
 
 ### Q3: n_level 设多大比较好？
-通常 `n_level=2` 即可。更多层会显著增加参数量和训练时间。
+示例使用一层。再加一层，上一层的输出会送入下一组专家和门控网络。比较两种设置时，在同一批验证样本上分别看两个任务的分数。
 
 ---
 

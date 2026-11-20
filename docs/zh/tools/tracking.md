@@ -3,28 +3,46 @@ title: 实验追踪
 description: Torch-RecHub 实验记录与对比
 ---
 
-# 实验跟踪（简化版）
+# 实验追踪
 
-torch-rechub 内置了可选的实验跟踪能力，支持：
-- **Weights & Biases (wandb)**
-- **SwanLab**
-- **TensorBoardX**
+想比较两次 DeepFM 训练，可以先把每轮的损失和验证 AUC 记下来。自己在本机看曲线，用 TensorBoardX 把记录写到文件。团队已经用 W&B 或 SwanLab 时，把对应的 logger 传给同一个 `model_logger` 参数就行。只看终端的训练进度无需设置这个参数。
 
-设计目标：默认零开销，不想记录就不创建 logger；想记录时，只需把 `model_logger` 传给 Trainer。
+## 保存一条本地训练曲线
 
-## 安装
+在运行训练的 Python 环境里安装 `tensorboardX`，再安装用来查看曲线的 `tensorboard`。下面接在快速入门的 DeepFM 示例后，沿用已经定义好的 `model`、`train_dl` 和 `val_dl`。[DeepFM 快速入门](/zh/guide/quick_start)
 
-```bash
-# 安装全部
-pip install "torch-rechub[tracking]"
+```python
+from torch_rechub.basic.tracking import TensorBoardXLogger
+from torch_rechub.trainers import CTRTrainer
 
-# 或按需
-pip install wandb
-pip install swanlab
-pip install tensorboardX
+logger = TensorBoardXLogger(log_dir="./runs/deepfm")
+trainer = CTRTrainer(model, n_epoch=2, device="cpu", model_logger=logger)
+trainer.fit(train_dl, val_dl)
 ```
 
-## 快速使用
+训练结束后，`./runs/deepfm` 目录里会有事件文件。从同一工作目录启动 TensorBoard，打开终端打印的地址即可看到 `train/loss`、`learning_rate` 和 `val/auc`。做第二次实验时换一个日志目录，比如 `./runs/deepfm-lr2`，两条曲线就能分开看。
+
+```bash
+tensorboard --logdir ./runs
+```
+
+## 用 W&B 或 SwanLab 记录实验
+
+先在当前 Python 环境安装要用的包，W&B 对应 `wandb`，SwanLab 对应 `swanlab`。需要同时使用三个后端时，也可以运行 `pip install "torch-rechub[tracking]"`。使用平台账号登录，或在运行训练的终端设置对应平台的密钥。
+
+```bash
+# bash/zsh：仅在当前 shell 中设置
+export WANDB_API_KEY="..."
+export SWANLAB_API_KEY="..."
+```
+
+```powershell
+# PowerShell：仅在当前会话中设置
+$env:WANDB_API_KEY = "..."
+$env:SWANLAB_API_KEY = "..."
+```
+
+下面把训练记录写入 W&B 的 `my-ctr` 项目，这次实验名为 `exp1`。使用 SwanLab 时，把 logger 换成 `SwanLabLogger(project="my-ctr", experiment_name="exp1")`。
 
 ```python
 from torch_rechub.trainers import CTRTrainer
@@ -45,7 +63,7 @@ trainer.fit(train_dl, val_dl)
 
 ### 同时使用多个 logger
 
-`model_logger` 可以是单个实例或列表：
+如果既想保留本地曲线，又要把指标发给团队，把需要的 logger 放进列表。下面展示三个后端一起记录的写法，可按需取其中几个。
 
 ```python
 from torch_rechub.basic.tracking import TensorBoardXLogger, WandbLogger, SwanLabLogger
@@ -57,74 +75,20 @@ sb = SwanLabLogger(project="my-ctr")
 trainer = CTRTrainer(model, model_logger=[tb, wb, sb])
 ```
 
-### 配置 API key
-
-```bash
-# bash/zsh：仅在当前 shell 中设置
-export WANDB_API_KEY="..."
-export SWANLAB_API_KEY="..."
-```
-
-```powershell
-# PowerShell：仅在当前会话中设置
-$env:WANDB_API_KEY = "..."
-$env:SWANLAB_API_KEY = "..."
-```
-
-也可以使用各平台登录命令或密钥管理服务。
-
-不要把真实 API key 硬编码或提交到仓库。
-
-### 不记录时的开销
-
-当 `model_logger=None` 时，训练流程不会调用任何跟踪代码，保持与原始实现一致、零额外开销。
-
 ## 支持的 Trainer
 
-| Trainer        | 支持 | 自动记录的指标                                                                 |
-| -------------- | ---- | ------------------------------------------------------------------------------ |
-| `CTRTrainer`   | ✅    | `train/loss`, `learning_rate`, `val/auc`                                       |
-| `MatchTrainer` | ✅    | `train/loss`, `learning_rate`, `val/auc`                                       |
-| `MTLTrainer`   | ✅    | `train/task_i_loss`, `learning_rate`, `val/task_i_score`, `loss_weight/task_i` |
-| `SeqTrainer`   | ✅    | `train/loss`, `learning_rate`, `val/loss`, `val/accuracy`                      |
+训练开始时会记录超参数，训练指标按轮记录。传入验证集才会看到对应的验证指标。多任务的 `i` 从 0 开始，与传给训练器的任务顺序一致。
 
-## 生命周期管理
-
-### 自动管理（推荐）
-
-Trainer 会自动管理 logger 的生命周期：
-
-```python
-logger = WandbLogger(project="demo")
-trainer = CTRTrainer(model, model_logger=logger)
-
-trainer.fit(train_dl, val_dl)
-# ✅ fit() 内部会自动调用：
-#    1. logger.log_hyperparams() - 训练开始时
-#    2. logger.log_metrics()     - 每个 epoch 结束时
-#    3. logger.finish()          - 训练结束时
-```
+| 训练器 | 常用记录项 |
+| --- | --- |
+| `CTRTrainer`、`MatchTrainer` | `train/loss`、`learning_rate`、`val/auc` |
+| `MTLTrainer` | `train/task_i_loss`、`val/task_i_score`、`learning_rate`。使用自适应任务权重时还会记录 `loss_weight/task_i` |
+| `SeqTrainer` | `train/loss`、`learning_rate`、`val/loss`、`val/accuracy` |
+| `RQVAETrainer` | `train/loss`、`train/recon_loss` 和评估时的 `val/collision_rate` |
 
 ### 在 fit() 后记录额外指标
 
-由于 `fit()` 结束时会自动调用 `finish()` 关闭 logger，如果需要在训练后记录测试集指标，有以下方案：
-
-**方案 A：不传给 Trainer，完全手动管理**
-
-```python
-logger = WandbLogger(project="demo")
-
-# 不传给 Trainer
-trainer = CTRTrainer(model, model_logger=None)
-trainer.fit(train_dl, val_dl)
-
-# 手动记录
-test_auc = trainer.evaluate(trainer.model, test_dl)
-logger.log_metrics({"test/auc": test_auc})
-logger.finish()  # 手动关闭
-```
-
-**方案 B：创建新 logger 记录测试指标**
+交给 Trainer 的 logger 会在 `fit()` 正常结束时关闭。如果还要记录测试 AUC，可以新开一条实验记录，名字和训练用的区分开。
 
 ```python
 logger = WandbLogger(project="demo", name="train-exp1")
@@ -138,144 +102,17 @@ test_logger.log_metrics({"test/auc": test_auc})
 test_logger.finish()
 ```
 
-## API 概览
-
-### BaseLogger 接口
+如果只关心最终的测试 AUC，可以自己管理 logger，在测试结束后写一次结果并关闭。
 
 ```python
-class BaseLogger:
-    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
-        """记录指标值"""
-        pass
+logger = WandbLogger(project="demo")
 
-    def log_hyperparams(self, params: Dict[str, Any]) -> None:
-        """记录超参数"""
-        pass
-
-    def finish(self) -> None:
-        """关闭 logger，释放资源"""
-        pass
-```
-
-### Logger 实现类
-
-**WandbLogger**
-
-```text
-WandbLogger(
-    project: str,              # 项目名称（必填）
-    name: str = None,          # 运行名称
-    config: dict = None,       # 初始配置/超参数
-    tags: List[str] = None,    # 标签
-    notes: str = None,         # 备注
-    dir: str = None,           # 本地缓存目录
-    **kwargs                   # 其他传给 wandb.init() 的参数
-)
-```
-
-**SwanLabLogger**
-
-```text
-SwanLabLogger(
-    project: str = None,           # 项目名称
-    experiment_name: str = None,   # 实验名称
-    description: str = None,       # 描述
-    config: dict = None,           # 初始配置
-    logdir: str = None,            # 日志目录
-    **kwargs                       # 其他传给 swanlab.init() 的参数
-)
-```
-
-**TensorBoardXLogger**
-
-```text
-TensorBoardXLogger(
-    log_dir: str,          # 日志目录（必填）
-    comment: str = "",     # 目录名后缀
-    **kwargs               # 其他传给 SummaryWriter 的参数
-)
-```
-
-## 完整示例
-
-```python
-import torch
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.basic.tracking import WandbLogger, SwanLabLogger, TensorBoardXLogger
-
-# 配置
-SEED = 2022
-EPOCH = 10
-LR = 1e-3
-BATCH_SIZE = 2048
-
-# 选择要使用的 logger（可多选）
-loggers = []
-
-# 本地 TensorBoard
-loggers.append(TensorBoardXLogger(log_dir=f"./runs/deepfm-{SEED}"))
-
-# 云端 WandB
-loggers.append(WandbLogger(
-    project="ctr-experiment",
-    name=f"deepfm-{SEED}",
-    config={"seed": SEED, "lr": LR, "batch_size": BATCH_SIZE},
-    tags=["deepfm", "criteo"]
-))
-
-# 模型和数据准备（略）
-model = DeepFM(...)
-train_dl, val_dl, test_dl = ...
-
-# 训练
-trainer = CTRTrainer(
-    model,
-    optimizer_params={"lr": LR, "weight_decay": 1e-5},
-    n_epoch=EPOCH,
-    earlystop_patience=3,
-    device="cuda:0",
-    model_logger=loggers,  # 传入 logger 列表
-)
-
+# 不传给 Trainer
+trainer = CTRTrainer(model, model_logger=None)
 trainer.fit(train_dl, val_dl)
-# 训练结束，所有 logger 自动关闭
 
-# 评估测试集
+# 手动记录
 test_auc = trainer.evaluate(trainer.model, test_dl)
-print(f"Test AUC: {test_auc}")
+logger.log_metrics({"test/auc": test_auc})
+logger.finish()  # 手动关闭
 ```
-
-## 常见问题
-
-**1. 不想使用跟踪功能？**
-
-不传 `model_logger` 参数或传 `None`（默认值）。
-
-**2. 某个库未安装怎么办？**
-
-创建对应 logger 时会抛出友好的 `ImportError` 提示，不影响其他功能。
-
-**3. 为什么在 `fit()` 后调用 `log_metrics()` 报错？**
-
-因为 `fit()` 结束时会自动调用 `finish()` 关闭 logger。如需在训练后记录指标，请参考上文「在 fit() 后记录额外指标」章节。
-
-**4. 能否关闭自动记录的超参数？**
-
-目前不支持，Trainer 会在训练开始时自动记录一次超参数。如需完全自定义，可不传 `model_logger`，手动管理。
-
-**5. TensorBoard 如何查看？**
-
-```bash
-tensorboard --logdir ./runs
-```
-
-## 最佳实践
-
-| 场景               | 推荐方案                         |
-| ------------------ | -------------------------------- |
-| 本地快速调试       | `TensorBoardXLogger`             |
-| 团队协作/云端记录  | `WandbLogger` 或 `SwanLabLogger` |
-| 同时本地+云端      | 传入多个 logger 组成的列表       |
-| 不需要跟踪         | 不传 `model_logger`（零开销）    |
-| 需要记录测试集指标 | 手动管理 logger 或创建新 logger  |

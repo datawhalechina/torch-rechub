@@ -5,16 +5,9 @@ description: TIGER 生成式推荐模型在 torch-rechub 中的运行说明，�
 
 # TIGER 在 torch-rechub 中的复现说明
 
-本文件说明当前 `torch-rechub` 中 TIGER（Transformer Index for GEnerative Recommenders）的实现与运行方式。TIGER 把"预测下一个 item"建模成"生成下一个 item 的语义 ID"的序列到序列任务：每个 item 先由 RQ-VAE 量化成一串 codebook token（语义 ID，如 `<a_1><b_3><c_5>`），再用 T5 自回归地生成下一个 item 的语义 ID，并通过前缀受限的 beam search 约束到合法 item 上。
+TIGER 给每件物品起一个由几段符号组成的“名字”，例如 `<a_1><b_3><c_5>`。训练时，把用户看过的电影换成这些名字，交给 T5，让它逐段写出下一部电影的名字。推理时每写一段，就在片库里查还有哪些合法的后续片段，因此能把结果映射回电影。这串名字就是电影的语义 ID。
 
-这里复现 RQ-VAE 语义 ID、T5 自回归训练与合法候选受限解码的基本流程，使用 Hugging Face 实现以便单卡运行；并非官方训练环境或论文指标的完整复刻。先用小数据跑通，再按显存调整 batch size、AMP 和梯度累积。RQ-VAE 量化与梯度逻辑修正前的权重应重新训练，并重新导出语义 ID 后训练 TIGER，避免混用两套编码。
-
-示例脚本按数据集拆分，与 HSTU / HLLM 保持一致的"一数据集一脚本"风格：
-
-- `examples/generative/run_tiger_movielens.py`
-- `examples/generative/run_tiger_amazon_books.py`
-
----
+第一次用 TIGER，可以直接跑第 4 节的小样本，两条命令就能看到测试集结果。换成真实电影时，再按第 5 节先用 RQ-VAE 编码电影向量。MovieLens 和 Amazon Books 各有一个入口，分别是 `examples/generative/run_tiger_movielens.py` 和 `examples/generative/run_tiger_amazon_books.py`。示例使用小型 T5 验证编码、训练和检索过程，论文指标还取决于数据和训练配置。
 
 ## 1. 模块划分
 
@@ -56,62 +49,35 @@ TIGER 需要两个 JSON 文件：
 | `prepare-data` | 仅 MovieLens：从真实 `ratings.dat` 构建 `inter.json` 和 `movie_id_map.json` |
 | `train` | 加入语义 ID token、`resize_token_embeddings`、从头训练 T5（随机初始化，不加载预训练权重），保存 tokenizer / config / 模型到 `--output_dir` |
 | `test` | 从 `--ckpt_path`（默认回退到 `--output_dir`）加载，做受限 beam search 并报告 hit@k / ndcg@k |
-| `all` | 依次执行 `generate-toy-data` → `train` → `test`（默认） |
+| `all` | 读取已准备好的数据，依次执行 `train` 和 `test`（默认） |
 
-关键实现细节：
+默认会根据语义 ID 在本地建立词表，随机初始化小型 T5。即使显式指定 `--base_model`，脚本读取的也只是结构配置和 tokenizer，权重仍从头训练。训练前会把 `<a_1>` 这样的片段注册为单个 token，并调整嵌入表大小。
 
-- **从头训练，不加载预训练权重**：TIGER 论文中 T5 编码器-解码器是随机初始化、从头训练的（语义 ID 词表不是自然语言，预训练的 NL 权重无意义）。`train()` 用 `TIGERModel(config)` 从 `--base_model` 的 config 构建架构并随机初始化，`--base_model` 只提供架构/config 与 tokenizer，不加载预训练权重。
-- **训练前必须加入语义 ID token**：`train()` 会 `tokenizer.add_tokens(dataset.get_new_tokens())` 后再 `resize_token_embeddings`，否则 `<a_1>` 这类 token 会被 T5 切成子词，训练无意义。
-- **生成与读取路径一致**：`generate-toy-data` 直接写到数据集读取的同一路径，避免"生成文件名 ≠ 读取文件名"。
-- **test 从 checkpoint 加载词表与权重**：用 checkpoint 自身的 config 加载模型（避免把扩词表后的 `vocab_size` 传进 `from_pretrained` 触发 embedding 尺寸不匹配），再按 tokenizer 对齐；若 checkpoint 缺少某些语义 ID token，会自动补齐并 resize 后再评估。
+测试要使用训练时保存的词表、配置和权重。脚本会核对物品与语义 ID 的映射以及词表大小。换过映射需要重新训练 TIGER。若之前用旧版 RQ-VAE 的量化和梯度逻辑训练过码本，应重新训练码本并导出编码，再训练 TIGER。
 
----
+## 4. 用小样本跑一次训练和测试
 
-## 4. Toy 快速跑通
-
-先安装生成式模型 extra：
-
-```bash
-pip install -e ".[generative]"
-pip install sentencepiece
-```
-
-当前 `generative` extra 尚未声明 `sentencepiece`，而 `T5Tokenizer` 需要它，因此 TIGER 需单独安装。
-
-Toy 模式不需要外部推荐数据集，但仍需从 `--base_model` 加载 T5 的 tokenizer 与 config。以下命令显式使用独立 toy 路径，CPU 也可做小规模端到端验证：
+从源码目录执行 `uv sync --extra generative`。默认的语义词表在本地创建，下面的 toy 示例可离线训练和评估。显式选用依赖 SentencePiece 的 T5Tokenizer 时，再安装 `sentencepiece` 并准备对应 tokenizer 文件。
 
 ```bash
 cd examples/generative
 
-# MovieLens 形态的合成数据
-python run_tiger_movielens.py --mode all \
-    --data_inter_path ./tmp/tiger-toy/ml/inter.json \
-    --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json \
-    --output_dir ./tmp/tiger-toy/ml/ckpt \
-    --toy_num_users 16 --toy_num_items 20 \
-    --epochs 2 --per_device_batch_size 4 \
-    --num_beams 4 --test_batch_size 2 --num_workers 0
+# 第一次生成示例数据。后续训练直接复用这两个文件。
+python run_tiger_movielens.py --mode generate-toy-data --data_inter_path ./tmp/tiger-toy/ml/inter.json --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json --toy_num_users 16 --toy_num_items 20
 
-# Amazon-Books 的内置 toy 数据
-python run_tiger_amazon_books.py --mode all \
-    --data_inter_path ./tmp/tiger-toy/amazon/inter.json \
-    --data_indice_path ./tmp/tiger-toy/amazon/semantic_ids.json \
-    --output_dir ./tmp/tiger-toy/amazon/ckpt \
-    --epochs 5 --per_device_batch_size 4 \
-    --num_beams 4 --test_batch_size 2 --num_workers 0
+# 从相同路径读取数据，训练后重新加载 checkpoint 进行评估。
+python run_tiger_movielens.py --mode all --data_inter_path ./tmp/tiger-toy/ml/inter.json --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json --output_dir ./tmp/tiger-toy/ml/ckpt --epochs 1 --per_device_batch_size 4 --num_beams 4 --metrics hit@1,ndcg@4 --test_batch_size 2 --num_workers 0
 ```
 
-正常会看到 `Added N semantic-id tokens` → `Model saved to ...` → `Test results: {...}` 的输出。
+第一条命令只需运行一次，数据文件已存在时脚本会报错。再次训练只跑第二条。训练结束会先打印模型保存位置，然后评估每个测试用户的 4 个候选并打印 Hit@1、NDCG@4。若把指标改为 Hit@10，要同时把 `--num_beams` 提到至少 10。
 
-> **数据覆盖风险**：`generate-toy-data` 和默认的 `all` 都会无条件重写 `--data_inter_path` 与 `--data_indice_path`。绝不要把 toy 命令指向真实数据；默认 mode 也是 `all`，真实训练必须显式写 `--mode train` 或 `--mode test`。
+这组 MovieLens toy 参数在 RTX 5080（16 GB）上实际完成了训练、checkpoint 加载和评估，PyTorch 峰值张量显存约 106 MiB。该数值对应 16 个用户、20 个物品的离线示例。
 
-> `t5-small` 与 `google-t5/t5-small` 都可能访问 HuggingFace Hub。离线运行必须把 tokenizer/config 预先缓存好，或将 `--base_model` 指向包含这些文件的本地目录；只改成规范仓库名不能解决离线问题。
+Amazon Books 示例 `run_tiger_amazon_books.py` 也先显式执行 `--mode generate-toy-data`，再用 `--mode all` 训练和评估。为它指定自己的数据路径与输出目录。
 
----
+## 5. 用 MovieLens-1M 训练 TIGER
 
-## 5. 真实数据流程（MovieLens-1M）
-
-真实数据需要先得到与 `inter.json` 对齐的语义 ID，整体是 RQ-VAE → TIGER 两段式流水线：
+使用真实数据时，要让交互记录和语义 ID 表指向同一部电影。例如，若交互文件中的 `12` 表示电影 A，编号 `12` 的语义 ID 也必须来自电影 A 的向量。按下面的顺序准备两份文件。
 
 1. **构建交互序列**：
 
@@ -125,11 +91,15 @@ python run_tiger_amazon_books.py --mode all \
 
    这一步按时间戳排序、过滤交互过少的用户，并额外写出 `movie_id_map.json`。传入 `--vocab_path` 时会复用 HSTU/HLLM 的 token id；不传时才会独立重映射成连续的 1-based item id。
 
-2. **生成语义 ID**：为同一批 item id 准备 item embedding（例如 HLLM 预处理产出的文本 embedding），用 `run_rqvae_amazon_books.py` 风格的 RQ-VAE 训练并导出 `semantic_ids.json`。**RQ-VAE 输出必须按第 1 步相同的 item id 作为 key**，否则 `inter.json` 与 `semantic_ids.json` 对不上。
+2. **生成语义 ID**　从同版 MovieLens 词表和 HLLM 预处理得到电影向量。沿用上一步的工作目录运行 RQ-VAE，行 0 是 PAD，其余每行对应同一 token ID。
 
-   通用 RQ-VAE 示例虽以 Amazon 命名，也可接收其他数据集的 item embedding。训练时打乱样本，导出时使用 `shuffle=False` 保持行号顺序，并删除 PAD 的语义 ID。仍需保证 embedding 第 `i` 行就是第 1 步的 token id `i`。
+   ```bash
+   python run_rqvae_amazon_books.py --data_path ./data/ml-1m/processed/item_embeddings_tinyllama.pt --model_path ./data/ml-1m/tiger --padding_idx 0 --num_workers 0 --device cuda:0
+   ```
 
-   至少应在训练前检查覆盖范围：
+   脚本会将 `semantic_ids.json` 写入 `--model_path`。交互表中的物品编码应与文件的 key 对应。
+
+   训练前可以先运行下面几行，检查交互记录中是否有电影缺少语义 ID。这个检查只核对编号是否存在，电影和向量是否对应还要靠同一份词表保证。
 
    ```python
    import json
@@ -172,8 +142,6 @@ Amazon-Books 的真实数据流程相同：先用 `run_rqvae_amazon_books.py` �
 
 ## 7. 常见问题
 
-- **`OSError: We couldn't connect to 'https://huggingface.co'`**：先联网缓存 tokenizer/config，或将 `--base_model` 指向对应本地目录；规范仓库名本身不保证离线可用。
-- **`KeyError` 出现在 `TigerSeqDataset._remap_items()`**：`inter.json` 引用的 item 没有语义 ID。运行上面的覆盖检查，并同时核实 RQ-VAE 行号与 item id 的对齐关系。
-- **`Trainer.__init__() got an unexpected keyword argument 'tokenizer'`**：`transformers>=5` 把 `tokenizer` 参数改名为 `processing_class`，脚本已按签名自动适配，无需手动改。
-- **`'TIGERModel' object has no attribute 'model_parallel'`**：旧版 T5 的 model-parallel 守卫在 `transformers>=5` 不再初始化，`TIGERModel.__init__` 已补 `model_parallel=False` / `device_map=None`，多卡 DataParallel 也能跑。
+- 显式指定远程 `--base_model` 时，需要已有缓存或可访问模型库。离线复现可使用默认语义词表或本地模型配置目录。
+- 在 `TigerSeqDataset._remap_items()` 遇到 `KeyError` 时，先从异常中找到缺失的物品 ID，再查 `semantic_ids.json` 是否有相同的键。若缺少许多 ID，检查 RQ-VAE 输入向量和交互文件是否使用了同一份词表。
 - **生成结果总是子词、命中率异常低**：确认训练时确实执行了 `add_tokens` + `resize_token_embeddings`（日志里有 `Added N semantic-id tokens`），且 `test` 是从训练保存的 `--output_dir` 加载词表。

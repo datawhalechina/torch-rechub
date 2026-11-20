@@ -5,17 +5,17 @@ description: Torch-RecHub 可复现模型对比 benchmark
 
 # Benchmark（实验性功能）
 
-`benchmarks/` 提供固定实验协议下的可复现模型对比，与 `examples/` 分开维护：`examples/` 侧重教学，`benchmarks/` 侧重横向比较。
+如果想比较 MIND 和 YoutubeDNN 在同一批用户上的召回效果，可以用 `benchmarks/` 下的配置运行两个模型。每个配置都写明了数据文件、随机种子、训练轮数和指标，便于确认两次实验改了什么。
 
-从已安装的包运行 benchmark 前需安装 YAML extra；在仓库开发环境中也可使用同一命令补齐依赖：
+先进入仓库根目录。基准脚本用 YAML 读取配置，下面的召回实验还要用 Annoy 查候选，因此一起安装这两组依赖。只运行排序或多任务实验时，选 `benchmark` 即可。
 
 ```bash
-pip install "torch-rechub[benchmark]"
+uv sync --extra benchmark --extra annoy
 ```
 
 ## 快速运行
 
-在仓库根目录执行：
+激活刚才创建的 `.venv` 环境，从仓库根目录运行下面的命令。第一条只跑 MIND，第二条依次跑完所有召回配置。
 
 ```bash
 # 单个 config
@@ -27,13 +27,9 @@ python benchmarks/suite.py \
   --output  benchmark_results/suites/matching
 ```
 
-每次运行写出：
+单次运行把结果写到配置里的 `output_dir`。直接打开 `summary.md` 就能看指标，要用脚本处理数据则读 `result.yaml`，里面还记录了代码提交号、Python 和 PyTorch 版本、运行时间。召回和排序权重保存在 `model.pth`，多任务示例保存在 `model_base_0.pth`。
 
-- `result.yaml`：结构化指标 + 运行元数据（git commit、Python/Torch 版本、时间戳）
-- `summary.md`：人类可读摘要
-- 模型权重：Matching/Ranking 为 `model.pth`；Multi-Task 当前为 `model_base_0.pth`
-
-Suite 额外写出 `suite.yaml` 和 `suite.md` 对比表，例如：
+批量运行还会在 `--output` 指定的目录生成 `suite.yaml` 和 `suite.md`。下面是自带小样本的结果格式。在全量数据上比较模型时，先确认各配置的数据划分一致。
 
 | model | dataset | params | Hit@10 | NDCG@10 | train_s |
 | --- | --- | --- | --- | --- | --- |
@@ -114,11 +110,11 @@ metrics:
 output_dir: benchmark_results/matching/ml_1m_mind
 ```
 
-加载时会做 schema 校验：拼错的 key（如 `batchsize`）直接报错，不会静默 fallback 到默认值。
+运行时会先检查字段名。例如把 `batch_size` 拼成 `batchsize`，脚本会指出这个字段有误，改好后再开始训练。
 
 ## 基线与回归检测
 
-`benchmarks/baselines/<task>.yaml` 记录每个 config 的 `expected + tolerance`。加 `--check-baseline` 后，指标低于预期超出容忍范围时非零退出：
+改完模型或训练器后，想知道指标有没有退步，可以加 `--check-baseline`。脚本会从 `benchmarks/baselines/<task>.yaml` 读取参考值 `expected` 和允许的偏差 `tolerance`，超过允许的退步幅度就以非零状态退出。
 
 ```bash
 python benchmarks/runner.py \
@@ -131,6 +127,6 @@ python benchmarks/suite.py \
   --check-baseline
 ```
 
-**更新基线**：跑一次 suite → 把 `benchmark_results/suites/<task>/suite.yaml` 里的指标复制到 `benchmarks/baselines/<task>.yaml`，设置合适的 `tolerance`。
+例如 AUC 的参考值为 0.75，允许偏差为 0.01，低于 0.74 才判为退步。LogLoss 和 MSE 则是越低越好，高于 `expected + tolerance` 才会失败。
 
-回归方向语义：`AUC`、`Hit`、`Recall` 等高指标只在**低于** `expected - tolerance` 时失败；`LogLoss`、`MSE` 等低指标只在**高于** `expected + tolerance` 时失败。
+调整参照结果时，先按相同配置重新运行整组实验，再将 `benchmark_results/suites/<task>/suite.yaml` 中确认过的指标写入对应基线文件。

@@ -1,13 +1,13 @@
 ---
 title: DSSM 使用示例
-description: DSSM 双塔模型完整使用教程 —— 从数据准备到向量召回
+description: 用 MovieLens 训练 DSSM，导出用户和电影向量并检索候选
 ---
 
 # DSSM 使用示例
 
 ## 1. 模型简介与适用场景
 
-DSSM（Deep Structured Semantic Model）是微软在 CIKM'2013 上提出的经典双塔模型，将用户和物品分别通过各自的 DNN Tower 映射到同一向量空间，使用余弦相似度计算匹配分数。是推荐系统**召回阶段**最常用的基础模型。
+DSSM 把用户和电影分别编码成向量。用户塔看用户属性和观影历史，物品塔看电影 ID 和类型。训练好后，整份片单的电影向量只需算一次。要为某个人推荐电影，就用他的向量到片单里找最相近的几部。
 
 **论文**: [Learning Deep Structured Semantic Models for Web Search using Clickthrough Data](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf)
 
@@ -17,22 +17,13 @@ DSSM（Deep Structured Semantic Model）是微软在 CIKM'2013 上提出的经�
   <img src="/img/models/dssm_arch.png" alt="DSSM Model Architecture" width="500"/>
 </div>
 
-- **User Tower**：将用户特征映射为向量表示
-- **Item Tower**：将物品特征映射为向量表示
-- **相似度计算**：通过余弦相似度 / 点积计算 User-Item 匹配分
-
-### 适用场景
-
-- 推荐系统召回阶段
-- 大规模候选集快速筛选（向量检索）
-- 搜索相关性匹配
-- 双塔结构支持 User/Item 向量离线预计算，适合线上实时服务
+图中两侧可以分别计算。这里两座塔最后都输出 64 维向量，匹配分数由两向量的余弦相似度决定。
 
 ---
 
 ## 2. 数据准备与预处理
 
-本示例使用 **MovieLens-1M** 数据集，包含约 100 万条用户对电影的评分记录。
+本页读取仓库随附的 MovieLens-1M 样本文件。一行表示某个用户在某个时间为一部电影评分。示例用这次交互构造正样本，评分的具体数值不作为回归目标。
 
 ### 2.1 加载和处理数据
 
@@ -59,11 +50,19 @@ user_col, item_col = "user_id", "movie_id"
 ### 2.2 特征编码
 
 ```python
+raw_id_maps = {}
 feature_max_idx = {}
 for feature in sparse_features:
     lbe = LabelEncoder()
     data[feature] = lbe.fit_transform(data[feature]) + 1
     feature_max_idx[feature] = data[feature].max() + 1
+
+    # 评估工具需要将编码 ID 映射回原始用户和电影
+    if feature in (user_col, item_col):
+        raw_id_maps[feature] = dict(enumerate(lbe.classes_, start=1))
+
+os.makedirs("saved/dssm", exist_ok=True)
+np.save("saved/dssm/raw_id_maps.npy", [raw_id_maps[user_col], raw_id_maps[item_col]])
 
 # 提取用户/物品 profile
 user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
@@ -78,7 +77,7 @@ df_train, df_test = generate_seq_feature_match(
     data, user_col, item_col,
     time_col="timestamp",
     item_attribute_cols=[],
-    sample_method=1,    # 随机负采样
+    sample_method=1,    # 按物品流行度的 0.75 次幂采样
     mode=0,             # point-wise
     neg_ratio=3,        # 负样本比例
     min_item=0
@@ -109,13 +108,13 @@ user_features += [
         vocab_size=feature_max_idx["movie_id"],
         embed_dim=16,
         pooling="mean",           # 序列聚合方式
-        shared_with="movie_id"    # 与 movie_id 共享 embedding
+        shared_with="movie_id", padding_idx=0,
     )
 ]
 
 # 物品特征
 item_features = [
-    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16)
+    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16, padding_idx=0)
     for name in item_cols
 ]
 
@@ -148,7 +147,7 @@ model = DSSM(
     temperature=1.0,  # 用于全 batch in-batch 训练，不影响 point-wise BCE
     user_params={
         "dims": [256, 128, 64],
-        "activation": "prelu"      # PReLU 激活函数效果更好
+        "activation": "prelu"      # 隐藏层使用 PReLU
     },
     item_params={
         "dims": [256, 128, 64],
@@ -163,12 +162,12 @@ model = DSSM(
 |------|------|------|--------|
 | `user_features` | `list[Feature]` | 用户侧特征列表 | 用户属性 + 行为序列 |
 | `item_features` | `list[Feature]` | 物品侧特征列表 | 物品ID + 属性 |
-| `temperature` | `float` | 全 batch in-batch 交叉熵的温度，必须为正且有限；不影响 point-wise BCE | 默认 1.0，示例 0.02 |
+| `temperature` | `float` | 批内交叉熵的温度，取有限正数 | 默认 1.0 |
 | `user_params.dims` | `list[int]` | User Tower MLP 维度 | `[256, 128, 64]` |
 | `item_params.dims` | `list[int]` | Item Tower MLP 维度 | `[256, 128, 64]` |
-| `*_params.activation` | `str` | 激活函数 | `"prelu"` 推荐 |
+| `*_params.activation` | `str` | 激活函数 | 本例用 `"prelu"` |
 
-> `temperature` 由 `MatchTrainer` 的默认全 batch in-batch 路径使用。DSSM 的 point-wise `forward` 仍返回未缩放余弦分数的 sigmoid。
+上面的默认训练方式先算用户与电影的余弦相似度，再用 sigmoid 得到分数。`temperature` 在第 4.3 节的批内采样中才用到。
 
 ---
 
@@ -207,7 +206,7 @@ trainer.fit(train_dl)
 | 1 | Pair-wise | BPR Loss | 需要模型返回 `(pos_score, neg_score)`，如 `FaceBookDSSM` |
 | 2 | List-wise | Softmax Loss | 需要模型返回 `[B, 1+n_neg]` logits，如 `YoutubeDNN` / `MIND` |
 
-`mode` 是训练器的损失契约，不能在同一个 DSSM 实例上任意切换。本页 DSSM 的标量概率输出应使用 `mode=0`。
+本页的 DSSM 给每对用户和电影输出一个分数，因此传 `mode=0`。表中的另两种模式对应不同形状的模型输出。
 
 ### 4.3 单设备 in-batch 训练
 
@@ -217,28 +216,11 @@ trainer.fit(train_dl)
 python run_ml_dssm.py --in_batch_neg --batch_size 256 --temperature 0.02 --device cpu
 ```
 
-使用一张 GPU 时将 `--device cpu` 改为 `--device cuda:0`。示例会自动以 `neg_ratio=0` 构造正交互，并使用独立的数据缓存；不加 `--in_batch_neg` 时保留原来的离线负采样与 BCE 训练。
+在一张 NVIDIA 显卡上跑时，把 `--device cpu` 换成 `--device cuda:0`。脚本会为批内采样另外生成训练数据。省略 `--in_batch_neg` 就沿用原先的正负样本和 BCE 损失。
 
-其他 MovieLens 召回示例也支持 `--in_batch_neg`。已有代码通常只需改两处：
+自己准备数据时，每行只放一次真实的用户和电影交互。一批有 `B` 行，用户塔和物品塔各输出 `B` 个向量。训练器计算 `user_emb @ item_emb.T / model.temperature`，让每一行对角线上的电影得分高于其他电影。同一部电影在批内出现两次时，也按这个位置规则处理。每批至少要有两行，只有一行的尾批会被跳过。
 
-```python
-df_train, df_test = generate_seq_feature_match(data, user_col, item_col, "timestamp", in_batch_neg=True)
-trainer = MatchTrainer(model, in_batch_neg=True)
-```
-
-数据生成函数会构造正样本配对；原来的模型参数、训练 `mode` 和推理接口保持原有形式。模型默认 `forward()` 仍返回原来的分数，Trainer 只在 in-batch 前向期间临时切换已有的 `model.mode`，并在结束后恢复。无需配置向量输出开关或改变已有预测代码。
-
-所有公开的 matching 模型均支持该入口。MIND/ComiRec 沿用正样本对应的兴趣选择，YoutubeSBC 保留采样偏差修正；NARM/STAMP 可直接沿用下一物品 ID 的训练标签，`run_sbr.py --in_batch_neg` 即可开启。若自己构造会话输入，历史序列使用后补齐，`y` 应为真实的下一物品 ID，或者显式提供 `item_feature` 及对应的物品列。SASRec 原有逐位置正负序列训练保持可用，in-batch 使用最后一个有效位置对应的正物品。
-
-向量是否归一化沿用各模型原有的打分方式：DSSM/YoutubeDNN 等使用归一化向量，YoutubeSBC 使用余弦打分，NARM/STAMP/SINE 等保留原有点积。Trainer 不统一改变模型的向量尺度，以保持训练与原有召回评估一致。
-
-当前 in-batch 入口支持单设备（`cpu` 或一张 CUDA 显卡），多卡支持单独维护。
-
-自己准备配对数据时，每行必须是一个真实的用户—物品正交互，不能混入离线负样本。调用 `MatchTrainer(model, in_batch_neg=True)` 即可使用默认全 batch 路径：DSSM 两塔提供归一化向量，Trainer 计算 `user_emb @ item_emb.T / model.temperature`，再以对角线位置 `arange(B)` 为标签计算交叉熵。显式用户—物品配对的训练 `y` 仅作占位，不决定正负；会话模型的下一物品标签则作为目标物品 ID。已有随机/困难负采样或 BPR 的显式配置保留原路径。
-
-该简单版本把所有非对角线位置当作负样本，不屏蔽重复物品；除 YoutubeSBC 本身的修正外，不额外引入采样概率修正。同 batch 出现相同物品时可能产生假负例。`batch_size` 至少为 2，只有一条样本的尾批会跳过并提示；整个 epoch 都没有有效 batch 时会报错。
-
-训练后沿用下一节的向量召回评估。正样本训练集不能直接作为 AUC 验证集；`fit(..., val_dataloader=...)` 的 AUC 验证仍需要真实的 0/1 标签。
+完整的 Python 写法见[召回训练教程](/zh/tutorials/retrieval)。从构造训练集开始使用同一个开关，取向量时也要读这一轮保存的权重。可以用留出的电影评估召回列表。如果还想算 AUC，请另备一份同时包含 0 和 1 标签的验证集。
 
 ---
 
@@ -279,7 +261,7 @@ match_evaluation(
     item_embedding,
     test_user,
     all_item,
-    raw_id_maps="examples/matching/data/ml-1m/saved/raw_id_maps.npy",
+    raw_id_maps="saved/dssm/raw_id_maps.npy",
     topk=10,
 )
 ```
@@ -290,10 +272,7 @@ match_evaluation(
 
 ### 6.1 关键调优点
 
-1. **激活函数**: 使用 `"prelu"` 通常优于 `"relu"`（原论文推荐）
-2. **Embedding 维度**: User 和 Item Tower 的最终输出维度应相同（由 dims[-1] 决定）
-3. **负采样比例**: `neg_ratio=3~5` 通常效果较好
-4. **学习率**: 匹配任务推荐较小的学习率 `1e-4`
+两座塔的中间层宽度可以各自调整，最后一层要保持同样宽，才能计算向量内积。默认配对训练中，`neg_ratio=3` 表示一次正交互配 3 个负例。用批内采样时，每个用户看到多少个候选由实际批大小决定。
 
 ### 6.2 向量检索与部署
 
@@ -353,60 +332,7 @@ faiss_index.load_index("item_faiss.index")
 > | `ivf` | 倒排索引，需训练 | 需要在速度与召回率间权衡 |
 > | `hnsw` | 图索引，无需训练 | 高召回率需求 |
 
-#### 方式三：Milvus（旧封装仅用于隔离的本地实验）
-
-```bash
-pip install "torch-rechub[milvus]"
-# 需要先启动 Milvus 服务: https://milvus.io/docs/install_standalone-docker.md
-```
-
-::: danger 数据删除风险
-旧版 `torch_rechub.utils.match.Milvus` 在构造时会删除固定名称 `rechub` 的已有 collection，然后重新创建。不要对保存真实数据的 Milvus 实例运行下面的示例。
-:::
-
-```python
-from torch_rechub.utils.match import Milvus
-from pymilvus import connections
-
-# 连接 Milvus 并插入 Embedding
-connections.connect(alias="default", host="localhost", port="19530")
-milvus = Milvus(dim=item_embedding.shape[1], host="localhost", port="19530")
-milvus.fit(item_embedding)
-
-# 查询 Top-10
-indices, distances = milvus.query(user_embedding, n=10)
-```
-
-#### 使用新版 Serving API（Builder/Indexer 模式）
-
-项目还提供了更标准化的 `serving` 模块。当前 `torch_rechub.serving` 会在导入时同时加载三种后端，因此即使这里只使用 Faiss，也要先安装三组依赖：
-
-```bash
-pip install "torch-rechub[annoy,faiss,milvus]"
-```
-
-下面示例使用 Faiss；`top_k` 是该 API 的参数名，返回值顺序是 `(indices, distances)`：
-
-```python
-from torch_rechub.serving import builder_factory
-
-# 使用工厂函数创建 Builder（支持 "annoy" / "faiss" / "milvus"）
-builder = builder_factory("faiss", index_type="Flat", metric="L2")
-
-# 构建索引并查询
-with builder.from_embeddings(item_embedding) as indexer:
-    indices, distances = indexer.query(user_embedding[:5], top_k=10)
-    print(indices, distances)
-    indexer.save("item.index")
-
-# 从文件加载
-with builder.from_index_file("item.index") as indexer:
-    indices, distances = indexer.query(user_embedding[:5], top_k=10)
-```
-
-Serving API 的 Milvus Builder 会在上下文退出时删除临时 collection，并且不支持 `from_index_file`，因此当前也不是持久化生产服务封装。
-
----
+使用可持久化的本地索引时，可复用[按索引行号查回原始电影的示例](/zh/serving/demo)。使用 Milvus 前先阅读[向量索引文档](/zh/serving/vector_index)里的临时集合生命周期。旧版 `torch_rechub.utils.match.Milvus` 在构造时会删除名为 `rechub` 的已有集合。
 
 ## 7. 模型可视化
 
@@ -516,7 +442,7 @@ print(f"User Embedding shape: {output[0].shape}")
 ```python
 SequenceFeature("hist_movie_id", vocab_size=n_movie,
                 embed_dim=16, pooling="mean",
-                shared_with="movie_id")
+                shared_with="movie_id", padding_idx=0)
 ```
 
 ### Q3: 线上如何高效部署 DSSM？
@@ -526,7 +452,7 @@ SequenceFeature("hist_movie_id", vocab_size=n_movie,
 3. 通过 ANN 检索最相似的 Top-K Item
 
 ### Q4: temperature 会影响当前 DSSM 吗？
-默认全 batch in-batch 训练会使用它缩放 logits；point-wise BCE 不受影响，`DSSM.forward()` 仍不执行温度缩放。
+开启批内采样时，训练器把每个相似度除以 `temperature`，再计算交叉熵。使用本页默认的配对训练时，改它不会改变输出。
 
 ### Q5: Annoy、Faiss、Milvus 如何选择？
 
@@ -539,87 +465,11 @@ SequenceFeature("hist_movie_id", vocab_size=n_movie,
 
 ---
 
-## 完整代码
+## 运行仓库示例
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder
+从仓库根目录执行。脚本会保存映射和权重，并评估召回列表。
 
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.models.matching import DSSM
-from torch_rechub.trainers import MatchTrainer
-from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
-
-
-def main():
-    torch.manual_seed(2022)
-    save_dir = "./saved/dssm/"
-    os.makedirs(save_dir, exist_ok=True)
-
-    # 1. 数据处理
-    data = pd.read_csv("examples/matching/data/ml-1m/ml-1m_sample.csv")
-    data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
-    sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', 'cate_id']
-    user_col, item_col = "user_id", "movie_id"
-
-    feature_max_idx = {}
-    for feature in sparse_features:
-        lbe = LabelEncoder()
-        data[feature] = lbe.fit_transform(data[feature]) + 1
-        feature_max_idx[feature] = data[feature].max() + 1
-
-    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
-    item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
-
-    # 2. 构建序列特征
-    df_train, df_test = generate_seq_feature_match(
-        data, user_col, item_col, time_col="timestamp",
-        item_attribute_cols=[], sample_method=1, mode=0, neg_ratio=3, min_item=0
-    )
-    x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-    y_train = x_train["label"]
-    x_train = {k: v for k, v in x_train.items() if k != "label"}
-    x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-
-    # 3. 定义特征
-    user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
-    item_cols = ['movie_id', 'cate_id']
-    user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-    user_features += [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="mean", shared_with="movie_id")]
-    item_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in item_cols]
-
-    all_item = df_to_dict(item_profile)
-    test_user = x_test
-
-    # 4. 创建模型
-    dg = MatchDataGenerator(x=x_train, y=y_train)
-    model = DSSM(user_features, item_features, temperature=1.0,
-                 user_params={"dims": [256, 128, 64], "activation": "prelu"},
-                 item_params={"dims": [256, 128, 64], "activation": "prelu"})
-
-    # 5. 训练
-    trainer = MatchTrainer(model, mode=0, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-                           n_epoch=10, device="cpu", model_path=save_dir)
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=4096, num_workers=0)
-    trainer.fit(train_dl)
-
-    # 6. 生成 Embedding
-    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
-    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
-    print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
-
-    # 7. 使用 Annoy 进行向量召回
-    annoy = Annoy(n_trees=10)
-    annoy.fit(item_embedding)
-    for i in range(min(5, len(user_embedding))):
-        indices, distances = annoy.query(user_embedding[i], n=10)
-        print(f"User {i} -> Top-10 Items: {indices}")
-
-
-if __name__ == "__main__":
-    main()
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_dssm.py --epoch 1 --device cpu
 ```

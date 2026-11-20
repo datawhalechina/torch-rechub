@@ -5,7 +5,7 @@ description: Torch-RecHub 召回模型教程，覆盖 DSSM、GRU4Rec、MIND 与�
 
 # 召回模型教程
 
-本教程聚焦召回场景的通用流程：构建用户/物品特征、生成序列样本、训练双塔或序列召回模型、导出向量并做 ANN 检索。示例默认在**仓库根目录**执行，使用 `MovieLens-1M` 样本数据。
+给定一个用户看过的电影，怎样从电影库里再找出 10 部候选？下面用 MovieLens 样本训练 DSSM。训练完分别计算用户和电影的向量，再检查推荐列表里有没有用户最后一次交互的那部电影。从仓库根目录运行即可。
 
 ## 一、数据准备
 
@@ -27,7 +27,9 @@ user_col, item_col = "user_id", "movie_id"
 sparse_features = ["user_id", "movie_id", "gender", "age", "occupation", "zip", "cate_id"]
 ```
 
-### 2. 编码特征并构建 profile
+### 2. 编码 ID，整理用户表和电影表
+
+这里把样本中的电影当作一份已知片单。`user_profile` 每位用户一行，`item_profile` 每部电影一行。训练使用编码后的 ID，最后展示结果时还要靠 `raw_movie_ids` 查回原始电影编号。换成业务日志时，词表和片单应使用当时已经可用的版本。
 
 ```python
 feature_max_idx = {}
@@ -35,6 +37,8 @@ for feature in sparse_features:
     lbe = LabelEncoder()
     # +1 给 padding 预留 0，和框架里 embedding 的常见约定保持一致
     data[feature] = lbe.fit_transform(data[feature]) + 1
+    if feature == item_col:
+        raw_movie_ids = lbe.classes_
     feature_max_idx[feature] = data[feature].max() + 1
 
 # profile 表记录静态画像，后面会和序列特征拼接成模型输入
@@ -44,10 +48,10 @@ item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
 
 ### 3. 生成序列样本
 
-#### DSSM（point-wise）
+默认设置下，每条正交互会配 3 条负样本，标签分别是 1 和 0。要试批内负采样，只需把下一段的 `in_batch_neg` 改成 `True`，然后从这里向下重新运行。构造样本时会只保留正交互，训练器从同一批的其他电影里取负例。
 
 ```python
-# point-wise：每条 user-item 样本独立打 0/1 标签，适合 DSSM 这类基础双塔
+in_batch_neg = False
 df_train, df_test = generate_seq_feature_match(
     data,
     user_col=user_col,
@@ -56,6 +60,7 @@ df_train, df_test = generate_seq_feature_match(
     item_attribute_cols=[],
     sample_method=1,
     mode=0,
+    in_batch_neg=in_batch_neg,
     neg_ratio=3,
     min_item=0,
 )
@@ -64,45 +69,6 @@ df_train, df_test = generate_seq_feature_match(
 x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
 y_train = x_train.pop("label")
 x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-```
-
-#### GRU4Rec / MIND（list-wise）
-
-```python
-# list-wise：一个正样本配多个负样本，适合序列召回模型
-df_train, df_test = generate_seq_feature_match(
-    data,
-    user_col=user_col,
-    item_col=item_col,
-    time_col="timestamp",
-    item_attribute_cols=[],
-    sample_method=1,
-    mode=2,
-    neg_ratio=3,
-    min_item=0,
-)
-
-x_train = gen_model_input(
-    df_train,
-    user_profile,
-    user_col,
-    item_profile,
-    item_col,
-    seq_max_len=50,
-    padding="post",
-    truncating="post",
-)
-y_train = [0] * len(df_train)  # list-wise 下标签恒为 0，表示列表第一个位置是正样本
-x_test = gen_model_input(
-    df_test,
-    user_profile,
-    user_col,
-    item_profile,
-    item_col,
-    seq_max_len=50,
-    padding="post",
-    truncating="post",
-)
 ```
 
 ## 二、DSSM：基础双塔召回
@@ -120,11 +86,11 @@ user_features = [
 user_features += [
     # 历史序列在 DSSM 里只需要被压成一个固定向量，因此可以用 mean pooling
     SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="mean", shared_with="movie_id")
+                    pooling="mean", shared_with="movie_id", padding_idx=0)
 ]
 
 item_features = [
-    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16)
+    SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16, padding_idx=0)
     for name in item_cols
 ]
 
@@ -152,7 +118,7 @@ train_dl, test_dl, item_dl = dg.generate_dataloader(
     num_workers=0,  # Windows / Notebook 下这里显式设 0 更稳
 )
 
-# DSSM 是最标准的双塔召回基线，建议先跑通它再看更复杂的序列召回
+# 两座塔都输出 64 维向量
 model = DSSM(
     user_features=user_features,
     item_features=item_features,
@@ -162,162 +128,71 @@ model = DSSM(
 )
 
 # Trainer 不会自动建目录，所以这里先创建
-os.makedirs("./saved/dssm", exist_ok=True)
+save_dir = "./saved/dssm_inbatch" if in_batch_neg else "./saved/dssm"
+os.makedirs(save_dir, exist_ok=True)
 
 trainer = MatchTrainer(
     model,
     mode=0,
+    in_batch_neg=in_batch_neg,
     optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
     n_epoch=2,
     device="cpu",  # GPU 改成 "cuda:0"
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 
 trainer.fit(train_dl)
 ```
 
-### 3. 批内负采样（可选）
-
-对具有 `user_tower()` / `item_tower()` 且两塔输出都是二维张量的模型（如 DSSM），`MatchTrainer` 可以直接把同一 batch 的其他物品当作负样本：
-
-```python
-os.makedirs("./saved/dssm_inbatch", exist_ok=True)
-
-trainer = MatchTrainer(
-    model,
-    mode=0,
-    in_batch_neg=True,
-    in_batch_neg_ratio=3,
-    hard_negative=False,  # True 时选当前 batch 中得分最高的负样本
-    sampler_seed=2022,
-    optimizer_params={"lr": 1e-4},
-    n_epoch=2,
-    device="cpu",
-    model_path="./saved/dssm_inbatch",
-)
-```
-
-该模式先计算 `[B, B]` 的用户-物品分数矩阵：对角线 `(user_i, item_i)` 必须是原始配对的正样本，非对角位置才是可采样的负样本。因此 batch size 必须大于 1，且 `in_batch_neg_ratio <= batch_size - 1`；同一 batch 中存在其他真正样本时，它们仍可能成为 false negative。`sampler_seed` 用于复现随机采样。
+例如一批有 3 对正交互，3 个用户分别和 3 部电影打分，就得到一个 3 × 3 的矩阵。第一个用户对应第一部电影，第二个用户对应第二部，第三个用户对应第三部，因此正例都在对角线上。使用这种方式每批至少需要两对正交互。
 
 ### 3. 导出向量
+
+`test_dl` 用每个用户留出的那条记录构造用户输入，`item_dl` 遍历整份电影表。下面打印的两个形状，第一维分别是用户记录数和电影数，第二维都应为 64，即两座塔的最后一层宽度。
 
 ```python
 user_embedding = trainer.inference_embedding(
     model=model,
     mode="user",
     data_loader=test_dl,
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 item_embedding = trainer.inference_embedding(
     model=model,
     mode="item",
     data_loader=item_dl,
-    model_path="./saved/dssm",
+    model_path=save_dir,
 )
 
 print(user_embedding.shape, item_embedding.shape)
 ```
 
-## 三、序列召回：GRU4Rec / MIND
+## 三、查出 10 部电影，检查是否命中
 
-这两类模型和 DSSM 的主要区别是：
-
-- 训练样本需要 `mode=2` 的 list-wise 数据
-- 历史行为和负样本都使用 `SequenceFeature(..., pooling="concat")`
-
-### 1. 定义序列特征
-
-```python
-user_cols = ["user_id", "gender", "age", "occupation", "zip"]
-
-user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-history_features = [
-    # 这里必须保留完整序列，交给 GRU4Rec / MIND 在模型内部处理
-    SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="concat", shared_with="movie_id")
-]
-item_features = [SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16)]
-neg_item_feature = [
-    # list-wise 训练里的负样本序列同样要保留完整张量
-    SequenceFeature("neg_items", vocab_size=feature_max_idx["movie_id"], embed_dim=16,
-                    pooling="concat", shared_with="movie_id")
-]
-```
-
-### 2. GRU4Rec
-
-```python
-from torch_rechub.models.matching import GRU4Rec
-
-# GRU4Rec 用 RNN 对历史兴趣做时序建模，结构上比 DSSM 更适合顺序敏感场景
-model = GRU4Rec(
-    user_features,
-    history_features,
-    item_features,
-    neg_item_feature,
-    user_params={"dims": [128, 64, 16]},
-    temperature=0.02,
-)
-```
-
-### 3. MIND
-
-```python
-from torch_rechub.models.matching import MIND
-
-# MIND 会把一个用户拆成多个兴趣 capsule，适合兴趣分散的场景
-model = MIND(
-    user_features,
-    history_features,
-    item_features,
-    neg_item_feature,
-    max_length=50,
-    temperature=0.02,
-)
-```
-
-### 4. 训练方式
-
-```python
-import os
-
-# 序列召回训练时仍然建议显式设置 num_workers=0，尤其是 Windows 环境
-dg = MatchDataGenerator(x=x_train, y=y_train)
-train_dl, test_dl, item_dl = dg.generate_dataloader(
-    test_user,
-    all_item,
-    batch_size=256,
-    num_workers=0,
-)
-
-os.makedirs("./saved/matching_sequence", exist_ok=True)
-
-trainer = MatchTrainer(
-    model,
-    mode=2,
-    optimizer_params={"lr": 1e-3, "weight_decay": 1e-6},
-    n_epoch=2,
-    device="cpu",  # GPU 改成 "cuda:0"
-    model_path="./saved/matching_sequence",
-)
-
-trainer.fit(train_dl)
-```
-
-## 四、向量检索
-
-Torch-RecHub 内置了 `Annoy / Faiss / Milvus` 三种向量检索封装。最小示例：
+先安装 `annoy` 可选依赖。Annoy 返回的是电影在向量表里的行号。先用行号取出 `movie_id` 的编码，再按编码查回原始电影 ID。若测试用户最后看过的电影出现在前 10 部里，下面打印的 `Hit@10` 就是 1，否则是 0。这里检查的是一个用户。
 
 ```python
 from torch_rechub.utils.match import Annoy
 
-annoy = Annoy(n_trees=10)
-annoy.fit(item_embedding)
-similar_items, scores = annoy.query(user_embedding[0], n=10)
-print(similar_items)
+index = Annoy(n_trees=10)
+index.fit(item_embedding)
+rows, distances = index.query(user_embedding[0], n=10)
+recommended = raw_movie_ids[all_item[item_col][rows] - 1]
+held_out = raw_movie_ids[test_user[item_col][0] - 1]
+print("推荐电影", recommended.tolist())
+print("留出的电影", held_out, "Hit@10", int(held_out in recommended))
 ```
 
-> 如果缺少依赖，请先安装对应包，例如 `pip install annoy`。
+## 四、显式候选列表
+
+YoutubeDNN、GRU4Rec 和 MIND 的 list-wise 示例为每行准备一个正物品和一组负物品，打分形状为 `[B, 1 + K]`。正物品放第一列，所以交叉熵的位置标签全是 0。以下命令各自构建样本、训练和评估，可从仓库根目录选择一条运行。
+
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_youtube_dnn.py --epoch 1 --device cpu
+uv run --extra annoy python run_ml_gru4rec.py --epoch 1 --device cpu
+uv run --extra annoy python run_ml_mind.py --epoch 1 --device cpu
+```
 
 ## 五、常见问题
 
@@ -334,7 +209,7 @@ print(similar_items)
 
 召回场景会同时创建训练、用户推理、物品推理三个 DataLoader。Windows / Notebook 环境下多进程 worker 更容易触发权限或句柄问题，文档示例默认显式设置为 0。
 
-### Q4：还想看具体模型页？
+### 各模型的训练和检索示例
 
 - [DSSM 教程](/zh/tutorials/models/matching/dssm)
 - [YoutubeDNN 教程](/zh/tutorials/models/matching/youtube_dnn)
