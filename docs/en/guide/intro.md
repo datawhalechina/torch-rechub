@@ -1,97 +1,27 @@
 ---
-title: Project Introduction
-description: Overview of Torch-RecHub project architecture, features, and design principles
+title: Introducing Torch-RecHub
+description: How features, models and trainers fit together in Torch-RecHub.
 ---
 
-# Project Introduction
+# Introducing Torch-RecHub
 
-## Project Overview
+Torch-RecHub implements retrieval, ranking, multi-task and generative recommendation models in PyTorch. A good first experiment is to train DeepFM on the bundled ad-click sample and see how it turns one ad impression into a click probability. [Quick start](/guide/quick_start)
 
-**Torch-RecHub** is a flexible and easily extensible recommendation system framework built using PyTorch. It aims to simplify the research and application of recommendation algorithms, providing common model implementations, data processing tools, and evaluation metrics.
+![Torch-RecHub banner](/img/banner.png)
 
-![Torch-RecHub Banner](/img/banner.png "Torch-RecHub Banner")
+## Framework architecture
 
-## Features
+![Torch-RecHub framework architecture](/img/project_framework_en.png)
 
-* **Modular Design:** Easy to add new models, datasets, and evaluation metrics.
-* **Based on PyTorch:** Leverage PyTorch's dynamic graph and hardware acceleration capabilities across CPU, NVIDIA CUDA GPU, AMD ROCm GPU, and Huawei Ascend NPU.
-* **Rich Model Library:** Includes various classic and cutting-edge recommendation algorithms.
-* **Standardized Process:** Provide unified data loading, training, and evaluation processes.
-* **Easy to Configure:** Adjust experiments through Python constructor arguments and the command-line options exposed by example scripts.
-* **Reproducibility:** Aims to ensure the reproducibility of experimental results.
-* **Easy to Extend:** Decouple model training from model definition, without the concept of a base model.
-* **Native Functions:** Use PyTorch's native classes and functions as much as possible without excessive customization.
-* **Concise Model Code:** Facilitate beginners' learning while adhering to the ideas of academic papers.
-* **Other Features:** For example, support negative sampling, multi-task learning, etc.
+When you bring your own data, three parts of the code matter first. Feature definitions tell the model how to read each column. For example, `item_id` looks up a row in an embedding table, while `price` goes in as a number. The model's `forward` method combines those inputs. The trainer reads batches, computes validation metrics and saves weights. To change how a model scores an example, start with its `forward` method. [Feature definitions](/core/features) · [Training and evaluation](/core/evaluation)
 
-## Overall Architecture
+## Choose a model for your task
 
-![Architecture Design Diagram](/img/project_framework_en.png "Architecture Design Diagram")
+| What do you need to do? | Where to start |
+| --- | --- |
+| Select a short list of candidates for each user from a large catalog | [Retrieve candidates with DSSM](/tutorials/retrieval) |
+| Order existing candidates by how likely the user is to click | [Rank candidates with DeepFM](/tutorials/ctr) |
+| Learn from both click and purchase labels on the same impression | [Multi-task learning](/tutorials/pipeline) |
+| Predict the next item from a sequence of timestamped interactions | [Sequential and generative models](/models/generative) |
 
-## Core Components
-
-Torch-RecHub adopts a modular design, dividing the core functions of recommendation systems into multiple components:
-
-### 1. Feature Processing
-
-Handles different types of features, including dense features, sparse features, and sequence features.
-
-See [Feature Definitions](/core/features) for details.
-
-### 2. Data Pipeline
-
-Responsible for data loading, preprocessing, and generating dataloaders, supporting data processing for ranking and matching models.
-
-See [Data Pipeline](/core/data) for details.
-
-### 3. Model Library
-
-Implements various recommendation models, including ranking models, matching models, multi-task models, and generative recommendation models.
-
-See [Model Library](/models/intro) for details.
-
-### 4. Training & Evaluation
-
-Provides a unified training interface, supporting model training, evaluation, prediction, and ONNX export.
-
-See [Training & Evaluation](/core/evaluation) for details.
-
-### 5. Development Tools
-
-Provides various utility functions, such as ONNX export, model visualization, callbacks, and loss functions.
-
-See [Development Tools](/tools/intro) for details.
-
-## Supported Models
-
-### Ranking Models - 13 exported classes
-
-* DeepFM, WideDeep, DCN, DCNv2, DIN, DIEN, BST, AFM, AutoInt, FiBiNet, DeepFFM, FatDeepFFM, EDCN
-
-### Matching Models - 12 exported classes
-
-* DSSM, YoutubeDNN, YoutubeSBC, MIND, SINE, GRU4Rec, SASRec, NARM, STAMP, ComirecDR, ComirecSA, FaceBookDSSM
-
-### Multi-Task Models - 5
-
-* ESMM, MMoE, PLE, AITM, SharedBottom
-
-### Generative Recommendation - 4
-
-* HSTU, HLLM, RQ-VAE, TIGER
-
-## Quick Start
-
-To get started with Torch-RecHub, see the [Quick Start](/guide/quick_start) page to learn how to install the framework and run your first example.
-
-## Production Deployment
-
-Torch-RecHub supports exporting trained models to ONNX format for production deployment. See [Production Deployment](/serving/intro) for details.
-
-## Community Contribution
-
-We welcome all forms of contributions! See the [Contributing Guide](/community/contributing) for detailed contribution guidelines.
-
-## FAQ
-
-If you encounter issues, see the [FAQ](/community/faq) page or submit an Issue on GitHub.
+You can run the introductory examples on a CPU. For an NVIDIA GPU, AMD GPU or Huawei Ascend NPU, install the PyTorch build that matches the device. After training, you can export a ranker to ONNX for inference. With a two-tower model, you can also compute user and item vectors separately for retrieval. [Installation](/guide/install) · [Serving example](/serving/demo)

@@ -7,7 +7,7 @@ description: Torch-RecHub 向量检索工具
 
 双塔模型为每个物品算出一个向量。给用户做召回时，用这个用户的向量查索引，取回最接近的物品。Annoy、Faiss 和 Milvus 都使用下面的 `from_embeddings` 建索引、`query` 查候选，区别主要在索引的保存方式和运行环境。
 
-![向量索引 Builder-Indexer 组件关系图](/img/diagrams/vector_index_builder_indexer.png)
+![用物品向量建索引，再按查询返回的行号找回原始电影 ID](/img/diagrams/zh/vector_index_builder_indexer.svg)
 
 ## 安装
 

@@ -7,7 +7,7 @@ description: Torch-RecHub 数据加载与预处理
 
 在排序任务里，一条训练样本包含一组特征和一个标签。先把城市、电影等类别换成整数，把同一批用户的历史补到相同长度，再让 DataLoader 把这些样本分批交给训练器。[特征定义](/zh/core/features)
 
-![数据流水线图](/img/diagrams/data_pipeline.png)
+![两条电影记录组成一个训练批次，特征按列放进字典，点击标签单独传给训练器](/img/diagrams/zh/data_pipeline.svg)
 
 ## 数据类
 

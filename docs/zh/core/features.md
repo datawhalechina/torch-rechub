@@ -7,7 +7,7 @@ description: Torch-RecHub 特征类型定义
 
 先看一条样本里每一列装的是什么。年龄是一个数，城市是一个类别，观影历史是一串电影 ID。这三种输入分别用 `DenseFeature`、`SparseFeature` 和 `SequenceFeature` 描述。`name` 要和输入字典里的键一致。
 
-![特征类型到模型输入示意图](/img/diagrams/feature_types_flow.png)
+![一条电影样本中的数值、类别和历史分别怎样输入模型，历史补位怎样被忽略](/img/diagrams/zh/feature_types_flow.svg)
 
 ## DenseFeature
 

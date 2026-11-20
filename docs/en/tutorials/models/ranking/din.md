@@ -1,13 +1,13 @@
 ---
 title: DIN Tutorial
-description: A complete Deep Interest Network (DIN) tutorial—a model designed to capture diverse interests in user behavior histories
+description: Use the current candidate to weight each action in the user's history
 ---
 
 # DIN Tutorial
 
 ## 1. Model Overview and Use Cases
 
-DIN (Deep Interest Network) is a classic recommendation model proposed by Alibaba's advertising team at KDD 2018. To address the **diversity** and **local activation** of user interests in e-commerce—where a user's current click is usually related to only a small portion of their history—DIN introduces a **target-attention mechanism (Target Attention/Activation Unit)**. It dynamically weights the user's behavior sequence according to the current candidate item (Target Item), thereby adapting the representation to the user's current interest.
+Imagine a shopper who has browsed both headphones and monitors. When the candidate is a new pair of headphones, which past interactions help predict the click? DIN scores each historical action using the candidate and combines the weighted history into one vector. A different candidate can give the same history different weights.
 
 **Paper**: [Deep Interest Network for Click-Through Rate Prediction](https://arxiv.org/abs/1706.06978)
 
@@ -17,22 +17,13 @@ DIN (Deep Interest Network) is a classic recommendation model proposed by Alibab
   <img src="/img/models/din_arch.png" alt="DIN Model Architecture" width="600"/>
 </div>
 
-- **Base model**: similar to a standard Embedding + MLP architecture
-- **Activation Unit**: the core of DIN. It computes attention scores (weights) from the target-item features and the user's historical sequence features, then aggregates the sequence into a fixed-dimensional representation.
-- **Dice activation**: a data-dependent activation introduced in the paper. It adaptively adjusts its rectification point and can outperform PReLU.
-
-### Suitable Scenarios
-
-- CTR prediction
-- E-commerce recommendation ranking
-- Data with rich and relatively long **user behavior sequences**, such as browsing or click histories
-- Scenarios with many candidate-item categories and diverse user interests
+The Activation Unit takes a candidate vector and a sequence of history vectors. It outputs a representation of the history for that particular candidate. The model then combines it with the candidate and user features to predict a click probability.
 
 ---
 
 ## 2. Data Preparation and Preprocessing
 
-This example uses a sample of the **Amazon Electronics** dataset. It contains user-item interactions and timestamps, from which item-history and category-history sequences are constructed.
+The Amazon Electronics sample includes user IDs, item IDs, categories and interaction times. Build examples in chronological order, retaining the items and categories the user saw before each candidate.
 
 ### 2.1 Load Data and Build Sequences
 
@@ -75,8 +66,8 @@ features = [
 
 # 2. Current candidate-item features
 target_features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0),
 ]
 
 # 3. Historical behavior sequence features (History Features)
@@ -87,17 +78,19 @@ history_features = [
         vocab_size=n_items + 1,
         embed_dim=8,
         pooling="concat",     # Must use concat so the Activation Unit can process the sequence
-        shared_with="target_item_id"
+        shared_with="target_item_id", padding_idx=0
     ),
     SequenceFeature(
         "hist_cate_id",
         vocab_size=n_cates + 1,
         embed_dim=8,
         pooling="concat",     # Must use concat
-        shared_with="target_cate_id"
+        shared_with="target_cate_id", padding_idx=0
     )
 ]
 ```
+
+For the history `[3, 0, 0]`, the valid-position mask is `[1, 0, 0]`. `shared_with` lets the candidate and history use the same embedding table, and `padding_idx=0` tells the attention layer to ignore the padding.
 
 ### 2.3 Build Input Dictionaries and DataLoaders
 
@@ -143,14 +136,14 @@ model = DIN(
 ### 3.2 Parameter Details
 
 | Parameter | Type | Description | Suggested Value |
-|-----------|------|-------------|-----------------|
+|------|------|------|--------|
 | `features` | `list[Feature]` | User-profile and context features, excluding history and target features | |
 | `history_features` | `list[Feature]` | Historical sequence features; must be `SequenceFeature` instances with `pooling="concat"` | |
 | `target_features` | `list[Feature]` | Current candidate-item features, paired with `history_features` by index | |
 | `mlp_params` | `dict` | Top-level prediction MLP parameters (`activation` is fixed internally to `dice`, so do not pass it) | `{"dims": [256, 128]}` |
 | `attention_mlp_params` | `dict` | Target-attention network (Activation Unit) parameters (defaults: `activation="dice"`, `use_softmax=False`) | `{"dims": [256, 128]}` |
 
-> **Important**: `history_features` and `target_features` should form meaningful pairs (for example, `hist_item_id` with `target_item_id`) and must share their embedding tables through `shared_with`.
+Match item IDs with item IDs and categories with categories. Even when both fields have width 8, swapping their order makes attention compare vectors with different meanings.
 
 ---
 
@@ -191,22 +184,17 @@ print(f"Test AUC: {auc:.4f}")
 
 ## 6. Tuning Suggestions
 
-1. **Activation function**: The DIN paper introduced the `Dice` activation, which often performs better than standard `ReLU` or `PReLU` on large-scale sparse data.
-2. **Attention softmax**: `use_softmax=False` in `attention_mlp_params` follows the paper's design. It allows the magnitude of the aggregated vector to vary and represent total interest intensity.
-3. **Sequence-length limit**: Long histories increase computation latency. Online systems commonly keep only the most recent 20–50 interactions.
-4. **Shared embeddings**: Make sure historical IDs and target IDs use the same lookup table; this is the semantic basis on which attention operates.
+With `use_softmax=False`, the attention weights enter the weighted sum directly. With `True`, the model normalizes the weights over valid history positions. Use the same training data and history length to compare the two settings.
 
 ---
 
 ## 7. FAQ and Troubleshooting
 
 ### Q1: Why must `SequenceFeature` use `pooling="concat"`?
-
-DIN needs to aggregate the sequence itself. It requires a 3D tensor shaped `[batch, seq_len, embed_dim]` for the Activation Unit, rather than a sequence that has already been averaged with `mean` pooling.
+DIN scores each history position separately. `pooling="concat"` preserves the time axis of `[batch, seq_len, embed_dim]` so attention can compare the candidate with each past item.
 
 ### Q2: Why do I get a `dimension mismatch` error or an unexpected tensor size?
-
-Check that `target_features` and `history_features` have strictly matching order and counts. Internally, the model uses zip-like logic to compute attention between the $i$-th `history_feature` and the $i$-th `target_feature`.
+Check that the lists have the same length and matching order. If the first history field is `hist_item_id`, the first target should be `target_item_id` with the same embedding width.
 
 ---
 
@@ -267,12 +255,12 @@ def main():
         SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8)
     ]
     target_features = [
-        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8)
+        SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+        SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0)
     ]
     history_features = [
-        SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-        SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id")
+        SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id", padding_idx=0),
+        SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id", padding_idx=0)
     ]
 
     # 4. Build data dictionaries and DataLoaders

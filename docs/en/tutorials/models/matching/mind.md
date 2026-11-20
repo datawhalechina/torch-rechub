@@ -1,13 +1,13 @@
 ---
 title: MIND Tutorial
-description: Complete tutorial for the Multi-Interest Network with Dynamic Routing (MIND), a multi-interest retrieval model
+description: Learn several interest vectors per user with MIND and merge the movies retrieved by each vector
 ---
 
 # MIND Tutorial
 
 ## 1. Model Overview and Use Cases
 
-MIND (Multi-Interest Network with Dynamic Routing) is a multi-interest retrieval model proposed by Alibaba at CIKM 2019. Unlike DSSM, which produces a **single vector** for each user, MIND uses a **Capsule Network with dynamic routing** to extract **multiple interest vectors** from the user's behavior sequence, enabling it to represent diverse user interests more effectively.
+Someone who likes science fiction may also watch comedies. MIND extracts several interest vectors from the same viewing history, and each vector can retrieve movies from the catalog. The vectors are learned from interactions. There is no need to name or label the interests.
 
 **Paper**: [Multi-Interest Network with Dynamic Routing for Recommendation at Tmall](https://arxiv.org/pdf/1904.08030v1)
 
@@ -43,11 +43,7 @@ y: [batch_size, 1 + n_neg_items]
 
 The reduction must be performed over the embedding dimension, `dim=-1`, rather than the candidate-item dimension. `MatchTrainer(mode=2)` uses `CrossEntropyLoss`, so `y_train = 0` means that candidate item 0 is the positive item.
 
-### Suitable Scenarios
-
-- The **retrieval stage** of recommendation systems
-- Scenarios where users have **diverse interests** (for example, an e-commerce user may be interested in phones, clothing, and food at the same time)
-- ANN retrieval from large candidate sets
+During training, the positive movie selects an interest vector for scoring. At recommendation time the next movie is unknown, so query the index with each interest vector. Section 5 shows how to merge the results.
 
 ---
 
@@ -86,9 +82,9 @@ df_train, df_test = generate_seq_feature_match(
     item_attribute_cols=[], sample_method=1, mode=2, neg_ratio=3, min_item=0
 )
 
-x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
+x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50, padding="post", truncating="post")
 y_train = np.array([0] * df_train.shape[0])
-x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
+x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50, padding="post", truncating="post")
 ```
 
 ### Define Features
@@ -140,7 +136,7 @@ model = MIND(
     item_features=item_features,
     neg_item_feature=neg_item_feature,
     max_length=50,          # Maximum sequence length
-    temperature=0.02,       # Temperature coefficient
+    temperature=0.02,       # Only used for in-batch cross-entropy.
     interest_num=4          # Number of interest vectors
 )
 ```
@@ -148,16 +144,16 @@ model = MIND(
 ### 3.2 Parameter Details
 
 | Parameter | Type | Description | Recommended Value |
-|-----------|------|-------------|-------------------|
+|------|------|------|--------|
 | `user_features` | `list[Feature]` | User-side features | User attributes |
 | `history_features` | `list[Feature]` | User behavior sequence (`pooling="concat"`) | |
 | `item_features` | `list[Feature]` | Positive-item features | |
 | `neg_item_feature` | `list[Feature]` | Negative-item features | |
 | `max_length` | `int` | Maximum sequence length | 50 |
-| `temperature` | `float` | Softmax temperature coefficient | 0.02 |
+| `temperature` | `float` | Temperature for in-batch cross-entropy. This example's `mode=2` forward pass uses dot products directly. | Used for in-batch sampling |
 | `interest_num` | `int` | Number of extracted interest vectors | 4–8 |
 
-> **`interest_num`** is MIND's most important hyperparameter. It determines how many vectors represent each user. Values between 4 and 8 usually work best.
+Here `interest_num=4` gives each user four vectors, each the same width as a movie vector.
 
 ---
 
@@ -206,41 +202,36 @@ print(f"Item Embedding shape: {item_embedding.shape}")
 
 ### Vector Retrieval
 
+Query the index with each active interest vector, then merge the candidates by ascending Annoy distance. When several interests retrieve the same movie, keep the closest match. The example checks Hit@10 against the first user's held-out movie.
+
 ```python
 from torch_rechub.utils.match import Annoy
 
-# Retrieve with each interest vector separately, then merge the results
-annoy = Annoy(n_trees=10)
-annoy.fit(item_embedding)
+index = Annoy(n_trees=10)
+index.fit(item_embedding)
+candidates = []
+for interest in user_embedding[0]:
+    if interest.norm().item() > 0:
+        rows, distances = index.query(interest, n=10)
+        candidates.extend(zip(rows, distances))
 
-# Query with each interest vector of each user
-for i in range(min(3, len(user_embedding))):
-    all_indices = set()
-    for k in range(user_embedding.shape[1]):  # interest_num: retrieve for each interest and merge
-        indices, _ = annoy.query(user_embedding[i, k], n=10)
-        all_indices.update(indices)
-    print(f"User {i} -> Total unique items: {len(all_indices)}")
+candidates.sort(key=lambda pair: pair[1])
+rows = list(dict.fromkeys(row for row, _ in candidates))[:10]
+movie_ids = all_item["movie_id"][rows]
+print("Hit@10", int(test_user["movie_id"][0] in movie_ids))
 ```
 
----
+The example script evaluates all users and uses the matching vocabulary to recover the original item IDs.
 
 ## 6. Tuning Recommendations
 
-1. **`interest_num`**: the key hyperparameter. A larger value can capture more diverse interests, but retrieval cost increases proportionally
-2. **`max_length`**: a longer sequence gives the capsule network more information but increases computation
-3. **Temperature**: `temperature=0.02` is the recommended value for MIND
-
----
+Increasing `interest_num` gives the index more vectors to look up per user. Start with four and use the same held-out movies to compare Hit@10 and query time per user. If you change the history length, update both `seq_max_len` in preprocessing and `max_length` in the model.
 
 ## 7. FAQ and Troubleshooting
 
-### Q1: How does online deployment differ between MIND and DSSM?
+### Why can the same movie appear twice?
 
-DSSM produces one vector per user, whereas MIND produces `interest_num` vectors. Online retrieval must query the ANN index with each interest vector separately and then merge the Top-K results.
-
-### Q2: How should I choose `interest_num`?
-
-It depends on the diversity of user interests in the application. Values of 4–8 are common in e-commerce; news and video applications can use 8–16 because interests tend to be more dispersed.
+Two interest vectors can retrieve the same movie. Section 5 merges the results by distance and keeps the closest match for each movie, so it occupies only one recommendation slot.
 
 ---
 
@@ -269,83 +260,11 @@ exporter.export("mind_item_tower.onnx", mode="item")
 
 ---
 
-## Complete Example
+## Run the example script
 
-```python
-import os
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder
+Run this from the repository root. The script saves the ID maps and weights, then evaluates the recommendations.
 
-from torch_rechub.basic.features import SparseFeature, SequenceFeature
-from torch_rechub.models.matching import MIND
-from torch_rechub.trainers import MatchTrainer
-from torch_rechub.utils.data import MatchDataGenerator, df_to_dict
-from torch_rechub.utils.match import gen_model_input, generate_seq_feature_match, Annoy
-
-
-def main():
-    torch.manual_seed(2022)
-    save_dir = "./saved/mind/"
-    os.makedirs(save_dir, exist_ok=True)
-
-    data = pd.read_csv("examples/matching/data/ml-1m/ml-1m_sample.csv")
-    data["cate_id"] = data["genres"].apply(lambda x: x.split("|")[0])
-    sparse_features = ['user_id', 'movie_id', 'gender', 'age', 'occupation', 'zip', 'cate_id']
-    user_col, item_col = "user_id", "movie_id"
-
-    feature_max_idx = {}
-    for feature in sparse_features:
-        lbe = LabelEncoder()
-        data[feature] = lbe.fit_transform(data[feature]) + 1
-        feature_max_idx[feature] = data[feature].max() + 1
-
-    user_profile = data[["user_id", "gender", "age", "occupation", "zip"]].drop_duplicates("user_id")
-    item_profile = data[["movie_id", "cate_id"]].drop_duplicates("movie_id")
-
-    df_train, df_test = generate_seq_feature_match(
-        data, user_col, item_col, time_col="timestamp",
-        item_attribute_cols=[], sample_method=1, mode=2, neg_ratio=3, min_item=0
-    )
-    x_train = gen_model_input(df_train, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-    y_train = np.array([0] * df_train.shape[0])
-    x_test = gen_model_input(df_test, user_profile, user_col, item_profile, item_col, seq_max_len=50)
-
-    user_cols = ['user_id', 'gender', 'age', 'occupation', 'zip']
-    user_features = [SparseFeature(name, vocab_size=feature_max_idx[name], embed_dim=16) for name in user_cols]
-    history_features = [SequenceFeature("hist_movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="concat", shared_with="movie_id")]
-    item_features = [SparseFeature("movie_id", vocab_size=feature_max_idx["movie_id"], embed_dim=16)]
-    neg_item_feature = [SequenceFeature("neg_items", vocab_size=feature_max_idx["movie_id"], embed_dim=16, pooling="concat", shared_with="movie_id")]
-
-    all_item = df_to_dict(item_profile)
-    test_user = x_test
-
-    dg = MatchDataGenerator(x=x_train, y=y_train)
-    train_dl, test_dl, item_dl = dg.generate_dataloader(test_user, all_item, batch_size=2048, num_workers=0)
-
-    model = MIND(user_features, history_features, item_features, neg_item_feature,
-                 max_length=50, temperature=0.02, interest_num=4)
-
-    trainer = MatchTrainer(model, mode=2, optimizer_params={"lr": 1e-4, "weight_decay": 1e-6},
-                           n_epoch=10, device="cpu", model_path=save_dir)
-    trainer.fit(train_dl)
-
-    user_embedding = trainer.inference_embedding(model=model, mode="user", data_loader=test_dl, model_path=save_dir)
-    item_embedding = trainer.inference_embedding(model=model, mode="item", data_loader=item_dl, model_path=save_dir)
-    print(f"User Embedding: {user_embedding.shape}, Item Embedding: {item_embedding.shape}")
-
-    # Vector retrieval
-    annoy = Annoy(n_trees=10)
-    annoy.fit(item_embedding)
-    for i in range(min(3, len(user_embedding))):
-        all_indices = set()
-        for k in range(user_embedding.shape[1]):
-            indices, _ = annoy.query(user_embedding[i, k], n=10)
-            all_indices.update(indices)
-        print(f"User {i} -> Total unique items: {len(all_indices)}")
-
-
-if __name__ == "__main__":
-    main()
+```bash
+cd examples/matching
+uv run --extra annoy python run_ml_mind.py --epoch 1 --device cpu
 ```

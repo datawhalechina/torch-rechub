@@ -1,13 +1,13 @@
 ---
 title: DCN / DCNv2 Tutorial
-description: "Complete Deep & Cross Network tutorial: from data preparation to training and evaluation"
+description: Compare the cross layers of DCN and DCNv2 using the same Criteo features
 ---
 
 # DCN / DCNv2 Tutorial
 
 ## 1. Model Overview and Use Cases
 
-**DCN** (Deep & Cross Network) was proposed by Google at ADKDD 2017. It uses a dedicated cross network to **explicitly learn high-order feature interactions** while keeping linear-time complexity. **DCNv2**, published at WWW 2021, is an enhanced version with stronger representation power.
+DCN learns combinations of input fields in its cross layers while a multilayer network processes the same fields. Two fields can each contribute to the click score individually and have a different effect when they occur together. Train DCN or DCNv2 on the same Criteo sample below.
 
 **Papers**:
 - DCN: [Deep & Cross Network for Ad Click Predictions](https://arxiv.org/abs/1708.05123)
@@ -15,119 +15,62 @@ description: "Complete Deep & Cross Network tutorial: from data preparation to t
 
 ### Key Differences
 
-| Aspect | DCN | DCNv2 |
-|------|-----|-------|
-| Cross operation | Vector-wise cross | Matrix-wise cross |
-| Representation power | Moderate | Stronger |
-| Parameter count | Smaller | Larger |
-
-### Suitable Scenarios
-
-- CTR prediction tasks that need explicit feature crossing
-- Scenarios with many sparse features
-- Online systems that care about both accuracy and inference efficiency
+Each DCN cross layer uses a weight vector. Torch-RecHub's DCNv2 defaults to a mixture of low-rank experts. Set `use_low_rank_mixture=False` to use a full matrix in each cross layer. Both models accept the same input features.
 
 ---
 
 ## 2. Data Preparation and Preprocessing
 
-This example uses the sampled **Criteo** dataset. The preprocessing pipeline is the same as in the [ranking tutorial](/tutorials/ctr).
-
-```python
-import numpy as np
-import pandas as pd
-import torch
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
-
-data = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-
-dense_features = [f for f in data.columns if f.startswith("I")]
-sparse_features = [f for f in data.columns if f.startswith("C")]
-
-# Fill missing values before normalization / label encoding.
-data[sparse_features] = data[sparse_features].fillna("-1")
-data[dense_features] = data[dense_features].fillna(0)
-
-# Normalize dense features to [0, 1].
-data[dense_features] = MinMaxScaler().fit_transform(data[dense_features])
-
-# Encode categorical features as consecutive integer ids.
-for f in sparse_features:
-    data[f] = LabelEncoder().fit_transform(data[f])
-
-features = [DenseFeature(name) for name in dense_features] + [
-    SparseFeature(name, vocab_size=data[name].nunique(), embed_dim=16)
-    for name in sparse_features
-]
-
-target = data["label"].values.tolist()
-train, val, test = data[:800], data[800:900], data[900:]
-
-dg = DataGenerator(train, val, test)
-train_dl, val_dl, test_dl = dg.generate_dataloader(
-    x=features,
-    y=target,
-    batch_size=256,
-)
-```
+Run [Prepare the Criteo inputs](/guide/quick_start#criteo-input) in the same Python session to get `dense_feas`, `sparse_feas` and the three DataLoaders. If you just trained another model, keep its data split but recreate the feature objects before constructing the new model.
 
 ## 3. Model Configuration and Parameter Notes
 
-### 3.1 DCN
+Choose one model to construct and train. Replace `DCN` with `DCNv2` to try the other cross layer. For an independent comparison, rerun the data preparation so each model starts with its own embedding weights.
 
 ```python
-from torch_rechub.models.ranking import DCN
+from torch_rechub.models.ranking import DCN, DCNv2
 
 model = DCN(
-    features=features,
+    features=dense_feas + sparse_feas,
     n_cross_layers=3,
-    mlp_params={"dims": [256, 128], "dropout": 0.2, "activation": "relu"},
+    mlp_params={"dims": [256, 128]},
 )
 ```
 
-### 3.2 DCNv2
+### Model parameters
 
-```python
-from torch_rechub.models.ranking import DCNv2
+| Parameter | Type | Description | Example setting |
+|------|------|------|--------|
+| `features` | `list[Feature]` | All dense and sparse input features | All features |
+| `n_cross_layers` | `int` | Number of cross-network layers | 2–4 |
+| `mlp_params.dims` | `list[int]` | Hidden widths in the deep network | `[256, 128]` |
+| `mlp_params.dropout` | `float` | Dropout rate | 0.1–0.3 |
 
-model = DCNv2(
-    features=features,
-    cross_num=3,
-    dnn_hidden_units=(256, 128),
-    low_rank=32,
-    num_experts=4,
-)
-```
-
-### 3.3 Parameter Details
-
-- `n_cross_layers` / `cross_num`: controls how many cross layers are stacked. More layers can model more complex interactions, but may overfit on small data.
-- `mlp_params` / `dnn_hidden_units`: controls the deep branch capacity.
-- `low_rank` and `num_experts` in DCNv2: improve expressiveness while keeping parameter growth manageable.
+---
 
 ## 4. Training Process and Code Example
 
 ```python
 import os
+import torch
 from torch_rechub.trainers import CTRTrainer
 
+torch.manual_seed(2022)
 os.makedirs("./saved/dcn", exist_ok=True)
 
-# Use either DCN or DCNv2 here.
 trainer = CTRTrainer(
     model,
-    optimizer_params={"lr": 1e-3, "weight_decay": 1e-5},
-    n_epoch=5,
-    earlystop_patience=5,
-    device="cpu",  # change to "cuda:0" if GPU is available
-    model_path="./saved/dcn",
+    optimizer_params={"lr": 1e-3, "weight_decay": 1e-3},
+    n_epoch=2,
+    earlystop_patience=10,
+    device="cpu",
+    model_path="./saved/dcn"
 )
 
 trainer.fit(train_dl, val_dl)
 ```
+
+---
 
 ## 5. Evaluation and Result Analysis
 
@@ -136,31 +79,23 @@ auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
-### DCN vs DCNv2 Performance Comparison
-
-- If your feature interactions are relatively simple, DCN is usually a strong and efficient baseline.
-- If your data is larger and interaction patterns are more complex, DCNv2 often performs better.
+The bundled Criteo sample contains just 115 rows. Use it to check that training and evaluation run. To compare click prediction quality, use a larger dataset and the same training, validation and test splits for every model. [Benchmarks](/tools/benchmark)
 
 ## 6. Tuning Suggestions
 
-- Tune `n_cross_layers` / `cross_num` first. A common range is `2 ~ 4`.
-- Use a slightly larger deep branch when the dataset is large enough.
-- If DCNv2 is unstable on a small dataset, reduce `low_rank`, `num_experts`, or hidden sizes first.
+The example starts with three cross layers. To see whether depth helps, keep the split and MLP widths fixed, change only `n_cross_layers`, and compare validation AUC. For DCNv2, also record whether you used low-rank experts, since that choice affects the parameter count.
 
 ## 7. FAQ and Troubleshooting
 
-### Q1: What is the main difference between DCN and DCNv2?
+### Do I need to create cross features myself?
 
-DCN uses vector-wise feature crossing, while DCNv2 uses a richer matrix-based formulation and usually has stronger modeling power.
+Pass the original Criteo fields to the model. The cross layers learn combinations during training. If you have a manually crossed field, compare validation results on the same split with and without that extra column.
 
-### Q2: How many cross layers should I use?
+---
 
-Start from `2` or `3`. More layers are not always better, especially on small sampled datasets.
+## Run the example script
 
-### Q3: Can the Cross Network replace manual feature engineering?
-
-It can learn many useful interaction patterns automatically, but business-specific crosses can still help in some production scenarios.
-
-## Full Example
-
-The code blocks above form a complete runnable example. For a full end-to-end training script using the same Criteo pipeline, see [examples/ranking/run_criteo.py](https://github.com/datawhalechina/torch-rechub/blob/main/examples/ranking/run_criteo.py).
+```bash
+cd examples/ranking
+uv run python run_criteo.py --model_name dcn --epoch 1 --device cpu
+```

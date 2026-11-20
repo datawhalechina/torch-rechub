@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" lang="en" xml:lang="en" width="720" height="512" viewBox="0 0 720 512" role="img" aria-labelledby="title desc">
+  <title id="title">How one movie request becomes a ranked list</title>
+  <desc id="desc">The item tower supplies the offline index. A user vector retrieves M91 then M42. A ranker uses user and movie features to return M42 then M91.</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #152A43; }
+    .title { font-size:29px; font-weight:700 } .body { font-size:20px; font-weight:600 }
+    .copy { font-size:18px; fill:#40566C } .label { font-size:17px; font-weight:600; fill:#40566C }
+    .teal { fill:#006C67 } .orange { fill:#994519 }
+    .mono { font-family:Consolas, "Liberation Mono", monospace; font-size:19px; font-weight:600 }
+    .value { font-family:Consolas, "Liberation Mono", monospace; font-size:22px; font-weight:700 }
+  </style>
+  <rect x="0" y="0" width="720" height="512" rx="16" fill="#F8FAFC"/>
+  <text x="32" y="50" class="title" text-anchor="start">How one movie request becomes a ranked list</text>
+  <text x="32" y="81" class="copy" text-anchor="start">The two towers retrieve candidates. A ranker estimates click probability.</text>
+  <rect x="32" y="102" width="656" height="92" rx="10" fill="#DDF3ED"/>
+  <text x="50" y="132" class="body teal" text-anchor="start">Offline · when the catalog changes</text>
+  <text x="50" y="170" class="body" text-anchor="start">Movie catalog</text>
+  <path d="M193 163 L217 163" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M210 159 L217 163 L210 167" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="234" y="170" class="body" text-anchor="start">DSSM item tower</text>
+  <path d="M408 163 L433 163" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M426 159 L433 163 L426 167" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="450" y="170" class="body" text-anchor="start">Index + movie ID map</text>
+  <path d="M580 185 L580 243" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M584 236 L580 243 L576 236" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="47" y="228" class="body" text-anchor="start">Online · for each request</text>
+  <text x="50" y="270" class="body" text-anchor="start">User features</text>
+  <path d="M193 263 L217 263" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M210 259 L217 263 L210 267" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="234" y="270" class="body" text-anchor="start">DSSM user tower</text>
+  <path d="M408 263 L433 263" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M426 259 L433 263 L426 267" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="450" y="270" class="body" text-anchor="start">Retrieve two movies</text>
+  <path d="M32 295 H688" fill="none" stroke="#CCD9DF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="32" y="333" class="body" text-anchor="start">Score each candidate using user and movie features</text>
+  <text x="32" y="368" class="label" text-anchor="start">Retrieval order</text>
+  <text x="435" y="368" class="label" text-anchor="start">Final order</text>
+  <text x="656" y="368" class="label" text-anchor="end">P(click)</text>
+  <rect x="32" y="383" width="138" height="35" rx="5" fill="#DDF3ED"/>
+  <rect x="32" y="429" width="138" height="35" rx="5" fill="#FFF0DF"/>
+  <text x="46" y="407" class="label" text-anchor="start">1</text>
+  <text x="81" y="408" class="value teal" text-anchor="start">M91</text>
+  <text x="46" y="453" class="label" text-anchor="start">2</text>
+  <text x="81" y="454" class="value orange" text-anchor="start">M42</text>
+  <path d="M170 400 H206 C272 400 309 447 382 447 H423" fill="none" stroke="#006C67" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M170 446 H206 C274 446 307 400 382 400 H423" fill="none" stroke="#F8FAFC" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M170 446 H206 C274 446 307 400 382 400 H423" fill="none" stroke="#994519" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="422" cy="400" r="4" fill="#994519" stroke="none" stroke-width="0"/>
+  <circle cx="422" cy="447" r="4" fill="#006C67" stroke="none" stroke-width="0"/>
+  <rect x="435" y="383" width="229" height="35" rx="5" fill="#FFF0DF"/>
+  <rect x="435" y="429" width="229" height="35" rx="5" fill="#DDF3ED"/>
+  <text x="451" y="407" class="label" text-anchor="start">1</text>
+  <text x="485" y="408" class="value orange" text-anchor="start">M42</text>
+  <text x="650" y="408" class="value orange" text-anchor="end">0.81</text>
+  <text x="451" y="453" class="label" text-anchor="start">2</text>
+  <text x="485" y="454" class="value teal" text-anchor="start">M91</text>
+  <text x="650" y="454" class="value teal" text-anchor="end">0.38</text>
+  <text x="32" y="493" class="copy" text-anchor="start">Scores are illustrative. The application handles requests and joins features.</text>
+</svg>

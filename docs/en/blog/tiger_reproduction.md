@@ -1,119 +1,85 @@
 ---
-title: TIGER Reproduction Notes
-description: How TIGER is run in torch-rechub, including the semantic-ID pipeline, run modes, and the toy training workflow
+title: Reproducing TIGER
+description: Generate semantic IDs, train TIGER, and retrieve items on a small dataset with torch-rechub.
 ---
 
-# TIGER in torch-rechub
+# Reproducing TIGER in torch-rechub
 
-This document describes how TIGER (Transformer Index for GEnerative Recommenders) is implemented and run in `torch-rechub`. TIGER frames "predict the next item" as a sequence-to-sequence task of "generate the next item's semantic ID": each item is first quantized by RQ-VAE into a tuple of codebook tokens (a *semantic ID*, e.g. `<a_1><b_3><c_5>`), then T5 autoregressively generates the next item's semantic ID, constrained to legal items via prefix-restricted beam search.
+TIGER names each item with a sequence of symbols, such as `<a_1><b_3><c_5>`. During training, it replaces the movies in a user's history with these names and trains T5 to generate the next movie's name one symbol at a time. During retrieval, each symbol restricts the possible continuations to names in the catalog. The completed name maps back to a movie. This sequence of symbols is the movie's *semantic ID*.
 
-This reproduces the basic RQ-VAE semantic-ID, autoregressive T5 training, and catalog-constrained decoding pipeline using Hugging Face for single-GPU use. It does not reproduce the complete official environment or establish paper-metric equivalence. Start with a small dataset, then adjust batch size, AMP, and gradient accumulation for available memory. Retrain RQ-VAE checkpoints from before the quantization and gradient corrections, regenerate semantic IDs, and then train TIGER to avoid mixing code assignments.
+For a first run, the two commands in section 4 take a small synthetic dataset through training and test evaluation. To work with real movies, follow section 5 to encode their vectors with RQ-VAE first. The entry points are `examples/generative/run_tiger_movielens.py` for MovieLens and `examples/generative/run_tiger_amazon_books.py` for Amazon Books. Both examples use a small T5 to demonstrate encoding, training, and retrieval. Reproducing the paper's metrics also depends on the data and training configuration.
 
-The example scripts follow the same "one script per dataset" layout as HSTU / HLLM:
+## 1. Source files
 
-- `examples/generative/run_tiger_movielens.py`
-- `examples/generative/run_tiger_amazon_books.py`
-
----
-
-## 1. Module Layout
-
-- **Model**: `torch_rechub/models/generative/tiger.py`
-  - `TIGERModel`: subclasses `transformers.T5ForConditionalGeneration`, adding `set_hyper(temperature)` and a temperature-scaled `ranking_loss`.
-- **Dataset & constrained decoding**: `torch_rechub/utils/data.py`
-  - `TigerSeqDataset`: maps item-id sequences in `inter.json` to semantic-ID strings and applies a leave-one-out split for `train` / `valid` / `test`.
-  - `Trie`: builds a prefix tree over all legal semantic IDs and yields a `prefix_allowed_tokens_fn` for constrained beam search.
-- **Semantic-ID generation**: `examples/generative/run_rqvae_amazon_books.py`
-  - Trains an RQ-VAE over item embeddings and exports `semantic_ids.json`.
-- **Example scripts**: `run_tiger_movielens.py` / `run_tiger_amazon_books.py`, each implementing `train` / `test` and toy-data generation.
+- **Model** — `torch_rechub/models/generative/tiger.py`
+  - `TIGERModel` extends `transformers.T5ForConditionalGeneration` with `set_hyper(temperature)` and a temperature-scaled `ranking_loss`.
+- **Data and constrained decoding** — `torch_rechub/utils/data.py`
+  - `TigerSeqDataset` maps the item IDs in `inter.json` to semantic ID strings and creates leave-one-out examples for `train`, `valid`, and `test`.
+  - `Trie` builds a prefix tree of all valid semantic IDs and supplies `prefix_allowed_tokens_fn` for constrained beam search.
+- **Semantic ID generation** — `examples/generative/run_rqvae_amazon_books.py`
+  - RQ-VAE applies residual quantization to the item embeddings and exports `semantic_ids.json`.
+- **Example scripts** — `run_tiger_movielens.py` and `run_tiger_amazon_books.py` both support `train`, `test`, and synthetic data generation.
 
 ---
 
-## 2. Data Format
+## 2. Data format
 
-TIGER needs two JSON files:
+TIGER needs two JSON files.
 
-- **`inter.json`**: `{user_id: [item_id, item_id, ...]}`, each user's chronologically ordered item-id history. Item ids are 1-based; `0` is reserved for padding.
-- **`semantic_ids.json`**: `{item_id: ["<a_..>", "<b_..>", ...]}`, a semantic ID for every item id that appears in `inter.json`.
+- **`inter.json`** maps `{user_id: [item_id, item_id, ...]}`. Each user's item history is in chronological order. Item IDs start at 1, with `0` reserved for padding.
+- **`semantic_ids.json`** maps `{item_id: ["<a_..>", "<b_..>", ...]}`. Every item in `inter.json` needs a semantic ID from RQ-VAE.
 
-`TigerSeqDataset` leave-one-out split:
+`TigerSeqDataset` constructs the leave-one-out splits as follows.
 
-- `train`: expand the history `items[:-2]` into multiple `(history, next_item)` samples.
-- `valid`: history is `items[:-2]`, label is `items[-2]`.
-- `test`: history is `items[:-1]`, label is `items[-1]`.
+- `train` expands `items[:-2]` into `(history, next_item)` examples, one per eligible position.
+- `valid` uses `items[:-2]` as the history and `items[-2]` as the target.
+- `test` uses `items[:-1]` as the history and `items[-1]` as the target.
 
-Therefore, each user needs at least 4 interactions to produce at least one training sample; 3 interactions can only produce validation and test samples.
+A user needs at least four interactions to produce a training example. Three interactions yield only validation and test examples.
 
 ---
 
-## 3. Run Modes
+## 3. Run modes
 
-Both scripts use `--mode` to select the stage(s):
+Both scripts select the stage to run with `--mode`.
 
-| mode | Description |
+| Mode | What it does |
 | --- | --- |
-| `generate-toy-data` | Write a small synthetic dataset to `--data_inter_path` / `--data_indice_path` (the exact paths the loader reads) |
-| `prepare-data` | MovieLens only: build `inter.json` and `movie_id_map.json` from the real `ratings.dat` |
-| `train` | Add semantic-ID tokens, `resize_token_embeddings`, train T5 from scratch (random init, no pretrained weights), save tokenizer / config / model to `--output_dir` |
-| `test` | Load from `--ckpt_path` (defaults to `--output_dir`), run constrained beam search, report hit@k / ndcg@k |
-| `all` | Run `generate-toy-data` → `train` → `test` (default) |
+| `generate-toy-data` | Writes a small synthetic dataset to `--data_inter_path` and `--data_indice_path`, the same paths used for training and evaluation. |
+| `prepare-data` | MovieLens only. Builds `inter.json` and `movie_id_map.json` from the original `ratings.dat`. |
+| `train` | Adds semantic ID tokens, calls `resize_token_embeddings`, trains a randomly initialized T5 from scratch, and saves the tokenizer, configuration, and model to `--output_dir`. |
+| `test` | Loads the checkpoint from `--ckpt_path` (defaults to `--output_dir`), runs constrained beam search, and reports hit@k and ndcg@k. |
+| `all` | Reads the prepared dataset, then runs `train` and `test` in sequence. This is the default. |
 
-Key implementation details:
+By default, the scripts build a vocabulary locally from the semantic IDs and initialize a small T5 with random weights. If you supply `--base_model`, the scripts read its architecture configuration and tokenizer but still train the weights from scratch. Before training, they register segments such as `<a_1>` as individual tokens and resize the embedding table.
 
-- **Trained from scratch, no pretrained weights**: per the TIGER paper the T5 encoder-decoder is randomly initialized and trained from scratch (the semantic-ID vocabulary is not natural language, so pretrained NL weights are not useful). `train()` builds the architecture from `--base_model`'s config via `TIGERModel(config)`; `--base_model` only supplies the architecture/config and tokenizer, not pretrained weights.
-- **Semantic-ID tokens must be added before training**: `train()` calls `tokenizer.add_tokens(dataset.get_new_tokens())` and then `resize_token_embeddings`; otherwise tokens like `<a_1>` are split into sub-words and training is meaningless.
-- **Generated and read paths are identical**: `generate-toy-data` writes to the same paths the dataset reads, avoiding a "generated filename ≠ read filename" mismatch.
-- **`test` loads the vocabulary and weights from the checkpoint**: the model is loaded with the checkpoint's own config, avoiding an embedding-size mismatch caused by passing the expanded `vocab_size` into `from_pretrained`, and is then aligned with the tokenizer. If the checkpoint is missing any semantic-ID tokens, they are added automatically and the embeddings are resized before evaluation.
+Testing uses the vocabulary, configuration, and weights saved during training. The scripts check the item-to-semantic-ID mapping and vocabulary size. Retrain TIGER if you change the mapping. If you trained a codebook with the older RQ-VAE quantization and gradient implementation, retrain the codebook, export fresh codes, and then train TIGER.
 
----
+## 4. Train and evaluate on a small dataset
 
-## 4. Quick Toy Run
-
-First install the generative-model extra:
-
-```bash
-pip install -e ".[generative]"
-pip install sentencepiece
-```
-
-The current `generative` extra does not yet declare `sentencepiece`, although `T5Tokenizer` requires it, so TIGER needs it installed separately.
-
-Toy mode does not require an external recommendation dataset, but it still loads the T5 tokenizer and config from `--base_model`. The following commands use explicit, isolated toy paths and can run a small end-to-end check on CPU:
+Run `uv sync --extra generative` from the repository root. The default semantic vocabulary is built locally, so the following toy example can train and evaluate offline. If you explicitly select a T5Tokenizer that requires SentencePiece, also install `sentencepiece` and make the tokenizer files available.
 
 ```bash
 cd examples/generative
 
-# Synthetic MovieLens-shaped data
-python run_tiger_movielens.py --mode all \
-    --data_inter_path ./tmp/tiger-toy/ml/inter.json \
-    --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json \
-    --output_dir ./tmp/tiger-toy/ml/ckpt \
-    --toy_num_users 16 --toy_num_items 20 \
-    --epochs 2 --per_device_batch_size 4 \
-    --num_beams 4 --test_batch_size 2 --num_workers 0
+# Generate the example data once. Reuse these files for subsequent training runs.
+python run_tiger_movielens.py --mode generate-toy-data --data_inter_path ./tmp/tiger-toy/ml/inter.json --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json --toy_num_users 16 --toy_num_items 20
 
-# Built-in Amazon-Books toy data
-python run_tiger_amazon_books.py --mode all \
-    --data_inter_path ./tmp/tiger-toy/amazon/inter.json \
-    --data_indice_path ./tmp/tiger-toy/amazon/semantic_ids.json \
-    --output_dir ./tmp/tiger-toy/amazon/ckpt \
-    --epochs 5 --per_device_batch_size 4 \
-    --num_beams 4 --test_batch_size 2 --num_workers 0
+# Train from the same paths, then reload the checkpoint for evaluation.
+python run_tiger_movielens.py --mode all --data_inter_path ./tmp/tiger-toy/ml/inter.json --data_indice_path ./tmp/tiger-toy/ml/semantic_ids.json --output_dir ./tmp/tiger-toy/ml/ckpt --epochs 1 --per_device_batch_size 4 --num_beams 4 --metrics hit@1,ndcg@4 --test_batch_size 2 --num_workers 0
 ```
 
-You should see `Added N semantic-id tokens` → `Model saved to ...` → `Test results: {...}`.
+Run the first command once. The script reports an error if the data files already exist. For subsequent runs, use only the second command. After training it prints the model's save location, evaluates four candidates per test user, and prints Hit@1 and NDCG@4. To report Hit@10, increase `--num_beams` to at least 10.
 
-> **Data overwrite risk**: both `generate-toy-data` and the default `all` mode unconditionally rewrite `--data_inter_path` and `--data_indice_path`. Never point a toy command at real data. Because the default mode is also `all`, real training must explicitly use `--mode train` or `--mode test`.
+This MovieLens toy configuration completed training, checkpoint loading, and evaluation on an RTX 5080 (16 GB). Peak memory allocated to PyTorch tensors was about 106 MiB for the offline example with 16 users and 20 items.
 
-> Both `t5-small` and `google-t5/t5-small` may access the HuggingFace Hub. For offline execution, cache the tokenizer/config in advance or point `--base_model` to a local directory containing those files. Merely switching to the canonical repository name does not make it work offline.
+For the Amazon Books example, run `run_tiger_amazon_books.py` with `--mode generate-toy-data` and then `--mode all` to train and evaluate. Give it its own data paths and output directory.
 
----
+## 5. Train TIGER on MovieLens-1M
 
-## 5. Real-Data Pipeline (MovieLens-1M)
+With real data, the interaction file and semantic ID table must refer to the same movies. If item `12` in the interactions is movie A, the semantic ID for `12` must come from movie A's vector. Prepare the two files in this order.
 
-Real data needs semantic IDs aligned with `inter.json`, so it is a two-stage RQ-VAE → TIGER pipeline:
-
-1. **Build interaction sequences**:
+1. **Build the interaction sequences.**
 
    ```bash
    python run_tiger_movielens.py --mode prepare-data \
@@ -123,13 +89,17 @@ Real data needs semantic IDs aligned with `inter.json`, so it is a two-stage RQ-
        --min_seq_len 5 --max_his_len 20
    ```
 
-   This orders interactions by timestamp, filters users with too few interactions, and also writes `movie_id_map.json`. With `--vocab_path`, it reuses the HSTU/HLLM token ids; without it, movie ids are independently remapped to contiguous 1-based item ids.
+   This step sorts interactions by timestamp, filters out users with too few interactions, and writes `movie_id_map.json`. Supply `--vocab_path` to reuse HSTU/HLLM token IDs. Without it, the script independently remaps the items to consecutive IDs starting at 1.
 
-2. **Generate semantic IDs**: prepare item embeddings for the same item ids (e.g. the text/ID embeddings produced by HLLM preprocessing), then train an `run_rqvae_amazon_books.py`-style RQ-VAE and export `semantic_ids.json`. **The RQ-VAE output must be keyed by the same item ids as step 1**, otherwise `inter.json` and `semantic_ids.json` will not line up.
+2. **Generate semantic IDs.** Obtain the movie vectors from HLLM preprocessing with the same MovieLens vocabulary. Run RQ-VAE from the working directory used in step 1. Row 0 is PAD, and each remaining row corresponds to the same token ID in both steps.
 
-   The Amazon-named RQ-VAE example also accepts item embeddings from other datasets. Training shuffles samples; export uses `shuffle=False` to preserve row order and removes the PAD semantic ID. Embedding row `i` must still represent token id `i` from step 1.
+   ```bash
+   python run_rqvae_amazon_books.py --data_path ./data/ml-1m/processed/item_embeddings_tinyllama.pt --model_path ./data/ml-1m/tiger --padding_idx 0 --num_workers 0 --device cuda:0
+   ```
 
-   At minimum, check coverage before training:
+   The script writes `semantic_ids.json` to `--model_path`. Its keys should match the item IDs in the interaction data.
+
+   Before training, use the snippet below to find movies in the interactions that have no semantic ID. This checks that the IDs exist. Using the same vocabulary for both files is what ensures that each movie gets the right vector.
 
    ```python
    import json
@@ -141,10 +111,10 @@ Real data needs semantic IDs aligned with `inter.json`, so it is a two-stage RQ-
 
    referenced = {str(item) for seq in interactions.values() for item in seq}
    missing = sorted(referenced - set(semantic_ids))
-   assert not missing, f"semantic_ids is missing {len(missing)} items, for example {missing[:10]}"
+   assert not missing, f"semantic_ids is missing {len(missing)} items, including {missing[:10]}"
    ```
 
-3. **Train and test**:
+3. **Train and test.**
 
    ```bash
    python run_tiger_movielens.py --mode train \
@@ -156,24 +126,22 @@ Real data needs semantic IDs aligned with `inter.json`, so it is a two-stage RQ-
        --data_indice_path ./data/ml-1m/tiger/semantic_ids.json
    ```
 
-The Amazon-Books real-data flow is identical: produce `semantic_ids.json` with `run_rqvae_amazon_books.py`, prepare `inter.json`, then `--mode train` / `--mode test`.
+For real Amazon Books data, follow the same sequence of stages: use `run_rqvae_amazon_books.py` to produce `semantic_ids.json`, prepare `inter.json`, and then run `--mode train` and `--mode test`.
 
 ---
 
 ## 6. Evaluation
 
-The `test` stage runs constrained beam search per test sample:
+In `test` mode, the script runs constrained beam search for each test example.
 
-- A `Trie` builds the `prefix_allowed_tokens_fn` so each step only allows the next token of a legal semantic ID.
-- `--num_beams` is also used as `num_return_sequences` to obtain top-N candidates; `--filter_items` pushes any generated result outside the legal item set to a very low score.
-- Metrics are leave-one-out `hit@k` and `ndcg@k` (each user has a single ground truth, so IDCG=1). Configure with `--metrics hit@1,hit@5,hit@10,ndcg@5,ndcg@10`.
+- `Trie` supplies `prefix_allowed_tokens_fn` so each decoding step can only produce a next token that occurs in a valid semantic ID.
+- `--num_beams` also sets `num_return_sequences`, the number of top candidates returned. With `--filter_items`, generated sequences outside the valid item set receive a very low score.
+- The script reports leave-one-out `hit@k` and `ndcg@k`. Each user has one ground-truth item, so IDCG equals 1. Set the cutoffs with `--metrics hit@1,hit@5,hit@10,ndcg@5,ndcg@10`.
 
 ---
 
 ## 7. Troubleshooting
 
-- **`OSError: We couldn't connect to 'https://huggingface.co'`**: cache the tokenizer/config while online or point `--base_model` to the corresponding local directory; a canonical repository name alone does not guarantee offline availability.
-- **A `KeyError` occurs in `TigerSeqDataset._remap_items()`**: an item referenced by `inter.json` has no semantic ID. Run the coverage check above and also verify the alignment between RQ-VAE row numbers and item ids.
-- **`Trainer.__init__() got an unexpected keyword argument 'tokenizer'`**: `transformers>=5` renamed the `tokenizer` argument to `processing_class`; the script auto-adapts via the signature, no manual change needed.
-- **`'TIGERModel' object has no attribute 'model_parallel'`**: the legacy T5 model-parallel guards are no longer initialized in `transformers>=5`; `TIGERModel.__init__` now sets `model_parallel=False` / `device_map=None`, so multi-GPU DataParallel works too.
-- **Outputs are always sub-words / accuracy is abnormally low**: confirm that training actually ran `add_tokens` + `resize_token_embeddings` (the log shows `Added N semantic-id tokens`) and that `test` loads the vocabulary from the `--output_dir` saved during training.
+- A remote `--base_model` requires a cached copy or access to the model repository. For offline runs, use the default semantic vocabulary or a local directory with the model configuration.
+- If `TigerSeqDataset._remap_items()` raises `KeyError`, look up the missing item ID from the error in `semantic_ids.json`. If many IDs are missing, check that the RQ-VAE input vectors and the interaction file use the same vocabulary.
+- **The model keeps generating subwords, or the hit rate is unexpectedly low.** Check that training called both `add_tokens` and `resize_token_embeddings`. Look for `Added N semantic-id tokens` in the log and confirm that `test` loads the vocabulary from the `--output_dir` saved during training.

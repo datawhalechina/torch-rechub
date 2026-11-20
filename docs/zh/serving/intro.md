@@ -11,7 +11,7 @@ description: Torch-RecHub 模型部署指南
 
 ## 部署流程概览
 
-![从离线训练、导出模型到线上查询的流程](/img/diagrams/serving_pipeline.png)
+![离线为物品建索引，在线按用户向量召回候选，再给候选排序](/img/diagrams/zh/serving_pipeline.svg)
 
 ## 快速开始
 

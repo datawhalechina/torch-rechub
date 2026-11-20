@@ -1,55 +1,23 @@
 ---
-title: Visualization
-description: Torch-RecHub model architecture visualization
+title: Model diagrams
+description: Inspect the shapes of model inputs and outputs in Jupyter or save the graph to a file
 ---
 
-# Visualization
+# Model diagrams
 
-Torch-RecHub provides model architecture visualization to help developers intuitively understand model structure and computation flow.
+To see where DeepFM concatenates features or whether the two DSSM towers produce vectors of the same width, draw the model before training. By default, `visualize_model` creates a small batch from the model's feature definitions and traces one forward pass with torchview. Follow the edges to see the input and output shapes of each layer.
 
-## Why torchview
+## Install the dependencies
 
-Torch-RecHub uses [torchview](https://github.com/mert-kurttutan/torchview) as its visualization backend. The project's wrapper passes the feature dictionary to the model as one positional argument, so it can trace the dictionary inputs commonly used by recommendation models.
-
-Recommendation model inputs are typically dictionaries containing multiple feature types:
-
-```python
-# Typical input format for recommendation models
-x = {
-    "user_id": tensor([1, 2, 3]),           # Sparse feature
-    "age": tensor([0.5, 0.3, 0.8]),         # Dense feature
-    "hist_items": tensor([[1,2,3], ...]),   # Sequence feature
-}
-model(x)  # Dictionary as input
-```
-
-torchviz is based on the autograd graph, while Netron primarily inspects an already exported static model. These tools serve different purposes; the distinction cannot be reduced to whether they "support dictionaries."
-
-> **Tip**: If you have exported your model to ONNX format, you can also use [Netron](https://netron.app/) to view the model structure online. See [ONNX Export Documentation](/serving/onnx).
-
-| Feature | torchview | torchviz | netron |
-|---------|-----------|----------|--------|
-| **This project's dictionary-input wrapper** | ✅ | Requires a custom wrapper | Requires model export first |
-| Forward pass tracing | ✅ | ❌ (autograd-based) | ❌ (static parsing) |
-| Shows one actually executed path | ✅ | ✅ | ❌ (static parsing) |
-| Show tensor shapes | ✅ | ❌ | ✅ |
-| Adjustable depth | ✅ | ❌ | ❌ |
-| Nested module expansion | ✅ | ❌ | Partial |
-
-**Other advantages**:
-- **Forward tracing**: Captures the modules traversed by this input during one forward pass; control-flow branches that are not executed do not appear in the graph
-- **Depth control**: Flexibly control display granularity via `depth` parameter
-- **Shape visualization**: Intuitively display tensor shapes at each layer
-
-## Installation
-
-Visualization requires additional dependencies:
+From a source checkout, install the visualization extra.
 
 ```bash
-pip install "torch-rechub[visualization]"
+uv sync --extra visualization
 ```
 
-Also install system-level graphviz:
+For a PyPI installation, run `pip install "torch-rechub[visualization]"`.
+
+Rendering also requires Graphviz's `dot` executable. Use the installation command for your operating system.
 
 ```bash
 # Ubuntu/Debian
@@ -62,189 +30,127 @@ brew install graphviz
 choco install graphviz
 ```
 
-## Quick Start
+## Quick start
 
-```python
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.utils.visualization import visualize_model
-
-# Create model
-model = DeepFM(
-    deep_features=deep_features,
-    fm_features=fm_features,
-    mlp_params={"dims": [256, 128], "dropout": 0.2}
-)
-
-# Visualize (auto-display in Jupyter)
-graph = visualize_model(model, depth=4)
-
-# Save as PDF
-visualize_model(model, save_path="model_arch.pdf", dpi=300)
-```
-
-## Core Functions
-
-### visualize_model
-
-Generate computation graph visualization. CTR, Match, MTL and Seq trainers share this drawing function; their training calls are unchanged.
-
-Drawing preserves each submodule's training/evaluation mode, including when tracing fails. CPU tracing remains the default. A copy is used when tracing on another device, leaving the trainer's model untouched. For large models, pass their current device (for example, `device="cuda:0"`) to avoid a model copy.
-
-The diagram shows the forward path taken by these inputs, not every possible branch. Drawing does not train the model or run backpropagation.
-
-```python
-from torch_rechub.utils.visualization import visualize_model
-
-graph = visualize_model(
-    model,                    # PyTorch model
-    input_data=None,          # Input data (optional, auto-generated)
-    batch_size=2,             # Batch size for auto-generated input
-    seq_length=10,            # Sequence feature length
-    depth=3,                  # Visualization depth
-    show_shapes=True,         # Show tensor shapes
-    expand_nested=True,       # Expand nested modules
-    save_path=None,           # Save path
-    graph_name="model",       # Graph name
-    device="cpu",             # Device
-    dpi=300,                  # Output resolution
-)
-```
-
-**Parameter Description:**
-
-| Parameter | Type | Description | Default |
-| --- | --- | --- | --- |
-| `model` | nn.Module | PyTorch model to visualize | Required |
-| `input_data` | dict / Tensor / tuple / list | Dict as one argument; tuple/list as positional arguments; None generates feature inputs | None |
-| `batch_size` | int | Batch size for auto-generated input | 2 |
-| `seq_length` | int | Sequence feature length | 10 |
-| `depth` | int | Visualization depth, -1 shows all layers | 3 |
-| `show_shapes` | bool | Show tensor shapes on edges | True |
-| `expand_nested` | bool | Expand nested nn.Module | True |
-| `save_path` | str | Save path, supports .pdf/.svg/.png | None |
-| `dpi` | int | Output image resolution | 300 |
-
-### display_graph
-
-Display computation graph in Jupyter.
-
-```python
-from torch_rechub.utils.visualization import display_graph
-
-# Get the computation graph
-graph = visualize_model(model, depth=4)
-
-# Display it in Jupyter
-display_graph(graph, format='png');
-```
-
-The trailing semicolon prevents Jupyter from displaying the returned Graphviz object a second time. Usually, `graph = trainer.visualization()` already displays the diagram; no extra `display_graph()` call is needed.
-
-## Usage Examples
-
-### Ranking Model Visualization
+This DeepFM example defines two continuous and two categorical features. Its FM branch computes interactions between categorical embeddings, so both embeddings have width 16.
 
 ```python
 from torch_rechub.models.ranking import DeepFM
 from torch_rechub.utils.visualization import visualize_model
 from torch_rechub.basic.features import DenseFeature, SparseFeature
 
-# Define features
+# Define the features.
 dense_features = [DenseFeature("age"), DenseFeature("income")]
 sparse_features = [
     SparseFeature("city", vocab_size=100, embed_dim=16),
-    # Sparse features used in FM interactions must share the same embedding dimension
+    # Use the same embedding width for the features in the FM interactions.
     SparseFeature("gender", vocab_size=3, embed_dim=16)
 ]
 
-# Create model
+# Create the model.
 model = DeepFM(
     deep_features=sparse_features + dense_features,
     fm_features=sparse_features,
     mlp_params={"dims": [256, 128, 64], "dropout": 0.2}
 )
-
-# Visualize
-visualize_model(model, depth=4, save_path="deepfm_arch.pdf")
 ```
 
-### Retrieval Model Visualization
+In Jupyter, run this line to display the model graph in the current cell.
 
 ```python
-from torch_rechub.models.matching import DSSM
+graph = visualize_model(model, depth=4)
+```
+
+In a terminal, set `save_path` to save the graph and then open the PDF.
+
+```python
+graph = visualize_model(model, depth=4, save_path="deepfm_arch.pdf")
+```
+
+## Drawing a graph
+
+### visualize_model
+
+The graph shows the layers the current input passes through. To trace another branch, draw it again with a different `input_data`. Increase `depth` to expand more submodules.
+
+By default, tracing runs on the CPU. If the model is on a GPU, the function uses a CPU copy and leaves the original on its GPU. For a large model, pass its current device, such as `device="cuda:0"`, to avoid the copy. Each layer returns to its original training or evaluation mode after tracing.
+
+```python
 from torch_rechub.utils.visualization import visualize_model
 
-model = DSSM(
-    user_features=user_features,
-    item_features=item_features,
-    temperature=0.02,
-    user_params={"dims": [256, 128, 64]},
-    item_params={"dims": [256, 128, 64]}
+graph = visualize_model(
+    model,                    # PyTorch model
+    input_data=None,          # Optional inputs, inferred by default
+    batch_size=2,             # Batch size for generated inputs
+    seq_length=10,            # Length of generated sequence features
+    depth=3,                  # Number of module levels to display
+    show_shapes=True,         # Show tensor shapes
+    expand_nested=True,       # Expand nested modules
+    save_path=None,           # Output path
+    graph_name="model",       # Graph name
+    device="cpu",             # Device for tracing
+    dpi=300,                  # Output resolution
 )
-
-visualize_model(model, depth=3, save_path="dssm_arch.png", dpi=300)
 ```
 
-### Visualization via Trainer
+**Parameters**
 
-Trainers also provide a visualization method:
+| Parameter | Type | Description | Default |
+| --- | --- | --- | --- |
+| `model` | nn.Module | PyTorch model to draw | Required |
+| `input_data` | dict / Tensor / tuple / list | A dictionary is passed as one argument. Tuples and lists supply positional arguments in order. `None` generates inputs. | None |
+| `batch_size` | int | Batch size for generated inputs | 2 |
+| `seq_length` | int | Length of generated sequence features | 10 |
+| `depth` | int | Module depth to show. Use -1 to show all layers. | 3 |
+| `show_shapes` | bool | Show tensor shapes on edges | True |
+| `expand_nested` | bool | Expand nested nn.Module objects | True |
+| `save_path` | str | Output path ending in .pdf, .svg or .png | None |
+| `dpi` | int | Output resolution | 300 |
+
+### Change the Jupyter display format
+
+The call above displays PNG by default. If you already have `graph`, you can display the same graph as SVG in another cell.
 
 ```python
-from torch_rechub.trainers import CTRTrainer
+from torch_rechub.utils.visualization import display_graph
 
-trainer = CTRTrainer(model)
-trainer.fit(train_dl, val_dl)
-
-# Visualize model
-trainer.visualization(save_path="model.pdf", depth=4)
+display_graph(graph, format="svg");
 ```
 
-The sequence trainer keeps its original argument order and generates non-padding tokens with zero time differences, for drawing only:
+## Draw from a trainer
+
+In the DSSM tutorial, you can run the following line as soon as you have created `trainer = MatchTrainer(...)`, even before training. `CTRTrainer` and `MTLTrainer` accept the same call. [DSSM tutorial](/tutorials/models/matching/dssm)
+
+```python
+trainer.visualization(save_path="dssm_arch.png", depth=3)
+```
+
+For `SeqTrainer`, set `seq_length` to choose the length of the sequence used for the diagram.
 
 ```python
 seq_trainer.visualization(seq_length=20, save_path="sequence.svg")
 ```
 
-For a custom model without recognizable feature definitions, provide its actual inputs:
+If a custom model's `forward` takes `tokens` and `time_diffs` as separate arguments, pass the two tensors in a tuple.
 
 ```python
 visualize_model(model, input_data=(tokens, time_diffs), save_path="custom.png")
 ```
 
-## Output Formats
+## Output formats
 
-| Format | Extension | Use Case |
-|--------|-----------|----------|
-| PDF | .pdf | Papers, reports (vector, scalable) |
-| SVG | .svg | Web display (vector) |
-| PNG | .png | General image format |
+| Format | Extension | When to use it |
+| --- | --- | --- |
+| PDF | .pdf | Papers and reports where the diagram needs to scale |
+| SVG | .svg | Scalable diagrams on the web |
+| PNG | .png | General-purpose raster images |
 
-## FAQ
+## Common questions
 
-### Q: graphviz not installed error?
+### Why does rendering fail even though the Python package is installed?
 
-Make sure both Python package and system package are installed:
+The Python package describes the graph. Graphviz's `dot` executable renders it. Run `dot -V` in the terminal where you launch Jupyter. If the command is missing, install Graphviz, add its `bin` directory to `PATH`, then restart the terminal and Jupyter.
 
-```bash
-pip install graphviz
-# Plus system-level installation (see above)
-```
+### How can I change the image size?
 
-### Q: Image not displaying in VSCode?
-
-Try setting output format to PNG:
-
-```python
-import graphviz
-graphviz.set_jupyter_format('png')
-```
-
-### Q: How to adjust image size?
-
-Use the `dpi` parameter to control resolution, or use the returned graph object:
-
-```python
-graph = visualize_model(model, depth=4)
-graph.resize_graph(scale=1.5)
-```
-
+Use `dpi` to set the resolution when saving a PNG. For a figure that needs to scale in a report, use an `.svg` or `.pdf` extension in `save_path`.

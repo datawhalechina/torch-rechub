@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="502" viewBox="0 0 720 502" lang="en" xml:lang="en" role="img" aria-labelledby="title desc">
+  <title id="title">How two impressions become one batch</title>
+  <desc id="desc">Two impressions contain ages 28 and 41, candidate movie IDs 3 and 9, padded histories [7, 4, 0] and [5, 0, 0], and click labels 1 and 0. DataLoader stacks each column to return (x_dict, y). Histories have shape [2, 3]. Scalar fields and labels have shape [2].</desc>
+  <defs>
+    <style>
+      text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #152A43; }
+      .title { font-size: 29px; font-weight: 700; }
+      .sub, .label, .muted { fill: #40566C; }
+      .sub { font-size: 18px; }
+      .label { font-size: 17px; font-weight: 600; }
+      .muted { font-size: 17px; }
+      .mono, .mono-sm, .num { font-family: Consolas, "Liberation Mono", Menlo, monospace; }
+      .mono { font-size: 20px; }
+      .mono-sm { font-size: 18px; }
+      .num { font-size: 23px; font-weight: 600; }
+      .teal { fill: #006C67; }
+      .amber { fill: #994519; }
+    </style>
+  </defs>
+  <rect x="1" y="1" width="718" height="500" rx="16" fill="#F8FAFC" stroke="#D5DFE5"/>
+  <text x="32" y="51" class="title">How two impressions become one batch</text>
+  <text x="32" y="84" class="sub">Each row is one impression. Histories have length 3. The label is 1 for a click.</text>
+  <rect x="32" y="106" width="465" height="119" rx="6" fill="#FFFFFF"/>
+  <rect x="500" y="106" width="188" height="119" rx="6" fill="#FFF0DF"/>
+  <rect x="32" y="106" width="465" height="34" rx="5" fill="#DDF3ED"/>
+  <text x="82" y="130" class="mono-sm teal" text-anchor="middle">age</text>
+  <text x="199" y="130" class="mono-sm teal" text-anchor="middle">movie_id</text>
+  <text x="379" y="130" class="mono-sm teal" text-anchor="middle">hist_movie_id</text>
+  <text x="594" y="130" class="mono-sm amber" text-anchor="middle">label</text>
+  <text x="82" y="170" class="mono" text-anchor="middle">28</text>
+  <text x="199" y="170" class="mono" text-anchor="middle">3</text>
+  <text x="379" y="170" class="mono" text-anchor="middle">[7, 4, 0]</text>
+  <text x="594" y="170" class="mono amber" text-anchor="middle">1</text>
+  <text x="82" y="209" class="mono" text-anchor="middle">41</text>
+  <text x="199" y="209" class="mono" text-anchor="middle">9</text>
+  <text x="379" y="209" class="mono" text-anchor="middle">[5, 0, 0]</text>
+  <text x="594" y="209" class="mono amber" text-anchor="middle">0</text>
+  <path d="M40 184 H489 M508 184 H680" fill="none" stroke="#D6DDE0" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 224 H489" fill="none" stroke="#B6CDCB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M508 224 H680" fill="none" stroke="#E5C7A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M264 226 v24 m-6 -6 6 6 6 -6" fill="none" stroke="#006C67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M594 226 v24 m-6 -6 6 6 6 -6" fill="none" stroke="#994519" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="283" class="num teal">x_dict</text>
+  <text x="151" y="283" class="label">Feature tensors</text>
+  <text x="489" y="283" class="label" text-anchor="end">Shape</text>
+  <text x="509" y="283" class="num amber">y</text>
+  <text x="544" y="283" class="label">Labels</text>
+  <text x="688" y="283" class="label" text-anchor="end">Shape</text>
+  <path d="M32 297 H489" fill="none" stroke="#8DBCB6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M509 297 H688" fill="none" stroke="#DDB797" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="328" class="mono-sm">age</text>
+  <text x="195" y="328" class="mono">[28, 41]</text>
+  <text x="489" y="328" class="mono-sm muted" text-anchor="end">[2]</text>
+  <text x="32" y="365" class="mono-sm">movie_id</text>
+  <text x="195" y="365" class="mono">[3, 9]</text>
+  <text x="489" y="365" class="mono-sm muted" text-anchor="end">[2]</text>
+  <text x="32" y="402" class="mono-sm">hist_movie_id</text>
+  <text x="195" y="402" class="mono">[[7, 4, 0],</text>
+  <text x="207" y="426" class="mono">[5, 0, 0]]</text>
+  <text x="489" y="402" class="mono-sm muted" text-anchor="end">[2, 3]</text>
+  <text x="509" y="328" class="mono amber">[1, 0]</text>
+  <text x="688" y="328" class="mono-sm muted" text-anchor="end">[2]</text>
+  <path d="M32 445 H688" fill="none" stroke="#CBD7DE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="477" class="mono-sm">(x_dict, y)</text>
+  <text x="184" y="477" class="muted">2 is the batch size. The history tensor has 3 positions per row.</text>
+</svg>

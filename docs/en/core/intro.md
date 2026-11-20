@@ -1,65 +1,22 @@
 ---
-title: Core Components Overview
-description: Overview of Torch-RecHub's core components
+title: Core components
+description: Follow one movie impression from feature encoding to a training batch and a click score.
 ---
 
-# Core Components Overview
+# Core components
 
-Torch-RecHub uses a modular design that divides the core functionality of a recommender system into components for feature processing, data pipelines, model design, training, and evaluation. This modular design makes the framework easy to use and extend while preserving a well-organized codebase.
+Consider a movie impression. You know which movies the user has already watched, which movie you showed them, and whether they clicked it. To train a ranker, first turn that record into numbers the model can read. The trainer can then compare the predicted click score with the observed label to calculate the loss.
 
-## Core Component Architecture
+## From one record to a training batch
 
-Torch-RecHub's core component architecture is organized as follows:
+1. **Encode the features.** Suppose movie `M42` has ID `3` in your vocabulary. If it is the user's only watched movie and the history length is three, `hist_movie_id` is `[3, 0, 0]`. The last two positions are padding. Use the same movie vocabulary for candidates and histories. [Feature definitions](/core/features)
+2. **Build a batch.** With `B` records, the candidate IDs have shape `[B]` and the histories have shape `[B, 3]`. `DataGenerator` puts the features in a dictionary and passes them to the trainer with the `B` click labels. [Loading data](/core/data)
+3. **Train the ranker.** The model scores each record in the feature dictionary. `CTRTrainer.fit(train_dl, val_dl)` updates the weights on the training set and measures AUC on the validation set after each epoch. [Training and evaluation](/core/evaluation)
 
-1. **Feature layer**: Handles different types of features, including numerical, categorical, and sequence features
-2. **Data layer**: Handles data loading, preprocessing, and DataLoader generation
-3. **Model layer**: Implements recommendation models, including ranking, matching, multi-task, and generative recommendation models
-4. **Training layer**: Provides unified training interfaces for model training, evaluation, prediction, and ONNX export
-5. **Tools layer**: Provides utilities such as ONNX export, model visualization, callbacks, and loss functions
+## Trainers for other tasks
 
-## Component Relationships
+For retrieval, you need to find candidates in the item catalog. `MatchDataGenerator` prepares separate inputs for users and items. Once the two towers are trained, `MatchTrainer` can compute the embeddings for each side. [Retrieval tutorial](/tutorials/retrieval)
 
-The core components relate to one another as follows:
+If a record has several labels, you can still batch it with `DataGenerator`. Configure the tasks in `MTLTrainer` in the same order as the label columns so you can read each task's metrics separately. [Multi-task tutorial](/tutorials/pipeline)
 
-1. **Feature layer** -> **Data layer**: Feature definitions guide preprocessing and feature engineering in the data layer
-2. **Data layer** -> **Training layer**: DataLoaders produced by data generators are used for model training and evaluation
-3. **Model layer** -> **Training layer**: The training layer trains and evaluates models defined in the model layer
-4. **Training layer** -> **Tools layer**: The training layer uses utilities for tasks such as ONNX export and model visualization
-
-## Component Details
-
-### Feature Processing
-
-The feature-processing component defines and handles different types of features, including:
-
-- **DenseFeature**: Handles numerical features
-- **SparseFeature**: Handles categorical features
-- **SequenceFeature**: Handles sequence or multi-hot features
-
-See [Feature Definitions](/core/features) for details.
-
-### Data Pipeline
-
-The data-pipeline component handles data loading, preprocessing, and DataLoader generation, including:
-
-- **TorchDataset**: A dataset for training and validation
-- **PredictDataset**: A dataset for prediction
-- **DataGenerator**: Generates DataLoaders for ranking and multi-task models
-- **MatchDataGenerator**: Generates DataLoaders for matching models
-- **SequenceDataGenerator**: Generates DataLoaders for HSTU/HLLM sequence tasks
-- **ParquetIterableDataset**: Streams Parquet files batch by batch
-
-See [Data Pipeline](/core/data) for details.
-
-### Training and Evaluation
-
-The training-and-evaluation component trains different types of recommendation models, including:
-
-- **CTRTrainer**: Trains ranking models
-- **MatchTrainer**: Trains matching models
-- **MTLTrainer**: Trains multi-task models
-- **SeqTrainer**: Trains HSTU/HLLM sequence-generation models
-
-RQ-VAE and TIGER use dedicated data-processing and training workflows. See [Generative Models](/models/generative) and the corresponding reproduction guides.
-
-See [Training and Evaluation](/core/evaluation) for details.
+HSTU and HLLM use `SequenceDataGenerator` and `SeqTrainer` to predict the next item. RQ-VAE learns semantic IDs for items, and TIGER learns to generate those IDs. Each has its own training script. [Generative models](/models/generative)

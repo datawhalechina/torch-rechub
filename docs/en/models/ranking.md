@@ -1,59 +1,54 @@
 ---
-title: Ranking Models
-description: Torch-RecHub ranking models detailed introduction
+title: Ranking models
+description: Ranking models, feature interactions and in-batch negatives in Torch-RecHub
 ---
 
-# Ranking Models
+# Ranking models
 
-Ranking models are core components in recommendation systems, used to predict users' click-through rates or preference scores for items, thereby performing fine-grained ranking on retrieved candidates. Torch-RecHub provides various advanced ranking models covering different feature processing and modeling approaches.
+A ranking model scores each user–candidate pair. For example, to rank ten movies for a user’s home page, construct ten rows with the same user features and different movie features. Sort the movies by the ten predicted scores. Start with the [DeepFM quick start](/guide/quick_start) for training code. The examples below show how to construct the individual models.
 
-## In-Batch Negatives: One Training Entry Point
+## In-batch negatives with CTRTrainer
 
-All 13 public ranking models use the same entry point without changing model constructors, default outputs or inference:
+When your data contains impressions and click labels, the default training path uses those labels directly. To construct negatives from items clicked by other users in the same batch, tell `CTRTrainer` which columns belong to the item.
 
 ```python
 trainer = CTRTrainer(model, in_batch_neg=True,
                      item_features=["item_id", "cate_id"])
 ```
 
-The default remains supervised BCE on the original labels. When enabled, the trainer keeps only positive interactions (`y=1`), retains each row's user/context/history and swaps another positive row's complete item fields into it. These generated pairs receive label 0 and use the original model forward and BCE. Labels must be binary; all-zero placeholder labels used by retrieval examples are not valid here.
+Suppose Alex clicks science fiction movie A and Sam clicks comedy B. The trainer selects rows with label 1. It keeps Alex’s user features, history and context, takes both `item_id` and `cate_id` from B, and gives the new row label 0. Replacing only the movie ID would pair comedy B with A’s science fiction category.
 
-`item_features` accepts column names or existing Feature objects. Include the item ID and all item attributes, never user/history fields. Precomputed user-item cross features must be recomputed and are not supported by this simple swapping entry point. Anonymous fields such as Criteo C1/C2 require an explicit, meaningful item-field definition; the trainer does not guess.
+`item_features` accepts column names or existing Feature objects. Include the item ID and every attribute that changes with it. A cross feature such as “how many movies of this genre the user watched in the last seven days” needs to be recomputed when the movie changes. The trainer does not do that automatically. For anonymous Criteo fields, you need to know which fields describe the item before enabling this option.
 
-The default `in_batch_neg_ratio=1` draws one other row's item per positive, avoiding a full `B × B` ranking forward. Set a positive integer for more negatives or `None` for all other rows. Random sampling is with replacement and excludes the same row, not repeated item IDs or other known positives, so false negatives remain possible. `sampler_seed` controls sampling randomness. Batches with fewer than two positive rows are skipped with a warning; an epoch without usable pairs raises an error.
+- By default, each positive is paired with a randomly selected item from another positive row. A row cannot select itself, but two rows can contain the same item. Set `in_batch_neg_ratio` to a positive integer to sample that many items with replacement or to `None` to use all other positive rows.
+- `sampler_seed` controls the random sampling. A batch with fewer than two positive rows is skipped. If there are no usable pairs over an entire epoch, the trainer raises an error.
+- The Amazon DIN and DIEN examples already define the item columns. Add `--in_batch_neg` to switch modes. DIEN still needs negative history sequences for its auxiliary loss. Other single-task ranking examples also require `--item_features`.
 
-DIN/BST recompute candidate-conditioned attention through their original forward. DIEN keeps `loss_mode=False` and its auxiliary history loss: this switch changes target-item sampling, not the auxiliary task's negative-history inputs.
-
-Add `--in_batch_neg` to the Amazon DIN/DIEN examples. Other single-task ranking examples also require `--item_features`; existing binary training labels select positive interactions. `generate_seq_feature(..., in_batch_neg=True)` generates positive-only training rows while retaining supervised positive/negative validation and test rows.
-
-Evaluation, prediction, export and checkpoint structure remain unchanged. Generated negatives are training assumptions, not observed non-clicked impressions; evaluate with real labels and do not assume calibrated production click probabilities. Multi-task models and `MTLTrainer` are outside this single-task ranking entry point.
+A synthetic negative is a pair assigned label 0 for training. Evaluate click prediction on held-out impressions with their observed click labels. To prepare a training set containing only positives, use `generate_seq_feature(..., in_batch_neg=True)`. The validation and test sets keep their original labels.
 
 ## 1. WideDeep
 
-### Description
+WideDeep sends each impression through two branches. The wide branch scores selected fields with a linear layer. The deep branch concatenates its fields and passes them through an MLP. The two scores are added, then a sigmoid produces the click score.
 
-WideDeep is a hybrid model combining a linear model (Wide part) and a deep neural network (Deep part), designed to leverage both the memorization capability of linear models and the generalization capability of deep models.
-
-### Paper Reference
+### Paper
 
 ```
 Cheng, Heng-Tze, et al. "Wide & deep learning for recommender systems." Proceedings of the 1st workshop on deep learning for recommender systems. 2016.
 ```
 
-### Core Principles
-
-- **Wide Part**: Linear model using cross features, good at capturing memorization effects
-- **Deep Part**: Deep neural network using Embedding and fully connected layers, good at capturing generalization effects
-- **Joint Training**: Wide and Deep parts are trained simultaneously, outputs combined through sigmoid function
+`wide_features` and `deep_features` determine which fields go into each branch.
 
 ### Usage
 
 ```python
+from torch_rechub.basic.features import DenseFeature, SparseFeature
 from torch_rechub.models.ranking import WideDeep
 
+# Define the features
 dense_features = [DenseFeature(name="age", embed_dim=1), DenseFeature(name="income", embed_dim=1)]
-sparse_features = [SparseFeature(name="city", vocab_size=100, embed_dim=16), SparseFeature(name="gender", vocab_size=3, embed_dim=8)]
+sparse_features = [SparseFeature(name="city", vocab_size=100, embed_dim=16), SparseFeature(name="gender", vocab_size=3, embed_dim=16)]
 
+# Create the model
 model = WideDeep(
     wide_features=sparse_features,
     deep_features=sparse_features + dense_features,
@@ -65,41 +60,28 @@ model = WideDeep(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| wide_features | list | Feature list for Wide part | None |
-| deep_features | list | Feature list for Deep part | None |
-| mlp_params | dict | DNN parameters including dims, dropout, activation | None |
-
-### Use Cases
-
-- Basic ranking tasks
-- Scenarios requiring both memorization and generalization
-- Limited feature engineering resources
+| wide_features | list | Fields used by the wide branch | Required |
+| deep_features | list | Fields used by the deep branch | Required |
+| mlp_params | dict | Deep network parameters, including dims, dropout and activation | Required |
 
 ## 2. DeepFM
 
-### Description
+DeepFM uses an FM branch for pairwise field interactions and an MLP for concatenated features. For example, the model can assign different scores to different movie genres even when both impressions occur on the weekend.
 
-DeepFM combines Factorization Machine (FM) and deep neural network, capable of capturing both low-order and high-order feature interactions.
-
-### Paper Reference
+### Paper
 
 ```
 Guo, Huifeng, et al. "DeepFM: a factorization-machine based neural network for CTR prediction." Proceedings of the 26th international joint conference on artificial intelligence. 2017.
 ```
 
-### Core Principles
-
-- **FM Part**: Captures second-order feature interactions with linear complexity
-- **Deep Part**: Captures high-order feature interactions through neural network
-- **Shared Embedding**: FM and Deep parts share feature embeddings, reducing parameters
+The FM branch stacks fields to take dot products, so the sparse features in `fm_features` need a common embedding width. When a field appears in both branches, they share its embedding.
 
 ### Usage
 
 ```python
-import os
-
 from torch_rechub.models.ranking import DeepFM
 
+# Create the model
 model = DeepFM(
     deep_features=sparse_features + dense_features,
     fm_features=sparse_features,
@@ -111,40 +93,33 @@ model = DeepFM(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| deep_features | list | Feature list for Deep part | None |
-| fm_features | list | Feature list for FM part | None |
-| mlp_params | dict | DNN parameters | None |
-
-### Use Cases
-
-- Scenarios where feature interactions are important
-- Need to capture both low-order and high-order feature interactions
-- CTR prediction tasks
+| deep_features | list | Fields used by the deep branch | Required |
+| fm_features | list | Features used by the FM branch | Required |
+| mlp_params | dict | Deep network parameters | Required |
 
 ## 3. DCN
 
-### Description
+DCN (Deep & Cross Network) reintroduces the original features at each cross layer. Deeper layers can combine the interactions learned by earlier ones. The cross and deep branch outputs are used together to predict clicks.
 
-DCN (Deep & Cross Network) explicitly learns feature crosses through a Cross Network while maintaining linear computational complexity.
-
-### Paper Reference
+### Paper
 
 ```
 Wang, Ruoxi, et al. "Deep & cross network for ad click predictions." Proceedings of the ADKDD'17. 2017.
 ```
 
-### Core Principles
+### How it works
 
-- **Cross Network**: Explicitly learns high-order feature crosses, each layer output:
+- **Cross network.** Each layer explicitly learns feature crosses of increasing order. Its output is
   $$x_{l+1} = x_0 x_l^T w_l + b_l + x_l$$
-- **Deep Network**: Deep neural network capturing nonlinear feature interactions
-- **Joint Training**: Cross and Deep networks compute in parallel, results concatenated for final output
+- **Deep network.** An MLP learns nonlinear feature interactions.
+- **Joint training.** The cross and deep networks run in parallel. Their outputs are concatenated and passed to a fully connected layer.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import DCN
 
+# Create the model
 model = DCN(
     features=sparse_features + dense_features,
     n_cross_layers=3,
@@ -156,39 +131,28 @@ model = DCN(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Features shared by the Cross and Deep branches | required |
-| mlp_params | dict | DNN parameters | None |
-| n_cross_layers | int | Number of Cross Network layers | required |
-
-### Use Cases
-
-- Scenarios requiring explicit feature crosses
-- Limited computational resources
-- CTR prediction tasks
+| features | list | Features used by both the cross and deep branches | Required |
+| mlp_params | dict | Deep network parameters | Required |
+| n_cross_layers | int | Number of cross layers | Required |
 
 ## 4. DCNv2
 
-### Description
+DCNv2 replaces the weight vector in a DCN cross layer with a matrix. This gives individual pairs of dimensions separate interaction weights and increases the parameter count.
 
-DCNv2 extends DCN's scalar/vector cross parameters to matrix interactions. This implementation can also use a mixture of low-rank experts to reduce the cost of a full matrix interaction.
-
-### Paper Reference
+### Paper
 
 ```
 Wang, Ruoxi, et al. "DCN V2: Improved deep & cross network and practical lessons for web-scale learning to rank systems." Proceedings of the web conference 2021. 2021.
 ```
 
-### Core Principles
-
-- **Matrix-form crossing**: More expressive than DCN's vector-form crossing
-- **Low-rank expert mixture**: Uses multiple low-rank Cross experts when `use_low_rank_mixture=True`
-- **Selectable structure**: Supports `crossnet_only`, `stacked`, and `parallel`
+`use_low_rank_mixture=True` uses low-rank experts to reduce the cost of large matrices. `model_structure` selects a cross-only network or a serial or parallel combination of cross and deep networks.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import DCNv2
 
+# Create the model
 model = DCNv2(
     features=sparse_features + dense_features,
     n_cross_layers=3,
@@ -204,43 +168,32 @@ model = DCNv2(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Features shared by the Cross and Deep branches | required |
-| mlp_params | dict | DNN parameters | None |
-| n_cross_layers | int | Number of Cross Network layers | required |
+| features | list | Features used by both the cross and deep branches | Required |
+| mlp_params | dict | Deep network parameters | Required |
+| n_cross_layers | int | Number of cross layers | Required |
 | model_structure | str | `crossnet_only` / `stacked` / `parallel` | `parallel` |
-| use_low_rank_mixture | bool | Whether to use a mixture of low-rank CrossNet experts | True |
+| use_low_rank_mixture | bool | Use a mixture of low-rank cross-network experts | True |
 | low_rank | int | Low-rank dimension | 32 |
 | num_experts | int | Number of CrossNetMix experts | 4 |
 
-### Use Cases
-
-- Scenarios requiring more efficient feature crosses
-- Large-scale recommendation systems
-- CTR prediction tasks
-
 ## 5. EDCN
 
-### Description
+EDCN adds a bridge between the cross network and the deep network. At each layer the two branches can exchange features. The final score uses both branches and the bridge output.
 
-EDCN (Enhanced Deep & Cross Network) is an enhanced cross network model that combines explicit feature crosses with deep feature extraction for improved expressiveness.
-
-### Paper Reference
+### Paper
 
 ```
 Ma, Xiao, et al. "Enhanced Deep & Cross Network for Feature Cross Learning in Click-Through Rate Prediction." Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
 ```
 
-### Core Principles
-
-- **Cross Network**: Explicitly learns high-order feature crosses
-- **Deep Network**: Deep neural network capturing nonlinear feature interactions
-- **Feature Importance Learning**: Introduces feature importance weights for better interpretability
+`bridge_type` selects how to combine the branch outputs. The regulation module learns separate field weights for each branch.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import EDCN
 
+# Create the model
 model = EDCN(
     features=sparse_features + dense_features,
     n_cross_layers=3,
@@ -254,44 +207,33 @@ model = EDCN(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | All features used by the model | required |
-| mlp_params | dict | DNN parameters | None |
-| n_cross_layers | int | Number of Cross Network layers | required |
-| bridge_type | str | Bridge between the Cross and Deep streams | `hadamard_product` |
-| use_regulation_module | bool | Whether to enable the feature regulation module | True |
-
-### Use Cases
-
-- Complex feature interaction scenarios
-- Models requiring high expressiveness
-- CTR prediction tasks
+| features | list | All input features | Required |
+| mlp_params | dict | Deep network parameters | Required |
+| n_cross_layers | int | Number of cross layers | Required |
+| bridge_type | str | How to combine the cross and deep branches | `hadamard_product` |
+| use_regulation_module | bool | Enable the feature regulation module | True |
 
 ## 6. AFM
 
-### Description
+AFM learns a weight for each pairwise field interaction. For instance, time of day × movie genre and city × time of day can receive different weights.
 
-AFM (Attention Factorization Machine) is an attention-based factorization machine that adaptively learns the importance of different feature interactions.
-
-### Paper Reference
+### Paper
 
 ```
 Xiao, Jun, et al. "Attentional factorization machines: Learning the weight of feature interactions via attention networks." arXiv preprint arXiv:1708.04617 (2017).
 ```
 
-### Core Principles
-
-- **FM Foundation**: Based on factorization machine, captures second-order feature interactions
-- **Attention Mechanism**: Introduces attention network to assign dynamic weights to each feature interaction
-- **Attention Output**: Weighted sum of attention weights and feature interaction vectors
+It multiplies each pair of field embeddings element by element, then computes an attention-weighted sum of the resulting interaction vectors.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import AFM
 
+# Create the model
 model = AFM(
     fm_features=sparse_features,
-    embed_dim=16,  # must match the embedding width of fm_features
+    embed_dim=16,  # Must match the embedding width of fm_features
     t=64,
 )
 ```
@@ -300,39 +242,28 @@ model = AFM(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| fm_features | list | Sparse features used for FM interactions; all embedding widths must match | required |
-| embed_dim | int | Feature embedding dimension | required |
+| fm_features | list | Sparse features used in FM interactions. Use one embedding width for all of them. | Required |
+| embed_dim | int | Feature embedding width | Required |
 | t | int | Attention hidden dimension | 64 |
-
-### Use Cases
-
-- Scenarios with varying feature interaction importance
-- Need for interpretability
-- CTR prediction tasks
 
 ## 7. FiBiNET
 
-### Description
+FiBiNET adjusts the weight of each field for the current example, then computes pairwise interactions with bilinear transformations. A field’s contribution can depend on the field it is paired with.
 
-FiBiNET (Feature Importance and Bilinear feature Interaction NETwork) combines feature importance learning with bilinear feature interactions for more effective feature interaction capture.
-
-### Paper Reference
+### Paper
 
 ```
 Juan, Yuchin, et al. "FiBiNET: Combining Feature Importance and Bilinear feature Interaction for Click-Through Rate Prediction." Proceedings of the 13th ACM Conference on Recommender Systems. 2019.
 ```
 
-### Core Principles
-
-- **Feature Importance Network**: Learns feature importance through Squeeze-and-Excitation mechanism
-- **Bilinear Interaction**: Uses bilinear functions to capture feature interactions
-- **Feature Enhancement**: Enhances input features for improved expressiveness
+The model computes bilinear interactions for both the original and reweighted embeddings and uses both sets to score the example.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import FiBiNet
 
+# Create the model
 model = FiBiNet(
     features=sparse_features,
     mlp_params={"dims": [256, 128, 64], "dropout": 0.2, "activation": "relu"},
@@ -345,42 +276,29 @@ model = FiBiNet(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | Features used by SENET and bilinear interaction | required |
-| mlp_params | dict | Prediction MLP parameters | required |
+| features | list | Features used by SENET and the bilinear interaction layer | Required |
+| mlp_params | dict | Prediction MLP parameters | Required |
 | reduction_ratio | int | SENET reduction ratio | 3 |
 | bilinear_type | str | `field_all` / `field_each` / `field_interaction` | `field_interaction` |
 
-### Use Cases
-
-- Scenarios with varying feature importance
-- Need for complex feature interactions
-- CTR prediction tasks
-
 ## 8. DeepFFM
 
-### Description
+DeepFFM takes field identity into account. A city’s vector when interacting with age can differ from its vector when interacting with movie genre.
 
-DeepFFM (Deep Field-aware Factorization Machine) combines field-aware factorization machine with deep neural network, capturing field-aware high-order feature interactions.
-
-### Paper Reference
+### Paper
 
 ```
 Xiao, Jun, et al. "Deep learning over multi-field categorical data." European conference on information retrieval. Springer, Cham, 2016.
 ```
 
-### Core Principles
-
-- **FFM Foundation**: Field-aware factorization machine, learns specific interaction vectors for each field pair
-- **Deep Network**: Deep neural network capturing high-order feature interactions
-- **Joint Training**: FFM and Deep parts trained jointly
+With many fields, check how many embedding parameters this requires. The example also shows how to construct `FatDeepFFM` with field attention.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import DeepFFM, FatDeepFFM
 
-# FFM uses a different embedding for every field pair, so cross-feature
-# vocabularies must reserve one offset range per field.
+# FFM uses different embeddings per field pair. Scale the cross-feature vocabulary by the number of fields.
 ffm_linear_features = [
     SparseFeature(f.name, vocab_size=f.vocab_size, embed_dim=1) for f in sparse_features
 ]
@@ -396,7 +314,7 @@ model = DeepFFM(
     mlp_params={"dims": [1600, 1600], "dropout": 0.5, "activation": "relu"},
 )
 
-# FatDeepFFM (enhanced version)
+# Create the FatDeepFFM variant
 fat_model = FatDeepFFM(
     linear_features=ffm_linear_features,
     cross_features=ffm_cross_features,
@@ -410,35 +328,27 @@ fat_model = FatDeepFFM(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| linear_features | list | First-order linear features, normally with `embed_dim=1` | required |
-| cross_features | list | FFM interaction features whose vocabularies reserve field-offset space | required |
-| embed_dim | int | FFM embedding dimension | required |
-| reduction_ratio | int | CEN reduction ratio, required only by FatDeepFFM | required (FatDeepFFM) |
-| mlp_params | dict | MLP parameters after FFM interactions | required |
-
-### Use Cases
-
-- Scenarios where field-aware feature interactions are important
-- Complex feature interaction scenarios
-- CTR prediction tasks
+| linear_features | list | First-order linear features, usually with `embed_dim=1` | Required |
+| cross_features | list | FFM interaction features. Reserve vocabulary space for field offsets. | Required |
+| embed_dim | int | FFM embedding width | Required |
+| reduction_ratio | int | CEN reduction ratio for FatDeepFFM | Required for FatDeepFFM |
+| mlp_params | dict | MLP parameters after the FFM interactions | Required |
 
 ## 9. BST
 
-### Description
+BST appends the candidate item to the user’s history. A Transformer encodes the history and candidate together to score the impression.
 
-BST (Behavior Sequence Transformer) uses Transformer to model user behavior sequences, capturing long-range dependencies in sequences.
-
-### Paper Reference
+### Paper
 
 ```
 Chen, Qiwei, et al. "Behavior Sequence Transformer for E-commerce Recommendation in Alibaba." arXiv preprint arXiv:1905.06874 (2019).
 ```
 
-### Core Principles
+### How it works
 
-- **Transformer Encoder**: Uses multi-head self-attention to capture sequence dependencies
-- **Positional Encoding**: Adds positional information to preserve sequence order
-- **Feature Fusion**: Fuses sequence features with other features for final prediction
+- **Transformer encoder.** Multi-head self-attention captures dependencies in the sequence.
+- **Positional encoding.** Position information preserves the order of interactions.
+- **Combining features.** The model combines the sequence representation with the other features to produce its prediction.
 
 ### Usage
 
@@ -474,38 +384,26 @@ model = BST(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | User-profile/context features, excluding history and target | required |
-| history_features | list | History sequences with `pooling="concat"` | required |
-| target_features | list | Target-item features corresponding to the history features | required |
-| mlp_params | dict | Prediction MLP parameters | required |
-| nhead | int | Attention heads; must divide the summed history embedding dimension | 8 |
+| features | list | User profile and context features, excluding history and target | Required |
+| history_features | list | History sequences with `pooling="concat"` | Required |
+| target_features | list | Target item features corresponding to the history fields | Required |
+| mlp_params | dict | Prediction MLP parameters | Required |
+| nhead | int | Attention heads. Must divide the total history embedding width. | 8 |
 | dropout | float | Transformer dropout | 0.2 |
-| num_layers | int | Number of Transformer Encoder layers | 1 |
-| max_seq_len | int | Upper bound of history length plus one target | 51 |
-
-### Use Cases
-
-- Scenarios where user behavior sequences are important
-- Long sequence modeling
-- Sequential recommendation tasks
+| num_layers | int | Transformer encoder layers | 1 |
+| max_seq_len | int | Maximum history length plus one position for the target | 51 |
 
 ## 10. DIN
 
-### Description
+DIN uses the candidate to weight the user’s past interactions. The same history can produce different representations for a comedy candidate and a science fiction candidate.
 
-DIN (Deep Interest Network) is an attention-based deep interest network that dynamically captures user interests based on target items.
-
-### Paper Reference
+### Paper
 
 ```
 Zhou, Guorui, et al. "Deep interest network for click-through rate prediction." Proceedings of the 24th ACM SIGKDD international conference on knowledge discovery & data mining. 2018.
 ```
 
-### Core Principles
-
-- **Interest Extraction**: Extracts interest representations from user behavior sequences
-- **Attention Mechanism**: Computes attention weights for each historical behavior based on target item
-- **Dynamic Interest Aggregation**: Dynamically aggregates user interests based on attention weights
+Place the current candidate in `target_features` and the corresponding sequences in `history_features`. If both contain IDs from the same item vocabulary, `shared_with` lets them use the same embedding table.
 
 ### Usage
 
@@ -533,36 +431,28 @@ model = DIN(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| features | list | User-profile/context features | required |
-| history_features | list | History sequences with `pooling="concat"` | required |
-| target_features | list | Target features matching history count, order, and dimensions | required |
-| mlp_params | dict | Prediction MLP parameters | required |
-| attention_mlp_params | dict | Activation Unit parameters | required |
-
-### Use Cases
-
-- Scenarios with dynamic user interests
-- Target item-related interest modeling
-- CTR prediction tasks
+| features | list | User profile and context features | Required |
+| history_features | list | History sequences with `pooling="concat"` | Required |
+| target_features | list | Target features matching the number, order and widths of the history features | Required |
+| mlp_params | dict | Prediction MLP parameters | Required |
+| attention_mlp_params | dict | Activation unit parameters | Required |
 
 ## 11. DIEN
 
-### Description
+DIEN reads the history with a GRU and uses the candidate item to determine which changes in interest matter. Training also needs a negative history sequence to supervise the interest representation at each step.
 
-DIEN (Deep Interest Evolution Network), proposed by Alibaba at AAAI 2019, extends DIN with an **Interest Extractor Layer** (GRU + auxiliary loss) and an **Interest Evolution Layer** (AUGRU) to model how user interests evolve over time.
-
-### Paper Reference
+### Paper
 
 ```
 Zhou, Guorui, et al. "Deep interest evolution network for click-through rate prediction." Proceedings of the AAAI conference on artificial intelligence. 2019.
 ```
 
-### Core Principles
+### How it works
 
-- **Interest Extractor Layer**: GRU over behaviour sequences; auxiliary loss supervises each hidden state with positive/negative next-step samples (paper Eq.7)
-- **Interest Evolution Layer**: AUGRU embeds attention into the update gate; attention is softmax-normalised over the full valid sequence (paper Eq.14-16)
-- **Auxiliary Loss**: $L_{aux} = -\frac{1}{N}\sum[\log\sigma(h_t \cdot e^+_{t+1}) + \log(1-\sigma(h_t \cdot e^-_{t+1}))]$
-- **Padding**: index 0 is the padding token; padding positions are excluded from GRU, AUGRU attention, and auxiliary loss; all-padding samples keep zero hidden state
+- **Interest extraction.** A GRU encodes the behavior sequence. An auxiliary loss uses positive and negative examples to supervise each hidden state (Eq. 7 in the paper).
+- **Interest evolution.** AUGRU incorporates attention scores in its update gate. Attention is normalized over the full sequence with softmax before the recurrent updates (Eqs. 14–16).
+- **Auxiliary loss.** $L_{aux} = -\frac{1}{N}\sum[\log\sigma(h_t \cdot e^+_{t+1}) + \log(1-\sigma(h_t \cdot e^-_{t+1}))]$
+- **Padding.** The GRU and AUGRU skip padded positions (index 0). An empty history keeps its zero hidden state.
 
 ### Usage
 
@@ -570,22 +460,18 @@ Zhou, Guorui, et al. "Deep interest evolution network for click-through rate pre
 from torch_rechub.basic.features import SparseFeature, SequenceFeature
 from torch_rechub.models.ranking import DIEN
 
-# padding_idx=0 must be set on target_features — they own the embedding tables
+# Set padding_idx=0 on the target, which owns the embedding shared with both histories.
 target_features = [
     SparseFeature("target_item_id", vocab_size=n_items+1, embed_dim=8, padding_idx=0),
-    SparseFeature("target_cate_id", vocab_size=n_cates+1, embed_dim=8, padding_idx=0),
 ]
+# Point shared_with on both histories to the target feature (the root key in embed_dict).
 history_features = [
     SequenceFeature("hist_item_id", vocab_size=n_items+1, embed_dim=8,
                     pooling="concat", shared_with="target_item_id", padding_idx=0),
-    SequenceFeature("hist_cate_id", vocab_size=n_cates+1, embed_dim=8,
-                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
 ]
 neg_history_features = [
     SequenceFeature("neg_hist_item_id", vocab_size=n_items+1, embed_dim=8,
                     pooling="concat", shared_with="target_item_id", padding_idx=0),
-    SequenceFeature("neg_hist_cate_id", vocab_size=n_cates+1, embed_dim=8,
-                    pooling="concat", shared_with="target_cate_id", padding_idx=0),
 ]
 
 model = DIEN(
@@ -596,50 +482,38 @@ model = DIEN(
     mlp_params={"dims": [256, 128]},
     alpha=0.2,
 )
-# CTRTrainer must use loss_mode=False — forward returns (prediction, aux_loss)
+# Use loss_mode=False: forward returns (prediction, aux_loss).
 ```
 
 ### Parameters
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| features | list | User profile / context features fed into the top MLP |
-| history_features | list | Positive behaviour sequences; pooling="concat", padding_idx=0, shared_with=target_feature |
-| neg_history_features | list | Negative-sampled sequences; same constraints as history_features; shared_with must point to target feature |
-| target_features | list | Target item features; padding_idx=0 so the shared embedding table's row 0 is a zero vector |
-| mlp_params | dict | Top MLP params; activation is fixed to dice |
-| alpha | float | Auxiliary loss weight (default 0.2) |
-
-### Use Cases
-
-- E-commerce / news recommendation where user interests evolve over time
-- Sequential behaviour data with temporal ordering
-- CTR prediction tasks
+| features | list | User profile and context features passed to the top MLP |
+| history_features | list | Positive history sequences with pooling="concat", padding_idx=0 and shared_with set to the target feature |
+| neg_history_features | list | Negative history sequences with the same settings. Point shared_with to the target feature itself. |
+| target_features | list | Target item features used by AUGRU attention, with padding_idx=0 |
+| mlp_params | dict | Top MLP parameters. The activation is fixed to dice. |
+| alpha | float | Auxiliary loss weight, default 0.2 |
 
 ## 12. AutoInt
 
-### Description
+AutoInt applies self-attention across fields within an example. For instance, a movie genre can update its representation using the user’s age and the time of the impression.
 
-AutoInt (Automatic Feature Interaction Learning via Self-Attentive Neural Networks) uses self-attention to automatically learn feature interactions, flexibly capturing various orders of feature interactions.
-
-### Paper Reference
+### Paper
 
 ```
 Song, Weiping, et al. "AutoInt: Automatic Feature Interaction Learning via Self-Attentive Neural Networks." Proceedings of the 28th ACM International Conference on Information and Knowledge Management. 2019.
 ```
 
-### Core Principles
-
-- **Embedding Layer**: Maps discrete features to low-dimensional vector space
-- **Multi-head Self-attention**: Automatically learns interaction relationships between features
-- **Residual Connection**: Enhances training stability
-- **Layer Normalization**: Accelerates model convergence
+Numerical fields are projected into the embedding space with a linear transformation. Multi-head attention then operates across numerical and categorical fields of equal width.
 
 ### Usage
 
 ```python
 from torch_rechub.models.ranking import AutoInt
 
+# Create the model
 model = AutoInt(
     sparse_features=sparse_features,
     dense_features=dense_features,
@@ -654,123 +528,30 @@ model = AutoInt(
 
 | Parameter | Type | Description | Default |
 | --- | --- | --- | --- |
-| sparse_features | list | At least one sparse feature; all must use the same `embed_dim` | required |
-| dense_features | list | Dense features; may be an empty list | required |
-| num_layers | int | Number of Interacting Layers | 3 |
-| num_heads | int | Number of attention heads | 2 |
+| sparse_features | list | One or more sparse features with the same `embed_dim` | Required |
+| dense_features | list | Continuous features. May be an empty list. | Required |
+| num_layers | int | Number of interacting layers | 3 |
+| num_heads | int | Attention heads | 2 |
 | dropout | float | Attention dropout | 0.0 |
-| mlp_params | dict or None | Optional Deep-branch parameters | None |
+| mlp_params | dict or None | Optional deep branch parameters | None |
 
-### Use Cases
+## 13. Choosing a retrieval model
 
-- Automatic feature interaction learning
-- Complex feature interaction scenarios
-- CTR prediction tasks
+Choose a ranking model based on the fields available for one impression. With tabular user, item and context features, start with WideDeep or DeepFM and compare DCN to test explicit feature crosses. If you have chronological user behavior, try DIN, DIEN and BST. All three use a candidate and historical items. DIEN also needs a negative item at each historical position during training.
 
-## 13. Model Comparison
+Keep the training set, validation set and feature encoding fixed when comparing models. Compute AUC and LogLoss on the same validation rows to see the effect of the model change. [Interpreting ranking metrics](/blog/rank)
 
-| Model | Complexity | Expressiveness | Efficiency | Interpretability |
-| --- | --- | --- | --- | --- |
-| WideDeep | Low | Medium | High | High |
-| DeepFM | Medium | High | Medium | Medium |
-| DCN/DCNv2 | Medium | High | High | Medium |
-| EDCN | Medium | High | Medium | Medium |
-| AFM | Medium | Medium | Medium | High |
-| FiBiNET | Medium | High | Medium | Medium |
-| DeepFFM | High | High | Low | Medium |
-| BST | High | High | Low | Medium |
-| DIN | Medium | High | Medium | Medium |
-| DIEN | High | High | Low | Medium |
-| AutoInt | High | High | Low | Medium |
+## 14. Run a Criteo baseline
 
-## 14. Usage Recommendations
+The [quick start](/guide/quick_start) covers splitting the raw data, encoding features, training DeepFM and evaluating it. To run the training script from the repository root:
 
-1. **Choose based on data scale**: For small-scale data, use simple models (WideDeep, DeepFM); for large-scale data, try more complex models
-2. **Choose based on feature types**: For important sequence features, use BST, DIN, DIEN; for important feature interactions, use DCN, DeepFM
-3. **Choose based on computational resources**: For limited resources, use efficient models (DCN, WideDeep)
-4. **Try multiple models and ensemble**: Different models may capture different feature interaction patterns; ensembling can improve results
-
-## 15. Complete Training Example
-
-```python
-from torch_rechub.models.ranking import DeepFM
-from torch_rechub.trainers import CTRTrainer
-from torch_rechub.utils.data import DataGenerator
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-
-# 1. Define features
-dense_features = [
-    DenseFeature(name="age", embed_dim=1),
-    DenseFeature(name="income", embed_dim=1)
-]
-
-sparse_features = [
-    SparseFeature(name="city", vocab_size=100, embed_dim=16),
-    SparseFeature(name="gender", vocab_size=3, embed_dim=16),
-    SparseFeature(name="occupation", vocab_size=20, embed_dim=16)
-]
-
-# 2. Prepare data
-x = {
-    "age": age_data,
-    "income": income_data,
-    "city": city_data,
-    "gender": gender_data,
-    "occupation": occupation_data
-}
-y = label_data
-
-# 3. Create data generator
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-
-# 4. Create model
-model = DeepFM(
-    deep_features=sparse_features + dense_features,
-    fm_features=sparse_features,
-    mlp_params={"dims": [256, 128, 64], "dropout": 0.2, "activation": "relu"}
-)
-
-# 5. Create trainer
-trainer = CTRTrainer(
-    model=model,
-    optimizer_params={"lr": 0.001, "weight_decay": 0.0001},
-    n_epoch=50,
-    earlystop_patience=10,
-    device="cpu",
-    model_path="saved/deepfm"
-)
-
-# 6. Train model
-os.makedirs("saved/deepfm", exist_ok=True)
-trainer.fit(train_dl, val_dl)
-
-# 7. Evaluate model
-auc = trainer.evaluate(trainer.model, test_dl)
-print(f"Test AUC: {auc}")
-
-# 8. Export ONNX model (first install: pip install "torch-rechub[onnx]")
-trainer.export_onnx("deepfm.onnx")
+```bash
+cd examples/ranking
+uv run python run_criteo.py --model_name deepfm --epoch 1 --device cpu
 ```
 
-## 16. FAQ
+## 15. Training questions
 
-### Q: How to choose the right model?
-A: Choose based on data scale, feature types, computational resources, and business requirements. Start with simple models and gradually try more complex ones.
+**Why is validation AUC falling while training loss is still decreasing?** They measure different things. Compare AUC from earlier epochs on the same validation set. When `CTRTrainer.fit` receives a validation set, it saves the weights from the epoch with the best validation AUC. Use those weights for prediction.
 
-### Q: What to do about overfitting?
-A: Try the following:
-- Add regularization (L1/L2)
-- Increase dropout rate
-- Use early stopping
-- Add more training data
-- Simplify model structure
-
-### Q: How to handle large-scale features?
-A: Try the following:
-- Feature selection: Keep only important features
-- Feature hashing: Map high-dimensional features to low-dimensional space
-- Hierarchical embedding: Use different embedding dimensions for different features
-
-### Q: How to speed up training?
-A: `CTRTrainer` can use one GPU through `device`, or wrap the model in single-machine `torch.nn.DataParallel` through `gpus=[...]`. It does not provide automatic mixed precision (AMP) or multi-machine distributed training. Whether batch size can be increased depends on available memory; test it incrementally.
+**How do I use a GPU?** For one GPU, pass `device="cuda:0"` to `CTRTrainer`. On a multi-GPU machine, `gpus=[0, 1]` enables PyTorch `DataParallel`. Choose a batch size that fits the memory of each GPU.

@@ -1,94 +1,31 @@
 ---
-title: Model Library Overview
-description: Overview of the Torch-RecHub model library
+title: Model catalog
+description: Choose a Torch-RecHub model for your recommendation task
 ---
 
-# Model Library Overview
+# Model catalog
 
-Torch-RecHub provides a rich recommendation model library that covers ranking, matching, multi-task learning, and generative recommendation. All models are implemented in PyTorch and are easy to use and extend.
+Look at a single example from your logs. What is known at prediction time, and what are you trying to predict? For a movie recommender, the choice might look like this.
 
-## Model Library Structure
-
-The model library is organized by recommendation stage and task type:
-
-1. **Ranking Models**: Used during fine ranking to predict click-through rates or user preference scores for items
-2. **Matching Models**: Used during candidate generation to retrieve candidates from a large item collection
-3. **Multi-Task Models**: Jointly optimize multiple related tasks to improve generalization
-4. **Generative Recommendation**: Uses generative models to produce personalized recommendations
-
-## Model Selection Guide
-
-### Choosing a Ranking Model
-
-| Model | Suitable Scenario | Characteristics |
+| Question | Data you need | Where to start |
 | --- | --- | --- |
-| WideDeep | Basic ranking tasks | Combines linear and deep models to balance memorization and generalization |
-| DeepFM | Scenarios where feature interactions matter | Captures both low-order and high-order feature interactions |
-| DCN/DCNv2 | Explicit feature-crossing scenarios | Explicitly learns high-order feature crosses with high computational efficiency |
-| DIN | Scenarios with dynamically changing user interests | Uses attention to capture user interests |
-| DIEN | Long-sequence interest modeling | Models the dynamic evolution of user interests |
-| BST | Scenarios where sequence features matter | Uses a Transformer to model sequence features |
-| AutoInt | Automatic feature-interaction learning | Automatically learns feature-interaction patterns |
+| Which few hundred movies should enter the candidate set? | Movies a user has watched and a catalog of candidate movies | [Retrieval models](/models/matching). DSSM computes separate vectors for users and movies and retrieves candidates by similarity. |
+| Which candidate movie should appear first? | User, movie, context and click label for each impression | [Ranking models](/models/ranking). DeepFM gives each impression a score that can be used to order the candidates. |
+| Will the user click? If they do, will they pay? | Click and conversion labels for the same impression | [Multi-task models](/models/mtl). SharedBottom produces one prediction per target. ESMM also models the relationship between a click and a subsequent conversion. |
+| Which movie is the user likely to watch next? | Each user’s viewing history in chronological order | [Generative recommendation models](/models/generative). HSTU scores movies from the history. TIGER generates the semantic ID of the next movie one token at a time. |
 
-### Choosing a Matching Model
+## Choosing a model
 
-| Model | Suitable Scenario | Characteristics |
-| --- | --- | --- |
-| DSSM | Text-matching scenarios | Uses a two-tower architecture to map users and items into the same vector space |
-| YoutubeDNN | Large-scale recommendation | Deep matching based on user behavior sequences |
-| MIND | Multi-interest recommendation | Learns multiple interest representations for each user |
-| GRU4Rec/SASRec | Sequential recommendation | Models a user's recent behavior sequence |
-| ComirecDR/ComirecSA | Controllable multi-interest recommendation | Allows control over the number of generated interests |
+DeepFM is a useful first ranking model. Once you have chronological user histories, try DIN to see how the candidate movie affects the weight of each past interaction. For retrieval, start with DSSM to go from training to vector search. Try MIND if you want a user’s interests in, say, thrillers and animation to retrieve different candidates.
 
-### Choosing a Multi-Task Model
+For multi-task learning, check which labels are available for each impression. A click label alone is enough for single-task ranking. With conversion labels as well, you can compare the AUC of both tasks on the same validation set. For next-item prediction, interaction sequences suffice for HSTU. HLLM additionally needs movie text embeddings, while TIGER needs a semantic ID for each movie.
 
-| Model | Suitable Scenario | Characteristics |
-| --- | --- | --- |
-| SharedBottom | Scenarios with strongly related tasks | All tasks share the bottom network |
-| MMOE | Scenarios with substantial task conflict | Uses a multi-gate mixture of experts so each task learns a different expert combination |
-| PLE | Complex multi-task scenarios | Uses progressive layered extraction to alleviate negative transfer |
-| ESMM | Scenarios with sample-selection bias | Uses entire-space modeling to address sample-selection bias |
-| AITM | Scenarios with dependencies between tasks | Uses adaptive information transfer to learn task dependencies |
+## Usage examples
 
-### Choosing a Generative Recommendation Model
-
-| Model | Suitable Scenario | Characteristics |
-| --- | --- | --- |
-| HSTU | Next-item sequential recommendation | Hierarchical sequential transduction units with positional and temporal biases |
-| HLLM | Sequential recommendation with precomputed LLM item embeddings | Freezes the item semantic table and trains a user-sequence Transformer |
-| RQ-VAE | Item semantic-ID quantization | Compresses continuous item embeddings into multi-level codebook IDs |
-| TIGER | Semantic-ID generative retrieval | Uses T5 to generate a valid semantic ID for the next item |
-
-## Model Documentation
-
-### Ranking Models
-
-Detailed descriptions of ranking-model principles, usage, and parameters.
-
-[View Ranking Model Documentation](/models/ranking)
-
-### Matching Models
-
-Detailed descriptions of matching-model principles, usage, and parameters.
-
-[View Matching Model Documentation](/models/matching)
-
-### Multi-Task Models
-
-Detailed descriptions of multi-task-model principles, usage, and parameters.
-
-[View Multi-Task Model Documentation](/models/mtl)
-
-### Generative Recommendation Models
-
-Detailed descriptions of generative recommendation-model principles, usage, and parameters.
-
-[View Generative Recommendation Model Documentation](/models/generative)
-
-## Usage Example
+Ranking and retrieval use similar training calls. The main difference is how you prepare a batch. These snippets are independent. The [ranking quick start](/guide/quick_start) and [retrieval tutorial](/tutorials/retrieval) define their features and data loaders.
 
 ```python
-# Ranking-model example
+# Ranking example
 from torch_rechub.models.ranking import DeepFM
 from torch_rechub.trainers import CTRTrainer
 
@@ -101,7 +38,7 @@ trainer = CTRTrainer(model, optimizer_params={"lr": 0.001}, device="cpu")
 # Train the model
 trainer.fit(train_dataloader, val_dataloader)
 
-# Matching-model example
+# Retrieval example
 from torch_rechub.models.matching import DSSM
 from torch_rechub.trainers import MatchTrainer
 
@@ -116,15 +53,15 @@ trainer = MatchTrainer(model, mode=0, device="cpu")
 trainer.fit(train_dataloader)
 ```
 
-## Model Papers
+## Model papers
 
-* **Ranking** — [DeepFM](https://arxiv.org/abs/1703.04247), [Wide&Deep](https://arxiv.org/abs/1606.07792), [DCN](https://arxiv.org/abs/1708.05123), [DCNv2](https://arxiv.org/abs/2008.13535), [DIN](https://arxiv.org/abs/1706.06978), [DIEN](https://arxiv.org/abs/1809.03672), [BST](https://arxiv.org/abs/1905.06874), [AFM](https://arxiv.org/abs/1708.04617), [AutoInt](https://arxiv.org/abs/1810.11921), [FiBiNET](https://doi.org/10.1145/3298689.3347043), [FAT-DeepFFM](https://arxiv.org/abs/1905.06336), [EDCN](https://dlp-kdd.github.io/assets/pdf/DLP-KDD_2021_paper_12.pdf).
-* **Retrieval** — [DSSM](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf), [YouTubeDNN](https://dl.acm.org/doi/10.1145/2959100.2959190), [YouTubeSBC](https://doi.org/10.1145/3298689.3346996), [MIND](https://arxiv.org/abs/1904.08030), [SINE](https://arxiv.org/abs/2102.09267), [GRU4Rec](https://arxiv.org/abs/1511.06939), [SASRec](https://arxiv.org/abs/1808.09781), [NARM](https://arxiv.org/abs/1711.04725), [STAMP](https://doi.org/10.1145/3219819.3219950), [ComiRec](https://arxiv.org/abs/2005.09347).
-* **Multi-task learning** — [ESMM](https://arxiv.org/abs/1804.07931), [MMoE](https://dl.acm.org/doi/10.1145/3219819.3220007), [PLE](https://dl.acm.org/doi/10.1145/3383313.3412236), [AITM](https://arxiv.org/abs/2105.08489).
-* **Sequential and generative recommendation** — [HSTU](https://arxiv.org/abs/2402.17152), [HLLM](https://arxiv.org/abs/2409.12740), [TIGER](https://arxiv.org/abs/2305.05065).
+* **Ranking** [DeepFM](https://arxiv.org/abs/1703.04247), [Wide&Deep](https://arxiv.org/abs/1606.07792), [DCN](https://arxiv.org/abs/1708.05123), [DCNv2](https://arxiv.org/abs/2008.13535), [DIN](https://arxiv.org/abs/1706.06978), [DIEN](https://arxiv.org/abs/1809.03672), [BST](https://arxiv.org/abs/1905.06874), [AFM](https://arxiv.org/abs/1708.04617), [AutoInt](https://arxiv.org/abs/1810.11921), [FiBiNET](https://doi.org/10.1145/3298689.3347043), [FAT-DeepFFM](https://arxiv.org/abs/1905.06336), [EDCN](https://dlp-kdd.github.io/assets/pdf/DLP-KDD_2021_paper_12.pdf).
+* **Retrieval** [DSSM](https://posenhuang.github.io/papers/cikm2013_DSSM_fullversion.pdf), [YouTubeDNN](https://dl.acm.org/doi/10.1145/2959100.2959190), [YouTubeSBC](https://doi.org/10.1145/3298689.3346996), [MIND](https://arxiv.org/abs/1904.08030), [SINE](https://arxiv.org/abs/2102.09267), [GRU4Rec](https://arxiv.org/abs/1511.06939), [SASRec](https://arxiv.org/abs/1808.09781), [NARM](https://arxiv.org/abs/1711.04725), [STAMP](https://doi.org/10.1145/3219819.3219950), [ComiRec](https://arxiv.org/abs/2005.09347).
+* **Multi-task learning** [ESMM](https://arxiv.org/abs/1804.07931), [MMoE](https://dl.acm.org/doi/10.1145/3219819.3220007), [PLE](https://dl.acm.org/doi/10.1145/3383313.3412236), [AITM](https://arxiv.org/abs/2105.08489).
+* **Sequential and generative recommendation** [HSTU](https://arxiv.org/abs/2402.17152), [HLLM](https://arxiv.org/abs/2409.12740), [TIGER](https://arxiv.org/abs/2305.05065).
 
-The FAT-DeepFFM paper also describes DeepFFM, its base model.
+DeepFFM is the baseline described in the FAT-DeepFFM paper.
 
-## Contributing a New Model
+## Contributing a model
 
-If you would like to contribute a new model, see the [Contributing Guide](/community/contributing) and follow the project's coding standards and documentation requirements.
+To contribute a model, follow the coding and documentation conventions in the [contribution guide](/community/contributing).

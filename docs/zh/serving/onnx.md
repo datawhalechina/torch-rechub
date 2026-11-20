@@ -7,7 +7,7 @@ description: Torch-RecHub 模型 ONNX 导出与量化
 
 训练完成后，可以把模型导出为 `.onnx` 文件，用 ONNX Runtime 运行预测。先导出一份 FP32 模型，拿测试集里的一条记录与 PyTorch 对比分数。确认两边一致后，再根据推理设备尝试 INT8 或 FP16。[用同一条记录核对分数](/zh/serving/demo)
 
-![模型从 PyTorch 导出到 ONNX，再进行量化的步骤](/img/diagrams/onnx_quantization_flow.png)
+![用相同样本核对 PyTorch 和 ONNX 的预测，再按目标设备验证 INT8 或 FP16](/img/diagrams/zh/onnx_quantization_flow.svg)
 
 ## 安装依赖
 

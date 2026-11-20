@@ -7,7 +7,7 @@ description: Torch-RecHub 模型训练与评估
 
 DeepFM 为每条候选记录预测点击概率，用 `CTRTrainer`。DSSM 需要分别导出用户和物品向量，用 `MatchTrainer`。一条记录有多个预测目标时用 `MTLTrainer`。HSTU 和 HLLM 根据历史预测下一件物品，用 `SeqTrainer`。
 
-![Trainer 工作流图](/img/diagrams/trainer_lifecycle.png)
+![验证 AUC 依次为 0.70、0.75、0.73，第三轮结束后保留第二轮的权重](/img/diagrams/zh/trainer_lifecycle.svg)
 
 ## 训练器
 

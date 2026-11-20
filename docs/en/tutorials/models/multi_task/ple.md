@@ -1,13 +1,13 @@
 ---
 title: PLE Tutorial
-description: Complete tutorial for the Progressive Layered Extraction (PLE) multi-task model
+description: Predict clicks and purchases with shared and task-specific experts in PLE
 ---
 
 # PLE Tutorial
 
 ## 1. Model Overview and Use Cases
 
-PLE (Progressive Layered Extraction) is a multi-task learning model proposed by Tencent at RecSys 2020. PLE addresses the **seesaw phenomenon** in multi-task learning, where optimizing one task hurts the performance of another. It uses **Customized Gate Control (CGC)**, assigning task-specific experts and shared experts, then adaptively combining their outputs through gate networks.
+Clicks and purchases may depend on different features. PLE lets you reserve some experts for each task. In this example, each task has two experts of its own and can use one shared expert. Each gate combines the outputs of the experts available to its task before the prediction layer.
 
 **Paper**: [Progressive Layered Extraction (PLE): A Novel Multi-Task Learning (MTL) Model for Personalized Recommendations](https://dl.acm.org/doi/abs/10.1145/3383313.3412236)
 
@@ -17,17 +17,7 @@ PLE (Progressive Layered Extraction) is a multi-task learning model proposed by 
   <img src="/img/models/ple_arch.png" alt="PLE Model Architecture" width="600"/>
 </div>
 
-- **Task-Specific Experts**: each task has its own dedicated expert networks
-- **Shared Experts**: expert networks shared by all tasks
-- **Customized Gate (CGC)**: each task's gate network combines the outputs of its task-specific experts and the shared experts
-- **Multi-Level**: supports stacking multiple CGC levels for progressive feature extraction
-- **Task Towers**: an independent prediction tower for each task
-
-### Suitable Scenarios
-
-- Multi-objective optimization, such as CTR + CVR or click + favorite + purchase
-- Tasks that are related but also have distinct requirements
-- Scenarios requiring stronger task separation than MMOE provides
+One layer in the diagram contains task-specific experts, shared experts and gates that select the experts. `n_level` controls how many of these layers to stack. Start with one layer and keep the same label order as the MMOE tutorial to compare the two outputs directly.
 
 ---
 
@@ -130,7 +120,7 @@ model = PLE(
 ### 3.2 Parameter Details
 
 | Parameter | Type | Description | Recommended Value |
-|-----------|------|-------------|-------------------|
+|------|------|------|--------|
 | `features` | `list[Feature]` | Feature list | Dense + Sparse |
 | `task_types` | `list[str]` | Task-type list | `"classification"` or `"regression"` |
 | `n_level` | `int` | Number of CGC (progressive) levels | 1–3 |
@@ -139,7 +129,7 @@ model = PLE(
 | `expert_params` | `dict` | Expert MLP parameters | `{"dims": [16]}` |
 | `tower_params_list` | `list[dict]` | MLP parameters for each Task Tower | `{"dims": [8]}` |
 
-> **PLE vs. MMOE**: All MMOE experts are shared, whereas PLE separates task-specific experts from shared experts. PLE often performs better when correlations between tasks are weaker.
+`n_expert_specific=2` gives each task two experts of its own. With two tasks, the layer has four task-specific experts plus one shared expert.
 
 ---
 
@@ -168,12 +158,7 @@ mtl_trainer.fit(train_dl, val_dl)
 
 ### Multi-Task Loss-Balancing Methods
 
-| Method | `adaptive_params` | Description |
-|--------|-------------------|-------------|
-| Equal weighting | Omit the parameter | Simply sums the loss of every task |
-| UWL | `{"method": "uwl"}` | Uncertainty Weighting Loss |
-| GradNorm | `{"method": "gradnorm"}` | The current Trainer branch leaves `loss` unassigned and is not usable yet |
-| MetaBalance | `{"method": "metabalance"}` | The current Trainer branch leaves `loss` unassigned and is not usable yet |
+When `adaptive_params` is omitted, the trainer weights the task losses equally. The `uwl` setting above learns the task weights during training. Check the purchase and click AUCs separately with either setting.
 
 ---
 
@@ -188,27 +173,19 @@ print(f"Test AUC (CVR): {auc[0]:.4f}, Test AUC (CTR): {auc[1]:.4f}")
 
 ## 6. Tuning Recommendations
 
-1. **Number of CGC levels** (`n_level`): one or two levels are usually sufficient; more levels may overfit
-2. **Number of experts**: `n_expert_specific` is usually 2–4, and `n_expert_shared` is usually 1–2
-3. **Loss balancing**: UWL is currently available; wait until the Trainer is fixed before enabling GradNorm or MetaBalance
-4. **Tower structure**: keep each tower shallow (one or two layers), because the experts already perform feature extraction
-
----
+To compare PLE with MMOE, use the same training split, task order and loss weighting. With a single PLE layer, vary the number of experts per task and record both AUCs to see which task benefits.
 
 ## 7. FAQ and Troubleshooting
 
-### Q1: How should I choose between PLE and MMOE?
+### Q1: How do PLE and MMOE differ?
 
-- If the tasks are **strongly correlated**, MMOE is usually sufficient
-- If task correlations are **weak** or there is a strong **seesaw effect**, prefer PLE
+In MMOE, both tasks can use every expert. PLE gives each task its own experts and adds a pool of shared experts. Both models can predict clicks and purchases for the same batch of samples.
 
 ### Q2: How can I combine classification and regression tasks?
-
-Set each task type separately in `task_types`, for example `['classification', 'regression']`. The model automatically applies different prediction layers (Sigmoid vs. Identity).
+Set `task_types=["classification", "regression"]`. The model uses the appropriate prediction layer for each task. To use the second task's MSE for early stopping, set `earlystop_taskid=1, earlystop_mode="min"` in `MTLTrainer`.
 
 ### Q3: How large should `n_level` be?
-
-Usually, `n_level=2` is sufficient. More levels significantly increase the parameter count and training time.
+The example uses one layer. A second layer feeds the first layer's outputs to another set of experts and gates. Compare both tasks on the same validation samples when choosing between them.
 
 ---
 

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" lang="zh-CN" xml:lang="zh-CN" width="720" height="508" viewBox="0 0 720 508" role="img" aria-labelledby="title desc">
+  <title id="title">从索引行号找回电影 ID</title>
+  <desc id="desc">电影行 0、1、2、3 的 ID 依次是 M42、M18、M91、M72。用户在 (2, 2)，最近两行是 2 和 0，查表得到 M91、M42。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #152A43; }
+    .title { font-size:29px; font-weight:700 } .body { font-size:20px; font-weight:600 }
+    .copy { font-size:18px; fill:#40566C } .label { font-size:17px; font-weight:600; fill:#40566C }
+    .teal { fill:#006C67 } .orange { fill:#994519 }
+    .mono { font-family:Consolas, "Liberation Mono", monospace; font-size:19px; font-weight:600 }
+    .value { font-family:Consolas, "Liberation Mono", monospace; font-size:22px; font-weight:700 }
+  </style>
+  <rect x="0" y="0" width="720" height="508" rx="16" fill="#F8FAFC"/>
+  <text x="32" y="50" class="title" text-anchor="start">从索引行号找回电影 ID</text>
+  <text x="32" y="81" class="copy" text-anchor="start">from_embeddings() 按输入顺序建索引，query() 返回最近的行号。</text>
+  <text x="32" y="133" class="body" text-anchor="start">一个用户，四个物品向量</text>
+  <text x="344" y="133" class="body" text-anchor="start">建索引时保留的对照表</text>
+  <path d="M325 110 V331" fill="none" stroke="#D3DFE4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M93 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M121 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M149 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M177 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M205 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M233 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M261 151 V308" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 280 H273" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 252 H273" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 224 H273" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 196 H273" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 168 H273" fill="none" stroke="#E1E9ED" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M65 151 V308 H273" fill="none" stroke="#9DB0BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="54" y="321" class="label" text-anchor="end">0</text>
+  <text x="279" y="309" class="label" text-anchor="start">x</text>
+  <text x="56" y="158" class="label" text-anchor="end">y</text>
+  <path d="M121 252 v-28" fill="none" stroke="#006C67" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4"/>
+  <path d="M121 252 h56" fill="none" stroke="#994519" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4"/>
+  <circle cx="177" cy="252" r="6" fill="#994519" stroke="#F8FAFC" stroke-width="2"/>
+  <text x="186" y="244" class="label orange" text-anchor="start">行 0</text>
+  <circle cx="233" cy="196" r="6" fill="#647C8E" stroke="#F8FAFC" stroke-width="2"/>
+  <text x="242" y="188" class="label" text-anchor="start">行 1</text>
+  <circle cx="121" cy="224" r="6" fill="#006C67" stroke="#F8FAFC" stroke-width="2"/>
+  <text x="130" y="216" class="label teal" text-anchor="start">行 2</text>
+  <circle cx="65" cy="168" r="6" fill="#647C8E" stroke="#F8FAFC" stroke-width="2"/>
+  <text x="74" y="160" class="label" text-anchor="start">行 3</text>
+  <path d="M121 245 l7 7 -7 7 -7 -7 z" fill="none" stroke="#152A43" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:#152A43"/>
+  <text x="118" y="280" class="label" text-anchor="start">用户 (2, 2)</text>
+  <text x="68" y="338" class="label" text-anchor="start">按欧氏距离取最近两行</text>
+  <text x="361" y="172" class="label" text-anchor="start">行号</text>
+  <text x="442" y="172" class="label" text-anchor="start">向量</text>
+  <text x="565" y="172" class="label" text-anchor="start">电影 ID</text>
+  <path d="M344 181 H686" fill="none" stroke="#BDCFD6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+  <rect x="344" y="188" width="342" height="29" rx="4" fill="#FFF0DF"/>
+  <text x="364" y="209" class="mono" text-anchor="start">0</text>
+  <text x="441" y="209" class="mono" text-anchor="start">[4, 2]</text>
+  <text x="565" y="209" class="mono orange" text-anchor="start">M42</text>
+  <text x="364" y="246" class="mono" text-anchor="start">1</text>
+  <text x="441" y="246" class="mono" text-anchor="start">[6, 4]</text>
+  <text x="565" y="246" class="mono" text-anchor="start">M18</text>
+  <rect x="344" y="262" width="342" height="29" rx="4" fill="#DDF3ED"/>
+  <text x="364" y="283" class="mono" text-anchor="start">2</text>
+  <text x="441" y="283" class="mono" text-anchor="start">[2, 3]</text>
+  <text x="565" y="283" class="mono teal" text-anchor="start">M91</text>
+  <text x="364" y="320" class="mono" text-anchor="start">3</text>
+  <text x="441" y="320" class="mono" text-anchor="start">[0, 5]</text>
+  <text x="565" y="320" class="mono" text-anchor="start">M72</text>
+  <rect x="32" y="360" width="656" height="92" rx="10" fill="#EAF0F4"/>
+  <text x="50" y="390" class="label" text-anchor="start">查询结果 · rows[0]</text>
+  <text x="50" y="428" class="value" text-anchor="start">[2, 0]</text>
+  <path d="M241 414 L299 414" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M292 410 L299 414 L292 418" fill="none" stroke="#40566C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="326" y="390" class="label" text-anchor="start">用行号查电影表</text>
+  <text x="326" y="428" class="value" text-anchor="start">["M91", "M42"]</text>
+  <text x="32" y="487" class="copy" text-anchor="start">重建索引时，一起更新这份按行排列的电影 ID 表。</text>
+</svg>

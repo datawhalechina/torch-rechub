@@ -1,39 +1,35 @@
 ---
-title: Benchmark (Experimental)
-description: Reproducible model comparison benchmarks for Torch-RecHub
+title: Model benchmarks (experimental)
+description: Compare recommendation models with reproducible benchmark configurations
 ---
 
-# Benchmark (Experimental)
+# Model benchmarks (experimental)
 
-`benchmarks/` provides reproducible model comparisons under a fixed experimental protocol and is maintained separately from `examples/`: `examples/` focuses on teaching, while `benchmarks/` focuses on side-by-side comparisons.
+To compare MIND and YoutubeDNN on the same users, run their configurations in `benchmarks/`. Each configuration records the data file, random seed, training epochs and metrics, so you can see what changed between runs.
 
-Install the YAML extra before running benchmarks from an installed package. The same command can also be used to add the dependency in a repository development environment:
+Start in the repository root. The benchmark scripts read YAML, and the retrieval examples below use Annoy to look up candidates. Install both extras for these examples. The `benchmark` extra is enough for ranking or multi-task experiments.
 
 ```bash
-pip install "torch-rechub[benchmark]"
+uv sync --extra benchmark --extra annoy
 ```
 
-## Quick Start
+## Run a benchmark
 
-Run these commands from the repository root:
+Activate the `.venv` you just created and run the commands from the repository root. The first runs MIND alone. The second runs each retrieval configuration in turn.
 
 ```bash
-# Single config
+# Run a single configuration.
 python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_mind.yaml
 
-# Run a group and produce a comparison table
+# Run a whole suite and write a comparison table.
 python benchmarks/suite.py \
   --configs "benchmarks/configs/matching/*.yaml" \
   --output  benchmark_results/suites/matching
 ```
 
-Each run writes:
+Each run writes its results to the configured `output_dir`. Open `summary.md` to read the metrics or use `result.yaml` for programmatic access. The YAML also records the Git commit, Python and PyTorch versions, and timings. Retrieval and ranking runs save weights in `model.pth`. The multi-task example writes `model_base_0.pth`.
 
-- `result.yaml`: structured metrics and run metadata (git commit, Python/Torch versions, and timestamp)
-- `summary.md`: a human-readable summary
-- Model weights: `model.pth` for Matching/Ranking; currently `model_base_0.pth` for Multi-Task
-
-A suite additionally writes `suite.yaml` and `suite.md` comparison tables, for example:
+A suite also writes `suite.yaml` and `suite.md` to the directory passed to `--output`. The table below illustrates the format using the bundled sample data. When comparing models on a full dataset, check that their configurations use the same split.
 
 | model | dataset | params | Hit@10 | NDCG@10 | train_s |
 | --- | --- | --- | --- | --- | --- |
@@ -42,46 +38,46 @@ A suite additionally writes `suite.yaml` and `suite.md` comparison tables, for e
 | ComirecDR | ml-1m-sample | 54736 | 0.0000 | 0.0000 | 0.023 |
 | ComirecSA | ml-1m-sample | 4816 | 0.0000 | 0.0000 | 0.018 |
 
-## Supported Tasks
+## Available tasks
 
-### Matching / Retrieval
+### Retrieval
 
-Dataset: MovieLens sample (`examples/matching/data/ml-1m/ml-1m_sample.csv`)
+MovieLens sample at `examples/matching/data/ml-1m/ml-1m_sample.csv`.
 
-| Config | Model |
+| Configuration | Model |
 | --- | --- |
 | `configs/matching/ml_1m_mind.yaml` | MIND |
 | `configs/matching/ml_1m_youtube_dnn.yaml` | YoutubeDNN |
 | `configs/matching/ml_1m_comirec_dr.yaml` | ComirecDR |
 | `configs/matching/ml_1m_comirec_sa.yaml` | ComirecSA |
 
-Metrics: `Hit@K`, `Recall@K`, `NDCG@K`, `MRR@K`, and `Precision@K`
+Metrics include `Hit@K`, `Recall@K`, `NDCG@K`, `MRR@K` and `Precision@K`.
 
-### Ranking / CTR
+### Ranking and click-through rate prediction
 
-Dataset: Criteo sample (`examples/ranking/data/criteo/criteo_sample.csv`)
+Criteo sample at `examples/ranking/data/criteo/criteo_sample.csv`.
 
-| Config | Model |
+| Configuration | Model |
 | --- | --- |
 | `configs/ranking/criteo_widedeep.yaml` | WideDeep |
 | `configs/ranking/criteo_deepfm.yaml` | DeepFM |
 | `configs/ranking/criteo_dcn.yaml` | DCN |
 
-Metrics: `AUC` and `LogLoss` (customizable through the YAML `metrics:` field; supported values are `AUC`, `LogLoss`, `Accuracy`, and `MSE`)
+The example reports `AUC` and `LogLoss`. The YAML `metrics` field accepts `AUC`, `LogLoss`, `Accuracy` and `MSE`.
 
-### Multi-Task
+### Multi-task learning
 
-Dataset: Census-Income sample (`examples/ranking/data/census-income/`), with two tasks: income (`cvr`) and marital status (`ctr`)
+Census-Income sample at `examples/ranking/data/census-income/`. The example uses income as the CVR label and marital status as the CTR label.
 
-| Config | Model |
+| Configuration | Model |
 | --- | --- |
 | `configs/multitask/census_esmm.yaml` | ESMM |
 | `configs/multitask/census_mmoe.yaml` | MMOE |
 | `configs/multitask/census_ple.yaml` | PLE |
 
-Metrics: `AUC[<task>]` for each task plus `AUC_mean` (tasks whose value is NaN are automatically excluded)
+The report includes `AUC[<task>]` for each task and `AUC_mean` across tasks with a defined AUC. Tasks with NaN AUC are excluded from the mean.
 
-## Config Format
+## Configuration format
 
 ```yaml
 task: matching          # matching | ranking | multitask
@@ -114,11 +110,11 @@ metrics:
 output_dir: benchmark_results/matching/ml_1m_mind
 ```
 
-The loader validates the schema. A misspelled key such as `batchsize` raises an error instead of silently falling back to a default value.
+The runner checks configuration keys before training. For example, if you type `batchsize` instead of `batch_size`, the error identifies the unknown field so you can correct it.
 
-## Baselines and Regression Checks
+## Check a run against its baseline
 
-`benchmarks/baselines/<task>.yaml` records the `expected + tolerance` values for each config. With `--check-baseline`, the process exits non-zero when a metric misses its expectation by more than the allowed tolerance:
+After changing a model or trainer, add `--check-baseline` to check for regressions. The script reads the reference value (`expected`) and allowed deviation (`tolerance`) from `benchmarks/baselines/<task>.yaml`. It exits with a nonzero status if performance deteriorates beyond that tolerance.
 
 ```bash
 python benchmarks/runner.py \
@@ -131,6 +127,6 @@ python benchmarks/suite.py \
   --check-baseline
 ```
 
-**Updating baselines**: run a suite, copy the metrics from `benchmark_results/suites/<task>/suite.yaml` to `benchmarks/baselines/<task>.yaml`, and set an appropriate `tolerance`.
+For example, an expected AUC of 0.75 with a tolerance of 0.01 fails only below 0.74. Lower values are better for LogLoss and MSE, so those metrics fail only above `expected + tolerance`.
 
-Regression direction is metric-aware: higher-is-better metrics such as `AUC`, `Hit`, and `Recall` fail only below `expected - tolerance`; lower-is-better metrics such as `LogLoss` and `MSE` fail only above `expected + tolerance`.
+To update a baseline, rerun the suite with the same configuration. Review its metrics in `benchmark_results/suites/<task>/suite.yaml` before copying them into the corresponding baseline file.

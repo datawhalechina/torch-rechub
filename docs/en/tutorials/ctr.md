@@ -5,48 +5,13 @@ description: Torch-RecHub ranking model tutorial covering WideDeep, DeepFM, DCN,
 
 # Ranking Model Tutorial
 
-This tutorial focuses on the shared training workflow for ranking scenarios: data preparation, feature definition, trainer usage, evaluation, and common extensions. The basic examples use the built-in `Criteo` sample data, while the sequence-model section uses the `Amazon Electronics` sample data.
+Each Criteo row represents an ad impression. Its label records whether the user clicked. We'll train DeepFM to predict a click probability for each impression. The second example uses Amazon product data to show how DIN and BST score a candidate using the shopper's browsing history.
 
-## I. Basic Ranking Pipeline (Criteo)
+## 1. Predict clicks on Criteo impressions
 
 ### 1. Data Preparation and Feature Processing
 
-```python
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-
-from torch_rechub.basic.features import DenseFeature, SparseFeature
-from torch_rechub.utils.data import DataGenerator
-
-df = pd.read_csv("examples/ranking/data/criteo/criteo_sample.csv")
-
-# Ranking baselines generally follow this "continuous features + categorical features" input pattern.
-dense_features = [f"I{i}" for i in range(1, 14)]
-sparse_features = [f"C{i}" for i in range(1, 27)]
-
-# Keep missing-value handling aligned with the repository examples to avoid reproduction differences.
-df[sparse_features] = df[sparse_features].fillna("-996")
-df[dense_features] = df[dense_features].fillna(0)
-
-# Normalize continuous features and encode categorical features as discrete IDs.
-scaler = MinMaxScaler()
-df[dense_features] = scaler.fit_transform(df[dense_features])
-
-for feat in sparse_features:
-    encoder = LabelEncoder()
-    df[feat] = encoder.fit_transform(df[feat].astype(str))
-
-# These Feature objects describe how each column should be fed into the model.
-dense_feas = [DenseFeature(name) for name in dense_features]
-sparse_feas = [SparseFeature(name, vocab_size=df[name].nunique(), embed_dim=16) for name in sparse_features]
-
-x = df.drop(columns=["label"])
-y = df["label"]
-
-# DataGenerator automatically splits the training, validation, and test sets according to split_ratio.
-dg = DataGenerator(x, y)
-train_dl, val_dl, test_dl = dg.generate_dataloader(split_ratio=[0.7, 0.1], batch_size=256)
-```
+Run [Prepare the Criteo inputs](/guide/quick_start#criteo-input) in the same Python session. Keep the two feature lists, `dense_feas` and `sparse_feas`, and the training, validation and test DataLoaders. You can reuse the three DataLoaders across models. Create fresh feature objects for each model so it starts with its own embedding weights.
 
 ### 2. Shared Training Pattern for WideDeep / DeepFM / DCN
 
@@ -56,7 +21,7 @@ from torch_rechub.models.ranking import WideDeep, DeepFM, DCN
 from torch_rechub.trainers import CTRTrainer
 
 # Choose any one of the models.
-# DeepFM is a good first ranking pipeline; the commented WideDeep / DCN variants only switch the model and do not change the data flow.
+# Train DeepFM first. To compare another model, replace this constructor with one below.
 model = DeepFM(
     deep_features=dense_feas + sparse_feas,
     fm_features=sparse_feas,
@@ -91,17 +56,13 @@ auc = trainer.evaluate(trainer.model, test_dl)
 print(f"Test AUC: {auc:.4f}")
 ```
 
-### 3. Which Models Does This Section Apply To?
+### 3. How do I compare the three models?
 
-- `WideDeep`: Quickly validate a wide + deep architecture
-- `DeepFM`: A classic baseline combining categorical-feature interactions with an MLP
-- `DCN / DCNv2`: Explicit feature crossing
+Keep the training, validation and test sets fixed. Run one model constructor at a time. WideDeep adds the scores from a linear layer and a multilayer network. DeepFM includes an additional term for pairwise feature interactions. DCN learns feature combinations in its cross layers. All three use `CTRTrainer`.
 
-These models all use the same `DenseFeature + SparseFeature + DataGenerator + CTRTrainer` training pattern.
+## 2. Use browsing history with DIN or BST
 
-## II. Sequence Ranking Pipeline (DIN / BST)
-
-The main difference between sequence models and basic ranking models is that you must generate historical behavior sequences and keep `history_features` strictly aligned with `target_features`.
+This sample includes interaction timestamps. When predicting a click on a product, include only earlier interactions in the user's history. Keep the product IDs and categories in the same order so each category still describes the right product.
 
 ### 1. Build Sequences from the Amazon Electronics Sample Data
 
@@ -131,14 +92,14 @@ features = [
     SparseFeature("user_id", vocab_size=n_users + 1, embed_dim=8),
 ]
 target_features = [
-    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8),
-    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8),
+    SparseFeature("target_item_id", vocab_size=n_items + 1, embed_dim=8, padding_idx=0),
+    SparseFeature("target_cate_id", vocab_size=n_cates + 1, embed_dim=8, padding_idx=0),
 ]
 
 history_features = [
     # Sequence models must retain the complete sequence tensor here, so use concat rather than mean / sum.
-    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id"),
-    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id"),
+    SequenceFeature("hist_item_id", vocab_size=n_items + 1, embed_dim=8, pooling="concat", shared_with="target_item_id", padding_idx=0),
+    SequenceFeature("hist_cate_id", vocab_size=n_cates + 1, embed_dim=8, pooling="concat", shared_with="target_cate_id", padding_idx=0),
 ]
 
 # Convert each DataFrame to a dict before passing it to DataGenerator, matching the examples/ranking workflow.
@@ -234,24 +195,17 @@ visualize_model(model, save_path="model_architecture.png", dpi=300)
 
 ## IV. FAQ
 
-### Q1: Why Doesn't This Page Include Complete Code for Every Ranking Model?
 
-Ranking models can be divided into two groups:
 
-- Basic ranking: `WideDeep / DeepFM / DCN`
-- Sequence ranking: `DIN / DIEN / BST`
+### How do I train on an NVIDIA GPU?
 
-Their data-preparation workflows differ. This page preserves the shared workflow, while each model page covers model-specific parameters and tuning guidance.
+Install a CUDA build of PyTorch, then set `device="cuda:0"` when creating `CTRTrainer`.
 
-### Q2: How Do I Switch to a GPU?
+### Where are the weights saved?
 
-Change `device="cpu"` to `device="cuda:0"`.
+`CTRTrainer` writes weights to `model_path`. The example creates that directory with `os.makedirs` before training.
 
-### Q3: Why Does the Example Call `os.makedirs` First?
-
-The current `CTRTrainer` saves weights directly to `model_path` and does not create the directory automatically. Create the save directory before training so the example can run as written.
-
-### Q4: Where Can I Find More Detailed Model Guides?
+### Model configuration examples
 
 - [DeepFM Tutorial](/tutorials/models/ranking/deepfm)
 - [WideDeep Tutorial](/tutorials/models/ranking/widedeep)
