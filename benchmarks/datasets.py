@@ -195,7 +195,7 @@ _CENSUS_DENSE_COLS = [
 _CENSUS_ESMM_USER_COLS = ["industry code", "occupation code", "race", "education", "sex"]
 
 
-def build_census_multitask_dataset(config: dict[str, Any], embed_dim: int, model_name: str) -> MultiTaskDatasetBundle:
+def build_census_multitask_dataset(config: dict[str, Any], embed_dim: int, model_name: str, *, sample: bool = True) -> MultiTaskDatasetBundle:
     """Build the Census-Income multi-task benchmark dataset.
 
     Two tasks drawn from Census-Income: income (cvr_label) and marital-status (ctr_label).
@@ -203,9 +203,10 @@ def build_census_multitask_dataset(config: dict[str, Any], embed_dim: int, model
     the sparse columns into user/item groups, matching the original paper setup.
     """
     data_dir = Path(config["path"])
-    df_train = pd.read_csv(data_dir / "census_income_train_sample.csv")
-    df_val = pd.read_csv(data_dir / "census_income_val_sample.csv")
-    df_test = pd.read_csv(data_dir / "census_income_test_sample.csv")
+    suffix = "_sample" if sample else ""
+    df_train = pd.read_csv(data_dir / f"census_income_train{suffix}.csv")
+    df_val = pd.read_csv(data_dir / f"census_income_val{suffix}.csv")
+    df_test = pd.read_csv(data_dir / f"census_income_test{suffix}.csv")
     train_idx = df_train.shape[0]
     val_idx = train_idx + df_val.shape[0]
 

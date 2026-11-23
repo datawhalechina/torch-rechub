@@ -1,112 +1,70 @@
 # Benchmarks
 
-想比较两个模型时，可以让它们使用同一份数据、同一种切分和相同的训练轮数。`benchmarks/configs/` 里已有三组小样本配置。第一次运行可以从下面的 MovieLens 示例开始。
+在同一份数据上比较多个模型，运行结束后打开 `suite.md` 查看指标。仓库提供全量数据模板，也附带可以直接运行的小样本配置。
 
-## 运行 Matching Benchmark
+## 同一数据集上的模型对比
 
-从仓库根目录安装实验依赖，再运行 MIND 配置。召回评估会用 Annoy 在电影向量里查候选。
+### MovieLens-1M
 
-```bash
-uv sync --extra benchmark --extra annoy
-uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_mind.yaml
-```
+每位用户留出最后一部电影作测试。各模型训练 10 轮，按验证集 NDCG@10 选权重，在同一电影库中召回。GAUC 是按用户计算的平均 AUC。每人只有一个测试目标，Recall@K 与 Hit@K 相等。
 
-在同一份电影数据上，还可以运行 YoutubeDNN 和两个 ComiRec 模型。
+| 模型 | GAUC | Recall@5 / Hit@5 | Recall@10 / Hit@10 | NDCG@5 | NDCG@10 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SINE | 0.837437 | 0.106623 | 0.168212 | 0.068642 | 0.088378 |
+| STAMP | 0.839963 | 0.095199 | 0.149834 | 0.059889 | 0.077447 |
+| GRU4Rec | 0.858918 | 0.090563 | 0.147351 | 0.056654 | 0.074937 |
+| ComirecDR | 0.854196 | 0.082781 | 0.131126 | 0.052228 | 0.067701 |
+| SASRec | 0.832628 | 0.080629 | 0.126159 | 0.051157 | 0.065777 |
+| YoutubeDNN | 0.818883 | 0.058609 | 0.103477 | 0.035582 | 0.049994 |
+| MIND | 0.827980 | 0.048510 | 0.084272 | 0.029637 | 0.041174 |
+| DSSM | 0.805208 | 0.046854 | 0.083444 | 0.029233 | 0.040895 |
+| ComirecSA | 0.834305 | 0.045861 | 0.081291 | 0.027935 | 0.039161 |
+| NARM | 0.806611 | 0.039073 | 0.074503 | 0.023360 | 0.034827 |
 
-```bash
-uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_youtube_dnn.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_dr.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/matching/ml_1m_comirec_sa.yaml
-```
+### Avazu_x1
 
-这条 MIND 命令把文件写到 `benchmark_results/matching/ml_1m_mind/`。打开 `summary.md` 看指标和耗时，`result.yaml` 里还有数据路径、模型参数和向量形状。`model.pth` 是本次训练保存的权重。其他实验写到各自配置里的 `output_dir`。
+WideDeep、DeepFM 和 DCN 使用同一训练、验证与测试切分，均训练 2 轮。在全部 8,085,794 条测试曝光上计算点击 AUC 和 LogLoss。AUC 越高越好，LogLoss 越低越好。
 
-## 当前范围
+| 模型 | AUC ↑ | LogLoss ↓ |
+| --- | ---: | ---: |
+| WideDeep | 0.758915 | 0.369409 |
+| DeepFM | 0.758300 | 0.369325 |
+| DCN | 0.759873 | 0.369670 |
 
-仓库提供以下三类小样本配置。
+其他数据集的模型对照、指标定义和复现命令见[中文 Benchmark 文档](../docs/zh/tools/benchmark.md)和[全量结果表](./FULL_RESULTS.md)。
 
-### Matching / Retrieval
+## 用自己的数据比较模型
 
-MovieLens sample 数据：
-
-- `MIND`
-- `YoutubeDNN`
-- `ComirecDR`
-- `ComirecSA`
-
-### Ranking / CTR
-
-Criteo sample 数据：
-
-- `WideDeep`
-- `DeepFM`
-- `DCN`
-
-运行示例：
+从仓库根目录运行。先按设备安装 PyTorch，再安装实验依赖。Criteo 和 AliExpress 的全量模板使用 PyArrow，需要加上 `--extra bigdata`。
 
 ```bash
-uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_widedeep.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_deepfm.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml
+uv sync --extra benchmark --extra bigdata
 ```
 
-### Multi-Task
+以 Criteo 为例，CSV 首行包含点击标签 `label`、数值字段 `I1` 至 `I13` 和类别字段 `C1` 至 `C26`。在 `benchmarks/configs/full.yaml` 中编辑对应段落：
 
-Census-Income 有两个分类任务。`cvr_label` 表示收入是否达到数据中的 50,000 美元档，`ctr_label` 表示婚姻状态是否为“从未结婚”。这两个列名沿用了推荐示例的命名。
+```yaml
+criteo:
+  path: data/criteo/criteo.csv
+  models: [WideDeep, DeepFM]
+  epochs: 2
+```
 
-- `ESMM`（输出额外的 `ctcvr_label`）
-- `MMOE`
-- `PLE`
-
-运行示例：
+激活项目虚拟环境后运行：
 
 ```bash
-uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_esmm.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_mmoe.yaml
-uv run python benchmarks/runner.py --config benchmarks/configs/multitask/census_ple.yaml
+python -m benchmarks.full criteo --device cuda:0
 ```
 
-例如，`AUC[cvr_label]` 对应收入预测，`AUC[ctr_label]` 对应婚姻状态。`AUC_mean` 是各个可计算 AUC 的任务的平均值。
+默认报告位于 `benchmark_results/full/criteo/suite.md`。`suite.yaml` 保留原始指标和运行环境。此例按配置顺序训练两个排序模型，各自恢复验证点击 AUC 最高的权重，再评估同一测试集。省略 `epochs` 会沿用模板原有的轮数。临时换模型、轮数或输出目录也可以直接传 `--models`、`--epochs`、`--output`。[全量配置](./configs/full.yaml) · [数据下载与格式](../docs/zh/tools/benchmark.md)
 
-## 一次跑一组 (Suite)
+## 用自带样本跑通流程
 
-如果想一次跑多个 config 并得到一张对比表：
+小样本涵盖 MovieLens 召回、Criteo 排序和 Census-Income 多任务。单次运行使用 `runner`，一次比较整组模型使用 `suite`。以下两条命令分别训练一个 DeepFM 和全部三个排序模型：
 
 ```bash
-uv run python benchmarks/suite.py \
-  --configs "benchmarks/configs/matching/*.yaml" \
-  --output  benchmark_results/suites/matching
-
-uv run python benchmarks/suite.py \
-  --configs "benchmarks/configs/ranking/*.yaml" \
-  --output  benchmark_results/suites/ranking
+python -m benchmarks.runner --config benchmarks/configs/ranking/criteo_deepfm.yaml
+python -m benchmarks.suite --configs "benchmarks/configs/ranking/*.yaml" --output benchmark_results/suites/ranking
 ```
 
-每个配置仍把 `summary.md` 和 `result.yaml` 写到自己的目录。要并排比较所有模型，打开 `--output` 下的 `suite.md`。后续脚本需要读取整组结果时，用同目录的 `suite.yaml`。
-
-## Config 校验
-
-如果把 `batch_size` 写成 `batchsize`，程序会在训练开始前指出配置里有未知字段。缺少必填项也会在这里报错。
-
-## 指标注册
-
-排序实验按 YAML 的 `metrics` 列表计算指标，可选 `AUC`、`LogLoss`、`Accuracy`、`MSE`。要添加指标，在 `benchmarks/metrics.py` 的 `BINARY_RANKING_METRICS` 中登记名称和函数。函数接收 `y_true` 与 `y_pred`，返回一个分数。
-
-## 基线与回归检测
-
-基线文件 `benchmarks/baselines/<task>.yaml` 为每个指标记录参考值 `expected` 和允许退步的幅度 `tolerance`。加上 `--check-baseline` 后，若指标向较差的方向变化且超出这个幅度，命令会以非零状态退出。例如 AUC 下降和 LogLoss 上升都可能触发检查。
-
-```bash
-# 单次运行
-uv run python benchmarks/runner.py --config benchmarks/configs/ranking/criteo_dcn.yaml --check-baseline
-
-# 整组运行
-uv run python benchmarks/suite.py \
-  --configs "benchmarks/configs/matching/*.yaml" \
-  --output  benchmark_results/suites/matching \
-  --check-baseline
-```
-
-确认新的一组结果可以重复后，从 `benchmark_results/suites/<task>/suite.yaml` 取出相应指标，更新基线中的 `expected`，并按多次运行的波动设定 `tolerance`。
-
-各任务的数据切分和指标见[实验设计](./BENCHMARK_DESIGN.md)。
+单个配置将 `summary.md` 和 `result.yaml` 写入它的 `output_dir`。整组模型的对比表在 `--output` 指定目录的 `suite.md` 中。运行召回配置前，用 `uv sync --extra benchmark --extra annoy` 安装 Annoy。[小样本配置](./configs/) · [指标与基线检查](./BENCHMARK_DESIGN.md)
