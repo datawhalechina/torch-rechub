@@ -1,0 +1,32 @@
+# Paths are relative to the directory where you run python -m benchmarks.full.
+# List the models in the order they should appear in the report.
+movielens:
+  path: examples/matching/data/ml-1m/ml-1m.csv
+  models: [YoutubeDNN, MIND, ComirecDR, ComirecSA, DSSM, GRU4Rec, NARM, STAMP, SASRec, SINE]
+  epochs: 10
+
+criteo:
+  path: data/criteo/criteo.csv
+  models: [WideDeep, DeepFM]
+  # epochs: 10  # Omit to use each model's original training budget.
+
+avazu:
+  path: data/avazu/Avazu_x1.zip
+  models: [WideDeep, DeepFM, DCN]
+
+amazon:
+  path: data/amazon/amazon_electronic_datasets.csv
+  models: [DIN]
+
+census:
+  path: data/census-income
+  models: [SharedBottom, ESMM, MMOE, PLE, PLE-2, AITM]
+  epochs: 10
+
+ali_ccp:
+  path: data/ali-ccp
+  models: [DeepFM, MMOE]
+
+aliexpress:
+  path: data/aliexpress/AliExpress_US.zip
+  models: [SharedBottom, AITM]

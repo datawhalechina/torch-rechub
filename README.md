@@ -72,6 +72,23 @@ uv run python run_criteo.py --model_name deepfm --epoch 1 --batch_size 8 --devic
 
 The script prints training loss, validation AUC, and test AUC, and saves the weights to `examples/ranking/model.pth`. The small sample lets you check the training workflow end to end.
 
+## Benchmark · MovieLens-1M full-catalog retrieval
+
+| Model | GAUC | Recall@5 / Hit@5 | Recall@10 / Hit@10 | NDCG@5 | NDCG@10 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SINE | 0.837437 | 0.106623 | 0.168212 | 0.068642 | 0.088378 |
+| STAMP | 0.839963 | 0.095199 | 0.149834 | 0.059889 | 0.077447 |
+| GRU4Rec | 0.858918 | 0.090563 | 0.147351 | 0.056654 | 0.074937 |
+| ComirecDR | 0.854196 | 0.082781 | 0.131126 | 0.052228 | 0.067701 |
+| SASRec | 0.832628 | 0.080629 | 0.126159 | 0.051157 | 0.065777 |
+| YoutubeDNN | 0.818883 | 0.058609 | 0.103477 | 0.035582 | 0.049994 |
+| MIND | 0.827980 | 0.048510 | 0.084272 | 0.029637 | 0.041174 |
+| DSSM | 0.805208 | 0.046854 | 0.083444 | 0.029233 | 0.040895 |
+| ComirecSA | 0.834305 | 0.045861 | 0.081291 | 0.027935 | 0.039161 |
+| NARM | 0.806611 | 0.039073 | 0.074503 | 0.023360 | 0.034827 |
+
+[Full results and reproduction guide](docs/en/tools/benchmark.md)
+
 ## 💡 Model library
 
 * **Retrieval** — DSSM, FaceBookDSSM, YouTubeDNN, YouTubeSBC, MIND, SINE, ComiRec (DR and SA), GRU4Rec, SASRec, NARM, and STAMP.
